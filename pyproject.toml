@@ -1,0 +1,137 @@
+[build-system]
+requires = ["setuptools>=61.0","wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "epykit"
+version = "0.6.0"
+description = "Parquet-backed WGBS methylation analysis pipeline (Bismark / MethylDackel → DMC/DMR → annotation)"
+authors = [ { name = "epykit user" } ]
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = [
+  "polars>=0.20.0",
+  "pyarrow>=11.0.0",
+  "numpy",
+  "scipy",
+  "numba",
+  "bioframe>=0.7",
+  "pyfaidx",
+  "statsmodels",
+  "patsy>=0.5",
+  "psutil>=7.2.2",
+  "matplotlib>=3.9.4",
+  "seaborn>=0.13.2",
+  "scikit-learn>=1.6.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4.2",
+  "pytest-cov",
+]
+report = [
+  "jinja2>=3.1",
+  "plotly>=5.20",
+]
+export = [
+  "pyBigWig>=0.3.22",
+]
+anndata = [
+  "anndata>=0.10",
+  "mudata>=0.2",
+]
+# Plan 2 §6: visualization extras
+viz = [
+  "umap-learn>=0.5",
+  "scipy>=1.11",
+]
+# Plan 2 §7: methylKit tabix export (Linux/macOS only; pysam has no Windows wheel)
+methylkit = [
+  "pysam>=0.22",
+]
+# Plan 4 #5: BAM ingestion (ASM, methylation entropy). Linux/macOS only.
+bam = [
+  "pysam>=0.22",
+]
+# Plan 4 #1: distributed compute via Dask
+distributed = [
+  "dask[distributed]>=2024.1",
+]
+# Plan 4 #1: distributed compute via Ray (alternative)
+ray = [
+  "ray>=2.9",
+]
+# Plan 4 #2: GPU IRLS via CuPy (CUDA 12). Heavy wheel, not in "all".
+gpu = [
+  "cupy-cuda12x>=13.0",
+]
+# Plan 4 #2: GPU IRLS via JAX (CUDA 12). Heavy wheel, not in "all".
+gpu_jax = [
+  "jax[cuda12]>=0.4.30",
+]
+all = [
+  "jinja2>=3.1",
+  "plotly>=5.20",
+  "pyBigWig>=0.3.22",
+  "anndata>=0.10",
+  "mudata>=0.2",
+  "umap-learn>=0.5",
+  "scipy>=1.11",
+  "dask[distributed]>=2024.1",
+]
+
+[project.scripts]
+epykit = "epykit.cli:main"
+
+[tool.setuptools.package-data]
+epykit = ["py.typed", "templates/*.j2", "templates/*.css"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "slow: tests that take more than ~5s; deselect with -m 'not slow'",
+]
+filterwarnings = [
+    # Allow our own DeprecationWarnings through so tests can assert on them
+    "default::DeprecationWarning:epykit",
+    "default::UserWarning:epykit",
+    # Silence third-party deprecation noise that flooded test output
+    "ignore::DeprecationWarning:pyarrow",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+extend-exclude = [
+    ".venv",
+    "build",
+    "dist",
+    "scratch/",
+    "scratch_plan2.py",
+    "**/.claude/**",
+    "raw_data",
+]
+
+[tool.ruff.lint]
+# Start minimal: pyflakes (undefined names, unused imports) only. Once the
+# baseline is green in CI, ratchet up to ["F", "E", "W", "I", "B", "UP", "RUF"]
+# and add a one-shot autofix commit.
+select = ["F"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["F401", "F811"]
+"src/epykit/__init__.py" = ["F401"]  # re-exports
+"src/epykit/pl/__init__.py" = ["F401"]  # re-exports
+
+[tool.ruff.lint.isort]
+known-first-party = ["epykit"]
+
+[tool.mypy]
+python_version = "3.9"
+follow_imports = "silent"
+ignore_missing_imports = true
+no_strict_optional = true
+warn_unused_ignores = true

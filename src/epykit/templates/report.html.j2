@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ title }}</title>
+<style>{{ css_inline }}</style>
+</head>
+<body>
+<div class="container">
+
+<header class="section">
+  <h1>{{ title }}</h1>
+  <div class="subtitle">
+    epykit {{ epykit_version }} &middot; {{ generated_at }}
+  </div>
+  <div class="meta-grid">
+    <div><div class="label">Assembly</div><div class="value">{{ assembly }}</div></div>
+    <div><div class="label">Context</div><div class="value">{{ context }}</div></div>
+    <div><div class="label">Samples</div><div class="value">{{ n_samples }}</div></div>
+    <div><div class="label">Sites</div><div class="value">{{ n_sites }}</div></div>
+    <div><div class="label">State</div><div class="value">{{ state or "raw" }}</div></div>
+  </div>
+</header>
+
+<section class="section">
+  <h2>Samples</h2>
+  <div class="tablewrap">{{ samples_table | safe }}</div>
+</section>
+
+<section class="section">
+  <h2>Preprocessing</h2>
+  {% if history %}
+  <ul class="history">
+    {% for h in history %}
+    <li><b>{{ h.step }}</b> &mdash; {{ h.n_sites_str }} sites @ <code>{{ h.path }}</code></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="skipped">No preprocessing recorded.</div>
+  {% endif %}
+  {% if filter_params %}
+  <details><summary>filter params</summary><pre>{{ filter_params }}</pre></details>
+  {% endif %}
+  {% if regions_params %}
+  <details><summary>region aggregation</summary><pre>{{ regions_params }}</pre></details>
+  {% endif %}
+</section>
+
+<section class="section">
+  <h2>QC</h2>
+  {% if qc_summary %}
+  <div class="tablewrap">{{ qc_summary | safe }}</div>
+  {% endif %}
+  {% if coverage_plot %}
+    {{ coverage_plot | safe }}
+  {% else %}
+    <div class="skipped">No coverage histogram available.</div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <h2>Differential methylation (DMC)</h2>
+  {% if dmc_available %}
+    <div class="kpi-row">
+      <div class="kpi"><div class="num">{{ dmc_n_total }}</div><div class="label">total tested</div></div>
+      <div class="kpi"><div class="num">{{ dmc_n_sig }}</div><div class="label">significant (q&lt;{{ alpha }})</div></div>
+      <div class="kpi hyper"><div class="num">{{ dmc_n_hyper }}</div><div class="label">hyper</div></div>
+      <div class="kpi hypo"><div class="num">{{ dmc_n_hypo }}</div><div class="label">hypo</div></div>
+    </div>
+    {% if volcano_plot %}{{ volcano_plot | safe }}{% endif %}
+    {% if ma_plot %}{{ ma_plot | safe }}{% endif %}
+    {% if manhattan_plot %}{{ manhattan_plot | safe }}{% endif %}
+    {% if dmc_top_table %}
+      <h3>Top {{ dmc_top_n }} DMCs</h3>
+      <div class="tablewrap">{{ dmc_top_table | safe }}</div>
+    {% endif %}
+  {% else %}
+    <div class="skipped">DMC not yet called &mdash; run <code>ep.tl.dmc(md)</code>.</div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <h2>Differentially methylated regions (DMR)</h2>
+  {% if dmr_available %}
+    <div class="kpi-row">
+      <div class="kpi"><div class="num">{{ dmr_n_total }}</div><div class="label">DMRs called</div></div>
+      {% if dmr_n_hyper is defined %}
+      <div class="kpi hyper"><div class="num">{{ dmr_n_hyper }}</div><div class="label">hyper</div></div>
+      <div class="kpi hypo"><div class="num">{{ dmr_n_hypo }}</div><div class="label">hypo</div></div>
+      {% endif %}
+    </div>
+    {% if dmr_top_table %}
+      <h3>Top {{ dmr_top_n }} DMRs</h3>
+      <div class="tablewrap">{{ dmr_top_table | safe }}</div>
+    {% endif %}
+  {% else %}
+    <div class="skipped">DMR not yet called &mdash; run <code>ep.tl.dmr(md)</code>.</div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <h2>Annotation</h2>
+  {% if feature_pie or cpg_pie %}
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      {% if feature_pie %}<div style="flex:1 1 380px">{{ feature_pie | safe }}</div>{% endif %}
+      {% if cpg_pie %}<div style="flex:1 1 380px">{{ cpg_pie | safe }}</div>{% endif %}
+    </div>
+  {% else %}
+    <div class="skipped">No annotations &mdash; run <code>ep.tl.annotate(md, gtf=..., cpg_islands=...)</code>.</div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <h2>TSS metaplot</h2>
+  {% if metaplot %}
+    {{ metaplot | safe }}
+  {% else %}
+    <div class="skipped">Metaplot not generated &mdash; pass <code>gtf_path</code> when calling <code>md.report()</code>.</div>
+  {% endif %}
+</section>
+
+<section class="section">
+  <h2>Sample similarity (PCA)</h2>
+  {% if pca_plot %}
+    {{ pca_plot | safe }}
+  {% else %}
+    <div class="skipped">PCA could not be computed &mdash; not enough common sites or scikit-learn missing.</div>
+  {% endif %}
+</section>
+
+<footer class="provenance">
+  <details>
+    <summary>Provenance</summary>
+    <pre>{{ provenance }}</pre>
+  </details>
+</footer>
+
+</div>
+</body>
+</html>

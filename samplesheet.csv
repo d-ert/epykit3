@@ -1,0 +1,7 @@
+sample_id,path,group
+ctrl_d3_rep1,raw_data/GSM9212480_CONTROLDONOR3_REP1_1_val_1_bismark_bt2_pe.deduplicated.bismark.cov.gz,control
+cd55_d3_rep1,raw_data/GSM9212482_CD55DONOR3_REP1_1_val_1_bismark_bt2_pe.deduplicated.bismark.cov.gz,cd55
+ctrl_d4_rep1,raw_data/GSM9212484_CONTROLDONOR4_REP1_1_val_1_bismark_bt2_pe.deduplicated.bismark.cov.gz,control
+cd55_d4_rep1,raw_data/GSM9212486_CD55DONOR4_REP1_1_val_1_bismark_bt2_pe.deduplicated.bismark.cov.gz,cd55
+ctrl_d3_rep2,raw_data/GSM9212488_CONTROLDONOR3_REP2_1_val_1_bismark_bt2_pe.deduplicated.bismark.cov.gz,control
+cd55_d3_rep2,raw_data/GSM9212490_CD55DONOR3_REP2_1_val_1_bismark_bt2_pe.deduplicated.bismark.cov.gz,cd55
