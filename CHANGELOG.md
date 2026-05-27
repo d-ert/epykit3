@@ -4,6 +4,17 @@ All notable changes to **epykit** are tracked here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project uses
 SemVer (`MAJOR.MINOR.PATCH`).
 
+## Unreleased
+
+### Fixed (P0 manifest, paper preparation)
+
+- **P0-3 (docs)**: `tl.dmc(..., dispersion=...)` docstring previously said
+  the default was `"site"`; the actual code default is `"eb"`. The
+  empirical-Bayes shrinkage is the intended default. Docstring corrected;
+  PROTOCOL.md and EXECUTIVE_SUMMARY downstream notes pending in
+  `benchmarkin_merges/FINAL_REPORT/`. See
+  `docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md`.
+
 ## [0.7.2] — 2026-05-21
 
 Eight targeted fixes identified by a full benchmark comparison against

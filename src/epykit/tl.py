@@ -377,11 +377,15 @@ def dmc(
         Name of the binary 0/1 column in ``md.obs`` used by the legacy
         binary path. Ignored when ``contrast`` is supplied and resolves
         without it.
-    dispersion : {"site", "chrom", "shrink"}
+    dispersion : {"site", "chrom", "shrink", "eb"}
         McCullagh-Nelder dispersion strategy used by the ``"lr"`` and
-        ``"score"`` tests. Default ``"site"`` estimates a per-site phi_i
-        from the 4-df Pearson residual sum. See :func:`_score_finalize`
-        in ``dmc.py`` for the alternatives.
+        ``"score"`` tests. Default ``"eb"`` shrinks the per-site Pearson
+        residual estimate toward a chromosome-wide pool via empirical-Bayes
+        weights (stable at low n / low coverage). Alternatives:
+        ``"site"`` uses the noisy per-site estimate only; ``"chrom"`` uses
+        the chromosome-pooled phi for every site; ``"shrink"`` is a fixed
+        inverse-Gamma shrinkage with no marginal-variance learning. See
+        :func:`_score_finalize` in ``dmc.py`` for the math.
     chromosomes : list[str], optional
         Restrict to a subset of chromosomes. Auto-detected when None.
     min_samples_treatment, min_samples_control : int
