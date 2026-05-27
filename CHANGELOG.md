@@ -35,6 +35,13 @@ SemVer (`MAJOR.MINOR.PATCH`).
   evidence. Affects any DMR run that used ``empirical_fdr=True``;
   empirical p-values will rise (more conservative).
 
+- **P0-2b (`dmc.empirical_fdr_for_dmc`)**: DMC analogue of P0-2.
+  Empirical p-value denominator changed from
+  ``|pooled null p-values| + 1`` to ``n_perm + 1`` (per-permutation
+  tail count). The old pooled-null formula was anti-conservative.
+  Affects any DMC run that used ``empirical_fdr=True``; empirical
+  p-values will rise (more conservative).
+
 ### Changed (breaking on the `lr+` schema)
 
 - **P0-1**: ``tl.dmc(..., neighbour_combine=True)`` no longer overwrites

@@ -3065,22 +3065,29 @@ def empirical_fdr_for_dmc(
             "(<=0.7.2) workflow that overwrote `pvalue` with the "
             "combined value -- re-run dmc() on the current epykit."
         )
-    null_pool = (
-        np.concatenate(null_pvals_list)
-        if any(len(a) for a in null_pvals_list)
-        else np.array([1.0])
-    )
-    null_sorted = np.sort(null_pool)
     obs_p = observed_dmc.get_column("pvalue").to_numpy()
-    # For each observed p, count null sites with raw pvalue <= obs_p.
-    # +1 in num/den is the standard correction so empirical p never
-    # collapses to 0 at finite n_perm. NaN observed p-values map to NaN
-    # empirical p so degenerate sites stay degenerate.
+    # Per-permutation tail count: for each observed p, count the number
+    # of permutations that produced at least one null site with p <= obs_p.
+    # Denominator is n_perm + 1 (not |pooled null| + 1) so the empirical
+    # p-value floor is 1/(n_perm+1), independent of how many sites each
+    # permutation emitted.  This is the same formula used by
+    # empirical_fdr_for_dmr (P0-2 fix) and ensures that the floor is
+    # invariant to the permutation count rather than growing as n_perm
+    # grows (the old pooled formula was anti-conservative for the same
+    # reason).
     obs_finite_mask = np.isfinite(obs_p)
     obs_safe = np.where(obs_finite_mask, obs_p, 1.0)
-    counts = np.searchsorted(null_sorted, obs_safe, side="right")
-    total_null = max(len(null_sorted), 1)
-    emp_p = (counts + 1.0) / (total_null + 1.0)
+
+    # min_null_p_per_perm[i] = min p across all null sites from perm i
+    # (1.0 if perm produced no sites). The number of perms with at least
+    # one null site with p <= obs_p is then sum(min_null_p[i] <= obs_p).
+    min_null_p_per_perm = np.array([
+        float(arr.min()) if len(arr) > 0 else 1.0
+        for arr in null_pvals_list
+    ], dtype=np.float64)
+    min_null_sorted = np.sort(min_null_p_per_perm)
+    counts = np.searchsorted(min_null_sorted, obs_safe, side="right")
+    emp_p = (counts + 1.0) / (n_perm + 1.0)
     emp_p = np.clip(emp_p, 0.0, 1.0)
     emp_p = np.where(obs_finite_mask, emp_p, np.nan)
 
