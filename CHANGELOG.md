@@ -28,6 +28,13 @@ SemVer (`MAJOR.MINOR.PATCH`).
   in any run where `merge_adjacent=True` (the default for
   `call_dmr_tile_based`).
 
+- **P0-2 (`dmr.empirical_fdr_for_dmr`)**: empirical p-value denominator
+  changed from ``|pooled null DMRs| + 1`` to ``n_perm + 1`` (per-permutation
+  tail count). The old pooled-null formula was anti-conservative -- more
+  permutations grew the denominator and shrank emp_p without adding
+  evidence. Affects any DMR run that used ``empirical_fdr=True``;
+  empirical p-values will rise (more conservative).
+
 ## [0.7.2] — 2026-05-21
 
 Eight targeted fixes identified by a full benchmark comparison against

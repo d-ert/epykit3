@@ -1430,19 +1430,32 @@ def empirical_fdr_for_dmr(
             "p-values default to 1 / (1 + n_perm).",
             n_perm,
         )
-    null_pool = (
-        np.concatenate(null_pvals_list) if any(len(a) for a in null_pvals_list)
-        else np.array([1.0])
-    )
-    null_sorted = np.sort(null_pool)
+
+    # Per-permutation tail count (max-T style):
+    # For each observed DMR with p = p_obs, count the number of
+    # permutations that produced at least one null DMR with p <= p_obs.
+    # Denominator is n_perm + 1 (not |pooled null| + 1) so the empirical
+    # p-value floor is 1 / (n_perm + 1), independent of how many DMRs
+    # each permutation emitted. This is the standard region-statistic
+    # FDR; pooling p-values across perms would inflate the denominator
+    # and anti-conservatively shrink emp_p.
     obs_p = observed_dmr.get_column("pvalue").to_numpy()
-    # For each observed p, count null DMRs with raw pvalue <= obs_p.
-    # Plus-one in num/den is the standard "add 1" correction so empirical
-    # p never hits 0 with finite permutations.
-    counts = np.searchsorted(null_sorted, obs_p, side="right")
-    total_null = max(len(null_sorted), 1)
-    emp_p = (counts + 1.0) / (total_null + 1.0)
+    obs_finite_mask = np.isfinite(obs_p)
+    obs_safe = np.where(obs_finite_mask, obs_p, 1.0)
+
+    # min_null_p_per_perm[i] = min p across all null DMRs from perm i
+    # (1.0 if perm produced no DMRs). The number of perms with at least
+    # one null <= p_obs is then sum(min_null_p_per_perm <= p_obs).
+    min_null_p_per_perm = np.array([
+        float(arr.min()) if len(arr) > 0 else 1.0
+        for arr in null_pvals_list
+    ], dtype=np.float64)
+    min_null_sorted = np.sort(min_null_p_per_perm)
+    # For each obs p, count perms with min_null <= obs p.
+    counts = np.searchsorted(min_null_sorted, obs_safe, side="right")
+    emp_p = (counts + 1.0) / (n_perm + 1.0)
     emp_p = np.clip(emp_p, 0.0, 1.0)
+    emp_p = np.where(obs_finite_mask, emp_p, np.nan)
 
     # BH-adjust to empirical q-value
     from statsmodels.stats.multitest import multipletests
