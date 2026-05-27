@@ -59,18 +59,15 @@ The `lr` test with default settings (no power stack, standard BH) provides a
 conservative baseline with well-controlled FPR. Use this when strict FDR
 control matters more than sensitivity.
 
-### Quick exploration: welch_t or logit_t
+### Quick exploration: welch_t
 
 ```python
 ep.tl.dmc(md, test="welch_t")
-# or
-ep.tl.dmc(md, test="logit_t")
 ```
 
-These transformation-based tests are fast because they skip the binomial model
-entirely. They compare mean beta values (or logit-transformed betas) using a
-Welch t-test. Useful for rapid exploration but less powerful than `lr` for
-formal analysis.
+This transformation-based test is fast because it skips the binomial model
+entirely. It compares mean beta values using a Welch t-test. Useful for rapid
+exploration but less powerful than `lr` for formal analysis.
 
 ### Single replicate: fisher
 

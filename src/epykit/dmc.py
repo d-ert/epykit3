@@ -1578,7 +1578,7 @@ def _process_one_chromosome(
         del sn_case, sm_case, sm2n_case, nv_case
         del sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl
 
-    elif test in ("welch_t", "logit_t"):
+    elif test == "welch_t":
         # Load all samples for Welford accumulators
         for sample in samples_case:
             meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
@@ -1591,16 +1591,10 @@ def _process_one_chromosome(
             del meth, cov
 
         # Welford path: no (n_sites x n_replicates) matrix ever built.
-        if test == "logit_t":
-            pvals, log2_ors = _beta_binom_mom_from_welford_logit(
-                mean_case, M2_case, n_valid_case,
-                mean_ctrl, M2_ctrl, n_valid_ctrl,
-            )
-        else:
-            pvals, log2_ors = _beta_binom_mom_from_welford(
-                mean_case, M2_case, n_valid_case,
-                mean_ctrl, M2_ctrl, n_valid_ctrl,
-            )
+        pvals, log2_ors = _beta_binom_mom_from_welford(
+            mean_case, M2_case, n_valid_case,
+            mean_ctrl, M2_ctrl, n_valid_ctrl,
+        )
 
     elif test == "bb_lr":
         # True beta-binomial LRT via a quasi-binomial GLM on a binary
@@ -1899,7 +1893,7 @@ def _process_one_chromosome(
     else:
         raise NotImplementedError(
             f"Test '{test}' not implemented. "
-            "Choose 'lr', 'score', 'fisher', 'cmh', 'logit_t', "
+            "Choose 'lr', 'score', 'fisher', 'cmh', "
             "'welch_t', 'bb_lr', or 'glm'."
         )
 
@@ -2114,7 +2108,7 @@ def process_chromosomes_dmc(
         Path to filtered partitioned Parquet methylstore.
     samples_treatment, samples_control : list[str]
         Sample identifiers for treatment and control groups.
-    test : {"lr", "score", "fisher", "cmh", "logit_t", "welch_t", "bb_lr"}
+    test : {"lr", "score", "fisher", "cmh", "welch_t", "bb_lr"}
         Statistical test.
             "lr"       (default) -- Quasi-binomial likelihood-ratio chi-square
                                    on per-group read counts with per-site
@@ -2125,12 +2119,9 @@ def process_chromosomes_dmc(
                                    accumulators. Marginally more powerful
                                    than "lr" but mildly anti-conservative
                                    when pi is near 0 or 1.
-            "logit_t"            -- Welch t on logit(beta), variance via
-                                   Welford. Variance-stabilising fallback
-                                   when count-model assumptions are
+            "welch_t"            -- Welch t on raw betas. Variance-stabilising
+                                   fallback when count-model assumptions are
                                    doubtful (e.g. very low coverage).
-            "welch_t"            -- Welch t on raw betas. Same boundary-beta
-                                   caveat as logit_t.
             "bb_lr"              -- True quasi-binomial LRT via a full per-
                                    site GLM on a binary-treatment design.
                                    Slow, but the honest "fit-the-model"

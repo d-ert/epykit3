@@ -34,6 +34,13 @@ SemVer (`MAJOR.MINOR.PATCH`).
   ``engine_fn`` callable) so it tests with mock engines for CI and
   wraps ``ep.tl.dmc`` for real use.
 
+### Removed
+
+- **`tl.dmc(test='logit_t')`** removed. The engine was documented by
+  epykit's own source as miscalibrated near β=0/1; no paper claim
+  depends on it. Calls now raise `ValueError` with a migration hint.
+  Migration: `test='logit_t'` → `test='welch_t'` or `test='lr'`.
+
 ### Changed (BREAKING for `log2_odds_ratio` column name)
 
 - **`varm["dmc_lr"].log2_odds_ratio`** renamed to

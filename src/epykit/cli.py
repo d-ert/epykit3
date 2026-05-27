@@ -6,7 +6,7 @@ dispersion. Closed-form on streaming (S0_g, S1_g, Sigmam^2/n_g) accumulators,
 recommended at n >= 2 replicates per group.
 
 CLI surface:
-* ``dmc`` -- per-CpG calling with ``--test {lr,score,glm,logit_t,welch_t,
+* ``dmc`` -- per-CpG calling with ``--test {lr,score,glm,welch_t,
   bb_lr,cmh,fisher}``, ``--min-samples-treatment`` / ``--min-samples-control``
   filters, and ``--allow-n1`` to opt into the (anti-conservative) Fisher fallback when
   there are fewer than 2 replicates per group.
@@ -534,7 +534,7 @@ def main():
     p_dmc.add_argument(
         "--test",
         choices=[
-            "lr", "score", "glm", "logit_t", "welch_t",
+            "lr", "score", "glm", "welch_t",
             "bb_lr", "cmh", "fisher",
         ],
         default="lr",
@@ -548,7 +548,6 @@ def main():
             "anti-conservative at the boundaries. "
             "glm -- Binomial GLM with covariates (requires a design via "
             "--formula). "
-            "logit_t -- Welch t on logit(beta), variance-stabilising fallback. "
             "welch_t -- Welch t on raw betas. "
             "bb_lr -- True quasi-binomial LRT on a binary-treatment GLM with "
             "per-site dispersion. "
@@ -627,7 +626,7 @@ def main():
     p_dmr.add_argument(
         "--test",
         choices=[
-            "lr", "score", "glm", "logit_t", "welch_t",
+            "lr", "score", "glm", "welch_t",
             "bb_lr", "cmh", "fisher",
         ],
         default="lr",

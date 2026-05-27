@@ -1099,7 +1099,7 @@ def call_dmr_tile_based(
     samples_treatment: list[str] | None = None,
     samples_control: list[str] | None = None,
     tile_size_bp: int = 1000,
-    test: str = "logit_t",
+    test: str = "lr",
     chromosomes: list[str] | None = None,
     min_cpgs_per_tile: int = 5,
     alpha: float = 0.05,
@@ -1148,9 +1148,9 @@ def call_dmr_tile_based(
     tile_size_bp : int
         Tile width in bp (default 1000). Adjacent tiles do not overlap.
     test : str
-        Statistical test for tile-level counts. Defaults to ``"logit_t"``
-        -- Welch t on logit(beta), a robust fallback at the tile level
-        where counts are large.
+        Statistical test for tile-level counts. Defaults to ``"lr"``
+        (quasi-binomial likelihood-ratio), the recommended default
+        when tile-level pooled counts are available.
     chromosomes : list[str], optional
         Chromosomes to process. Auto-detected when None.
     min_cpgs_per_tile : int

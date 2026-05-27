@@ -174,14 +174,14 @@ def test_dmc_property_uses_last_key_pointer(synth_md_filtered):
     import epykit as ep
 
     ep.tl.dmc(synth_md_filtered, test="lr")
-    ep.tl.dmc(synth_md_filtered, test="logit_t")
+    ep.tl.dmc(synth_md_filtered, test="welch_t")
 
     # Last writer wins.
-    assert synth_md_filtered.uns["dmc"]["last_key"] == "dmc_logit_t"
+    assert synth_md_filtered.uns["dmc"]["last_key"] == "dmc_welch_t"
     df_via_property = synth_md_filtered.dmc
-    df_via_explicit_logit_t = synth_md_filtered.get_dmc(test="logit_t")
-    # Both should reference the same logit_t table (or its annotated variant).
-    assert df_via_property is df_via_explicit_logit_t or df_via_property.shape == df_via_explicit_logit_t.shape
+    df_via_explicit_welch_t = synth_md_filtered.get_dmc(test="welch_t")
+    # Both should reference the same welch_t table (or its annotated variant).
+    assert df_via_property is df_via_explicit_welch_t or df_via_property.shape == df_via_explicit_welch_t.shape
 
 
 def test_get_dmc_prefers_annotated_when_available(synth_md_filtered):

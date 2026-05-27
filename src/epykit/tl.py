@@ -346,11 +346,10 @@ def dmc(
         Analysis object containing the methylstore path and the
         treatment/control sample lists.
     test : str
-        One of ``"auto"``, ``"lr"``, ``"score"``, ``"logit_t"``,
-        ``"welch_t"`` (Welch t on raw betas),
-        ``"bb_lr"`` (true quasi-binomial LRT), ``"cmh"``, ``"fisher"``,
-        ``"glm"``. ``"auto"`` resolves to ``"fisher"`` at n<2 and ``"lr"``
-        (the recommended default) at n>=2.
+        One of ``"auto"``, ``"lr"``, ``"score"``, ``"welch_t"``
+        (Welch t on raw betas), ``"bb_lr"`` (true quasi-binomial LRT),
+        ``"cmh"``, ``"fisher"``, ``"glm"``. ``"auto"`` resolves to
+        ``"fisher"`` at n<2 and ``"lr"`` (the recommended default) at n>=2.
 
         When ``formula`` and/or ``contrast`` are supplied, the test is
         forced to a GLM-based path regardless of ``test=``.
@@ -398,6 +397,13 @@ def dmc(
     """
     if min_samples_treatment is None:
         min_samples_treatment = 0
+
+    if test == "logit_t":
+        raise ValueError(
+            "test='logit_t' was removed in 0.7.5 (miscalibrated near β=0/1). "
+            "Use test='welch_t' for the replicate-aware β-mean test or "
+            "test='lr' for the recommended default."
+        )
 
     # --- New contrast / multi-group path -------------------------------------
     if formula is not None or contrast is not None:
