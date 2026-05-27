@@ -19,6 +19,15 @@ SemVer (`MAJOR.MINOR.PATCH`).
   autocorrelation. The 0.7.x FDR safety net is the sign-agreement gate,
   not the Stouffer null; Brown's-method replacement deferred to v0.8.
 
+- **P0-5 (`dmr._merge_adjacent_tiles`)**: three Stouffer-combination bugs
+  fixed: (a) input p-values are two-sided so the magnitude conversion is
+  ``isf(p/2)``, not ``isf(p)``; (b) chains of length > 2 now use the
+  correct ``sum_z / sqrt(n)`` denominator (was iterative pairwise
+  ``/sqrt(2)`` which over-conserves on long chains); (c) running
+  ``(sum_z, n)`` accumulator added. Affects tile-based DMR p-values
+  in any run where `merge_adjacent=True` (the default for
+  `call_dmr_tile_based`).
+
 ## [0.7.2] — 2026-05-21
 
 Eight targeted fixes identified by a full benchmark comparison against

@@ -1021,7 +1021,13 @@ def _aggregate_sample_to_tiles(
 
 
 def _merge_adjacent_tiles(dmr_df: pl.DataFrame) -> pl.DataFrame:
-    """Merge adjacent significant tiles on the same chromosome with same direction."""
+    """Merge adjacent significant tiles on the same chromosome with same direction.
+
+    The combined p-value uses signed Stouffer with the correct two-sided
+    -> one-sided conversion ``z = isf(p/2)`` and a running ``(sum_z, n)``
+    accumulator so chains of length > 2 combine as ``sum_z / sqrt(n)``,
+    not by iterative pairwise /sqrt(2).
+    """
     if dmr_df.is_empty():
         return dmr_df
 
@@ -1029,11 +1035,25 @@ def _merge_adjacent_tiles(dmr_df: pl.DataFrame) -> pl.DataFrame:
     rows = sorted_df.to_dicts()
     merged: list[dict] = []
     current: dict | None = None
+    current_sum_z = 0.0
+    current_n_z = 0
+
+    def _abs_z(p: float) -> float:
+        # Two-sided p -> magnitude of one-sided z; clamp p to avoid inf.
+        return float(sp_stats.norm.isf(max(p, 1e-300) / 2.0))
+
+    def _finalise(c: dict, sum_z: float, n_z: int) -> dict:
+        if n_z > 0:
+            z_comb = sum_z / math.sqrt(n_z)
+            c["pvalue"] = float(2.0 * sp_stats.norm.sf(abs(z_comb)))
+        return c
 
     for row in rows:
         if current is None:
             current = dict(row)
             current["_count"] = 1
+            current_sum_z = _abs_z(row["pvalue"])
+            current_n_z = 1
             continue
         if (
             row["chrom"] == current["chrom"]
@@ -1050,18 +1070,17 @@ def _merge_adjacent_tiles(dmr_df: pl.DataFrame) -> pl.DataFrame:
             for col in ("n_case", "n_control"):
                 if col in current and current[col] is not None and row.get(col) is not None:
                     current[col] = max(current[col], row[col])
-            z1 = sp_stats.norm.isf(max(current["pvalue"], 1e-300))
-            z2 = sp_stats.norm.isf(max(row["pvalue"], 1e-300))
-            current["pvalue"] = float(sp_stats.norm.sf(
-                (z1 + z2) / math.sqrt(2)
-            ))
+            current_sum_z += _abs_z(row["pvalue"])
+            current_n_z += 1
             current["_count"] = prev_n + 1
         else:
-            merged.append(current)
+            merged.append(_finalise(current, current_sum_z, current_n_z))
             current = dict(row)
             current["_count"] = 1
+            current_sum_z = _abs_z(row["pvalue"])
+            current_n_z = 1
     if current is not None:
-        merged.append(current)
+        merged.append(_finalise(current, current_sum_z, current_n_z))
 
     for m in merged:
         m.pop("_count", None)
