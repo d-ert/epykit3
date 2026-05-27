@@ -34,6 +34,17 @@ SemVer (`MAJOR.MINOR.PATCH`).
   ``engine_fn`` callable) so it tests with mock engines for CI and
   wraps ``ep.tl.dmc`` for real use.
 
+### Changed (BREAKING for `log2_odds_ratio` column name)
+
+- **`varm["dmc_lr"].log2_odds_ratio`** renamed to
+  `log2_odds_ratio_pooled` (same value, clearer name). Same rename
+  applies to `fisher`.
+- **`varm["dmc_glm"].log2_odds_ratio`** renamed to
+  `coef_treatment_log2` (it was always the logit coefficient in log₂
+  units, not log₂ of an odds ratio; the old name was misleading).
+- A transitional `log2_odds_ratio` column is NaN-filled in 0.7.5 with
+  a `FutureWarning` on the producing call. Column removed in 0.8.
+
 ### Changed (BREAKING for `epykit.dmr_hmm` import path)
 
 - **Renamed** `epykit.dmr_hmm` → `epykit.dmr_segment`; function

@@ -110,7 +110,9 @@ The result DataFrame (`md.varm["dmc_<test>"]`) contains:
 | `meth_diff_ci_hi` | float | Upper 95% CI bound on meth_diff |
 | `pvalue` | float | Raw p-value |
 | `qvalue` | float | BH-adjusted q-value |
-| `log2_odds_ratio` | float | Log2 odds ratio |
+| `log2_odds_ratio_pooled` | float | Log2 odds ratio (pooled-count tests: `lr`, `fisher`). Renamed from `log2_odds_ratio` in 0.7.5. |
+| `coef_treatment_log2` | float | Logit coefficient in log2 units (`glm` backend). Renamed from `log2_odds_ratio` in 0.7.5. |
+| `log2_odds_ratio` | float | **Deprecated.** Transitional NaN-filled column present in 0.7.5 for backward compatibility; removed in 0.8. Use `log2_odds_ratio_pooled` or `coef_treatment_log2` instead. |
 
 Results are stored at `md.varm["dmc_<test>"]`, where `<test>` is the canonical
 test name (e.g., `dmc_lr`, `dmc_score`, `dmc_glm`).

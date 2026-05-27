@@ -418,6 +418,15 @@ def dmc(
             min_samples_control=min_samples_control,
             dispersion=dispersion, reference=reference,
         )
+        # P1-11 deprecation notice for GLM / contrast path.
+        import warnings as _warnings
+        _warnings.warn(
+            "The 'log2_odds_ratio' column is deprecated and will be removed in "
+            "0.8. Use 'log2_odds_ratio_pooled' for pooled-count tests (lr, "
+            "fisher) or 'coef_treatment_log2' for the glm backend. The "
+            "transitional column is NaN-filled in 0.7.5.",
+            FutureWarning, stacklevel=2,
+        )
         return
 
     # Unconditional n=1 guard: applies whether test is "auto" or explicit.
@@ -703,6 +712,18 @@ def dmc(
                 "[resume] failed to persist %s sidecar: %s",
                 resume_stage_name, exc,
             )
+
+    # P1-11 deprecation notice – emitted once per tl.dmc call (not per-row,
+    # not per-chromosome).  The transitional 'log2_odds_ratio' column is
+    # NaN-filled in 0.7.5; it will be removed in 0.8.
+    import warnings as _warnings
+    _warnings.warn(
+        "The 'log2_odds_ratio' column is deprecated and will be removed in "
+        "0.8. Use 'log2_odds_ratio_pooled' for pooled-count tests (lr, "
+        "fisher) or 'coef_treatment_log2' for the glm backend. The "
+        "transitional column is NaN-filled in 0.7.5.",
+        FutureWarning, stacklevel=2,
+    )
 
 
 def _run_dmc_contrast(

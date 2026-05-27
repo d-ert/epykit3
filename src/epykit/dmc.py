@@ -59,19 +59,23 @@ logger = logging.getLogger(__name__)
 _SMOOTH_BOX_NJIT_FN = None
 
 _EMPTY_SCHEMA = {
-    "chrom":             pl.Utf8,
-    "pos":               pl.Int32,
-    "strand":            pl.Utf8,
-    "n_case":            pl.Int32,
-    "n_control":         pl.Int32,
-    "mean_beta_case":    pl.Float32,
-    "mean_beta_control": pl.Float32,
-    "pvalue":            pl.Float64,
-    "log2_odds_ratio":   pl.Float64,
-    "meth_diff":         pl.Float32,
-    "meth_diff_ci_lo":   pl.Float32,
-    "meth_diff_ci_hi":   pl.Float32,
+    "chrom":                  pl.Utf8,
+    "pos":                    pl.Int32,
+    "strand":                 pl.Utf8,
+    "n_case":                 pl.Int32,
+    "n_control":              pl.Int32,
+    "mean_beta_case":         pl.Float32,
+    "mean_beta_control":      pl.Float32,
+    "pvalue":                 pl.Float64,
+    "log2_odds_ratio_pooled": pl.Float64,
+    "log2_odds_ratio":        pl.Float64,   # transitional NaN-filled; removed in 0.8
+    "meth_diff":              pl.Float32,
+    "meth_diff_ci_lo":        pl.Float32,
+    "meth_diff_ci_hi":        pl.Float32,
 }
+
+# Backends where log2_ors is a logit coefficient (not a pooled log2-OR).
+_GLM_BACKENDS = frozenset({"glm", "glm_contrast"})
 
 def _epykit_version() -> str:
     try:
@@ -1953,6 +1957,17 @@ def _process_one_chromosome(
 
     del mean_case, M2_case, n_valid_case, mean_ctrl, M2_ctrl, n_valid_ctrl
 
+    # P1-11: column name is backend-specific.
+    #   glm / glm_contrast: the value is the logit coefficient in log2 units
+    #                        (not log2 of an odds ratio) => coef_treatment_log2.
+    #   all other backends: genuine pooled log2 odds ratio => log2_odds_ratio_pooled.
+    # A transitional log2_odds_ratio column is NaN-filled for one release so
+    # existing code doesn't silently break; it is removed in 0.8.
+    _log2_col = (
+        "coef_treatment_log2"
+        if test in _GLM_BACKENDS
+        else "log2_odds_ratio_pooled"
+    )
     out_cols = {
         "chrom":             pl.Series([chrom] * n_sites, dtype=pl.Utf8),
         "pos":               canonical_df["pos"],
@@ -1964,7 +1979,10 @@ def _process_one_chromosome(
         "mean_beta_case":    pl.Series(mean_beta_case),
         "mean_beta_control": pl.Series(mean_beta_ctrl),
         "pvalue":            pl.Series(pvals),
-        "log2_odds_ratio":   pl.Series(log2_ors),
+        _log2_col:           pl.Series(log2_ors),
+        # Transitional alias – NaN-filled; emits FutureWarning in tl.dmc.
+        "log2_odds_ratio":   pl.Series(
+                                 np.full(n_sites, np.nan, dtype=np.float64)),
         "meth_diff":         pl.Series(meth_diff),
         "meth_diff_ci_lo":   pl.Series(ci_lo),
         "meth_diff_ci_hi":   pl.Series(ci_hi),
@@ -2154,7 +2172,8 @@ def process_chromosomes_dmc(
     pl.DataFrame
         Columns: chrom, pos, strand, n_case, n_control,
                  mean_beta_case, mean_beta_control,
-                 pvalue, log2_odds_ratio, meth_diff
+                 pvalue, log2_odds_ratio_pooled (or coef_treatment_log2 for glm),
+                 log2_odds_ratio (transitional NaN-filled), meth_diff
 
         For the ``score`` test, ``mean_beta_*`` are coverage-weighted (the
         group MLE proportion M/N). For all other tests they are the

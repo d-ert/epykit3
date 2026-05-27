@@ -138,7 +138,7 @@ def test_dmc_dask_matches_sequential(synth_bundle, tmp_path):
     dask_df = _sort_canonical(md_dask.varm[md_dask.uns["dmc"]["last_key"]])
 
     assert len(seq_df) == len(dask_df)
-    for col in ("pvalue", "meth_diff", "log2_odds_ratio"):
+    for col in ("pvalue", "meth_diff", "log2_odds_ratio_pooled"):
         seq_vals = seq_df[col].to_numpy()
         dask_vals = dask_df[col].to_numpy()
         # Bit-identity for integer / categorical cols; tight tolerance

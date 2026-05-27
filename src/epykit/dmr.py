@@ -1284,6 +1284,20 @@ def call_dmr_tile_based(
         schema={"chrom": pl.Utf8, "pos": pl.Int32, "n_cpgs": pl.Int32},
     )
 
+    # P1-11: DMC output no longer has a real-valued 'log2_odds_ratio' column;
+    # the backend-specific names are 'log2_odds_ratio_pooled' (lr/fisher) and
+    # 'coef_treatment_log2' (glm).  Normalise to 'log2_odds_ratio' for the
+    # DMR output schema (DMR schema rename is deferred to 0.8).
+    _log2_src = (
+        "coef_treatment_log2"
+        if "coef_treatment_log2" in tile_dmc.columns
+        else "log2_odds_ratio_pooled"
+    )
+    if _log2_src in tile_dmc.columns:
+        tile_dmc = tile_dmc.with_columns(
+            pl.col(_log2_src).alias("log2_odds_ratio")
+        )
+
     dmr_df = (
         tile_dmc
         .join(n_cpgs_df, on=["chrom", "pos"], how="left")
