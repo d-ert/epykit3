@@ -207,6 +207,10 @@ _TEST_RECOMMENDATIONS = {
 # Shared epsilon for boundary clipping in logit / log-OR computations.
 _BETA_EPSILON: float = 1e-6
 
+# F(1, 50) within ~1% of chi^2(1) at the 5% critical region.
+# Used in _score_finalize to floor df_phi when reference="adaptive" or "F".
+DF_PHI_FLOOR: float = 50.0
+
 
 
 # Core statistical tests (public, used by unit tests)
@@ -971,9 +975,6 @@ def _score_finalize(
     # the artifactually low FPR in eb mode in 0.7.2. Floor df_phi at 50
     # so F(1, 50) is within ~1% of chi^2(1) at typical statistics on
     # the F branch; the chi^2 branch (clamped phi) is unaffected.
-    # Rationale for 50: F(1, 50) is within ~1% of chi^2(1) at the 5%
-    # critical region (chi^2 critical value 3.84).
-    DF_PHI_FLOOR = 50.0  # F(1, 50) within ~1% of chi^2(1) at the 5% critical region
     if reference == "adaptive":
         df_phi_floored = np.maximum(df_phi, DF_PHI_FLOOR)
         p_F    = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi_floored)

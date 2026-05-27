@@ -52,6 +52,7 @@ SemVer (`MAJOR.MINOR.PATCH`).
   benchmark numbers: ``lr / eb`` FPR rises modestly, TPR essentially
   unchanged. Null-calibration smoke (n=1934, n_per_group=3, no true DMCs):
   observed FDR at q<0.05 = 0.0000 (BH conservative at low n, as expected).
+  If you benchmarked under 0.7.2 with `dispersion="eb"` (the default), the previously reported FPR is artificially suppressed and should be recomputed.
   See the bug-fix audit table in Phase 2 for per-cell deltas.
 
 ### Changed (breaking on the `lr+` schema)
