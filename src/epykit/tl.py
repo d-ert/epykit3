@@ -1598,6 +1598,7 @@ def annotate(
     *,
     refgene: str | None = None,
     gene_type_filter: str | list[str] | tuple[str, ...] | None = None,
+    features: list[str] | tuple[str, ...] | None = None,
 ) -> None:
     """Annotate DMC/DMR outputs.
 
@@ -1627,6 +1628,14 @@ def annotate(
         ``all_overlapping_features`` (one-to-many). Set False to skip them
         and keep only the legacy single-best gene-name columns. See
         :func:`epykit.annotate.annotate_features` for details.
+    features : sequence of str or None, keyword-only
+        Override the feature classes built by
+        :func:`epykit.annotate.annotate_features`. Default ``None`` lets
+        the lower-level function pick its own default (the full HOMER set:
+        promoter / 5UTR / exon / intron / 3UTR / TTS / noncoding). Pass a
+        narrower tuple to skip categories -- e.g.
+        ``("promoter", "exon", "intron")`` for the pre-0.x coarse
+        breakdown when downstream code expects only those buckets.
     """
     if gtf and refgene:
         raise ValueError("Provide only one of gtf or refgene, not both")
@@ -1655,15 +1664,16 @@ def annotate(
             # source. We forward whichever the caller set.
             annotation_path = gtf if gtf is not None else refgene
             forwarded_source = "gtf" if gtf is not None else "refgene"
-            ann = annotate_features(
-                ann,
-                annotation_path,
+            af_kwargs = dict(
                 source=forwarded_source,
                 promoter_upstream_bp=promoter_upstream_bp,
                 promoter_downstream_bp=promoter_downstream_bp,
                 multi_annotation=multi_annotation,
                 gene_type_filter=gene_type_filter,
             )
+            if features is not None:
+                af_kwargs["features"] = features
+            ann = annotate_features(ann, annotation_path, **af_kwargs)
         if cpg_islands:
             ann = annotate_cpg_islands(ann, cpg_island_bed=cpg_islands)
 
@@ -1673,15 +1683,16 @@ def annotate(
     if "dmr" in md.uns and isinstance(md.uns["dmr"], pl.DataFrame) and feature_source_present:
         annotation_path = gtf if gtf is not None else refgene
         forwarded_source = "gtf" if gtf is not None else "refgene"
-        md.uns["dmr"] = annotate_features(
-            md.uns["dmr"],
-            annotation_path,
+        af_kwargs = dict(
             source=forwarded_source,
             promoter_upstream_bp=promoter_upstream_bp,
             promoter_downstream_bp=promoter_downstream_bp,
             multi_annotation=multi_annotation,
             gene_type_filter=gene_type_filter,
         )
+        if features is not None:
+            af_kwargs["features"] = features
+        md.uns["dmr"] = annotate_features(md.uns["dmr"], annotation_path, **af_kwargs)
 
     md.uns["annotation"] = {
         "gtf": gtf,
@@ -1693,6 +1704,7 @@ def annotate(
         "promoter_downstream_bp": promoter_downstream_bp,
         "multi_annotation": multi_annotation,
         "gene_type_filter": gene_type_filter,
+        "features": list(features) if features is not None else None,
     }
 
     # Clear GTF cache if requested (default: True)

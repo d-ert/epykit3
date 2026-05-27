@@ -126,9 +126,20 @@ def test_nearest_tss_can_differ_from_best_pick(synth_gtf):
       - Single-best: gene_name=GENEA, feature=intron
       - Nearest-TSS: GENEB at 2000 is 700 bp away; GENEA at 1000 is
         1700 bp away -- GENEB still wins despite the best-pick being GENEA.
+
+    Note: explicitly pin ``features=`` to the legacy 3-tuple so the
+    intron / nearest-TSS divergence stays demonstrable. Under the new
+    full-HOMER default this fixture's 2700 also falls into GENEB's TTS
+    window ([End-100, End+1000) = [2400, 3500)) so single-best resolves
+    to GENEB+TTS and the divergence collapses. The test is about
+    best-pick vs nearest-TSS semantics, not about category vocabulary,
+    so restricting the feature set is the right knob here.
     """
     sites = _sites([2700])
-    out = annotate_features(sites, synth_gtf, multi_annotation=True)
+    out = annotate_features(
+        sites, synth_gtf, multi_annotation=True,
+        features=("promoter", "exon", "intron"),
+    )
     row = out.row(0, named=True)
     assert row["gene_name"] == "GENEA"
     assert row["feature_type"] == "intron"
@@ -396,3 +407,100 @@ def test_source_invalid_value_raises():
     sites = _sites([100])
     with pytest.raises(ValueError, match="must be 'auto'"):
         annotate_features(sites, "x.gtf", source="bam")
+
+
+# ---------------------------------------------------------------------------
+# default-features regression: the full HOMER set is built by default so
+# downstream ``feature_type`` value-counts match HOMER's vocabulary without
+# the caller having to opt in via ``features=``.
+# ---------------------------------------------------------------------------
+
+def test_default_features_is_full_homer_set():
+    """The default ``features=`` tuple covers every category in
+    :data:`epykit.annotate._FEATURE_PRIORITY` except the fallback
+    ``intergenic``. Anything narrower silently buckets UTR / TTS / noncoding
+    sites into intron/intergenic and produces a HOMER-incompatible
+    distribution -- which is what bit the chain_merge benchmark."""
+    import inspect
+    sig = inspect.signature(annotate_features)
+    default = tuple(sig.parameters["features"].default)
+    assert default == (
+        "promoter", "5UTR", "exon", "intron", "3UTR", "TTS", "noncoding",
+    )
+    # And the priority dict / default tuple must agree on the vocabulary
+    # (every default feature has a priority; intergenic is the fallback
+    # so it's deliberately not in ``features``).
+    assert set(default) == set(A._FEATURE_PRIORITY) - {"intergenic"}
+
+
+@pytest.fixture
+def synth_gtf_with_utrs_tts_noncoding(tmp_path):
+    """GTF with explicit UTR records, a TTS-window-overlapping site, and a
+    non-protein-coding gene. Lets us assert that the expanded default
+    actually surfaces 5UTR / 3UTR / TTS / noncoding in ``feature_type`` --
+    the categories that used to silently disappear under the old 3-feature
+    default.
+
+    Layout on chr2 (1-based GTF coords):
+      PROT_X: + strand, gene 1001-5000, exons 1001-1500 and 4501-5000,
+              five_prime_utr 1001-1100, three_prime_utr 4901-5000.
+              TSS=1001 (-> 0-based 1000); TTS-window on + strand is
+              [end-100, end+1000) i.e. [4900, 6000).
+      LNC_Y:  + strand, gene 10001-11000, exon 10001-11000,
+              gene_type "lincRNA" -> contributes a noncoding interval.
+    """
+    gtf = tmp_path / "synth_utrs.gtf"
+    lines = [
+        'chr2\tt\tgene\t1001\t5000\t.\t+\t.\tgene_id "px"; gene_name "PROT_X"; gene_type "protein_coding";',
+        'chr2\tt\texon\t1001\t1500\t.\t+\t.\tgene_id "px"; gene_name "PROT_X"; gene_type "protein_coding";',
+        'chr2\tt\texon\t4501\t5000\t.\t+\t.\tgene_id "px"; gene_name "PROT_X"; gene_type "protein_coding";',
+        'chr2\tt\tfive_prime_utr\t1001\t1100\t.\t+\t.\tgene_id "px"; gene_name "PROT_X"; gene_type "protein_coding";',
+        'chr2\tt\tthree_prime_utr\t4901\t5000\t.\t+\t.\tgene_id "px"; gene_name "PROT_X"; gene_type "protein_coding";',
+        'chr2\tt\tgene\t10001\t11000\t.\t+\t.\tgene_id "ly"; gene_name "LNC_Y"; gene_type "lincRNA";',
+        'chr2\tt\texon\t10001\t11000\t.\t+\t.\tgene_id "ly"; gene_name "LNC_Y"; gene_type "lincRNA";',
+    ]
+    gtf.write_text("\n".join(lines) + "\n")
+    return str(gtf)
+
+
+def test_default_surfaces_utr_tts_noncoding(synth_gtf_with_utrs_tts_noncoding):
+    """Regression for the chain_merge benchmark bug: under the old default
+    (``features=("promoter","exon","intron")``) the 5UTR / 3UTR / TTS /
+    noncoding categories never appeared in ``feature_type`` because their
+    builders weren't invoked. Each of the four positions below sits in a
+    category that only resolves correctly when the full HOMER default is
+    in effect.
+
+    Pick positions outside the promoter window (TSS=1000, window [-1000,
+    +200] so promoter covers up to 1200) and outside any earlier-priority
+    feature so the priority chain actually exposes the category we want
+    to assert on.
+    """
+    sites = pl.DataFrame({
+        "chrom": ["chr2"] * 4,
+        # 1300: in 5'UTR (1000-1100 is the actual UTR after 0-based conv).
+        # The UTR is priority 1 so it wins over exon (priority 4) when both
+        # overlap. To make this site UTR-dominated, place it at 1050.
+        "pos":   [1050, 4950, 5500, 10500],
+    })
+    out = annotate_features(sites, synth_gtf_with_utrs_tts_noncoding)
+    rows = out.to_dicts()
+    # 1050 -> in 5UTR (1000-1100). Promoter window [-1000,+200] from TSS=1000
+    # covers [-1000, 1200) so 1050 is also in promoter. Promoter (0) outranks
+    # 5UTR (1), so feature_type==promoter -- BUT all_overlapping_features
+    # must include the 5UTR label since the UTR builder ran.
+    assert "5UTR" in set(rows[0]["all_overlapping_features"]), \
+        f"5UTR missing from overlapping features: {rows[0]}"
+    # 4950 -> in 3UTR (4900-5000). Also inside an exon (4500-5000) and
+    # inside the TTS window [4900, 6000). 3UTR (priority 2) wins over TTS
+    # (3) and exon (4), so feature_type==3UTR.
+    assert rows[1]["feature_type"] == "3UTR", rows[1]
+    # 5500 -> outside gene body but inside TTS window [4900, 6000). Only
+    # TTS contributes here.
+    assert rows[2]["feature_type"] == "TTS", rows[2]
+    # 10500 -> inside LNC_Y (lincRNA). Exon (4) overlaps; noncoding (6)
+    # also overlaps. Exon wins, but noncoding must be present in the
+    # one-to-many list -- the builder having actually run is the
+    # regression we're guarding.
+    assert "noncoding" in set(rows[3]["all_overlapping_features"]), \
+        f"noncoding missing from overlapping features: {rows[3]}"

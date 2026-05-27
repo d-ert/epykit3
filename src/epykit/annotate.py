@@ -989,7 +989,9 @@ def annotate_features(
     annotation: str,
     *,
     source: str = "auto",
-    features: list[str] | tuple[str, ...] = ("promoter", "exon", "intron"),
+    features: list[str] | tuple[str, ...] = (
+        "promoter", "5UTR", "exon", "intron", "3UTR", "TTS", "noncoding",
+    ),
     promoter_upstream_bp: int = 2000,
     promoter_downstream_bp: int = 200,
     multi_annotation: bool = True,
@@ -1016,7 +1018,15 @@ def annotate_features(
         Feature classes to build overlap intervals for. Sites that don't
         hit any are reported as ``feature_type="intergenic"`` automatically
         -- "intergenic" is the fallback, not something you opt into.
-        Default builds promoter / exon / intron.
+        Default builds the full HOMER-style set
+        (promoter / 5UTR / exon / intron / 3UTR / TTS / noncoding) so
+        ``feature_type`` value-counts can be compared directly against
+        HOMER's vocabulary without a custom kwarg. Pass a narrower tuple
+        (e.g. ``("promoter", "exon", "intron")``) to skip the UTR / TTS /
+        noncoding builders when you don't need fine-grained categories
+        or your annotation source can't supply them (refGene has no UTR
+        coordinates and no biotype, so the UTR / noncoding builders are
+        silently no-ops on refGene sources).
     promoter_upstream_bp, promoter_downstream_bp : int, keyword-only
         Promoter window around each gene's TSS. Default ``(-2000, +200)``
         matches the conventional "core promoter" definition.
