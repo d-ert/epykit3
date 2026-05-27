@@ -905,8 +905,9 @@ def dmr(
 
     Parameters
     ----------
-    method : {"tile", "sliding_window", "hmm", "chain_merge"}
-        Which DMR algorithm to run.
+    method : {"tile", "sliding_window", "segment", "hmm", "chain_merge"}
+        Which DMR algorithm to run. ``"hmm"`` is a deprecated alias for
+        ``"segment"`` and will be removed in 0.8.
     preset : {"strict", "default", "permissive"}, optional
         Parameter preset bundle for ``method="chain_merge"``. Applies
         ``(alpha, min_abs_meth_diff, dis_merge_bp, min_cpgs, pct_sig,
@@ -1125,13 +1126,22 @@ def dmr(
         return
 
     if method == "hmm":
-        from .dmr_hmm import call_dmr_hmm
+        import warnings
+        warnings.warn(
+            "method='hmm' is deprecated; use method='segment' (same engine, "
+            "honest name). method='hmm' will be removed in 0.8.",
+            FutureWarning, stacklevel=2,
+        )
+        method = "segment"
+
+    if method == "segment":
+        from .dmr_segment import call_dmr_rule_segment
         dmc_df = md.dmc
         if dmc_df is None:
             raise ValueError(
-                "method='hmm' needs a DMC table on md. Run ep.tl.dmc(md) first."
+                "method='segment' needs a DMC table on md. Run ep.tl.dmc(md) first."
             )
-        dmr_df = call_dmr_hmm(
+        dmr_df = call_dmr_rule_segment(
             dmc_df,
             min_cpgs=min_cpgs,
             min_abs_meth_diff=min_abs_meth_diff,
@@ -1139,7 +1149,7 @@ def dmr(
         )
         md.uns["dmr"] = dmr_df
         md.uns["dmr_params"] = {
-            "method": "hmm",
+            "method": "segment",
             "min_cpgs": min_cpgs,
             "min_abs_meth_diff": min_abs_meth_diff,
             "alpha": alpha,
@@ -1204,7 +1214,7 @@ def dmr(
 
     raise ValueError(
         f"Unknown DMR method '{method}'. Expected 'tile', 'sliding_window', "
-        f"'hmm', or 'chain_merge'."
+        f"'segment', 'hmm' (deprecated alias for 'segment'), or 'chain_merge'."
     )
 
 

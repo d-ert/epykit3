@@ -34,6 +34,21 @@ SemVer (`MAJOR.MINOR.PATCH`).
   ``engine_fn`` callable) so it tests with mock engines for CI and
   wraps ``ep.tl.dmc`` for real use.
 
+### Changed (BREAKING for `epykit.dmr_hmm` import path)
+
+- **Renamed** `epykit.dmr_hmm` → `epykit.dmr_segment`; function
+  `call_dmr_hmm` → `call_dmr_rule_segment`. The engine uses fixed
+  state means / transition priors (not Baum-Welch fitted), so calling
+  it an HMM was misleading. Old import path remains as a deprecated
+  shim until 0.8. `tl.dmr(method='hmm')` works with `FutureWarning`.
+
+### Fixed (P2 manifest, folded into the rename)
+
+- **P2-4**: `call_dmr_rule_segment` now emits per-segment Stouffer-
+  combined p-values (BH-corrected per chromosome) instead of NaN.
+  The pre-0.7.5 implementation emitted NaN p/q-values for every
+  called segment, breaking any downstream filter on qvalue.
+
 ### Fixed (P0 manifest, paper preparation)
 
 - **P0-3 (docs)**: `tl.dmc(..., dispersion=...)` docstring previously said

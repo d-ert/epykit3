@@ -256,6 +256,24 @@ def _cmd_dmr(args: argparse.Namespace):
                 min_samples_treatment=args.min_samples_treatment,
                 min_samples_control=args.min_samples_control,
             )
+    elif args.method in ("segment", "hmm"):
+        # --- Rule-based segmentation path: takes a DMC parquet ---
+        if args.method == "hmm":
+            warnings.warn(
+                "--method=hmm is deprecated; use --method=segment (same engine, "
+                "honest name). --method=hmm will be removed in 0.8.",
+                FutureWarning, stacklevel=1,
+            )
+        if not args.dmc_results:
+            raise ValueError("method=segment requires --dmc-results.")
+        from .dmr_segment import call_dmr_rule_segment
+        dmc_results = pl.read_parquet(args.dmc_results)
+        dmr_results = call_dmr_rule_segment(
+            dmc_results,
+            min_cpgs=args.min_cpgs,
+            min_abs_meth_diff=args.min_abs_meth_diff,
+            alpha=args.alpha,
+        )
     else:
         # --- Legacy sliding-window path: takes a DMC parquet ---
         if not args.dmc_results:
@@ -578,14 +596,17 @@ def main():
     p_dmr = sub.add_parser("dmr", help="DMR calling (tile-based or sliding-window)")
     p_dmr.add_argument(
         "--method",
-        choices=["tile", "sliding_window"],
+        choices=["tile", "sliding_window", "segment", "hmm"],
         default="tile",
         help=(
             "DMR algorithm. "
             "'tile' (default) pools reads across "
             "CpGs within each fixed-size tile and runs one test per tile. "
             "'sliding_window' takes a precomputed DMC parquet and combines "
-            "per-CpG p-values with signed Stouffer's Z (legacy)."
+            "per-CpG p-values with signed Stouffer's Z (legacy). "
+            "'segment' rule-based 3-state segmentation on meth_diff signal "
+            "with Stouffer-combined per-segment p-values. "
+            "'hmm' is a deprecated alias for 'segment' (removed in 0.8)."
         ),
     )
     p_dmr.add_argument("--output", required=True)
