@@ -68,13 +68,21 @@ class SimConfig:
 
 
 def _draw_baseline_beta(n: int, rng: np.random.Generator) -> np.ndarray:
-    """Bimodal mixture: 40 % low, 40 % high, 20 % intermediate."""
-    component = rng.choice([0, 1, 2], size=n, p=[0.4, 0.4, 0.2])
-    out = np.empty(n, dtype=np.float64)
-    out[component == 0] = rng.beta(2.0, 50.0, size=int((component == 0).sum()))
-    out[component == 1] = rng.beta(50.0, 2.0, size=int((component == 1).sum()))
-    out[component == 2] = rng.beta(2.0, 2.0, size=int((component == 2).sum()))
-    return np.clip(out, 1e-4, 1.0 - 1e-4)
+    """Right-skewed Beta(0.75, 1.35) baseline matching Piao's marginals.
+
+    The Piao 2021 simulator produces a right-skewed, monotonically-decreasing
+    baseline-methylation distribution (22% of CpGs at freqC ~ 0, tapering to
+    ~7% at freqC ~ 100) rather than the U-shaped bimodal typical of high-CpG
+    bulk WGBS. Empirical fit to Piao amp.coverage=10.sample1.txt (100K CpGs):
+      Piao count_M mean = 3.77, std = 3.42
+      Beta(0.75, 1.35): count_M mean = 3.74 (err 0.9%), std = 3.31 (err 3.0%)
+    Both within the 10%/20% tolerances used in
+    test_simulator_marginals_match_piao_within_tolerance.
+
+    Previous parameters: bimodal mixture [40% Beta(2,50), 40% Beta(50,2),
+    20% Beta(2,2)], which gave mean_beta ~ 0.50 vs Piao ~ 0.38 — a 32% error.
+    """
+    return np.clip(rng.beta(0.75, 1.35, size=n), 1e-4, 1.0 - 1e-4)
 
 
 def _assign_dmcs(

@@ -81,3 +81,77 @@ def test_simulate_dmc_marginals_match_design(tmp_path):
         f"direction split unbalanced: {n_hyper} hyper vs {n_hypo} hypo (ratio "
         f"{n_hyper / n_dmc:.3f})"
     )
+
+
+def _piao_sample_path() -> Path | None:
+    """Return the path to a Piao coverage=10 sample if it exists locally."""
+    candidates = [
+        # User-confirmed location (Phase 2 Task 1 archive):
+        Path("_legacy_benchmark/deneme2/raw_sim_data/simulated_datasets/dmc_simulation/coverage/amp.coverage=10.sample1.txt"),
+        Path("benchmark/data/study1/raw_sim_data/simulated_datasets/dmc_simulation/coverage/amp.coverage=10.sample1.txt"),
+        Path("D:/Coding/Projeler/methyl_lib/benchmarkin_merges/epykit_vs_allPackages(simulated_approxData)/raw_sim_data/simulated_datasets/dmc_simulation/coverage/amp.coverage=10.sample1.txt"),
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    return None
+
+
+def test_simulator_marginals_match_piao_within_tolerance(tmp_path):
+    """The simulator's per-CpG count_M distribution at coverage=10 should
+    have the same first two moments as Piao's distributed sample within
+    Monte Carlo noise on ~100K CpGs. This is the 'did I rebuild the right
+    simulator?' check.
+
+    Tolerance is loose because we don't know Piao's exact baseline model:
+    mean within ±10%, std within ±20%. Failure here means investigate the
+    `_draw_baseline_beta` mixture parameters.
+    """
+    from simulate_piao import simulate_dmc
+
+    piao = _piao_sample_path()
+    if piao is None:
+        pytest.skip("Piao raw data not available locally; skipping marginal match")
+
+    # Read Piao's count_M distribution.
+    piao_df = pl.read_csv(piao, separator="\t")
+    piao_count_M = (piao_df["coverage"].cast(pl.Float64) * piao_df["freqC"] / 100.0).round().cast(pl.Int64)
+    piao_mean = float(piao_count_M.mean())
+    piao_std = float(piao_count_M.std())
+
+    # Match Piao's CpG count (100K for DMC sim) and coverage (10).
+    res = simulate_dmc(n_cpgs=len(piao_count_M), n_per_group=3, coverage=10,
+                       seed=12345, out_dir=tmp_path)
+    sim_amp = res["amp_files"][0]
+    sim_df = pl.read_csv(sim_amp, separator="\t")
+    sim_count_M = (sim_df["coverage"].cast(pl.Float64) * sim_df["freqC"] / 100.0).round().cast(pl.Int64)
+    sim_mean = float(sim_count_M.mean())
+    sim_std = float(sim_count_M.std())
+
+    # Tolerances are loose: we don't claim Piao's exact baseline model.
+    rel_mean_err = abs(sim_mean - piao_mean) / piao_mean
+    rel_std_err = abs(sim_std - piao_std) / piao_std
+    assert rel_mean_err < 0.10, (
+        f"simulator count_M mean {sim_mean:.2f} vs Piao {piao_mean:.2f}: "
+        f"rel error {rel_mean_err:.3f} > 10%"
+    )
+    assert rel_std_err < 0.20, (
+        f"simulator count_M std {sim_std:.2f} vs Piao {piao_std:.2f}: "
+        f"rel error {rel_std_err:.3f} > 20%"
+    )
+
+
+def test_simulator_truth_dmc_count_close_to_piao_design(tmp_path):
+    """Piao's design has exactly 20,000 / 100,000 = 20% true DMCs.
+    The simulator with default dmc_fraction=0.2 should land at 20% ± 0.5%
+    on 100K CpGs (~50 std error)."""
+    from simulate_piao import simulate_dmc
+
+    res = simulate_dmc(n_cpgs=100_000, n_per_group=3, coverage=10,
+                       seed=2026, out_dir=tmp_path)
+    truth = pl.read_parquet(res["truth"])
+    n_dmc = int(truth["is_dmc"].sum())
+    assert 19_500 <= n_dmc <= 20_500, (
+        f"n_dmc = {n_dmc:,}; design is 20,000 (20% of 100,000). "
+        f"Outside ±0.5% tolerance suggests a bug in _assign_dmcs."
+    )
