@@ -14,13 +14,14 @@ def test_dispersion_default_is_eb():
 
 
 def test_dispersion_docstring_mentions_eb_as_default():
+    import re
     doc = ep.tl.dmc.__doc__ or ""
-    # Both: 'eb' appears in the choices set AND default points to it.
     assert "eb" in doc, "Docstring no longer mentions the 'eb' option."
-    assert 'Default ``"eb"' in doc or 'default ``"eb"' in doc, (
-        "Docstring must state 'eb' is the default."
+    assert re.search(r'default\s+``"eb"``', doc, re.IGNORECASE), (
+        "Docstring must state 'eb' is the default (looking for "
+        "'default ``\"eb\"``' case-insensitively)."
     )
     # The old wrong claim must be gone.
-    assert 'Default ``"site"' not in doc, (
+    assert not re.search(r'default\s+``"site"``', doc, re.IGNORECASE), (
         "Docstring still says default is 'site'; should be 'eb'."
     )

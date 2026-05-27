@@ -383,8 +383,8 @@ def dmc(
         residual estimate toward a chromosome-wide pool via empirical-Bayes
         weights (stable at low n / low coverage). Alternatives:
         ``"site"`` uses the noisy per-site estimate only; ``"chrom"`` uses
-        the chromosome-pooled phi for every site; ``"shrink"`` is a fixed
-        inverse-Gamma shrinkage with no marginal-variance learning. See
+        the chromosome-pooled phi for every site; ``"shrink"`` is a James-Stein-style weighted average of per-site and
+        chromosome estimates with a fixed pseudo-df weight. See
         :func:`_score_finalize` in ``dmc.py`` for the math.
     chromosomes : list[str], optional
         Restrict to a subset of chromosomes. Auto-detected when None.
