@@ -599,14 +599,16 @@ def dmc(
         if neighbour_combine and len(result) > 0:
             from .dmc import combine_neighbour_pvalues
             result = combine_neighbour_pvalues(result, neighbour_bp=neighbour_bp)
-            result = result.with_columns(
-                pl.col("pvalue").alias("pvalue_raw"),
-                pl.col("qvalue").alias("qvalue_raw"),
-            ).with_columns(
-                pl.col("pvalue_combined").alias("pvalue"),
-            ).drop("pvalue_combined")
-            # Re-apply the same FDR method on the new pvalue column.
-            result = apply_multiple_testing_correction(result, method=fdr_method)
+            # Keep `pvalue` / `qvalue` as the raw per-CpG values.
+            # `combine_neighbour_pvalues` already added a `pvalue_combined`
+            # column; produce `qvalue_combined` next to it via BH on the
+            # combined p-values. Downstream consumers that want the
+            # combined values must opt in by reading `pvalue_combined` /
+            # `qvalue_combined`.
+            result = apply_multiple_testing_correction(
+                result, method=fdr_method,
+                pvalue_col="pvalue_combined", qvalue_col="qvalue_combined",
+            )
 
         if empirical_fdr and len(result) > 0:
             result = empirical_fdr_for_dmc(

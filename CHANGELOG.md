@@ -35,6 +35,22 @@ SemVer (`MAJOR.MINOR.PATCH`).
   evidence. Affects any DMR run that used ``empirical_fdr=True``;
   empirical p-values will rise (more conservative).
 
+### Changed (breaking on the `lr+` schema)
+
+- **P0-1**: ``tl.dmc(..., neighbour_combine=True)`` no longer overwrites
+  the per-CpG ``pvalue`` column with the Stouffer-combined value. The
+  raw per-CpG p-value stays in ``pvalue``; the combined value is in
+  ``pvalue_combined`` and its BH q-value in ``qvalue_combined``.
+  Downstream code reading ``pvalue`` (BH correction, empirical FDR,
+  DMR engines) now sees the raw per-CpG value, not the combined.
+  If you want the combined q-value, read ``qvalue_combined``.
+  ``empirical_fdr_for_dmc`` raises ``ValueError`` if it sees a stale
+  schema where ``pvalue`` was overwritten.
+
+  Affects: anyone who consumed ``md.dmc["pvalue"]`` after
+  ``neighbour_combine=True``. Migration: switch reads to
+  ``md.dmc["pvalue_combined"]`` / ``md.dmc["qvalue_combined"]``.
+
 ## [0.7.2] — 2026-05-21
 
 Eight targeted fixes identified by a full benchmark comparison against

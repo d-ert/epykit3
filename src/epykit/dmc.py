@@ -3053,6 +3053,18 @@ def empirical_fdr_for_dmc(
             "p-values default to 1 / (1 + n_perm).",
             n_perm,
         )
+    # `pvalue` is the per-CpG raw p-value by contract (P0-1 fix). The
+    # combined column, if neighbour_combine was on, is `pvalue_combined`
+    # and is intentionally NOT used here -- the null pool comes from
+    # raw per-CpG runs of the same test, so the observed side must also
+    # be raw to keep the comparison apples-to-apples.
+    if "pvalue_combined" in observed_dmc.columns and "pvalue" not in observed_dmc.columns:
+        raise ValueError(
+            "empirical_fdr_for_dmc requires the raw `pvalue` column; "
+            "got `pvalue_combined` instead. This indicates a stale "
+            "(<=0.7.2) workflow that overwrote `pvalue` with the "
+            "combined value -- re-run dmc() on the current epykit."
+        )
     null_pool = (
         np.concatenate(null_pvals_list)
         if any(len(a) for a in null_pvals_list)
