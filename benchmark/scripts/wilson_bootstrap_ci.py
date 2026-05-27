@@ -96,5 +96,76 @@ def main(argv: list[str] | None = None) -> None:
     print(f"wrote {args.out} with TPR/FPR Wilson CIs added")
 
 
+# --- Bootstrap CIs for AUROC and F1 ----------------------------------------
+
+
+def _auroc_mwu(is_dmc: np.ndarray, score: np.ndarray) -> float:
+    """AUROC via Mann-Whitney U with average ranks for ties."""
+    n_pos = int(is_dmc.sum())
+    n_neg = len(is_dmc) - n_pos
+    if n_pos == 0 or n_neg == 0:
+        return float("nan")
+    order = np.argsort(score, kind="mergesort")
+    ranks = np.empty_like(order, dtype=np.float64)
+    ranks[order] = np.arange(1, len(order) + 1, dtype=np.float64)
+    sum_ranks_pos = ranks[is_dmc].sum()
+    u = sum_ranks_pos - n_pos * (n_pos + 1) / 2.0
+    return float(u / (n_pos * n_neg))
+
+
+def bootstrap_auroc_ci(
+    is_dmc: np.ndarray,
+    pvalues: np.ndarray,
+    B: int = 1000,
+    seed: int = 0,
+    confidence: float = 0.95,
+) -> tuple[float, float]:
+    """Bootstrap AUROC CI by resampling CpGs with replacement.
+
+    Returns (lo, hi) at the given confidence level (two-sided percentile).
+    """
+    rng = np.random.default_rng(seed)
+    n = len(is_dmc)
+    score = 1.0 - np.asarray(pvalues, dtype=np.float64)
+    is_dmc = np.asarray(is_dmc, dtype=bool)
+
+    boot = np.empty(B, dtype=np.float64)
+    for b in range(B):
+        idx = rng.integers(0, n, size=n)
+        boot[b] = _auroc_mwu(is_dmc[idx], score[idx])
+    alpha = (1.0 - confidence) / 2.0
+    lo = float(np.nanpercentile(boot, 100 * alpha))
+    hi = float(np.nanpercentile(boot, 100 * (1.0 - alpha)))
+    return (lo, hi)
+
+
+def bootstrap_f1_ci(
+    is_dmc: np.ndarray,
+    qvalues: np.ndarray,
+    threshold: float = 0.05,
+    B: int = 1000,
+    seed: int = 0,
+    confidence: float = 0.95,
+) -> tuple[float, float]:
+    """Bootstrap F1 CI at a fixed q-threshold, resampling CpGs with replacement."""
+    rng = np.random.default_rng(seed)
+    n = len(is_dmc)
+    is_dmc = np.asarray(is_dmc, dtype=bool)
+    pred = np.asarray(qvalues, dtype=np.float64) < threshold
+
+    boot = np.empty(B, dtype=np.float64)
+    for b in range(B):
+        idx = rng.integers(0, n, size=n)
+        tp = int((pred[idx] & is_dmc[idx]).sum())
+        fp = int((pred[idx] & ~is_dmc[idx]).sum())
+        fn = int((~pred[idx] & is_dmc[idx]).sum())
+        denom = 2 * tp + fp + fn
+        boot[b] = (2 * tp / denom) if denom > 0 else 0.0
+    alpha = (1.0 - confidence) / 2.0
+    lo = float(np.nanpercentile(boot, 100 * alpha))
+    hi = float(np.nanpercentile(boot, 100 * (1.0 - alpha)))
+    return (lo, hi)
+
+
 if __name__ == "__main__":
     main()
