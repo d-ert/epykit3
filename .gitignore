@@ -2,8 +2,12 @@ raw_data/
 figures/
 mkdocs.yml
 
-
-
+# benchmark regenerables (not bundled in PyPI wheel; rebuilt by benchmark/scripts/*)
+benchmark/raw_sim_data/
+benchmark/ground_truth/
+benchmark/_converted/
+benchmark/_runs/
+benchmark/results/
 
 
 

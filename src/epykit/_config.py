@@ -34,7 +34,7 @@ def set_tmp_dir(path: Optional[Union[str, Path]]) -> str:
     Redirect all epykit transient work to a path on a larger drive::
 
         import epykit as ep
-        ep.set_tmp_dir("D:/work/epykit_tmp")
+        ep.set_tmp_dir("/scratch/epykit_tmp")  # or e.g. "C:/work/epykit_tmp" on Windows
         # ... every subsequent tl.dmc / tl.dmr / pp.smooth call now
         # stages its per-chrom parquet files under D:/work/epykit_tmp.
 

@@ -4,9 +4,9 @@ A Python-native WGBS methylation analysis pipeline built on Parquet partitioning
 
 epykit ingests Bismark / MethylDackel coverage output into a partitioned Parquet **methylstore** and runs the whole downstream analysis (QC → filtering → DMC → DMR → annotation → plotting → report) over that store with [polars](https://pola.rs) and lazy I/O. The Python API is organised in a scanpy-style `pp` / `tl` / `pl` namespace; a CLI mirrors the same operations for scripting.
 
-> **Status:** version 0.7.0 (unreleased), pre-1.0. API may change. MIT licensed.
+> **Status:** version 0.7.2, pre-1.0. API may change. MIT licensed.
 
-[Documentation](https://d-ert.github.io/epykit2/) | [Changelog](CHANGELOG.md)
+[Documentation](https://d-ert.github.io/epykit/) | [Changelog](CHANGELOG.md)
 
 
 ---
@@ -15,7 +15,7 @@ epykit ingests Bismark / MethylDackel coverage output into a partitioned Parquet
 
 - **Partitioned Parquet methylstore.** Per-chromosome, per-sample columnar storage — never load a whole genome into RAM. DMC results follow the same convention: `process_chromosomes_dmc(..., return_store=True)` returns a `DMCStore` handle backed by per-chromosome parquet files under `<methylstore>/.cache/dmc/<test>/`, and `apply_multiple_testing_correction` / `call_dmr_sliding_window` stream from it so peak memory stays at O(largest chromosome) on whole-genome inputs (~22 M CpGs).
 - **Statistical engines.** Per-CpG DMC tests cover the quasi-binomial likelihood-ratio (`lr`, the default at n ≥ 2; closed-form with McCullagh-Nelder dispersion), Pearson score, full IRLS binomial GLM with covariates, Welch t on logit(β), Welch t on raw β (`welch_t`), a true quasi-binomial LRT (`bb_lr`), Cochran-Mantel-Haenszel, and pooled Fisher exact. Every test surfaces 95 % Wald CIs on `meth_diff`. Permutation empirical FDR is available end-to-end: `tl.dmc(..., empirical_fdr=True)` and `tl.dmr(..., empirical_fdr=True)` shuffle labels, re-run the engine, and add `empirical_pvalue` / `empirical_qvalue` columns.
-- **`lr+` power stack (since 0.7.1).** Four opt-in enhancements to the `lr` engine that close the asymptotic-quasi-binomial gap to methylKit / RADMeth / DSS at low coverage and small cohorts: empirical-Bayes dispersion shrinkage (`dispersion="eb"`), sign-aware RADMeth-style Stouffer combiner over neighbouring CpGs (`neighbour_combine=True`, default ±200 bp), separation-aware Fisher fallback for near-perfect-separation 2 × 2 tables (`sep_fallback=True`), and Storey/two-stage BH q-values (`fdr_method="fdr_tsbh"` or `"fdr_storey"`). All four enabled together push TPR ≥ 0.999 on the Piao et al. 2021 simulated benchmark at every coverage ≥ 10× and every replicate count ≥ 4 while keeping FPR strictly tighter than every R baseline. See `comparison_test/benchmark/REPORT.md` for the head-to-head.
+- **`lr+` power stack (since 0.7.1).** Four opt-in enhancements to the `lr` engine that close the asymptotic-quasi-binomial gap to methylKit / RADMeth / DSS at low coverage and small cohorts: empirical-Bayes dispersion shrinkage (`dispersion="eb"`), sign-aware RADMeth-style Stouffer combiner over neighbouring CpGs (`neighbour_combine=True`, default ±200 bp), separation-aware Fisher fallback for near-perfect-separation 2 × 2 tables (`sep_fallback=True`), and Storey/two-stage BH q-values (`fdr_method="fdr_tsbh"` or `"fdr_storey"`). All four enabled together push TPR ≥ 0.999 on the Piao et al. 2021 simulated benchmark at every coverage ≥ 10× and every replicate count ≥ 4 while keeping FPR strictly tighter than every R baseline. See [`benchmark/REPORT.md`](benchmark/REPORT.md) for the head-to-head.
 - **Multi-group & covariate contrasts.** `tl.dmc(formula="~ group + age", contrast="group")` runs a joint F-test across factor levels; `contrast="age"` runs a Wald test on a continuous covariate as the primary effect.
 - **Four DMR engines plus permutation FDR.** Tile-based (read-pooled, default), per-CpG sliding-window with signed Stouffer's combining, HMM segmentation over `meth_diff`, and a DSS-compatible **chain-merge** caller (`tl.dmr(method="chain_merge", preset="strict" | "default" | "permissive")`) that mirrors DSS `callDMR` semantics. `tl.dmr(..., empirical_fdr=True, n_perm=100)` re-runs the engine on shuffled labels and reports empirical p- and q-values. `tl.diagnose_dmr_calling(md, reference_dmrs)` buckets unrecovered reference DMRs into actionable categories (coverage loss vs. weak test vs. structural filter) for triage.
 - **Differential variability.** `tl.dvc(md)` finds CpGs whose between-replicate variance differs between groups even when the means don't — the iEVORA signal that mean-based DMC misses.
@@ -148,7 +148,7 @@ ep.tl.dmr(md, method="tile", empirical_fdr=True, n_perm=100, perm_seed=42)
 
 ### 5. The `lr+` power stack — closing the gap to methylKit / RADMeth / DSS
 
-The default `lr` test is a *conservative* quasi-binomial likelihood ratio: it controls FPR aggressively, sometimes at the cost of 5-16 pp of TPR at low coverage on strong-effect sites or at 2 v 2 replicate designs (see `comparison_test/benchmark/REPORT.md` Section 4). Four targeted opt-in enhancements close that gap without inflating FPR.
+The default `lr` test is a *conservative* quasi-binomial likelihood ratio: it controls FPR aggressively, sometimes at the cost of 5-16 pp of TPR at low coverage on strong-effect sites or at 2 v 2 replicate designs (see [`benchmark/REPORT.md`](benchmark/REPORT.md) Section 4). Four targeted opt-in enhancements close that gap without inflating FPR.
 
 ```python
 # Drop-in "lr+" recipe: enable all four enhancements at once

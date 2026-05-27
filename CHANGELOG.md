@@ -4,7 +4,7 @@ All notable changes to **epykit** are tracked here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project uses
 SemVer (`MAJOR.MINOR.PATCH`).
 
-## [Unreleased] — 0.7.2
+## [0.7.2] — 2026-05-21
 
 Eight targeted fixes identified by a full benchmark comparison against
 methylKit, DSS, RADMeth, BiSeq, methylSig, and Fisher (Piao et al.
@@ -99,7 +99,7 @@ unaffected; only implicit defaults change.
 
 ---
 
-## [Unreleased] — 0.7.1
+## [0.7.1] — 2026-05-21
 
 Targeted improvements to the `lr` DMC engine that close its
 asymptotic-quasi-binomial gap to methylKit / RADMeth / DSS at low
@@ -149,7 +149,7 @@ exactly.
 
 - **Benchmark and write-up.** End-to-end reproduction of the Piao
   et al. 2021 (IJERPH 18:7975) simulated benchmark under
-  `comparison_test/benchmark/`, including ground-truth
+  `benchmark/`, including ground-truth
   reconstruction (35 reference DMRs / 19,999 true DMCs, both
   matching the paper's design exactly), baseline-table
   transcription, 7 figures, and a paper-style manuscript.
@@ -177,7 +177,7 @@ exactly.
   near-perfect-separation 2 × 2 tables. Fixed in 0.7.2 with a
   dual-tail hypergeometric computation.
 
-## [Unreleased] — 0.7.0
+## [0.7.0] — 2026-05-21
 
 Adds a DSS-compatible DMR caller, DSS-style raw-count smoothing for DMC,
 annotatr-style multi-annotation (nearest TSS + all overlapping genes /
@@ -412,7 +412,7 @@ matrix-completion imputation, pyGenomeTracks-style track plot.
 
 ---
 
-## [Unreleased] — 0.3.0
+## [0.3.0]
 
 ### Added
 
