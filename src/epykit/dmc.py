@@ -2501,6 +2501,26 @@ def combine_neighbour_pvalues(
     than per-DMR so it slots into the existing DMC pipeline; pass
     ``out_col`` to ``apply_multiple_testing_correction(pvalue_col=...)``
     to obtain BH q-values on the combined p-values.
+
+    Independence assumption (known limitation in 0.7.x)
+    ---------------------------------------------------
+    Stouffer's combination assumes the per-site z-scores are independent.
+    Adjacent CpGs in WGBS are positively correlated (typical lag-1
+    autocorrelation 0.3-0.7 in CpG-dense regions), so the variance of the
+    combined Z is **larger** than 1 under H0 and the nominal N(0, 1) tail
+    used by this function is anti-conservative for null sites. In epykit
+    0.7.x, FDR control over the combined p-values relies on the
+    ``min_sign_agreement`` gate (which restricts combining to sites where
+    a majority of the window agrees on direction) and ``require_focal_signal``
+    (which prevents amplification at otherwise-uniform sites), **not** on
+    the Stouffer null being well-calibrated.
+
+    A correlation-aware replacement (Brown's method with an empirical
+    correlation kernel estimated per chromosome) is planned for v0.8;
+    see ``docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md``
+    P0-6 for the deferral rationale. The same spec recommends that
+    benchmark reports include null-calibration FDR alongside any
+    nominal-q claim that uses this combiner.
     """
     if weight != "uniform":
         raise NotImplementedError(f"weight={weight!r} not implemented yet.")

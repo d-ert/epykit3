@@ -14,6 +14,11 @@ SemVer (`MAJOR.MINOR.PATCH`).
   PROTOCOL.md and EXECUTIVE_SUMMARY downstream notes follow separately. See
   `docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md`.
 
+- **P0-6 (docs)**: `combine_neighbour_pvalues` docstring now explicitly
+  owns the Stouffer independence assumption violation under spatial
+  autocorrelation. The 0.7.x FDR safety net is the sign-agreement gate,
+  not the Stouffer null; Brown's-method replacement deferred to v0.8.
+
 ## [0.7.2] — 2026-05-21
 
 Eight targeted fixes identified by a full benchmark comparison against
