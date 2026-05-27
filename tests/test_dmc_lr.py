@@ -37,8 +37,14 @@ def test_lr_emits_log2_odds_ratio_pooled(synth_md_filtered):
 
 def test_fisher_emits_log2_odds_ratio_pooled(synth_md_filtered):
     md = synth_md_filtered
-    ep.tl.dmc(md, test="fisher")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        ep.tl.dmc(md, test="fisher")
     df = md.dmc
     assert "log2_odds_ratio_pooled" in df.columns
     assert "log2_odds_ratio" in df.columns
     assert np.isnan(df["log2_odds_ratio"].to_numpy()).all()
+    fut = [w for w in caught if issubclass(w.category, FutureWarning)]
+    assert fut and "log2_odds_ratio" in str(fut[0].message), (
+        f"expected FutureWarning for fisher backend; got {[str(w.message) for w in fut]}"
+    )
