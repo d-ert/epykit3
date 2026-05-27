@@ -2,12 +2,29 @@ raw_data/
 figures/
 mkdocs.yml
 
-# benchmark regenerables (not bundled in PyPI wheel; rebuilt by benchmark/scripts/*)
+# benchmark: commit only the resulting reports + figures + scripts.
+# Everything under benchmark/data/ (raw inputs, intermediate parquets,
+# baseline tables, methylkit per-scenario TSVs, eval_summary.parquet,
+# ground truth) is regenerable from scripts/ and NOT bundled in git.
+# Same for shinygo_lists/, idk_if_needed/, and binary artefacts
+# (.docx, .pptx) -- the markdown copies are the canonical reports.
 benchmark/raw_sim_data/
-benchmark/ground_truth/
 benchmark/_converted/
 benchmark/_runs/
 benchmark/results/
+benchmark/data/
+benchmark/shinygo_lists/
+benchmark/idk_if_needed/
+benchmark/**/*.docx
+benchmark/**/*.pptx
+# Override the global 'figures/' rule for benchmark/figures/ -- those
+# are the publication figures and ARE committed.
+!benchmark/figures/
+!benchmark/figures/**
+
+# Phase 2: filesystem-only archive of the pre-2026-05-27 benchmark dir
+# (~15 GB of regenerables; kept on disk only, not in git history)
+_legacy_benchmark/
 
 
 
