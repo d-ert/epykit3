@@ -493,8 +493,8 @@ def compute_dispersion_phi(
     shrink_pseudo_df: float = 4.0,
     min_disp_sites: int = 100,
     chrom_name: str = "?",
-) -> tuple[np.ndarray, float]:
-    """McCullagh-Nelder dispersion in the three modes used elsewhere.
+) -> tuple[np.ndarray, float, np.ndarray]:
+    """McCullagh-Nelder dispersion in the four modes used elsewhere.
 
     Parameters
     ----------
@@ -507,6 +507,7 @@ def compute_dispersion_phi(
         ``"chrom"``: single chromosome-pooled phi.
         ``"shrink"``: James-Stein-style weighted average of per-site and
         chromosome estimates.
+        ``"eb"``: empirical-Bayes shrinkage with data-driven weight.
     min_dispersion
         Clamp on phi (default 1.0). Underdispersion (phi < 1) usually
         reflects model misspecification rather than truly less-than-
@@ -514,8 +515,19 @@ def compute_dispersion_phi(
 
     Returns
     -------
-    phi_eff      (n_sites,) per-site dispersion used by the test
-    phi_hat      scalar chromosome-pooled phi (logged / returned for audit)
+    phi_eff
+        (n_sites,) per-site dispersion used by the test
+    phi_hat
+        scalar chromosome-pooled phi (logged / returned for audit)
+    df_phi
+        (n_sites,) effective df backing each phi estimate. This is the
+        correct dfd for the F-reference in ``reference_pvalues``:
+          * "site":  df_per_site (per-site residual df)
+          * "chrom": chrom-pooled df (often >> 1e5 ~= chi^2(1))
+          * "shrink"/"eb": df_per_site + shrink weight (~= 8 at typical n=3+3)
+        Using df_per_site for the pooled modes was a pre-fix bug that
+        crushed every p-value because F(1, 4) is much more conservative
+        than F(1, 1e5) ~= chi^2(1) at typical test statistics.
     """
     if dispersion not in {"site", "chrom", "shrink", "eb"}:
         raise ValueError(
@@ -528,6 +540,7 @@ def compute_dispersion_phi(
     if n_usable < min_disp_sites:
         phi_hat = float(min_dispersion)
         phi_raw = float(min_dispersion)
+        df_chrom = 1.0
         if dispersion == "chrom":
             logger.warning(
                 "%s: only %d sites usable for dispersion estimation; "
@@ -538,26 +551,30 @@ def compute_dispersion_phi(
         pearson_sum = float(pearson_per_site[usable].sum())
         df_sum = float(df_per_site[usable].sum())
         df_sum = max(df_sum, 1.0)
+        df_chrom = df_sum
         phi_raw = pearson_sum / df_sum
         phi_hat = float(max(min_dispersion, phi_raw))
         logger.info(
-            "%s: chrom-pooled phi = %.3f (raw %.3f, %d sites); dispersion='%s'",
-            chrom_name, phi_hat, phi_raw, n_usable, dispersion,
+            "%s: chrom-pooled phi = %.3f (raw %.3f, %d sites, df=%s); dispersion='%s'",
+            chrom_name, phi_hat, phi_raw, n_usable, f"{int(df_chrom):,}", dispersion,
         )
+
+    df_safe = np.where(df_per_site > 0, df_per_site, 1.0)
 
     if dispersion == "chrom":
         phi_eff = np.full(pearson_per_site.shape, phi_hat, dtype=np.float64)
-        return phi_eff, phi_hat
+        df_phi  = np.full(pearson_per_site.shape, df_chrom, dtype=np.float64)
+        return phi_eff, phi_hat, df_phi
 
-    # site / shrink: per-site estimate
-    df_safe = np.where(df_per_site > 0, df_per_site, 1.0)
+    # site / shrink / eb: per-site estimate (or weighted average involving it)
     with np.errstate(invalid="ignore", divide="ignore"):
         phi_site = pearson_per_site / df_safe
     phi_site = np.where(usable, phi_site, min_dispersion)
     phi_site = np.maximum(phi_site, min_dispersion)
 
     if dispersion == "site":
-        return phi_site, phi_hat
+        # Per-site phi is estimated from this site's df_per_site Pearson sum.
+        return phi_site, phi_hat, df_safe.astype(np.float64).copy()
 
     if dispersion == "eb":
         n_usable_eb = int(usable.sum())
@@ -576,11 +593,14 @@ def compute_dispersion_phi(
         den = df_safe + w_eb
         phi_eff = np.maximum(num / den, min_dispersion)
         phi_eff = np.where(usable, phi_eff, phi_hat)
+        # Effective df of the weighted average. Where we fell back to phi_chrom,
+        # use the chrom-pool df.
+        df_phi = np.where(usable, df_safe + float(w_eb), df_chrom).astype(np.float64)
         logger.info(
-            "%s: bb_lr empirical-Bayes shrinkage w_eb=%.2f",
+            "%s: empirical-Bayes shrinkage w_eb=%.2f",
             chrom_name, w_eb,
         )
-        return phi_eff, phi_hat
+        return phi_eff, phi_hat, df_phi
 
     # shrink
     w = float(shrink_pseudo_df)
@@ -588,7 +608,8 @@ def compute_dispersion_phi(
     den = df_safe + w
     phi_eff = np.maximum(num / den, min_dispersion)
     phi_eff = np.where(usable, phi_eff, phi_hat)
-    return phi_eff, phi_hat
+    df_phi = np.where(usable, df_safe + w, df_chrom).astype(np.float64)
+    return phi_eff, phi_hat, df_phi
 
 
 def reference_pvalues(

@@ -798,21 +798,24 @@ def _score_finalize(
             )
         phi_hat = float(min_dispersion)
         phi_raw = float(min_dispersion)
+        # df_chrom = 1 in the fallback case isn't actually used because
+        # phi_hat = min_dispersion = 1.0 here, which never trips the F-branch.
+        df_chrom = 1.0
     else:
         n_obs = int(nv_case[sites_dispers].sum() + nv_ctrl[sites_dispers].sum())
-        df    = max(n_obs - 2 * n_disp, 1)
+        df_chrom = float(max(n_obs - 2 * n_disp, 1))
 
         pearson_sum = float(
             chi_case[sites_dispers].sum() + chi_ctrl[sites_dispers].sum()
         )
-        phi_raw = pearson_sum / df
+        phi_raw = pearson_sum / df_chrom
         phi_hat = float(max(min_dispersion, phi_raw))
 
         logger.info(
             "%s: chrom-pooled phi = %.3f (raw %.3f, %s sites, %s obs, df=%s); "
             "applying dispersion='%s'",
             chrom_name, phi_hat, phi_raw,
-            f"{n_disp:,}", f"{n_obs:,}", f"{df:,}", dispersion,
+            f"{n_disp:,}", f"{n_obs:,}", f"{int(df_chrom):,}", dispersion,
         )
 
     # --- Per-site Pearson dispersion phi_i (only used when needed) ---------
@@ -832,6 +835,8 @@ def _score_finalize(
 
         if dispersion == "site":
             phi_eff = phi_site
+            # Per-site phi is estimated from this site's 4 df Pearson sum.
+            df_phi = df_i_safe.copy()
         elif dispersion == "eb":
             # Empirical-Bayes shrinkage with data-driven shrinkage weight.
             # Treat phi_site_i as a noisy estimator of an unknown true phi_i,
@@ -864,6 +869,13 @@ def _score_finalize(
             den = df_i_safe + w_eb
             phi_eff = np.maximum(num / den, min_dispersion)
             phi_eff = np.where(sites_dispers & (df_i > 0), phi_eff, phi_hat)
+            # Weighted-average phi has effective df = (df_i + w_eb). Where we
+            # fell back to phi_chrom, the df is the chrom-pool df.
+            df_phi = np.where(
+                sites_dispers & (df_i > 0),
+                df_i_safe + float(w_eb),
+                max(df_chrom, 1.0),
+            )
             logger.info(
                 "%s: empirical-Bayes shrinkage with w_eb=%.2f (phi_chrom=%.3f, "
                 "phi_site var=%.2g over %d sites).",
@@ -880,8 +892,18 @@ def _score_finalize(
             # Where the per-site estimator was unusable, fall back to the
             # chromosome value rather than the floor.
             phi_eff = np.where(sites_dispers & (df_i > 0), phi_eff, phi_hat)
+            # Weighted-average phi has effective df = (df_i + shrink_pseudo_df).
+            # Where we fell back to phi_chrom, the df is the chrom-pool df.
+            df_phi = np.where(
+                sites_dispers & (df_i > 0),
+                df_i_safe + w,
+                max(df_chrom, 1.0),
+            )
     else:  # "chrom"
         phi_eff = np.full_like(sn_case, phi_hat, dtype=np.float64)
+        # Chromosome-pooled phi is estimated from the whole chrom's Pearson sum,
+        # so df_phi here is df_chrom (often >> 1e5, making F(1, df_phi) -> chi^2(1)).
+        df_phi = np.full_like(sn_case, max(df_chrom, 1.0), dtype=np.float64)
 
     # --- Test for H0: pi_case = pi_ctrl --------------------------------------
     # Both the score and LR statistics use the same per-group sufficient
@@ -933,21 +955,25 @@ def _score_finalize(
         chi2_stat = np.where(var_U_bin > 0, chi2_stat, np.nan)
 
     # --- Reference distribution -> p-value ---------------------------------
-    # Per-site adaptive switch: F(1, df_residual) where the dispersion phi
-    # cleared the min-dispersion floor (phi > 1, i.e. real overdispersion
-    # signal), chi^2(1) where phi was clamped to 1. F handles the over-
-    # dispersed sites; chi^2 handles the ones where the quasi-binomial
-    # collapses to a binomial.
-    df_resid = np.maximum(
-        (nv_case + nv_ctrl).astype(np.float64) - 2.0,
-        1.0,
-    )
+    # Per-site adaptive switch: F(1, df_phi) where the dispersion phi cleared
+    # the min-dispersion floor (phi > 1, i.e. real overdispersion signal),
+    # chi^2(1) where phi was clamped to 1. F handles the overdispersed sites;
+    # chi^2 handles the ones where the quasi-binomial collapses to a binomial.
+    #
+    # df_phi is the df backing the phi estimate (NOT the per-site residual df
+    # nv_case+nv_ctrl-2). It differs across dispersion modes:
+    #   - "site":   per-site Pearson sum has df ~= 4 at n=3+3
+    #   - "chrom":  chromosome-pooled phi has df_chrom (often >> 1e5)
+    #   - "shrink/eb": df_i + shrink_pseudo_df (or w_eb)
+    # Using nv_case+nv_ctrl-2 for the pooled modes (the pre-0.7.x bug) crushed
+    # every p-value because F(1, 4) is ~250x more conservative than chi^2(1)
+    # at typical test statistics.
     if reference == "adaptive":
-        p_F    = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_resid)
+        p_F    = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi)
         p_chi2 = sp_stats.chi2.sf(chi2_stat, df=1)
         pvals  = np.where(phi_eff > 1.0, p_F, p_chi2)
     elif reference == "F":
-        pvals = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_resid)
+        pvals = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi)
     else:  # "chi2"
         pvals = sp_stats.chi2.sf(chi2_stat, df=1)
 
@@ -1625,7 +1651,9 @@ def _process_one_chromosome(
 
         df_resid_per_site = (n_eff_bb.astype(np.float64) - 2.0)
         df_resid_safe = np.maximum(df_resid_per_site, 1.0)
-        phi_eff, _phi_hat = _glm.compute_dispersion_phi(
+        # bb_lr path: discards df_phi to preserve its pre-fix behavior
+        # (it still passes df_resid_safe to reference_pvalues).
+        phi_eff, _phi_hat, _df_phi = _glm.compute_dispersion_phi(
             pearson_per_site=pearson_f,
             df_per_site=df_resid_per_site,
             dispersion=dispersion,
@@ -1700,7 +1728,7 @@ def _process_one_chromosome(
         df_resid_per_site = (n_eff.astype(np.float64) - float(p_full))
         df_resid_safe = np.maximum(df_resid_per_site, 1.0)
 
-        phi_eff, _phi_hat = _glm.compute_dispersion_phi(
+        phi_eff, _phi_hat, df_phi = _glm.compute_dispersion_phi(
             pearson_per_site=pearson_full,
             df_per_site=df_resid_per_site,
             dispersion=dispersion,
@@ -1715,8 +1743,12 @@ def _process_one_chromosome(
             lr_raw = np.where(lr_raw < 0, 0.0, lr_raw)
             chi2_stat = np.where(phi_eff > 0, lr_raw / phi_eff, np.nan)
 
+        # F-reference uses df_phi (df backing the phi estimate), NOT
+        # df_resid_safe (per-site residual df). Identical to df_resid_safe for
+        # dispersion="site"; for "chrom"/"shrink"/"eb" it's the chrom-pool or
+        # shrinkage-effective df. Same bug-fix as in _score_finalize.
         pvals = _glm.reference_pvalues(
-            chi2_stat, phi_eff, df_resid_safe, reference=reference,
+            chi2_stat, phi_eff, df_phi, reference=reference,
         )
 
         # Effect-size columns from the GLM coefficient (log-odds) and its SE.
@@ -1795,7 +1827,7 @@ def _process_one_chromosome(
 
         p_full = design_full.shape[1]
         df_resid_per_site = (n_eff.astype(np.float64) - float(p_full))
-        phi_eff, _phi_hat = _glm.compute_dispersion_phi(
+        phi_eff, _phi_hat, df_phi = _glm.compute_dispersion_phi(
             pearson_per_site=pearson_full,
             df_per_site=df_resid_per_site,
             dispersion=dispersion,
@@ -1803,9 +1835,10 @@ def _process_one_chromosome(
         )
         df_resid_safe = np.maximum(df_resid_per_site, 1.0)
 
+        # F-reference uses df_phi (see comment in glm path above).
         stat, pvals, k_rank = _glm.wald_test(
             beta_full, cov_beta, contrast_matrix,
-            phi_eff=phi_eff, df_resid=df_resid_safe, reference=reference,
+            phi_eff=phi_eff, df_resid=df_phi, reference=reference,
         )
         k_rank = int(k_rank)
 
