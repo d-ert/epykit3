@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import numpy as np
 import polars as pl
-import pytest
 
 
 def test_add_wilson_ci_for_tpr_matches_scipy_reference():

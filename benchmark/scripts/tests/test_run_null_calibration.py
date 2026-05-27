@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import numpy as np
 import polars as pl
-import pytest
 
 
 def test_compute_observed_fdr_matches_definition():
