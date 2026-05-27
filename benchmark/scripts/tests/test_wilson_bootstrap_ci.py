@@ -115,17 +115,14 @@ def test_bootstrap_f1_ci_contains_point_estimate():
 
 
 def _auroc_reference(is_dmc: np.ndarray, pvalues: np.ndarray) -> float:
-    """Reference AUROC via Mann-Whitney U."""
+    """Reference AUROC via Mann-Whitney U with average-rank tie handling."""
     score = 1.0 - pvalues
     n_pos = int(is_dmc.sum())
     n_neg = len(is_dmc) - n_pos
     if n_pos == 0 or n_neg == 0:
         return float("nan")
-    # Average ranks for ties.
-    order = np.argsort(score)
-    ranks = np.empty_like(order, dtype=np.float64)
-    ranks[order] = np.arange(1, len(order) + 1)
-    # Handle ties (rare here; use scipy if needed).
+    from scipy.stats import rankdata
+    ranks = rankdata(score, method="average")
     sum_ranks_pos = ranks[is_dmc].sum()
     u = sum_ranks_pos - n_pos * (n_pos + 1) / 2
     return u / (n_pos * n_neg)

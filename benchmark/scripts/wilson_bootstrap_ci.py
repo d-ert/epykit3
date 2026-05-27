@@ -100,14 +100,14 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def _auroc_mwu(is_dmc: np.ndarray, score: np.ndarray) -> float:
-    """AUROC via Mann-Whitney U with average ranks for ties."""
+    """AUROC via Mann-Whitney U with proper average-rank tie handling
+    (matches scipy.stats.rankdata(method='average') and evaluate.py)."""
     n_pos = int(is_dmc.sum())
     n_neg = len(is_dmc) - n_pos
     if n_pos == 0 or n_neg == 0:
         return float("nan")
-    order = np.argsort(score, kind="mergesort")
-    ranks = np.empty_like(order, dtype=np.float64)
-    ranks[order] = np.arange(1, len(order) + 1, dtype=np.float64)
+    from scipy.stats import rankdata
+    ranks = rankdata(score, method="average")
     sum_ranks_pos = ranks[is_dmc].sum()
     u = sum_ranks_pos - n_pos * (n_pos + 1) / 2.0
     return float(u / (n_pos * n_neg))
@@ -123,6 +123,8 @@ def bootstrap_auroc_ci(
     """Bootstrap AUROC CI by resampling CpGs with replacement.
 
     Returns (lo, hi) at the given confidence level (two-sided percentile).
+    Uses ``np.nanpercentile`` because a bootstrap draw where all resampled
+    CpGs share one class returns NaN from ``_auroc_mwu``; those draws are skipped.
     """
     rng = np.random.default_rng(seed)
     n = len(is_dmc)
