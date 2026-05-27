@@ -1596,95 +1596,6 @@ def _process_one_chromosome(
             mean_ctrl, M2_ctrl, n_valid_ctrl,
         )
 
-    elif test == "bb_lr":
-        # True beta-binomial LRT via a quasi-binomial GLM on a binary
-        # treatment indicator, with site-level dispersion estimated from
-        # the per-replicate Pearson residuals. Distinct from "lr" (which
-        # works on per-group pooled counts and a single phi from
-        # _score_finalize): bb_lr fits the full GLM at every site so the
-        # quasi-binomial dispersion correctly reflects between-replicate
-        # over-dispersion at THIS site, which is the spirit of a beta-
-        # binomial model.
-        all_samples = samples_case + samples_control
-        n_samples = len(all_samples)
-        if n_samples < 6 and dispersion == "site":
-            logger.warning(
-                "[WARN]  bb_lr with n=%d total samples (df_resid=%d) has very "
-                "noisy per-site dispersion estimates. Promoting dispersion to "
-                "'shrink' to stabilise estimates. Consider test='lr' for "
-                "higher power.",
-                n_samples, n_samples - 2,
-            )
-            dispersion = "shrink"
-        meth_stack = np.zeros((n_sites, n_samples), dtype=np.int32)
-        cov_stack  = np.zeros((n_sites, n_samples), dtype=np.int32)
-        # DSS-style smoothing (smoothing=True): per-sample uniform-box
-        # average of (meth, cov) in a +/-smoothing_span_bp//2 window before
-        # the counts hit the IRLS. Rounded back to int32 to match DSS's
-        # round(smooth.chr(...)) and to fit the existing irls_dispatch
-        # contract (which expects integer count arrays).
-        chrom_positions_bb = (
-            canonical_pos.to_series().to_numpy() if smoothing else None
-        )
-        for j, sample in enumerate(all_samples):
-            meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
-            if smoothing:
-                meth_sm, cov_sm = _smooth_sample_counts_box(
-                    meth, cov, chrom_positions_bb, smoothing_span_bp,
-                )
-                meth = np.rint(meth_sm).astype(np.int32)
-                cov  = np.rint(cov_sm).astype(np.int32)
-            meth_stack[:, j] = meth
-            cov_stack[:, j]  = cov
-            if j < len(samples_case):
-                _welford_update(mean_case, M2_case, n_valid_case, meth, cov)
-            else:
-                _welford_update(mean_ctrl, M2_ctrl, n_valid_ctrl, meth, cov)
-            del meth, cov
-
-        # Build a tiny intercept + treatment design.
-        treat = np.zeros(n_samples, dtype=np.float64)
-        treat[:len(samples_case)] = 1.0
-        X_bb_full = np.column_stack([np.ones(n_samples), treat])
-        X_bb_red  = np.ones((n_samples, 1))
-
-        from . import _glm
-        beta_f, se_f, dev_f, pearson_f, n_eff_bb = _glm.irls_dispatch(
-            meth_stack, cov_stack, X_bb_full, backend=glm_backend,
-        )
-        _bbeta_r, _bse_r, dev_r, _bpearson_r, _bn_eff_r = _glm.irls_dispatch(
-            meth_stack, cov_stack, X_bb_red, backend=glm_backend,
-        )
-
-        df_resid_per_site = (n_eff_bb.astype(np.float64) - 2.0)
-        df_resid_safe = np.maximum(df_resid_per_site, 1.0)
-        # bb_lr path: discards df_phi to preserve its pre-fix behavior
-        # (it still passes df_resid_safe to reference_pvalues).
-        phi_eff, _phi_hat, _df_phi = _glm.compute_dispersion_phi(
-            pearson_per_site=pearson_f,
-            df_per_site=df_resid_per_site,
-            dispersion=dispersion,
-            chrom_name=chrom,
-        )
-
-        with np.errstate(invalid="ignore", divide="ignore"):
-            lr_raw = dev_r - dev_f
-            lr_raw = np.where(lr_raw < 0, 0.0, lr_raw)
-            chi2_stat = np.where(phi_eff > 0, lr_raw / phi_eff, np.nan)
-        pvals = _glm.reference_pvalues(
-            chi2_stat, phi_eff, df_resid_safe, reference=reference,
-        )
-
-        coef_treatment = beta_f[:, 1].astype(np.float64)
-        coef_se        = se_f[:, 1].astype(np.float64) * np.sqrt(np.maximum(phi_eff, 1.0))
-        log2_ors = (coef_treatment / np.log(2.0))
-        degenerate_bb = np.isnan(chi2_stat) | np.isnan(pvals) | (n_eff_bb < 2)
-        pvals = np.where(degenerate_bb, np.nan, pvals)
-        log2_ors = np.where(degenerate_bb, np.nan, log2_ors)
-        extras["coef_treatment"] = coef_treatment
-        extras["coef_se"]        = coef_se
-        del meth_stack, cov_stack, beta_f, se_f, dev_f, dev_r, pearson_f, n_eff_bb
-
     elif test == "glm":
         # Covariate-aware binomial GLM with deviance LR test.
         #
@@ -2037,16 +1948,7 @@ def _validate_sample_size_and_warn(n_case: int, n_ctrl: int, test: str) -> None:
         logger.warning(
             "[WARN]  Welch t with "
             "n<6 may have poor variance estimates.\n"
-            "   Consider using test='lr' (recommended) or test='bb_lr' "
-            "(true quasi-binomial LRT)."
-        )
-
-    if test == "bb_lr" and min_n < 3:
-        logger.warning(
-            "[WARN]  bb_lr requires at least 3 replicates per group for "
-            "reliable dispersion estimation (got min_n=%d). "
-            "Use test='lr' instead.",
-            min_n,
+            "   Consider using test='lr' (recommended)."
         )
 
     if test == "fisher" and min_n >= 2:
@@ -2108,7 +2010,7 @@ def process_chromosomes_dmc(
         Path to filtered partitioned Parquet methylstore.
     samples_treatment, samples_control : list[str]
         Sample identifiers for treatment and control groups.
-    test : {"lr", "score", "fisher", "cmh", "welch_t", "bb_lr"}
+    test : {"lr", "score", "fisher", "cmh", "welch_t"}
         Statistical test.
             "lr"       (default) -- Quasi-binomial likelihood-ratio chi-square
                                    on per-group read counts with per-site
@@ -2122,10 +2024,6 @@ def process_chromosomes_dmc(
             "welch_t"            -- Welch t on raw betas. Variance-stabilising
                                    fallback when count-model assumptions are
                                    doubtful (e.g. very low coverage).
-            "bb_lr"              -- True quasi-binomial LRT via a full per-
-                                   site GLM on a binary-treatment design.
-                                   Slow, but the honest "fit-the-model"
-                                   version of "welch_t".
             "cmh"                -- Cochran-Mantel-Haenszel with one stratum
                                    per (case_i, ctrl_j) pair.
             "fisher"             -- Fisher exact on reads pooled across

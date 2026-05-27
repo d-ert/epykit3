@@ -535,7 +535,7 @@ def main():
         "--test",
         choices=[
             "lr", "score", "glm", "welch_t",
-            "bb_lr", "cmh", "fisher",
+            "cmh", "fisher",
         ],
         default="lr",
         help=(
@@ -549,8 +549,6 @@ def main():
             "glm -- Binomial GLM with covariates (requires a design via "
             "--formula). "
             "welch_t -- Welch t on raw betas. "
-            "bb_lr -- True quasi-binomial LRT on a binary-treatment GLM with "
-            "per-site dispersion. "
             "cmh -- Cochran-Mantel-Haenszel on per-pair strata. "
             "fisher -- Fisher exact on reads pooled across replicates "
             "(anti-conservative, kept for backward compatibility; warns)."
@@ -627,7 +625,7 @@ def main():
         "--test",
         choices=[
             "lr", "score", "glm", "welch_t",
-            "bb_lr", "cmh", "fisher",
+            "cmh", "fisher",
         ],
         default="lr",
         help="(tile only) Statistical test applied to tile-level counts. "

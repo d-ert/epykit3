@@ -347,9 +347,9 @@ def dmc(
         treatment/control sample lists.
     test : str
         One of ``"auto"``, ``"lr"``, ``"score"``, ``"welch_t"``
-        (Welch t on raw betas), ``"bb_lr"`` (true quasi-binomial LRT),
-        ``"cmh"``, ``"fisher"``, ``"glm"``. ``"auto"`` resolves to
-        ``"fisher"`` at n<2 and ``"lr"`` (the recommended default) at n>=2.
+        (Welch t on raw betas), ``"cmh"``, ``"fisher"``, ``"glm"``.
+        ``"auto"`` resolves to ``"fisher"`` at n<2 and ``"lr"``
+        (the recommended default) at n>=2.
 
         When ``formula`` and/or ``contrast`` are supplied, the test is
         forced to a GLM-based path regardless of ``test=``.
@@ -403,6 +403,14 @@ def dmc(
             "test='logit_t' was removed in 0.7.5 (miscalibrated near β=0/1). "
             "Use test='welch_t' for the replicate-aware β-mean test or "
             "test='lr' for the recommended default."
+        )
+
+    if test == "bb_lr":
+        raise ValueError(
+            "test='bb_lr' was removed in 0.7.5 (TPR < 8% at n ≤ 4 + a "
+            "dispersion-df bug). Use test='lr' (recommended) which uses "
+            "the same quasi-binomial dispersion but pools counts per group "
+            "for higher power at small n."
         )
 
     # --- New contrast / multi-group path -------------------------------------

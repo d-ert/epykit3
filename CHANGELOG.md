@@ -41,6 +41,12 @@ SemVer (`MAJOR.MINOR.PATCH`).
   depends on it. Calls now raise `ValueError` with a migration hint.
   Migration: `test='logit_t'` → `test='welch_t'` or `test='lr'`.
 
+- **`tl.dmc(test='bb_lr')`** removed. TPR < 8% at n ≤ 4 in the
+  published benchmark; also affected by the P1-2 dispersion-df bug
+  (now closed by removal). Calls now raise `ValueError` with a
+  migration hint. Migration: `test='bb_lr'` → `test='lr'`. Note:
+  `irls_dispatch` stays (used by the `glm` engine).
+
 ### Changed (BREAKING for `log2_odds_ratio` column name)
 
 - **`varm["dmc_lr"].log2_odds_ratio`** renamed to
@@ -115,6 +121,15 @@ SemVer (`MAJOR.MINOR.PATCH`).
   observed FDR at q<0.05 = 0.0000 (BH conservative at low n, as expected).
   If you benchmarked under 0.7.2 with `dispersion="eb"` (the default), the previously reported FPR is artificially suppressed and should be recomputed.
   See the bug-fix audit table in Phase 2 for per-cell deltas.
+
+### Fixed (P1 manifest)
+
+- **P1-2** (`bb_lr` `df_resid` vs `df_phi`): **closed by removal** of
+  `test='bb_lr'`. The engine incorrectly discarded `df_phi` from
+  `compute_dispersion_phi` and passed `df_resid_safe` to
+  `reference_pvalues` instead, causing miscalibrated F-distributed
+  p-values under `dispersion != "site"`. Removed in 0.7.5 together
+  with the broader TPR < 8% finding. Migration: `test='lr'`.
 
 ### Changed (breaking on the `lr+` schema)
 

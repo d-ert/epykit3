@@ -301,7 +301,7 @@ def test_deconvolve_unknown_method_errors(synth_md_filtered):
 # ---- CI columns + bb_lr (merged from test_dmc_ci_and_rename.py) ----------
 
 
-@pytest.mark.parametrize("test", ["lr", "score", "welch_t", "bb_lr"])
+@pytest.mark.parametrize("test", ["lr", "score", "welch_t"])
 def test_dmc_emits_meth_diff_ci_columns(synth_md_filtered, test):
     """Every DMC test path emits meth_diff_ci_lo / meth_diff_ci_hi."""
     md = synth_md_filtered
@@ -332,15 +332,8 @@ def test_beta_binomial_is_rejected(synth_md_filtered):
         ep.tl.dmc(md, test="beta_binomial")
 
 
-def test_bb_lr_is_distinct_from_lr(synth_md_filtered):
-    """bb_lr (true quasi-binomial LRT) produces a separate output table
-    from lr and surfaces coef_treatment / coef_se."""
+def test_bb_lr_is_removed(synth_md_filtered):
+    """test='bb_lr' was removed in 0.7.5; it should now raise ValueError."""
     md = synth_md_filtered
-    ep.tl.dmc(md, test="bb_lr")
-    df = md.get_dmc(test="bb_lr")
-    assert df is not None
-    assert "coef_treatment" in df.columns
-    assert "coef_se" in df.columns
-    coef = df.get_column("coef_treatment").drop_nulls().to_numpy()
-    assert coef.size > 0
-    assert np.isfinite(coef).any()
+    with pytest.raises(ValueError, match="bb_lr"):
+        ep.tl.dmc(md, test="bb_lr")
