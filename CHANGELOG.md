@@ -42,6 +42,18 @@ SemVer (`MAJOR.MINOR.PATCH`).
   Affects any DMC run that used ``empirical_fdr=True``; empirical
   p-values will rise (more conservative).
 
+- **P0-4 (`dmc._score_finalize` adaptive-F branch)**: ``df_phi`` is now
+  floored at 50 when the F branch fires (``phi_eff > 1.0``). Previously, in
+  ``dispersion="eb"`` mode with small empirical-Bayes weight (the
+  homogeneous-dispersion case), ``df_phi`` collapsed to ~4 and F(1, 4) was
+  ~250x more conservative than chi^2(1) at typical test statistics --
+  this drove the artifactually low FPR in eb mode in 0.7.2. The
+  chi^2 branch (clamped phi) is unaffected. Expected impact on
+  benchmark numbers: ``lr / eb`` FPR rises modestly, TPR essentially
+  unchanged. Null-calibration smoke (n=1934, n_per_group=3, no true DMCs):
+  observed FDR at q<0.05 = 0.0000 (BH conservative at low n, as expected).
+  See the bug-fix audit table in Phase 2 for per-cell deltas.
+
 ### Changed (breaking on the `lr+` schema)
 
 - **P0-1**: ``tl.dmc(..., neighbour_combine=True)`` no longer overwrites

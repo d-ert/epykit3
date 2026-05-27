@@ -964,16 +964,24 @@ def _score_finalize(
     # nv_case+nv_ctrl-2). It differs across dispersion modes:
     #   - "site":   per-site Pearson sum has df ~= 4 at n=3+3
     #   - "chrom":  chromosome-pooled phi has df_chrom (often >> 1e5)
-    #   - "shrink/eb": df_i + shrink_pseudo_df (or w_eb)
-    # Using nv_case+nv_ctrl-2 for the pooled modes (the pre-0.7.x bug) crushed
-    # every p-value because F(1, 4) is ~250x more conservative than chi^2(1)
-    # at typical test statistics.
+    #   - "shrink/eb": df_i + shrink_pseudo_df (or w_eb), can collapse to ~4
+    # In "eb" mode with small w_eb (the homogeneous-dispersion / easy
+    # case), df_phi falls back to ~4 and F(1, 4) is ~250x more conservative
+    # than chi^2(1) at typical test statistics -- this is the bug behind
+    # the artifactually low FPR in eb mode in 0.7.2. Floor df_phi at 50
+    # so F(1, 50) is within ~1% of chi^2(1) at typical statistics on
+    # the F branch; the chi^2 branch (clamped phi) is unaffected.
+    # Rationale for 50: F(1, 50) is within ~1% of chi^2(1) at the 5%
+    # critical region (chi^2 critical value 3.84).
+    DF_PHI_FLOOR = 50.0  # F(1, 50) within ~1% of chi^2(1) at the 5% critical region
     if reference == "adaptive":
-        p_F    = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi)
+        df_phi_floored = np.maximum(df_phi, DF_PHI_FLOOR)
+        p_F    = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi_floored)
         p_chi2 = sp_stats.chi2.sf(chi2_stat, df=1)
         pvals  = np.where(phi_eff > 1.0, p_F, p_chi2)
     elif reference == "F":
-        pvals = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi)
+        df_phi_floored = np.maximum(df_phi, DF_PHI_FLOOR)
+        pvals = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi_floored)
     else:  # "chi2"
         pvals = sp_stats.chi2.sf(chi2_stat, df=1)
 
