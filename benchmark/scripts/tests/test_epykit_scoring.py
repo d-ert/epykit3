@@ -9,6 +9,8 @@ refactors cannot silently change either.
 
 from __future__ import annotations
 
+import math
+
 import polars as pl
 import pytest
 
@@ -75,10 +77,7 @@ def test_auroc_all_equal_scores_returns_nan():
         "is_dmc": [True, False, True, False, True, False],
         "pvalue": [0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
     })
-    assert _auroc(joined) != _auroc(joined) or (
-        # NaN != NaN; the canonical NaN check is `x != x` or math.isnan
-        str(_auroc(joined)) == "nan"
-    )
+    assert math.isnan(_auroc(joined))
 
 
 def test_auroc_no_positives_returns_nan():
@@ -86,8 +85,7 @@ def test_auroc_no_positives_returns_nan():
         "is_dmc": [False, False, False],
         "pvalue": [0.1, 0.5, 0.9],
     })
-    out = _auroc(joined)
-    assert str(out) == "nan"
+    assert math.isnan(_auroc(joined))
 
 
 def test_auroc_no_negatives_returns_nan():
@@ -95,8 +93,7 @@ def test_auroc_no_negatives_returns_nan():
         "is_dmc": [True, True, True],
         "pvalue": [0.1, 0.5, 0.9],
     })
-    out = _auroc(joined)
-    assert str(out) == "nan"
+    assert math.isnan(_auroc(joined))
 
 
 def test_auroc_perfect_separation_is_one():
