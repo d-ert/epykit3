@@ -134,9 +134,16 @@ def test_dvc_writes_expected_schema(synth_md_filtered):
     assert df.schema["is_dvc"] == pl.Boolean
 
 
-@pytest.mark.parametrize("bad_test", ["levene", "brown_forsythe", "f_test"])
+@pytest.mark.parametrize("bad_test", ["levene", "f_test"])
 def test_dvc_rejects_unsupported_tests(synth_md_filtered, bad_test):
-    """Only 'bartlett' is supported; others should raise a clear ValueError."""
+    """Unsupported test names should raise a clear ValueError."""
     md = synth_md_filtered
-    with pytest.raises(ValueError, match="bartlett"):
+    with pytest.raises(ValueError, match="brown_forsythe"):
         ep.tl.dvc(md, test=bad_test)
+
+
+def test_dvc_brown_forsythe_accepted(synth_md_filtered):
+    """'brown_forsythe' is the new default and must not raise."""
+    md = synth_md_filtered
+    ep.tl.dvc(md, test="brown_forsythe")
+    assert "dvc" in md.varm

@@ -89,6 +89,16 @@ SemVer (`MAJOR.MINOR.PATCH`).
   The pre-0.7.5 implementation emitted NaN p/q-values for every
   called segment, breaking any downstream filter on qvalue.
 
+### Fixed (P1 manifest)
+
+- **P1-7**: `tl.dvc` per-site variance test replaced from Bartlett with
+  Brown-Forsythe (median-centred Levene). Bartlett assumes normality; beta
+  methylation values are bounded [0,1] and U-shaped. Brown-Forsythe matches
+  `scipy.stats.levene(center='median')` to 1e-6. `process_chromosomes_dvc`
+  default changed to `test='brown_forsythe'`; `test='bartlett'` accepted as
+  a backward-compatible alias (silently redirected). DVC not in paper; no
+  headline impact.
+
 ### Fixed (P0 manifest, paper preparation)
 
 - **P0-3 (docs)**: `tl.dmc(..., dispersion=...)` docstring previously said
