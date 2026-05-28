@@ -39,3 +39,18 @@ Per-cell intermediate parquets live under this directory:
     epykit_post_phase3/dmc_replicate/<label>_<test>.parquet
     epykit_post_phase3/dmr_coverage/<label>_dmr_<method>.parquet
 These are gitignored bulk artefacts; regenerable via run_epykit_study1.py.
+
+Methylkit-tuned rows added -- Phase 4 Task 4 Step 2
+----------------------------------------------------
+Tool name in eval_summary_post_phase3.parquet: methylkit_tuned
+Rows added: 30  (10 cells x 3 meth_diff_bins)
+Source TSVs: benchmark/data/study2/methylkit_tuned/dmc_*_tuned.tsv
+Threshold: qvalue < 0.05, bins ['0.2-0.4', '0.4-0.6', '0.6-0.8']
+Scoring column: qvalue_combined (coalesce -> qvalue per row)
+Truth: benchmark/data/study1/ground_truth/dmc_truth.parquet
+Script: benchmark/scripts/score_methylkit_tuned.py
+Pair: row pairs 1:1 with the existing 'methylkit' rows (same
+  scenario/parameter/parameter_value/meth_diff_bin keys), with
+  integer tp/fp/tn/fn populated so Wilson CIs are real (the
+  untuned methylkit rows carry transcribed Piao-paper TPR/FPR
+  with null counts, hence NaN CIs).
