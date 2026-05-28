@@ -38,10 +38,11 @@ def _auto_test(
     covariates: list[str] | None = None,
     allow_n1: bool = False,
 ) -> str:
-    """Pick a sensible test based on group size, accounting for covariates.
+    """Auto-dispatcher: post-0.7.5 surface is closed to {fisher, lr}.
+    fisher at n=1 (only engine that works), lr at n>=2.
 
     When a covariate design is supplied, we MUST use the binomial GLM path
-    (``"glm"``) because the closed-form ``lr`` / ``score`` paths don't admit
+    (``"glm"``) because the closed-form ``lr`` path doesn't admit
     covariates. The choice is therefore unconditional whenever the user
     asks for adjustment.
 
@@ -342,10 +343,14 @@ def dmc(
         Analysis object containing the methylstore path and the
         treatment/control sample lists.
     test : str
-        One of ``"auto"``, ``"lr"``, ``"welch_t"``
-        (Welch t on raw betas), ``"fisher"``, ``"glm"``.
-        ``"auto"`` resolves to ``"fisher"`` at n<2 and ``"lr"``
+        One of ``"auto"``, ``"lr"``, ``"welch_t"``, ``"fisher"``, or
+        ``"glm"``. ``"auto"`` resolves to ``"fisher"`` at n<2 and ``"lr"``
         (the recommended default) at n>=2.
+
+        Engines removed in 0.7.5 (raise ``ValueError`` with a migration
+        hint): ``"logit_t"`` (use ``"welch_t"``), ``"bb_lr"`` (use
+        ``"lr"``), ``"score"`` (use ``"lr"``), ``"cmh"`` (use
+        ``formula='~ group + batch'``).
 
         When ``formula`` and/or ``contrast`` are supplied, the test is
         forced to a GLM-based path regardless of ``test=``.

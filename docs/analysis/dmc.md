@@ -1,7 +1,7 @@
 # DMC Calling
 
 `ep.tl.dmc(md)` runs per-CpG differential methylation calling and stores the
-result in `md.varm["dmc_<test>"]`. It supports 8 statistical backends, automatic
+result in `md.varm["dmc_<test>"]`. It supports 4 statistical backends, automatic
 test selection, covariate adjustment, empirical FDR, and distributed execution.
 
 ## Basic Usage
@@ -25,19 +25,20 @@ print(f"Tested {len(dmc_results)} CpG sites")
 
 ## Test Backends
 
-epykit ships 8 statistical backends for DMC calling. The `test` parameter
-selects which one to use.
+epykit ships 4 statistical backends for DMC calling (plus an `auto` dispatcher).
+The `test` parameter selects which one to use.
 
 | Test | Description | When to use |
 |------|-------------|-------------|
 | `lr` (default) | Quasi-binomial LR, McCullagh-Nelder dispersion | n >= 2, general purpose |
-| `score` | Pearson score test | Slightly more powerful, mildly anti-conservative |
 | `glm` | Full IRLS binomial GLM | Covariate adjustment (auto-selected with `formula=`) |
-| `logit_t` | Welch t on logit(beta) | Transformation-based alternative |
 | `welch_t` | Welch t on raw beta | Simple mean comparison |
-| `bb_lr` | True quasi-binomial LRT | Alternative to `lr` |
-| `cmh` | Cochran-Mantel-Haenszel | Stratified designs |
 | `fisher` | Pooled Fisher exact | n=1 fallback (auto-selected) |
+
+!!! note "Engines removed in 0.7.5"
+    `logit_t` (use `welch_t`), `bb_lr` (use `lr`), `score` (use `lr`),
+    `cmh` (use `formula='~ group + batch'`). All four raise `ValueError`
+    with a one-line migration hint.
 
 ### Auto-Selection Logic
 
@@ -50,7 +51,7 @@ When `test="auto"` (the default):
 
 ```python
 # Explicit test selection
-ep.tl.dmc(md, test="score")
+ep.tl.dmc(md, test="lr")
 
 # n=1 fallback (requires opt-in)
 ep.tl.dmc(md, test="auto", allow_n1=True)
@@ -65,7 +66,7 @@ ep.tl.dmc(md, test="auto", allow_n1=True)
 ## Dispersion Strategies
 
 The `dispersion` parameter controls how the overdispersion parameter (phi) is
-estimated for the `lr` and `score` tests.
+estimated for the `lr` test.
 
 | Strategy | Description |
 |----------|-------------|
@@ -115,7 +116,7 @@ The result DataFrame (`md.varm["dmc_<test>"]`) contains:
 | `log2_odds_ratio` | float | **Deprecated.** Transitional NaN-filled column present in 0.7.5 for backward compatibility; removed in 0.8. Use `log2_odds_ratio_pooled` or `coef_treatment_log2` instead. |
 
 Results are stored at `md.varm["dmc_<test>"]`, where `<test>` is the canonical
-test name (e.g., `dmc_lr`, `dmc_score`, `dmc_glm`).
+test name (e.g., `dmc_lr`, `dmc_glm`, `dmc_welch_t`, `dmc_fisher`).
 
 ## Smoothed-Input Mode
 

@@ -36,6 +36,12 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ### Removed
 
+- **DMC engine surface collapsed to `{auto, lr, welch_t, fisher, glm}`.** 
+  Dropped: `logit_t` (broken near β=0/1), `bb_lr` (TPR < 8% at n ≤ 4 + 
+  dispersion bug), `score` (dominated by `lr`), `cmh` (dominated by 
+  `glm + batch`). All four raise `ValueError` with a one-line migration 
+  hint. Removed from README, docs, CLAUDE.md, and CLI help.
+
 - **`tl.dmc(test='logit_t')`** removed. The engine was documented by
   epykit's own source as miscalibrated near β=0/1; no paper claim
   depends on it. Calls now raise `ValueError` with a migration hint.
