@@ -37,8 +37,18 @@ def _permute_md(md, samples_treatment: list[str], samples_control: list[str]):
     return md_copy
 
 
-def _dmc_engine(test_name: str, *, lr_plus: bool = False) -> Callable:
-    """Factory for a DMC engine closure."""
+def _dmc_engine(test_name: str, *, lr_plus: bool = False, glm: bool = False) -> Callable:
+    """Factory for a DMC engine closure.
+
+    ``glm=True`` routes through ``ep.tl.dmc(..., test="glm", formula="~ group",
+    contrast="group")``. This is the contrast / multi-group path in
+    :func:`epykit.tl.dmc`, which internally calls :func:`epykit._glm.build_design`
+    to construct the full design (``~ group``) and the reduced design
+    (intercept-only, equivalent to dropping the ``group`` term). The
+    permuted ``group`` column on ``md_perm.obs`` is the regressor; under a
+    calibrated null the resulting q-values should be approximately
+    uniformly distributed on [0, 1].
+    """
     def factory(md):
         def closure(samples_treatment, samples_control, seed):
             md_perm = _permute_md(md, samples_treatment, samples_control)
@@ -49,6 +59,15 @@ def _dmc_engine(test_name: str, *, lr_plus: bool = False) -> Callable:
                     neighbour_combine=True,
                     sep_fallback=True,
                     dispersion="eb",
+                )
+            elif glm:
+                # Full design ~ group (intercept + group[T.treatment]); reduced
+                # design ~ 1 (intercept only). build_design is called inside
+                # _run_dmc_contrast; we only need to pass the formula + contrast.
+                ep.tl.dmc(
+                    md_perm, test="glm",
+                    formula="~ group",
+                    contrast="group",
                 )
             else:
                 ep.tl.dmc(md_perm, test=test_name)
@@ -68,7 +87,8 @@ ENGINE_REGISTRY: dict[str, Callable] = {
     "lr_plus": _dmc_engine("lr", lr_plus=True),
     "welch_t": _dmc_engine("welch_t"),
     "fisher":  _dmc_engine("fisher"),
-    # glm requires a treatment column in obs; callers must ensure it exists.
-    # Registered but callers are responsible for setup.
-    "glm":     _dmc_engine("glm"),
+    # glm: builds design matrices on every shuffle via ep.tl.dmc(formula=...)
+    # which routes through _run_dmc_contrast -> _glm.build_design. The full
+    # model is ~ group, the reduced model is the intercept-only ~ 1.
+    "glm":     _dmc_engine("glm", glm=True),
 }

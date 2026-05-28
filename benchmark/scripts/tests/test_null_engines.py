@@ -8,9 +8,11 @@ import pytest
 
 from _null_engines import ENGINE_REGISTRY
 
-SURVIVING_DMC = ["lr", "lr_plus", "welch_t", "fisher"]
-# Skip glm -- requires a treatment column in obs; complex setup.
-# DMR engines are also skipped here (they need a prior DMC run).
+SURVIVING_DMC = ["lr", "lr_plus", "welch_t", "fisher", "glm"]
+# DMR engines are skipped here (they need a prior DMC run).
+# The glm closure builds full + reduced design matrices on each shuffle via
+# ep.tl.dmc(formula="~ group", contrast="group"), so no extra obs columns are
+# required beyond the "group" column that the synth_md fixture already writes.
 
 
 @pytest.mark.slow
