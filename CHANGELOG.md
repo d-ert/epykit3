@@ -153,6 +153,12 @@ SemVer (`MAJOR.MINOR.PATCH`).
   p-values under `dispersion != "site"`. Removed in 0.7.5 together
   with the broader TPR < 8% finding. Migration: `test='lr'`.
 
+- **P1-3**: `lr` and `fisher` engines now emit Newcombe (1998) hybrid
+  Wilson-score CIs for `meth_diff_ci_{lo,hi}`, matching
+  `statsmodels.confint_proportions_2indep(method='newcombe')`.
+  Previously emitted Welch-normal Wald CIs (symmetric, can violate
+  [-1,1] near boundary β). `welch_t` and `glm` CIs unchanged.
+
 ### Changed (breaking on the `lr+` schema)
 
 - **P0-1**: ``tl.dmc(..., neighbour_combine=True)`` no longer overwrites

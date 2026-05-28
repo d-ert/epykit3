@@ -1353,6 +1353,14 @@ def _process_one_chromosome(
     df1_out: Optional[int] = None
     df2_out: Optional[np.ndarray] = None
 
+    # Pooled counts retained for Newcombe CI (lr and fisher paths only).
+    # Set to non-None by those branches before the del statements below so
+    # the unified CI block can use newcombe_diff_ci instead of Wald.
+    _newcombe_meth_a: Optional[np.ndarray] = None
+    _newcombe_cov_a: Optional[np.ndarray] = None
+    _newcombe_meth_b: Optional[np.ndarray] = None
+    _newcombe_cov_b: Optional[np.ndarray] = None
+
     # --- Statistical test ---
     if test == "fisher":
         # Fisher exact on per-group POOLED read counts.
@@ -1389,6 +1397,11 @@ def _process_one_chromosome(
         pvals, log2_ors = fisher_exact_vectorized(
             meth_case_sum, unmeth_case_sum, meth_ctrl_sum, unmeth_ctrl_sum
         )
+        # Save for Newcombe CI (P1-3).
+        _newcombe_meth_a = meth_case_sum.astype(np.float64)
+        _newcombe_cov_a  = cov_case_sum.astype(np.float64)
+        _newcombe_meth_b = meth_ctrl_sum.astype(np.float64)
+        _newcombe_cov_b  = cov_ctrl_sum.astype(np.float64)
         del meth_case_sum, cov_case_sum, unmeth_case_sum
         del meth_ctrl_sum, cov_ctrl_sum, unmeth_ctrl_sum
 
@@ -1453,6 +1466,13 @@ def _process_one_chromosome(
         mean_ctrl[:] = np.where(np.isnan(pi_ctrl), 0.0, pi_ctrl)
         # nv_case / nv_ctrl from the score path agree with n_valid_case /
         # n_valid_ctrl from Welford by construction, so we don't overwrite.
+
+        # Save pooled counts for Newcombe CI (P1-3). sn_case = pooled coverage
+        # (sum across samples), sm_case = pooled methylated-read count.
+        _newcombe_meth_a = sm_case.copy()
+        _newcombe_cov_a  = sn_case.copy()
+        _newcombe_meth_b = sm_ctrl.copy()
+        _newcombe_cov_b  = sn_ctrl.copy()
 
         del sn_case, sm_case, sm2n_case, nv_case
         del sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl
@@ -1694,18 +1714,29 @@ def _process_one_chromosome(
     mean_beta_ctrl[n_valid_ctrl == 0] = np.nan
     meth_diff = (mean_beta_case - mean_beta_ctrl).astype(np.float32)
 
-    # Wald CI on Deltabeta from Welford accumulators. For the
-    # multi-group joint test (k>1) the scalar Deltabeta is undefined, so we leave
-    # CI columns as NaN and let the multi-group schema speak through
-    # f_stat / df1 / df2 / mean_beta_<level>.
+    # CI on Deltabeta. For the multi-group joint test (k>1) the scalar
+    # Deltabeta is undefined, so CI columns are NaN-filled and the multi-group
+    # schema speaks through f_stat / df1 / df2 / mean_beta_<level>.
+    #
+    # lr and fisher: Newcombe (1998) hybrid Wilson-score CI on pooled counts.
+    #   Asymmetric and bounded to [-1,1]; better than Wald near boundary betas.
+    # welch_t and glm: Welch-normal Wald CI (Welford accumulators or model-based).
     from . import _glm as _glm_for_ci
     if not multigroup_mode:
-        vm_case = _welford_var_mean(M2_case, n_valid_case)
-        vm_ctrl = _welford_var_mean(M2_ctrl, n_valid_ctrl)
-        ci_lo, ci_hi = _glm_for_ci.welch_meth_diff_ci(
-            mean_case.astype(np.float64), vm_case,
-            mean_ctrl.astype(np.float64), vm_ctrl,
-        )
+        if _newcombe_meth_a is not None:
+            # P1-3: lr and fisher paths -- use Newcombe CI on pooled counts.
+            ci_lo, ci_hi = _glm_for_ci.newcombe_diff_ci(
+                _newcombe_meth_a, _newcombe_cov_a,
+                _newcombe_meth_b, _newcombe_cov_b,
+            )
+        else:
+            # welch_t and glm paths -- Wald CI from Welford accumulators.
+            vm_case = _welford_var_mean(M2_case, n_valid_case)
+            vm_ctrl = _welford_var_mean(M2_ctrl, n_valid_ctrl)
+            ci_lo, ci_hi = _glm_for_ci.welch_meth_diff_ci(
+                mean_case.astype(np.float64), vm_case,
+                mean_ctrl.astype(np.float64), vm_ctrl,
+            )
         ci_lo = ci_lo.astype(np.float32)
         ci_hi = ci_hi.astype(np.float32)
     else:
