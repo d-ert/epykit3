@@ -1352,6 +1352,7 @@ def empirical_fdr_for_dmr(
     n_perm: int = 100,
     seed: int = 42,
     n_jobs: int = 1,
+    empirical_strata: "dict[str, list[str]] | None" = None,
     **dmr_kwargs,
 ) -> pl.DataFrame:
     """Empirical (permutation) FDR for tile-based DMRs.
@@ -1376,6 +1377,12 @@ def empirical_fdr_for_dmr(
     n_jobs
         joblib parallel worker count. -1 uses all cores. Falls back to
         serial execution when joblib is not installed.
+    empirical_strata : dict[str, list[str]] or None
+        When supplied, a mapping from stratum label to the list of sample
+        IDs belonging to that stratum.  Labels are shuffled **within** each
+        stratum rather than globally.  Build this dict from ``md.obs`` in
+        the caller (see :func:`epykit.tl.dmr`).  When ``None`` (default),
+        the standard global shuffle is used.
     **dmr_kwargs
         Forwarded to ``call_dmr_tile_based`` for each permutation; should
         match the observed run's settings (tile_size_bp, test, alpha,
@@ -1397,14 +1404,28 @@ def empirical_fdr_for_dmr(
         ])
 
     n_treat = len(samples_treatment)
+    n_ctrl = len(samples_control)
+    if n_treat == 1 and n_ctrl == 1:
+        raise ValueError(
+            "empirical DMR FDR requires n>=2 per group; got n_treat=1, "
+            "n_ctrl=1. Use Fisher-derived p-values directly via "
+            "tl.dmc(test='fisher')."
+        )
+
     pool = list(samples_treatment) + list(samples_control)
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(seed)  # noqa: F841  (kept for reproducibility docs)
 
     def _run_one_perm(perm_idx: int) -> np.ndarray:
         # Local RNG so parallel workers stay deterministic.
         local_rng = np.random.default_rng(seed + perm_idx + 1)
-        shuffled = pool.copy()
-        local_rng.shuffle(shuffled)
+        if empirical_strata is not None:
+            # Shuffle within each stratum and re-assemble the pool.
+            shuffled: list[str] = []
+            for group_samples in empirical_strata.values():
+                shuffled.extend(local_rng.permutation(group_samples).tolist())
+        else:
+            shuffled = pool.copy()
+            local_rng.shuffle(shuffled)
         perm_treat = shuffled[:n_treat]
         perm_ctrl = shuffled[n_treat:]
         # Force test='lr' or whatever observed used; do not run annotation.

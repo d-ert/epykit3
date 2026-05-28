@@ -932,6 +932,7 @@ def dmr(
     n_perm: int = 100,
     perm_seed: int = 42,
     perm_n_jobs: int = 1,
+    empirical_strata: str | None = None,
     *,
     backend: str = "sequential",
     n_workers: int | None = None,
@@ -1083,6 +1084,18 @@ def dmr(
                     "designs (label-shuffling invalidates stratification). "
                     "Use a stratified-permutation scheme manually if needed."
                 )
+            # Build strata map from obs column when empirical_strata= supplied.
+            strata_map: dict[str, list[str]] | None = None
+            if empirical_strata is not None and empirical_strata in md.obs.columns:
+                all_samples = list(md.treatment_ids) + list(md.control_ids)
+                obs_indexed = md.obs.filter(
+                    pl.col("sample_id").is_in(all_samples)
+                )
+                strata_map = {}
+                for row in obs_indexed.iter_rows(named=True):
+                    strata_map.setdefault(row[empirical_strata], []).append(
+                        row["sample_id"]
+                    )
             if len(dmr_df) > 0:
                 dmr_df = empirical_fdr_for_dmr(
                     methylstore_path=md.store,
@@ -1092,6 +1105,7 @@ def dmr(
                     n_perm=n_perm,
                     seed=perm_seed,
                     n_jobs=perm_n_jobs,
+                    empirical_strata=strata_map,
                     tile_size_bp=tile_size_bp,
                     test=selected_test,
                     chromosomes=chromosomes,

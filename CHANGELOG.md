@@ -171,6 +171,11 @@ SemVer (`MAJOR.MINOR.PATCH`).
   Fraction ≤ 1% is logged at INFO. Separated sites that are also
   non-converged are counted only once (under the separation diagnostic).
 
+- **P1-6**: DMR empirical FDR now (a) raises `ValueError` at
+  n_treat=1, n_ctrl=1 (no valid permutations), pointing the user at
+  `tl.dmc(test='fisher')`; (b) accepts `empirical_strata=<obs_column>`
+  to permute within strata for paired designs.
+
 ### Changed (breaking on the `lr+` schema)
 
 - **P0-1**: ``tl.dmc(..., neighbour_combine=True)`` no longer overwrites

@@ -55,8 +55,8 @@ def test_emp_p_uses_n_perm_denominator_not_pooled(monkeypatch):
 
     out = dmr_mod.empirical_fdr_for_dmr(
         methylstore_path="/dev/null",  # unused with monkeypatch
-        samples_treatment=["t1"],
-        samples_control=["c1"],
+        samples_treatment=["t1", "t2"],
+        samples_control=["c1", "c2"],
         observed_dmr=observed,
         n_perm=5,
         seed=0,
@@ -94,8 +94,8 @@ def test_emp_p_correct_on_pure_null():
     ])
     out = dmr2.empirical_fdr_for_dmr(
         methylstore_path="/dev/null",
-        samples_treatment=["t1"],
-        samples_control=["c1"],
+        samples_treatment=["t1", "t2"],
+        samples_control=["c1", "c2"],
         observed_dmr=observed,
         n_perm=n_perm,
         seed=0,
