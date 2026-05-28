@@ -11,6 +11,8 @@ mkdocs.yml
 benchmark/raw_sim_data/
 benchmark/_converted/
 benchmark/_runs/
+benchmark/_converted_post_phase3/
+benchmark/_runs_post_phase3/
 benchmark/results/
 benchmark/data/**
 benchmark/shinygo_lists/
@@ -30,6 +32,16 @@ benchmark/**/*.pptx
 !benchmark/data/study2/methylkit_tuned/MANIFEST.txt
 # but keep the bulk *_tuned.tsv outputs ignored
 benchmark/data/study2/methylkit_tuned/*.tsv
+
+# Phase 4 Task 2: re-run epykit on Piao-as-distributed.
+# Track the paper-critical post-Phase-3 eval summary and its MANIFEST.
+# Per-cell intermediate parquets stay ignored as bulk artefacts.
+!benchmark/data/study1/
+!benchmark/data/study1/eval_summary_post_phase3.parquet
+!benchmark/data/study1/epykit_post_phase3/
+!benchmark/data/study1/epykit_post_phase3/MANIFEST.txt
+benchmark/data/study1/epykit_post_phase3/*/
+benchmark/data/study1/epykit_post_phase3/*.parquet
 
 # Phase 2: filesystem-only archive of the pre-2026-05-27 benchmark dir
 # (~15 GB of regenerables; kept on disk only, not in git history)
