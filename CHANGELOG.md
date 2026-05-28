@@ -34,6 +34,11 @@ SemVer (`MAJOR.MINOR.PATCH`).
   rank/threshold metrics (AUROC, F1). Operates on the existing
   ``eval_summary.parquet`` schema without re-running engines.
 
+- **`benchmark/scripts/evaluate.py`** (new): `--ci-only` mode appends
+  Wilson 95% CIs (TPR/FPR) and bootstrap CIs (AUROC/F1, NaN without
+  per-CpG cache) to `eval_summary.parquet` in place. Wires the Phase 2
+  `wilson_bootstrap_ci.py` helper into the eval pipeline.
+
 - **`benchmark/scripts/run_null_calibration.py`** (new): Label-shuffle
   empirical FDR runner. Decoupled from epykit (takes an
   ``engine_fn`` callable) so it tests with mock engines for CI and
