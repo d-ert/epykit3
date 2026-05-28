@@ -41,6 +41,20 @@ SUBJECT_PID = re.compile(r"\b(P[01]-\d+[a-z]?)\b")
 
 METRICS = ("tpr", "fpr", "f1", "auroc", "precision")
 
+# Columns that, when present in both pre and post frames, further sub-divide a
+# (tool, scenario) cell into individual rows. Phase 4 eval_summary parquets
+# carry these threshold/parameter axes; the Phase 3 fixture parquets do not.
+# The audit auto-detects which of these are present in BOTH frames and adds
+# them to the join key so the outer join doesn't collapse to a cross-product.
+EXTRA_KEY_CANDIDATES = (
+    "test",
+    "parameter",
+    "parameter_value",
+    "threshold",
+    "threshold_kind",
+    "meth_diff_bin",
+)
+
 
 def _parse_commits(commits: list[dict]) -> dict[tuple[str, str], str]:
     """Map (engine, scenario) -> most-recent fix_id with an Affects: trailer."""
@@ -62,41 +76,65 @@ def _engine_from_tool(tool: str) -> str:
     return tool[len("epykit_"):] if tool.startswith("epykit_") else tool
 
 
+def _resolve_join_keys(pre_df: pl.DataFrame, post_df: pl.DataFrame) -> list[str]:
+    """Pick join columns: always (tool, scenario), plus any EXTRA_KEY_CANDIDATES
+    that are present in BOTH frames."""
+    keys = ["tool", "scenario"]
+    for c in EXTRA_KEY_CANDIDATES:
+        if c in pre_df.columns and c in post_df.columns:
+            keys.append(c)
+    return keys
+
+
 def audit(
     pre_df: pl.DataFrame,
     post_df: pl.DataFrame,
     attribution: dict[tuple[str, str], str],
     metrics: tuple[str, ...] = METRICS,
 ) -> tuple[pl.DataFrame, int]:
-    """Return (audit_df, n_unattributed)."""
-    join_cols = ["tool", "scenario"]
+    """Return (audit_df, n_unattributed).
+
+    Joins pre and post on (tool, scenario) plus any EXTRA_KEY_CANDIDATES
+    columns present in both frames, so threshold/parameter axes in Phase 4
+    eval_summary parquets don't collapse the outer join to a cross-product.
+    """
+    join_cols = _resolve_join_keys(pre_df, post_df)
+    metric_cols = [m for m in metrics if m in post_df.columns]
     joined = pre_df.join(
-        post_df.select(join_cols + [m for m in metrics if m in post_df.columns]),
+        post_df.select(join_cols + metric_cols),
         on=join_cols, how="outer", suffix="_post",
     )
     rows: list[dict] = []
     n_unattributed = 0
     for r in joined.iter_rows(named=True):
+        # Outer join with `coalesce=False` (Polars default for "outer" pre-1.0)
+        # leaves right-side keys under e.g. "tool_post" when only the right
+        # row exists. Coalesce manually so we always have a tool/scenario.
+        tool = r.get("tool") or r.get("tool_post") or ""
+        scen = r.get("scenario") or r.get("scenario_post") or ""
         for m in metrics:
             pre_v  = r.get(m)
             post_v = r.get(f"{m}_post")
             if pre_v is None or post_v is None:
                 continue
             try:
-                delta = float(post_v) - float(pre_v)
+                pre_f, post_f = float(pre_v), float(post_v)
             except (TypeError, ValueError):
                 continue
+            # NaN propagation: if either side is NaN, skip (can't compare).
+            if pre_f != pre_f or post_f != post_f:
+                continue
+            delta = post_f - pre_f
             if abs(delta) < 1e-9:
                 continue  # unchanged
-            engine = _engine_from_tool(r.get("tool", ""))
-            scen   = r.get("scenario", "")
+            engine = _engine_from_tool(tool)
             fix_id = attribution.get((engine, scen), "UNATTRIBUTED")
             if fix_id == "UNATTRIBUTED":
                 n_unattributed += 1
             rows.append({
-                "tool": r.get("tool", ""), "scenario": scen,
+                "tool": tool, "scenario": scen,
                 "metric": m,
-                "pre_value": float(pre_v), "post_value": float(post_v),
+                "pre_value": pre_f, "post_value": post_f,
                 "delta": delta, "fix_id": fix_id,
             })
     if not rows:

@@ -69,6 +69,15 @@ benchmark/data/study3/epykit_post_phase3/dmr/
 !benchmark/data/study3/comparisons_post_phase3/*.parquet
 !benchmark/data/study3/comparisons_post_phase3/SUMMARY.md
 
+# Phase 4 Task 8: bug-fix audit table for Limitations S10.5.
+# Track the commits.json (extracted commit messages with Affects: trailers),
+# the per-cell delta parquet, and its markdown rendering. Tiny artefacts,
+# all committed as the paper trail for pre/post-fix attribution.
+!benchmark/data/audit/
+!benchmark/data/audit/commits.json
+!benchmark/data/audit/bug_fix_deltas.parquet
+!benchmark/data/audit/bug_fix_deltas.md
+
 # Phase 2: filesystem-only archive of the pre-2026-05-27 benchmark dir
 # (~15 GB of regenerables; kept on disk only, not in git history)
 _legacy_benchmark/
