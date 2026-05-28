@@ -413,18 +413,31 @@ def _auroc(joined: pl.DataFrame) -> float:
 
 
 def _join_with_truth(epy_df: pl.DataFrame, truth: pl.DataFrame) -> pl.DataFrame:
-    # For lr+ (neighbour_combine=True) the canonical pvalue/qvalue columns
-    # ALREADY hold the combined values; raw per-CpG are in pvalue_raw/qvalue_raw.
-    # Downstream scoring uses pvalue/qvalue regardless of which engine produced
-    # them, so we don't need to switch column names here.
-    return truth.join(
-        epy_df.select(["chrom", "pos", "pvalue", "qvalue"]).with_columns(
-            pl.col("pvalue").cast(pl.Float64),
-            pl.col("qvalue").cast(pl.Float64),
-        ),
-        on=["chrom", "pos"],
-        how="left",
+    """Project pvalue/qvalue cols and inner-join to the canonical truth table.
+
+    For lr+ (neighbour_combine=True) the raw per-CpG p-value stays in `pvalue`
+    by Phase-3 contract, and the neighbour-combined value lives in
+    `pvalue_combined` / `qvalue_combined`. lr+ is *defined* as the combined
+    call, so when those columns are present we use them as the canonical
+    pvalue/qvalue for scoring (otherwise downstream metrics ignore the
+    power-stack improvement and lr+ collapses back to lr).
+    """
+    pcol = "pvalue_combined" if "pvalue_combined" in epy_df.columns else "pvalue"
+    qcol = "qvalue_combined" if "qvalue_combined" in epy_df.columns else "qvalue"
+    projected = epy_df.select(
+        ["chrom", "pos"]
+        + ([pcol] if pcol != "pvalue" else ["pvalue"])
+        + ([qcol] if qcol != "qvalue" else ["qvalue"])
     )
+    if pcol != "pvalue":
+        projected = projected.rename({pcol: "pvalue"})
+    if qcol != "qvalue":
+        projected = projected.rename({qcol: "qvalue"})
+    projected = projected.with_columns(
+        pl.col("pvalue").cast(pl.Float64),
+        pl.col("qvalue").cast(pl.Float64),
+    )
+    return truth.join(projected, on=["chrom", "pos"], how="left")
 
 
 def score_dmc_parquet(
@@ -881,6 +894,58 @@ def main(argv: list[str] | None = None) -> int:
     combined.write_parquet(EVAL_SUMMARY_NEW)
     logger.info("wrote %s (%d rows; %d new epykit rows)",
                 EVAL_SUMMARY_NEW, combined.height, len(all_rows))
+
+    # --- CI columns ------------------------------------------------------
+    # evaluate.py --ci-only expects every row to have valid tp/fp/tn/fn
+    # (so Wilson can binomtest on integer counts). Our DMR rows + the
+    # transcribed Piao baseline rows have NULL tp/fn/fp/tn -- those are
+    # split off here, the DMC subset gets Wilson + bootstrap CIs added,
+    # and the no-counts subset is concatenated back unchanged.
+    has_counts = combined.filter(
+        pl.col("tp").is_not_null()
+        & pl.col("fp").is_not_null()
+        & pl.col("tn").is_not_null()
+        & pl.col("fn").is_not_null()
+    )
+    no_counts = combined.filter(
+        pl.col("tp").is_null()
+        | pl.col("fp").is_null()
+        | pl.col("tn").is_null()
+        | pl.col("fn").is_null()
+    )
+    logger.info("CI split: %d rows with counts, %d without",
+                has_counts.height, no_counts.height)
+
+    if has_counts.height:
+        tmp_path = EVAL_SUMMARY_NEW.parent / ".eval_summary_ci_tmp.parquet"
+        has_counts.write_parquet(tmp_path)
+        import subprocess
+        # Use the Phase-3-sealed evaluate.py without modification.
+        evaluate_script = HERE / "evaluate.py"
+        proc = subprocess.run(
+            [sys.executable, str(evaluate_script),
+             "--ci-only", "--eval-summary", str(tmp_path)],
+            check=False, capture_output=True, text=True,
+        )
+        if proc.returncode != 0:
+            logger.error("evaluate.py --ci-only FAILED:\n%s", proc.stderr)
+            return 1
+        logger.info("evaluate.py: %s", proc.stdout.strip())
+        with_ci = pl.read_parquet(tmp_path)
+        tmp_path.unlink(missing_ok=True)
+
+        # Align schemas of no_counts to with_ci (add NaN CI cols).
+        for c in ("tpr_ci_lo", "tpr_ci_hi", "fpr_ci_lo", "fpr_ci_hi",
+                  "auroc_ci_lo", "auroc_ci_hi", "f1_ci_lo", "f1_ci_hi"):
+            if c not in no_counts.columns:
+                no_counts = no_counts.with_columns(pl.lit(float("nan")).alias(c))
+        # Reorder cols so the concat is clean.
+        all_cols = with_ci.columns
+        no_counts = no_counts.select(all_cols)
+        final = pl.concat([with_ci, no_counts], how="vertical_relaxed")
+        final.write_parquet(EVAL_SUMMARY_NEW)
+        logger.info("wrote %s (%d rows; CI cols added)",
+                    EVAL_SUMMARY_NEW, final.height)
 
     # Manifest
     if TIMINGS_NEW.exists():

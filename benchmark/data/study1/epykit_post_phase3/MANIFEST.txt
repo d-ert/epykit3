@@ -1,0 +1,41 @@
+epykit_post_phase3 -- Phase 4 Task 2 (run_epykit_study1.py)
+
+Date           : 2026-05-28 10:38:36
+epykit version : 0.7.2
+Engine tag     : v0.7.5-phase3-engines-frozen
+Git HEAD       : 60a71e049b62f60619da516e56043fb0eb206cb5
+
+DMC engines run: lr, lr+ (power stack), welch_t, fisher
+DMR methods run: tile, chain_merge, sliding_window, segment
+Skipped        : glm (no covariate columns in obs; reduces to lr).
+
+lr+ kwargs (explicit on top of test='lr'):
+    neighbour_combine=True, neighbour_bp=500, sep_fallback=True,
+    sep_threshold=0.9, fdr_method='fdr_tsbh', dispersion='eb'
+
+Total wallclock: 1353.0s
+eval_summary_post_phase3.parquet rows added: 353
+
+Per-engine wallclock summary:
+  epykit_dmr_chain_merge        n=5   total=24.1s  median=1.5s
+  epykit_dmr_segment            n=5   total=1080.5s  median=209.0s
+  epykit_dmr_sliding_window     n=5   total=22.2s  median=4.5s
+  epykit_dmr_tile               n=5   total=19.4s  median=3.4s
+  epykit_fisher                 n=10  total=182.7s  median=18.4s
+  epykit_lr                     n=9   total=4.3s  median=0.4s
+  epykit_lrplus                 n=9   total=16.2s  median=1.8s
+  epykit_welch_t                n=9   total=3.4s  median=0.4s
+
+Reassembly:
+    - Read benchmark/data/study1/eval_summary.parquet (pre-fix baseline).
+    - Dropped all rows whose tool starts with 'epykit_' (stale pre-Phase-3).
+      Explicitly stale: epykit_bb_lr (engine removed in 0.7.5).
+    - Concatenated fresh post-Phase-3 epykit rows.
+    - Wrote benchmark/data/study1/eval_summary_post_phase3.parquet.
+    - Original eval_summary.parquet kept untouched as pre-fix baseline.
+
+Per-cell intermediate parquets live under this directory:
+    epykit_post_phase3/dmc_coverage/<label>_<test>.parquet
+    epykit_post_phase3/dmc_replicate/<label>_<test>.parquet
+    epykit_post_phase3/dmr_coverage/<label>_dmr_<method>.parquet
+These are gitignored bulk artefacts; regenerable via run_epykit_study1.py.
