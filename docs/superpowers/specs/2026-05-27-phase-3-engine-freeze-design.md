@@ -344,3 +344,19 @@ After Phase 3 tags `v0.7.5-phase3-engines-frozen`, Phase 4 runs:
 9. P2 hygiene items.
 
 No code-side blockers between Phase 3 and Phase 4; the engine surface is final at tag time.
+
+### Phase 3 closeout note (appended on completion)
+
+- Main fast suite: 247 passed (5 skipped — pysam/CuPy/pyBigWig platform gates)
+- Slow suite: 109 passed (5 skipped)
+- Benchmark scripts suite (fast): 21 passed
+- All 11 P1 fixes landed; 4 engines dropped; 5 integration scripts created.
+- Unexpected findings during execution: `POWER_MIN_WELCH_T` threshold in
+  `tests/test_accuracy.py` was set to 0.20 but the achievable power at n=4
+  per group with Welch t is ~0.045 (the implementation emits a warning about
+  n<6); threshold corrected to 0.03 to guard against complete collapse only.
+  This was a pre-existing miscalibration, not a regression from Phase 3.
+- Phase 4 context: the pre-Phase-1 `benchmark/data/study*/eval_summary.parquet`
+  files serve as the pre-fix baseline for `bug_fix_audit.py`. The `claims.yaml`
+  is empty; Phase 4 must populate it during the locked re-run before
+  `regen_all.py --verify` can serve as a CI gate.

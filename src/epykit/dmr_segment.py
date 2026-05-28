@@ -12,7 +12,6 @@ implementation emitted NaN p/q-values for every segment.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import numpy as np
 import polars as pl
