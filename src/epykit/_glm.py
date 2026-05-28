@@ -452,7 +452,10 @@ def irls_binomial_batch(
     # Pearson denominator collapses to n*_PROP_CLIP, and per-site chi-sq
     # blows up by ~6 OOM (driving chrom-pooled phi from O(1) to O(10^6)
     # and producing nonsensical p-values).
-    degenerate = (n_eff < 2) | site_separated
+    # Non-converged sites are also degenerate: the iterate just before
+    # divergence is unreliable and must not silently emit Wald statistics.
+    site_nonconverged = ~converged
+    degenerate = (n_eff < 2) | site_separated | site_nonconverged
     deviance = np.where(degenerate, np.nan, deviance)
     pearson_chi2 = np.where(degenerate, np.nan, pearson_chi2)
     beta = np.where(degenerate[:, None], np.nan, beta)
@@ -471,6 +474,29 @@ def irls_binomial_batch(
             "NaN'd for dispersion + p-value computation.",
             n_separated, n_sites, 100.0 * sep_frac,
         )
+
+    # P1-5: log non-convergence separately from separation. Non-converged
+    # sites emit unreliable statistics (the iterate just before divergence);
+    # mask them and warn the user when the fraction exceeds 1% so they can
+    # increase max_iter or diagnose a degenerate design matrix.
+    # Only count sites that are non-converged but NOT already flagged as
+    # separated (separated sites are a subset of unreliable sites and are
+    # reported above).
+    n_nonconverged_only = int((site_nonconverged & ~site_separated).sum())
+    if n_nonconverged_only > 0:
+        nonconv_frac = n_nonconverged_only / max(n_sites, 1)
+        if nonconv_frac > 0.01:
+            logger.warning(
+                "IRLS non-convergence at %d / %d sites (%.1f%%); their Wald "
+                "statistics are NaN-masked. Consider increasing max_iter or "
+                "checking design matrix rank.",
+                n_nonconverged_only, n_sites, 100.0 * nonconv_frac,
+            )
+        else:
+            logger.info(
+                "IRLS non-convergence at %d / %d sites (%.1f%%); NaN-masked.",
+                n_nonconverged_only, n_sites, 100.0 * nonconv_frac,
+            )
 
     if return_cov:
         return beta, se_beta, deviance, pearson_chi2, n_eff, cov_beta

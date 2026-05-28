@@ -165,6 +165,12 @@ SemVer (`MAJOR.MINOR.PATCH`).
   reference). `_glm.build_design` now logs resolved column names and
   the chosen reference at INFO level.
 
+- **P1-5**: IRLS non-convergence is now surfaced. Non-converged sites
+  have their Wald statistics NaN-masked (previously only `separated`
+  sites were NaN'd); fraction non-converged > 1% is logged at WARNING.
+  Fraction ≤ 1% is logged at INFO. Separated sites that are also
+  non-converged are counted only once (under the separation diagnostic).
+
 ### Changed (breaking on the `lr+` schema)
 
 - **P0-1**: ``tl.dmc(..., neighbour_combine=True)`` no longer overwrites

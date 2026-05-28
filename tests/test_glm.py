@@ -1,6 +1,8 @@
 """P1-11 GLM half: coef_treatment_log2.
-P1-4: reference_level kwarg for patsy Treatment coding."""
+P1-4: reference_level kwarg for patsy Treatment coding.
+P1-5: NaN-mask non-converged IRLS sites + log fraction."""
 from __future__ import annotations
+import logging
 import warnings
 import numpy as np
 import polars as pl
@@ -70,3 +72,46 @@ def test_reference_level_respected(synth_md_filtered, tmp_path):
             "default and swapped should sum to ~0"
         ),
     )
+
+
+def test_nonconverged_irls_sites_are_nan(synth_md_filtered, caplog):
+    """P1-5: non-converged IRLS sites must have NaN Wald statistics
+    and a WARNING must be logged when the fraction exceeds 1%."""
+    import epykit._glm as _glm_mod
+
+    md = synth_md_filtered
+    md.obs = md.obs.with_columns(
+        (pl.col("group") == "treatment").cast(int).alias("treatment")
+    )
+
+    # Monkeypatch irls_dispatch so every call injects max_iter=1.
+    # With only 1 IRLS iteration the vast majority of sites won't converge.
+    _real_dispatch = _glm_mod.irls_dispatch
+
+    def _dispatch_max1(meth, cov, X, *, backend="cpu", **kwargs):
+        kwargs["max_iter"] = 1
+        return _real_dispatch(meth, cov, X, backend=backend, **kwargs)
+
+    _glm_mod.irls_dispatch = _dispatch_max1
+    try:
+        caplog.set_level(logging.WARNING, logger="epykit._glm")
+        ep.tl.dmc(md, test="glm", formula="~ treatment")
+    finally:
+        _glm_mod.irls_dispatch = _real_dispatch
+
+    df = md.dmc
+    pvalues = df["pvalue"].to_numpy(allow_copy=True).astype(float)
+    n_nan = int(np.isnan(pvalues).sum())
+    n_total = df.height
+    assert n_nan > 0, (
+        f"Expected NaN p-values for non-converged sites; got 0/{n_total}. "
+        "P1-5 fix may not be in place."
+    )
+
+    # If more than 1% of sites are non-converged, a WARNING must be logged.
+    if n_nan / n_total > 0.01:
+        warning_records = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert any("converg" in r.message.lower() for r in warning_records), (
+            f"Expected WARNING about non-convergence; got: "
+            f"{[r.message for r in warning_records]}"
+        )
