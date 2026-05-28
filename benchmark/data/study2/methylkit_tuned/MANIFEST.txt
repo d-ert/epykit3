@@ -1,0 +1,35 @@
+methylKit Stouffer-combine tuned outputs -- Phase 4 Task 4 Step 1
+==================================================================
+
+Tool:          benchmark/scripts/methylkit_stouffer_combine.R
+Parameters:    --max-gap-bp 1000 --window 3
+Run date:      2026-05-28T07:48:36Z
+Git HEAD:      d438b818d85468071eb65cffdf7c56e909f728fa
+R version:     R version 4.5.0 (2025-04-11 ucrt)
+methylKit:     1.34.0
+epykit:        0.7.2
+
+Purpose: Mirror epykit's lr+ neighbour_combine (adjacent-CpG Stouffer Z-combine,
+window=3, max-gap=1000bp; BH per chromosome) on the methylKit per-scenario DMC
+TSVs so the Phase 4 head-to-head is tuned-vs-tuned per PROTOCOL R1. New columns
+added: pvalue_combined, qvalue_combined.
+
+Inputs (10) -- benchmark/data/study2/methylkit_results/:
+  dmc_cov5.tsv    dmc_cov10.tsv   dmc_cov15.tsv   dmc_cov20.tsv   dmc_cov25.tsv
+  dmc_rep2.tsv    dmc_rep4.tsv    dmc_rep6.tsv    dmc_rep8.tsv    dmc_rep10.tsv
+
+Outputs (10) -- benchmark/data/study2/methylkit_tuned/  (rows match inputs):
+  dmc_cov5_tuned.tsv     100000
+  dmc_cov10_tuned.tsv    100000
+  dmc_cov15_tuned.tsv    100000
+  dmc_cov20_tuned.tsv    100000
+  dmc_cov25_tuned.tsv    100000
+  dmc_rep2_tuned.tsv     100000
+  dmc_rep4_tuned.tsv     100000
+  dmc_rep6_tuned.tsv     100000
+  dmc_rep8_tuned.tsv     100000
+  dmc_rep10_tuned.tsv    100000
+
+DMR TSVs intentionally excluded: neighbour-combine is a DMC operation; DMR
+results are already region-aggregated. Bulk *_tuned.tsv files are gitignored
+(benchmark/data/**); this MANIFEST.txt is the tracked paper trail.

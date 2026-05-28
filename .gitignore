@@ -23,6 +23,13 @@ benchmark/**/*.pptx
 !benchmark/figures/**
 # seed manifest -- reproducibility-critical, tracked
 !benchmark/data/seeds.json
+# Phase 4 methylKit Stouffer-tuned manifest -- paper trail, tracked
+# (re-include parent dirs first; ** above excludes them)
+!benchmark/data/study2/
+!benchmark/data/study2/methylkit_tuned/
+!benchmark/data/study2/methylkit_tuned/MANIFEST.txt
+# but keep the bulk *_tuned.tsv outputs ignored
+benchmark/data/study2/methylkit_tuned/*.tsv
 
 # Phase 2: filesystem-only archive of the pre-2026-05-27 benchmark dir
 # (~15 GB of regenerables; kept on disk only, not in git history)
