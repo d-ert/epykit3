@@ -280,6 +280,8 @@ def dmc(
     sep_threshold: float = 0.9,
     # Power stack convenience (since 0.7.2) --------------------------------
     power_stack: str | bool = False,
+    # Explicit patsy reference level for categorical factors (since 0.7.5) -
+    reference_level: str | None = None,
 ) -> None:
     """Run DMC calling and store result in md.varm['dmc_<test>'].
 
@@ -449,6 +451,7 @@ def dmc(
             min_samples_treatment=min_samples_treatment,
             min_samples_control=min_samples_control,
             dispersion=dispersion, reference=reference,
+            reference_level=reference_level,
         )
         # P1-11 deprecation notice for GLM / contrast path.
         import warnings as _warnings
@@ -771,6 +774,7 @@ def _run_dmc_contrast(
     min_samples_control: int,
     dispersion: str,
     reference: str,
+    reference_level: str | None = None,
 ) -> None:
     """Internal: multi-group / continuous-covariate primary-effect DMC.
 
@@ -802,6 +806,7 @@ def _run_dmc_contrast(
             treatment_col=treatment_col,
             require_treatment_col=need_treatment,
             return_design_info=True,
+            reference_level=reference_level,
         )
     )
 

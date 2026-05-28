@@ -159,6 +159,12 @@ SemVer (`MAJOR.MINOR.PATCH`).
   Previously emitted Welch-normal Wald CIs (symmetric, can violate
   [-1,1] near boundary β). `welch_t` and `glm` CIs unchanged.
 
+- **P1-4**: `tl.dmc(formula=..., reference_level='level')` lets users
+  set the categorical reference level explicitly via patsy's
+  `Treatment(reference=...)`. Default behaviour unchanged (alphabetical
+  reference). `_glm.build_design` now logs resolved column names and
+  the chosen reference at INFO level.
+
 ### Changed (breaking on the `lr+` schema)
 
 - **P0-1**: ``tl.dmc(..., neighbour_combine=True)`` no longer overwrites

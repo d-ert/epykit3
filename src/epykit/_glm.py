@@ -48,6 +48,7 @@ def build_design(
     treatment_col: str = "treatment",
     require_treatment_col: bool = True,
     return_design_info: bool = False,
+    reference_level: Optional[str] = None,
 ) -> tuple[np.ndarray, np.ndarray, int, list[str], str]:
     """Build full + reduced model matrices from ``md.obs``.
 
@@ -83,6 +84,12 @@ def build_design(
         When True, the function returns a 6-tuple with the patsy
         ``DesignInfo`` object appended. Allows callers to resolve
         contrast strings via :func:`resolve_contrast`.
+    reference_level
+        When set, the *first* term in the (possibly synthesised) formula
+        that matches a column present in ``obs`` as a string/categorical
+        dtype is wrapped as ``C(col, Treatment(reference='level'))``.
+        This overrides patsy's default alphabetical reference level.
+        Pass ``None`` (default) to preserve the existing behaviour.
 
     Returns
     -------
@@ -124,6 +131,32 @@ def build_design(
             "(or use the default binary path with a treatment column on md.obs)."
         )
 
+    # ---- Apply reference_level via patsy Treatment coding ------------------
+    if reference_level is not None:
+        # Find the first term that (a) corresponds to a column in obs and
+        # (b) has a string/categorical dtype -- i.e. a genuine factor for
+        # which setting the reference level makes sense.
+        obs_str_cols: set[str] = {
+            c for c, d in zip(obs.columns, obs.dtypes)
+            if d in (pl.Utf8, pl.Categorical, pl.String)
+        }
+        wrapped_terms: list[str] = []
+        _did_wrap = False
+        for term in terms:
+            # Only wrap simple column names (no interaction ':' or transforms).
+            if not _did_wrap and term in obs_str_cols and ":" not in term:
+                term = f"C({term}, Treatment(reference='{reference_level}'))"
+                _did_wrap = True
+            wrapped_terms.append(term)
+        if not _did_wrap:
+            logger.warning(
+                "build_design: reference_level=%r was specified but no "
+                "string/categorical column matching a formula term was found "
+                "in obs (terms=%r). reference_level has no effect.",
+                reference_level, terms,
+            )
+        terms = wrapped_terms
+
     formula_used = "~ " + " + ".join(terms)
 
     # ---- Reorder obs rows to samples_ordered -------------------------------
@@ -164,6 +197,12 @@ def build_design(
     X_full = np.asarray(X_design, dtype=np.float64)
     design_info = X_design.design_info
     term_names: list[str] = list(design_info.column_names)
+
+    logger.info(
+        "build_design: columns=%s reference_level=%r",
+        term_names,
+        reference_level,
+    )
 
     n_samples, p_full = X_full.shape
     if p_full >= n_samples:
@@ -712,10 +751,13 @@ def resolve_contrast(
         return C, contrast
 
     # Factor name -- collect every term beginning with "<factor>["
+    # Also match C(factor, ...)[...] terms produced when reference_level wraps
+    # the factor column with a Treatment(...) coding spec.
     factor_terms = [
         (i, t) for i, t in enumerate(term_names)
         if t.startswith(f"{contrast}[") or t == f"C({contrast})"
         or t.startswith(f"C({contrast})[")
+        or t.startswith(f"C({contrast},")
     ]
     if not factor_terms:
         raise ValueError(
