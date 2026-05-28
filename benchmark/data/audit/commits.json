@@ -2,7 +2,7 @@
   {
     "_note": "Hand-crafted from `git log main..v0.7.5-phase3-engines-frozen` (51 commits, 11 with Affects: trailers). Semantic placeholders in the original trailers (`@all`, `@small-table-cells`, `@degenerate-cells`, `@all-significant-cells`) are expanded here into the literal scenarios that appear in `eval_summary_pre_phase1.parquet` and `eval_summary_post_phase3.parquet` (dmc_coverage, dmc_replicate, dmr_coverage). `epykit_lrplus` cells are attributed to the same lr-engine fixes because `lr+` is the lr engine with neighbour-combine + tsbh + sep_fallback + eb dispersion layered on top -- any change in the underlying lr code path propagates to lrplus. The original commit messages are preserved verbatim in the `_original_body` field for audit; only the `body` field used by bug_fix_audit.py is rewritten with literal scenarios.",
     "_range": "main..v0.7.5-phase3-engines-frozen",
-    "_extracted_via": "benchmark/scripts/extract_affects_commits.py"
+    "_extraction_recipe": "If a future re-run needs to regenerate this file from git, the safe one-liner uses ASCII US (\\x1f) and RS (\\x1e) separators that cannot appear in commit messages: `git log --format='%H%x1f%s%x1f%b%x1e' <range>` then split on RS, then on US into (hash, subject, body). Avoid embedding JSON quotes in the --format string; multi-line bodies with quotes/backslashes break that approach."
   },
   {
     "hash": "fe218c742e08a91e5cf748f51f0ba7bdd63ed8bf",

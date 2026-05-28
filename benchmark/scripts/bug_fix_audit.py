@@ -28,11 +28,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
 import sys
 from pathlib import Path
 
 import polars as pl
+
+logger = logging.getLogger(__name__)
 
 AFFECTS_RE  = re.compile(r"^Affects:\s*(.+)$", re.MULTILINE)
 CELL_RE     = re.compile(r"([A-Za-z0-9_+\-]+)@([A-Za-z0-9_]+)")
@@ -81,8 +84,19 @@ def _resolve_join_keys(pre_df: pl.DataFrame, post_df: pl.DataFrame) -> list[str]
     that are present in BOTH frames."""
     keys = ["tool", "scenario"]
     for c in EXTRA_KEY_CANDIDATES:
-        if c in pre_df.columns and c in post_df.columns:
+        in_pre, in_post = c in pre_df.columns, c in post_df.columns
+        if in_pre and in_post:
             keys.append(c)
+        elif in_pre != in_post:
+            # Asymmetric schema: candidate is in only one frame. Silently
+            # dropping it means the outer join can cross-product on that
+            # axis -- warn so the caller knows to align the schemas.
+            side = "pre" if in_pre else "post"
+            logger.warning(
+                "extra join-key candidate %r is in %s but not the other frame; "
+                "dropping from join (this may cause a cross-product on that axis)",
+                c, side,
+            )
     return keys
 
 
