@@ -8,6 +8,12 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ### Added
 
+- **`benchmark/scripts/regen_all.py`** (new): `--verify` acceptance
+  gate reads `claims.yaml` and `<!-- claim: id -->` HTML comments in
+  `paper.md`, asserts cited parquets match expected values to stated
+  precision, exits non-zero on mismatch. Empty `claims.yaml` seed
+  landed; Phase 4 populates during the locked re-run.
+
 - **`benchmark/scripts/methylkit_stouffer_combine.R`** (new):
   adjacent-CpG Stouffer combination for methylKit output. Mirrors
   epykit's `neighbour_combine` knob for tuned-vs-tuned Phase 4
