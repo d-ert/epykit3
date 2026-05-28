@@ -39,6 +39,14 @@ SemVer (`MAJOR.MINOR.PATCH`).
   ``engine_fn`` callable) so it tests with mock engines for CI and
   wraps ``ep.tl.dmc`` for real use.
 
+- **`benchmark/scripts/_null_engines.py`** (new): real-engine
+  closures (`lr`, `lr_plus`, `welch_t`, `fisher`, `glm`) for
+  `run_null_calibration.py`. Each factory captures a `MethylData`
+  object once and returns a closure matching the Phase 2
+  `engine_fn(samples_treatment, samples_control, seed)→qvals` contract.
+  `run_null_calibration.py main()` rewritten to dispatch via the
+  registry with `--engine` + `--methylstore` args.
+
 ### Removed
 
 - **DMC engine surface collapsed to `{auto, lr, welch_t, fisher, glm}`.** 

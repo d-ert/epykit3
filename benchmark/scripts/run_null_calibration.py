@@ -101,33 +101,59 @@ def run_null_calibration(
 
 
 def main(argv: list[str] | None = None) -> None:
-    """CLI stub. Real callers wire ``ep.tl.dmc`` here; this stub demonstrates
-    the integration surface with a deterministic noise engine."""
+    """CLI: real-engine label-shuffle calibration.
+
+    python run_null_calibration.py \\
+        --engine lr \\
+        --methylstore <path-to-store-root> \\
+        --scenario cov10_3v3 \\
+        --k-shuffles 20 \\
+        --seed 0 \\
+        --out benchmark/data/null_calibration/cov10_3v3/lr.parquet
+    """
     import argparse
+    import sys
+    from pathlib import Path
+
+    # Make sure the scripts dir is importable.
+    _scripts_dir = Path(__file__).resolve().parent
+    if str(_scripts_dir) not in sys.path:
+        sys.path.insert(0, str(_scripts_dir))
+
+    from _null_engines import ENGINE_REGISTRY
+    from epykit import MethylData
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--engine", default="noise", help="Engine label for reporting")
-    parser.add_argument("--scenario", default="demo", help="Scenario label")
-    parser.add_argument("--k-shuffles", type=int, default=20)
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--out", required=True, type=str, help="Output parquet path")
+    parser.add_argument("--engine",      required=True,
+                        choices=sorted(ENGINE_REGISTRY), help="Engine name")
+    parser.add_argument("--methylstore", required=True, type=Path,
+                        help="Path to the methylstore directory (contains .cache/)")
+    parser.add_argument("--scenario",    required=True, type=str)
+    parser.add_argument("--k-shuffles",  type=int, default=20)
+    parser.add_argument("--seed",        type=int, default=0)
+    parser.add_argument("--out",         required=True, type=Path)
+    parser.add_argument("--q-thresh",    type=float, default=0.05)
     args = parser.parse_args(argv)
 
-    def noise_engine(samples_treatment, samples_control, seed=0):
-        rng = np.random.default_rng(seed)
-        return rng.uniform(0, 1, size=1000)
+    md = MethylData.load(str(args.methylstore))
+    closure = ENGINE_REGISTRY[args.engine](md)
+
+    samples = list(md.treatment_ids) + list(md.control_ids)
+    n_per_group = len(md.treatment_ids)
 
     df = run_null_calibration(
-        engine_fn=noise_engine,
+        engine_fn=closure,
         engine_name=args.engine,
         scenario_name=args.scenario,
-        samples=["s1", "s2", "s3", "s4", "s5", "s6"],
-        n_per_group=3,
+        samples=samples,
+        n_per_group=n_per_group,
         k_shuffles=args.k_shuffles,
+        q_thresh=args.q_thresh,
         seed=args.seed,
     )
-    df.write_parquet(args.out)
-    print(f"wrote {args.out} with {len(df)} shuffle rows")
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    df.write_parquet(str(args.out))
+    print(f"wrote {args.out} ({len(df)} rows, engine={args.engine})")
 
 
 if __name__ == "__main__":
