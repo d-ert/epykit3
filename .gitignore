@@ -12,7 +12,7 @@ benchmark/raw_sim_data/
 benchmark/_converted/
 benchmark/_runs/
 benchmark/results/
-benchmark/data/
+benchmark/data/**
 benchmark/shinygo_lists/
 benchmark/idk_if_needed/
 benchmark/**/*.docx
@@ -21,6 +21,8 @@ benchmark/**/*.pptx
 # are the publication figures and ARE committed.
 !benchmark/figures/
 !benchmark/figures/**
+# seed manifest -- reproducibility-critical, tracked
+!benchmark/data/seeds.json
 
 # Phase 2: filesystem-only archive of the pre-2026-05-27 benchmark dir
 # (~15 GB of regenerables; kept on disk only, not in git history)
