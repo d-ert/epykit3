@@ -54,14 +54,21 @@ _SCRIPTS = Path(__file__).resolve().parent
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
-from _epykit_scoring import (  # noqa: E402
+# Re-exported scoring helpers + constants live in _epykit_scoring.py
+# (single source of truth across Study 1 + Study 1b). The bare names
+# stay accessible on this module for back-compat with the existing test
+# suite -- F401-noqa marks each one as a deliberate re-export, not dead
+# code. Ruff is configured to F-only in this repo, so a per-import
+# noqa keeps the lint baseline green without disabling the broader
+# F-rule.
+from _epykit_scoring import (  # noqa: E402, F401
     DMR_OVERLAP_THRESHOLD,
     ENGINE_EXCEPTIONS,
     METH_DIFF_BINS,
     P_THRESHOLDS,
     Q_THRESHOLD,
     STALE_EPYKIT_TOOLS,
-    _auroc,  # re-exported for back-compat with the test suite
+    _auroc,
     _confusion,
     _dmc_kwargs,
     _join_with_truth,

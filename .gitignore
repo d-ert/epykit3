@@ -43,6 +43,20 @@ benchmark/data/study2/methylkit_tuned/*.tsv
 benchmark/data/study1/epykit_post_phase3/*/
 benchmark/data/study1/epykit_post_phase3/*.parquet
 
+# Phase 4 Task 3: epykit on the held-out intrinsic-truth simulator.
+# Track the three paper-critical eval parquets + the MANIFEST. Per-cell
+# AMP txt + methylstore caches and the bulk timings parquet stay ignored.
+!benchmark/data/study1b_simulator/
+!benchmark/data/study1b_simulator/eval_per_seed.parquet
+!benchmark/data/study1b_simulator/eval_frozen_grid.parquet
+!benchmark/data/study1b_simulator/eval_seed_iqr.parquet
+!benchmark/data/study1b_simulator/MANIFEST.txt
+benchmark/data/study1b_simulator/seed=*/
+benchmark/data/study1b_simulator/frozen_grid/
+benchmark/data/study1b_simulator/timings_simulator.parquet
+benchmark/_converted_simulator/
+benchmark/_runs_simulator/
+
 # Phase 2: filesystem-only archive of the pre-2026-05-27 benchmark dir
 # (~15 GB of regenerables; kept on disk only, not in git history)
 _legacy_benchmark/

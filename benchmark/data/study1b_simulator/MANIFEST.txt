@@ -1,0 +1,47 @@
+study1b_simulator -- Phase 4 Task 3 (run_epykit_simulator.py)
+
+Date           : 2026-05-28 11:39:36
+epykit version : 0.7.2
+Engine tag     : v0.7.5-phase3-engines-frozen
+Git HEAD       : 0dd28049e21462f94eb421b142bce90c37e0dc59
+
+Held-out intrinsic-truth simulator. The truth table is the
+per-CpG is_dmc column emitted by simulate_piao.py; only the four
+surviving DMC engines are scored (no DMR truth exists for this
+data).
+
+Engines run: lr, lr+ (power stack), welch_t, fisher.
+Skipped    : glm (no covariates), DMR engines (no DMR truth).
+
+lr+ kwargs (explicit on top of test='lr', single-sourced via
+_epykit_scoring._dmc_kwargs):
+    neighbour_combine=True, neighbour_bp=500, sep_fallback=True,
+    sep_threshold=0.9, fdr_method='fdr_tsbh', dispersion='eb'
+
+Cells:
+  Headline    : 80 rows (20 seeds x 4 engines @ cov=10)
+  Frozen grid : 20 rows (5 covs x 4 engines @ single seed)
+  Seed IQR    : 4 rows (one per engine; median + Q1/Q3)
+
+Total wallclock: 580.2s
+
+Per-engine wallclock (headline only):
+  epykit_fisher                 n=20   total=397.2s  median=19.69s
+  epykit_lr                     n=20   total=10.5s  median=0.48s
+  epykit_lrplus                 n=20   total=36.0s  median=1.79s
+  epykit_welch_t                n=20   total=7.1s  median=0.34s
+
+Outputs:
+  - benchmark\data\study1b_simulator\eval_per_seed.parquet
+  - benchmark\data\study1b_simulator\eval_frozen_grid.parquet
+  - benchmark\data\study1b_simulator\eval_seed_iqr.parquet
+
+Methods seeds:
+  - headline_seeds: see benchmark/data/seeds.json
+  - frozen_defaults_seed: single seed at
+      benchmark/data/study1b_simulator/frozen_grid/
+
+Per-cell intermediate parquets (converted .cov.gz + methylstore
+caches) live under benchmark/_converted_simulator/ and
+benchmark/_runs_simulator/. Both are gitignored bulk artefacts;
+regenerable via this script.
