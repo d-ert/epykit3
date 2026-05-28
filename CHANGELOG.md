@@ -91,6 +91,14 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ### Fixed (P1 manifest)
 
+- **P1-9**: `sex_check` now gates the 1D largest-gap clustering on
+  Hartigan's dip test (`diptest.diptest`). On unimodal distributions
+  (single-sex cohorts, dip p > 0.10), falls back to a fixed chrX-beta
+  threshold (0.25) and emits `UserWarning`. Bimodal mixed-sex cohorts
+  are unchanged. Clustering logic extracted into the internal helper
+  `_classify_sex_from_values`. Adds `diptest` to the `qc` extra in
+  `pyproject.toml`.
+
 - **P1-7**: `tl.dvc` per-site variance test replaced from Bartlett with
   Brown-Forsythe (median-centred Levene). Bartlett assumes normality; beta
   methylation values are bounded [0,1] and U-shaped. Brown-Forsythe matches

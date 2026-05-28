@@ -103,6 +103,10 @@ gpu = [
 gpu_jax = [
   "jax[cuda12]>=0.4.30",
 ]
+# Plan 3 P1-9: dip-test for sex_check unimodal fallback
+qc = [
+  "diptest",
+]
 all = [
   "jinja2>=3.1",
   "plotly>=5.20",
@@ -112,6 +116,7 @@ all = [
   "umap-learn>=0.5",
   "scipy>=1.11",
   "dask[distributed]>=2024.1",
+  "diptest",
 ]
 
 [project.scripts]
