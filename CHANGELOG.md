@@ -8,6 +8,11 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ### Added
 
+- **`benchmark/scripts/bug_fix_audit.py`** (new): diffs pre/post-fix
+  `eval_summary.parquet` per (tool, scenario, metric); attributes each
+  delta to a P0/P1 fix via `Affects: engine@scenario` trailers parsed
+  from commits JSON. Unattributed changed cells cause non-zero exit.
+
 - **`benchmark/scripts/regen_all.py`** (new): `--verify` acceptance
   gate reads `claims.yaml` and `<!-- claim: id -->` HTML comments in
   `paper.md`, asserts cited parquets match expected values to stated
