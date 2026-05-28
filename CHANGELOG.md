@@ -140,6 +140,12 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ### Fixed (P1 manifest)
 
+- **P1-1**: `fisher_exact_vectorized` two-sided p now uses the mid-p
+  convention (sum of hypergeometric pmf over all tables with pmf ≤
+  pmf(observed)), matching `scipy.stats.fisher_exact(alternative=
+  'two-sided')` to 1e-12. Previously doubled the smaller one-sided
+  tail. Affects small-table cells; headline cov≥10/n≥3 unchanged.
+
 - **P1-2** (`bb_lr` `df_resid` vs `df_phi`): **closed by removal** of
   `test='bb_lr'`. The engine incorrectly discarded `df_phi` from
   `compute_dispersion_phi` and passed `df_resid_safe` to

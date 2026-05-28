@@ -219,43 +219,68 @@ def fisher_exact_vectorized(
     meth_b: np.ndarray,
     unmeth_b: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Vectorised Fisher exact test via hypergeometric tail approximation."""
-    meth_a   = np.asarray(meth_a,   dtype=np.int64)
-    unmeth_a = np.asarray(unmeth_a, dtype=np.int64)
-    meth_b   = np.asarray(meth_b,   dtype=np.int64)
-    unmeth_b = np.asarray(unmeth_b, dtype=np.int64)
+    """Vectorised Fisher exact test on 2x2 contingency tables.
 
-    row1  = meth_a + unmeth_a
-    row2  = meth_b + unmeth_b
-    col1  = meth_a + meth_b
-    total = row1 + row2
+    Two-sided p-value matches ``scipy.stats.fisher_exact(alternative='two-sided')``:
+    sum of hypergeometric pmf over all tables with pmf <= pmf(observed).
 
-    n       = len(meth_a)
+    Parameters
+    ----------
+    meth_a, unmeth_a : array-like of int
+        Methylated / unmethylated read counts for group A.
+    meth_b, unmeth_b : array-like of int
+        Methylated / unmethylated read counts for group B.
+
+    Returns
+    -------
+    pvals : ndarray of float64
+        Two-sided p-values (NaN for degenerate tables with zero row total).
+    log2_or : ndarray of float64
+        Log2 odds ratios with Haldane-Anscombe (+0.5) correction.
+    """
+    a = np.asarray(meth_a,   dtype=np.int64)
+    b = np.asarray(unmeth_a, dtype=np.int64)
+    c = np.asarray(meth_b,   dtype=np.int64)
+    d = np.asarray(unmeth_b, dtype=np.int64)
+
+    n       = len(a)
     pvals   = np.full(n, np.nan, dtype=np.float64)
     log2_or = np.full(n, np.nan, dtype=np.float64)
 
+    row1  = a + b   # group A total
+    row2  = c + d   # group B total
+    col1  = a + c   # methylated total
+    total = row1 + row2
+
     valid = (row1 > 0) & (row2 > 0)
+
+    # log2 odds ratio with Haldane-Anscombe (+0.5) correction
     if np.any(valid):
-        denom = unmeth_a[valid] * meth_b[valid]
-        numer = meth_a[valid]  * unmeth_b[valid]
-
-        odds_ratio = np.full(denom.shape, np.nan, dtype=np.float64)
-        np.divide(numer, denom, out=odds_ratio, where=denom > 0)
-        odds_ratio = np.where(
-            denom > 0,
-            odds_ratio,
-            np.where(numer > 0, np.inf, np.nan),
-        )
+        ao = a[valid].astype(np.float64) + 0.5
+        bo = b[valid].astype(np.float64) + 0.5
+        co = c[valid].astype(np.float64) + 0.5
+        do = d[valid].astype(np.float64) + 0.5
         with np.errstate(divide="ignore", invalid="ignore"):
-            log2_or[valid] = np.where(odds_ratio > 0, np.log2(odds_ratio), np.nan)
+            log2_or[valid] = np.log2((ao * do) / (bo * co))
 
-        ma = meth_a[valid]
-        t, c1, r1 = total[valid], col1[valid], row1[valid]
-        expected = r1.astype(np.float64) * c1.astype(np.float64) / t.astype(np.float64)
-        p_upper = sp_stats.hypergeom.sf(ma - 1, t, c1, r1)
-        p_lower = sp_stats.hypergeom.cdf(ma, t, c1, r1)
-        one_tail = np.where(ma >= expected, p_upper, p_lower)
-        pvals[valid] = np.minimum(2.0 * one_tail, 1.0)
+    # Two-sided p-value: sum hypergeom pmf where pmf <= pmf(observed).
+    # Matches scipy.stats.fisher_exact(alternative='two-sided') to 1e-12.
+    vi = np.where(valid)[0]
+    for idx in vi:
+        Ni  = int(total[idx])
+        n1i = int(row1[idx])
+        m1i = int(col1[idx])
+        ai  = int(a[idx])
+        # Degenerate: fixed marginals leave no freedom
+        if Ni == 0 or n1i == 0 or n1i == Ni or m1i == 0 or m1i == Ni:
+            pvals[idx] = 1.0
+            continue
+        k_min = max(0, n1i + m1i - Ni)
+        k_max = min(n1i, m1i)
+        ks    = np.arange(k_min, k_max + 1)
+        pmf   = sp_stats.hypergeom.pmf(ks, Ni, m1i, n1i)
+        obs_pmf = sp_stats.hypergeom.pmf(ai, Ni, m1i, n1i)
+        pvals[idx] = float(np.clip(pmf[pmf <= obs_pmf + 1e-15].sum(), 0.0, 1.0))
 
     return pvals, log2_or
 

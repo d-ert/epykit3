@@ -85,15 +85,12 @@ def test_fisher_degenerate_row_returns_nan():
 
 
 def test_fisher_directionally_agrees_with_scipy():
-    """epykit's vectorised hypergeom approximation agrees with scipy's
-    two-sided ``fisher_exact`` on the *significance call* (p<0.05) for the
-    overwhelming majority of tables.
+    """epykit's vectorised Fisher exact agrees with scipy's two-sided
+    ``fisher_exact`` to machine precision (P1-1 fix: mid-p convention).
 
-    The implementation uses ``2 * P(X >= meth_a)`` clamped to 1, which is a
-    common one-sided-doubled approximation to the two-sided exact test.
-    On extreme tables this can disagree with scipy by orders of magnitude
-    in the raw p-value, but the *qualitative* call (significant vs not) is
-    what users actually act on. We assert that.
+    The implementation now sums hypergeometric pmf over all tables with
+    pmf <= pmf(observed), which is exactly what scipy does.  We assert
+    both numerical agreement (atol=1e-12) and perfect call agreement.
     """
     from scipy.stats import fisher_exact as scipy_fisher
     from epykit.dmc import fisher_exact_vectorized
@@ -111,15 +108,17 @@ def test_fisher_directionally_agrees_with_scipy():
         for i in range(n)
     ])
 
-    # Agreement on the qualitative call at alpha=0.05.
-    # The doubled-one-sided approximation is most likely to disagree right
-    # at the threshold (where both methods are near p=0.05), so a 75% bar
-    # is realistic; 90% would be over-tight on small tables.
+    # Numerical agreement to machine precision (P1-1: mid-p convention).
+    np.testing.assert_allclose(
+        epy_p, scipy_p, atol=1e-12, rtol=1e-9,
+        err_msg="vectorised Fisher p must match scipy to 1e-12",
+    )
+
+    # Perfect call agreement at alpha=0.05 (a consequence of exact match).
     agree_call = (epy_p < 0.05) == (scipy_p < 0.05)
-    assert agree_call.mean() >= 0.75, (
+    assert agree_call.mean() == 1.0, (
         f"epykit/scipy disagree on significance call for "
-        f"{(~agree_call).sum()}/{n} tables (rate "
-        f"{(~agree_call).mean():.2%})"
+        f"{(~agree_call).sum()}/{n} tables"
     )
 
     # Disagreements should concentrate near the alpha=0.05 boundary, not be
