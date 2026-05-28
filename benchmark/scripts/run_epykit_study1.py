@@ -48,6 +48,30 @@ from pathlib import Path
 
 import polars as pl
 
+# Make sibling scripts importable when this file is invoked as a script
+# from the repo root (not as a package).
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+from _epykit_scoring import (  # noqa: E402
+    DMR_OVERLAP_THRESHOLD,
+    ENGINE_EXCEPTIONS,
+    METH_DIFF_BINS,
+    P_THRESHOLDS,
+    Q_THRESHOLD,
+    STALE_EPYKIT_TOOLS,
+    _auroc,  # re-exported for back-compat with the test suite
+    _confusion,
+    _dmc_kwargs,
+    _join_with_truth,
+    _merge_intervals,
+    score_dmc_parquet,
+    score_dmr_parquet,
+    split_for_ci,
+)
+from _epykit_scoring import reassemble_eval_summary as _reassemble_eval_summary  # noqa: E402
+
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -80,11 +104,9 @@ COVERAGES_DMR = (5, 10, 15, 20, 25)
 DMC_TESTS = ("lr", "lr+", "welch_t", "fisher")
 DMR_METHODS = ("tile", "chain_merge", "sliding_window", "segment")
 
-# DMC threshold grid (matches legacy evaluate.py).
-P_THRESHOLDS = (0.001, 0.005, 0.01, 0.05)
-Q_THRESHOLD = 0.05
-METH_DIFF_BINS = ("0.2-0.4", "0.4-0.6", "0.6-0.8", "0.8-1.0")
-DMR_OVERLAP_THRESHOLD = 0.8
+# DMC threshold grid + DMR overlap threshold now live in _epykit_scoring
+# (single source of truth across Study 1 + Study 1b). They are re-exported
+# at the top of this module so callers can keep using the bare names.
 
 
 # ---------------------------------------------------------------------------
@@ -199,27 +221,6 @@ def write_samplesheet(sample_dir: Path, n_per_group: int, sheet_path: Path) -> P
 # ---------------------------------------------------------------------------
 
 
-def _dmc_kwargs(test: str, *, allow_n1: bool) -> tuple[str, dict]:
-    """Translate a logical test name to (backend_test, ep.tl.dmc kwargs).
-
-    Returns ``backend_test`` so we know which ``md.varm['dmc_<test>']`` key
-    to read after the call (lr+ uses the lr backend).
-    """
-    if test == "lr+":
-        kwargs = dict(
-            test="lr",
-            allow_n1=allow_n1,
-            neighbour_combine=True,
-            neighbour_bp=500,  # default per CLAUDE.md guidance
-            sep_fallback=True,
-            sep_threshold=0.9,
-            fdr_method="fdr_tsbh",
-            dispersion="eb",
-        )
-        return "lr", kwargs
-    return test, dict(test=test, allow_n1=allow_n1)
-
-
 def run_dmc_cell(
     sample_dir: Path,
     samplesheet: Path,
@@ -262,7 +263,7 @@ def run_dmc_cell(
         t0 = time.perf_counter()
         try:
             ep.tl.dmc(md, **kwargs)
-        except Exception as exc:  # noqa: BLE001
+        except ENGINE_EXCEPTIONS as exc:
             elapsed = time.perf_counter() - t0
             logger.error("[%s] DMC test=%s FAILED in %.1fs: %r",
                          label, test, elapsed, exc)
@@ -338,7 +339,7 @@ def run_dmr_cell(
         t0 = time.perf_counter()
         try:
             ep.tl.dmr(md, method=method)
-        except Exception as exc:  # noqa: BLE001
+        except ENGINE_EXCEPTIONS as exc:
             elapsed = time.perf_counter() - t0
             logger.error("[%s] DMR method=%s FAILED in %.1fs: %r",
                          label, method, elapsed, exc)
@@ -378,258 +379,26 @@ def run_dmr_cell(
 
 
 # ---------------------------------------------------------------------------
-# Evaluation (mirrors _legacy_benchmark/.../evaluate.py)
+# Evaluation + reassembly
+#
+# Scoring primitives (_confusion / _auroc / _join_with_truth /
+# score_dmc_parquet / score_dmr_parquet / _merge_intervals) and the
+# stale-engine filter (STALE_EPYKIT_TOOLS / reassemble_eval_summary) now
+# live in _epykit_scoring.py and are imported at the top of this module.
+# This module passes EVAL_SUMMARY_OLD as the baseline path explicitly so
+# the helper stays pure (no module-level globals).
 # ---------------------------------------------------------------------------
-
-
-def _confusion(joined: pl.DataFrame, sig_col: str) -> dict:
-    df = joined.with_columns(pred=pl.col(sig_col), truth=pl.col("is_dmc"))
-    tp = df.filter(pl.col("pred") & pl.col("truth")).height
-    fp = df.filter(pl.col("pred") & ~pl.col("truth")).height
-    fn = df.filter(~pl.col("pred") & pl.col("truth")).height
-    tn = df.filter(~pl.col("pred") & ~pl.col("truth")).height
-    n_pos = tp + fn
-    n_neg = fp + tn
-    n_pred = tp + fp
-    return {
-        "tp": tp, "fp": fp, "tn": tn, "fn": fn,
-        "tpr": tp / n_pos if n_pos else 0.0,
-        "fpr": fp / n_neg if n_neg else 0.0,
-        "precision": tp / n_pred if n_pred else 0.0,
-        "f1": (2 * tp / (2 * tp + fp + fn)) if (2 * tp + fp + fn) else 0.0,
-    }
-
-
-def _auroc(joined: pl.DataFrame) -> float:
-    df = joined.select("is_dmc", score=1.0 - pl.col("pvalue").fill_null(1.0))
-    n_pos = df.filter(pl.col("is_dmc")).height
-    n_neg = df.height - n_pos
-    if n_pos == 0 or n_neg == 0:
-        return float("nan")
-    df = df.with_columns(rank=pl.col("score").rank(method="average"))
-    sum_ranks_pos = df.filter(pl.col("is_dmc"))["rank"].sum()
-    u = sum_ranks_pos - n_pos * (n_pos + 1) / 2
-    return u / (n_pos * n_neg)
-
-
-def _join_with_truth(epy_df: pl.DataFrame, truth: pl.DataFrame) -> pl.DataFrame:
-    """Project pvalue/qvalue cols and inner-join to the canonical truth table.
-
-    For lr+ (neighbour_combine=True) the raw per-CpG p-value stays in `pvalue`
-    by Phase-3 contract, and the neighbour-combined value lives in
-    `pvalue_combined` / `qvalue_combined`. lr+ is *defined* as the combined
-    call, so when those columns are present we use them as the canonical
-    pvalue/qvalue for scoring (otherwise downstream metrics ignore the
-    power-stack improvement and lr+ collapses back to lr).
-    """
-    pcol = "pvalue_combined" if "pvalue_combined" in epy_df.columns else "pvalue"
-    qcol = "qvalue_combined" if "qvalue_combined" in epy_df.columns else "qvalue"
-    projected = epy_df.select(
-        ["chrom", "pos"]
-        + ([pcol] if pcol != "pvalue" else ["pvalue"])
-        + ([qcol] if qcol != "qvalue" else ["qvalue"])
-    )
-    if pcol != "pvalue":
-        projected = projected.rename({pcol: "pvalue"})
-    if qcol != "qvalue":
-        projected = projected.rename({qcol: "qvalue"})
-    projected = projected.with_columns(
-        pl.col("pvalue").cast(pl.Float64),
-        pl.col("qvalue").cast(pl.Float64),
-    )
-    return truth.join(projected, on=["chrom", "pos"], how="left")
-
-
-def score_dmc_parquet(
-    parquet: Path, truth: pl.DataFrame,
-    tool: str, scenario: str, parameter: str,
-    parameter_value, test: str,
-) -> list[dict]:
-    df = pl.read_parquet(parquet)
-    if "pvalue" not in df.columns or "qvalue" not in df.columns:
-        logger.warning("skip (no pvalue/qvalue): %s", parquet.name)
-        return []
-    joined = _join_with_truth(df, truth)
-
-    rows: list[dict] = []
-    auroc = _auroc(joined)
-
-    # All-bins p-value thresholds
-    for cut in P_THRESHOLDS:
-        m = _confusion(joined.with_columns(sig=pl.col("pvalue") < cut), "sig")
-        rows.append({
-            "tool": tool, "scenario": scenario, "parameter": parameter,
-            "parameter_value": parameter_value, "test": test,
-            "meth_diff_bin": "all", "threshold_kind": "pvalue",
-            "threshold": cut, **m, "auroc": auroc,
-        })
-
-    # All-bins q-value @ 0.05
-    m = _confusion(joined.with_columns(sig=pl.col("qvalue") < Q_THRESHOLD), "sig")
-    rows.append({
-        "tool": tool, "scenario": scenario, "parameter": parameter,
-        "parameter_value": parameter_value, "test": test,
-        "meth_diff_bin": "all", "threshold_kind": "qvalue",
-        "threshold": Q_THRESHOLD, **m, "auroc": auroc,
-    })
-
-    # Per-bin TPR stratified
-    for bin_label in METH_DIFF_BINS:
-        sub = joined.with_columns(
-            is_dmc_in_bin=pl.col("is_dmc") & (pl.col("meth_diff_bin") == bin_label),
-            sig=pl.col("qvalue") < Q_THRESHOLD,
-        )
-        tp = sub.filter(pl.col("sig") & pl.col("is_dmc_in_bin")).height
-        fn = sub.filter(~pl.col("sig") & pl.col("is_dmc_in_bin")).height
-        fp_g = sub.filter(pl.col("sig") & ~pl.col("is_dmc")).height
-        tn_g = sub.filter(~pl.col("sig") & ~pl.col("is_dmc")).height
-        n_pos = tp + fn
-        n_neg = fp_g + tn_g
-        rows.append({
-            "tool": tool, "scenario": scenario, "parameter": parameter,
-            "parameter_value": parameter_value, "test": test,
-            "meth_diff_bin": bin_label, "threshold_kind": "qvalue",
-            "threshold": Q_THRESHOLD,
-            "tp": tp, "fp": fp_g, "tn": tn_g, "fn": fn,
-            "tpr": tp / n_pos if n_pos else 0.0,
-            "fpr": fp_g / n_neg if n_neg else 0.0,
-            "precision": tp / (tp + fp_g) if (tp + fp_g) else 0.0,
-            "f1": (2 * tp / (2 * tp + fp_g + fn)) if (2 * tp + fp_g + fn) else 0.0,
-            "auroc": float("nan"),
-        })
-    return rows
-
-
-def _merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:
-    if not intervals:
-        return []
-    sorted_iv = sorted(intervals)
-    merged = [sorted_iv[0]]
-    for s, e in sorted_iv[1:]:
-        last_s, last_e = merged[-1]
-        if s <= last_e:
-            merged[-1] = (last_s, max(last_e, e))
-        else:
-            merged.append((s, e))
-    return merged
-
-
-def score_dmr_parquet(
-    parquet: Path, dmr_truth: pl.DataFrame,
-    tool: str, scenario: str, parameter_value, method: str,
-    min_overlap: float = DMR_OVERLAP_THRESHOLD,
-) -> list[dict]:
-    """Same overlap-fraction scoring as the legacy evaluate.py."""
-    df = pl.read_parquet(parquet)
-    if "qvalue" in df.columns:
-        called = df.filter(pl.col("qvalue") < Q_THRESHOLD)
-    else:
-        called = df
-
-    truth_rows = dmr_truth.to_dicts()
-    called_rows = called.select(["chrom", "start", "end"]).to_dicts()
-
-    by_chrom: dict[str, list[tuple[int, int]]] = {}
-    for r in called_rows:
-        by_chrom.setdefault(r["chrom"], []).append((int(r["start"]), int(r["end"])))
-
-    n_detected = 0
-    overlap_fracs: list[float] = []
-    for t in truth_rows:
-        t_start, t_end = int(t["start"]), int(t["end"])
-        t_len = max(1, t_end - t_start)
-        calls = by_chrom.get(t["chrom"], [])
-        clipped = [
-            (max(t_start, s), min(t_end, e))
-            for s, e in calls
-            if min(t_end, e) > max(t_start, s)
-        ]
-        merged = _merge_intervals(clipped)
-        union_cov = sum(e - s for s, e in merged)
-        frac = union_cov / t_len
-        overlap_fracs.append(frac)
-        if frac >= min_overlap:
-            n_detected += 1
-
-    n_called = called.height
-    n_truth = len(truth_rows)
-
-    n_false = 0
-    if called_rows and truth_rows:
-        truth_by_chrom: dict[str, list[tuple[int, int]]] = {}
-        for t in truth_rows:
-            truth_by_chrom.setdefault(t["chrom"], []).append(
-                (int(t["start"]), int(t["end"]))
-            )
-        for r in called_rows:
-            s, e = int(r["start"]), int(r["end"])
-            hit = False
-            for ts, te in truth_by_chrom.get(r["chrom"], []):
-                if min(e, te) > max(s, ts):
-                    hit = True
-                    break
-            if not hit:
-                n_false += 1
-    else:
-        n_false = n_called
-
-    tpr = n_detected / n_truth if n_truth else 0.0
-    precision = (n_called - n_false) / n_called if n_called else 0.0
-    f1 = (2 * tpr * precision / (tpr + precision)) if (tpr + precision) else 0.0
-
-    return [{
-        "tool": tool, "scenario": scenario, "parameter": "coverage",
-        "parameter_value": parameter_value, "test": method,
-        "meth_diff_bin": "all", "threshold_kind": "dmr_overlap",
-        "threshold": float(min_overlap),
-        "tp": None, "fp": None, "tn": None, "fn": None,
-        "tpr": tpr, "fpr": float("nan"),
-        "precision": precision, "f1": f1, "auroc": float("nan"),
-    }]
-
-
-# ---------------------------------------------------------------------------
-# Reassembly
-# ---------------------------------------------------------------------------
-
-
-_STALE_EPYKIT_TOOLS = {
-    # Phase 3 removed engines; rows are dropped on reassembly.
-    "epykit_bb_lr",
-    # Old-runner tool labels that we now replace with fresh post-Phase-3 ones.
-    "epykit_lr", "epykit_lrplus", "epykit_welch_t", "epykit_fisher",
-    "epykit_dmr_tile", "epykit_dmr_merge",
-    # New DMR runners added here for completeness (in case of partial reruns).
-    "epykit_dmr_chain_merge", "epykit_dmr_sliding_window", "epykit_dmr_segment",
-}
 
 
 def reassemble_eval_summary(new_rows: list[dict]) -> pl.DataFrame:
-    """Concat post-Phase-3 epykit rows with the non-epykit baseline rows
-    from the pre-existing eval_summary.parquet.
+    """Thin wrapper around ``_epykit_scoring.reassemble_eval_summary`` that
+    binds ``EVAL_SUMMARY_OLD`` for back-compat with the test suite.
     """
-    old = pl.read_parquet(EVAL_SUMMARY_OLD)
-    non_epykit = old.filter(~pl.col("tool").is_in(list(_STALE_EPYKIT_TOOLS)))
-    # Also explicitly drop anything still starting with epykit_ to be safe.
-    non_epykit = non_epykit.filter(~pl.col("tool").str.starts_with("epykit_"))
+    return _reassemble_eval_summary(new_rows, EVAL_SUMMARY_OLD)
 
-    if not new_rows:
-        logger.warning("no new epykit rows -- writing baseline-only summary")
-        return non_epykit
 
-    new_df = pl.DataFrame(new_rows)
-    # Align schemas
-    all_cols = sorted(set(non_epykit.columns) | set(new_df.columns))
-    for c in all_cols:
-        if c not in non_epykit.columns:
-            non_epykit = non_epykit.with_columns(pl.lit(None).alias(c))
-        if c not in new_df.columns:
-            new_df = new_df.with_columns(pl.lit(None).alias(c))
-    combined = pl.concat(
-        [non_epykit.select(all_cols), new_df.select(all_cols)],
-        how="vertical_relaxed",
-    )
-    return combined
+# Back-compat alias for the test suite (the old name was a module global).
+_STALE_EPYKIT_TOOLS = STALE_EPYKIT_TOOLS
 
 
 # ---------------------------------------------------------------------------
@@ -899,20 +668,10 @@ def main(argv: list[str] | None = None) -> int:
     # evaluate.py --ci-only expects every row to have valid tp/fp/tn/fn
     # (so Wilson can binomtest on integer counts). Our DMR rows + the
     # transcribed Piao baseline rows have NULL tp/fn/fp/tn -- those are
-    # split off here, the DMC subset gets Wilson + bootstrap CIs added,
-    # and the no-counts subset is concatenated back unchanged.
-    has_counts = combined.filter(
-        pl.col("tp").is_not_null()
-        & pl.col("fp").is_not_null()
-        & pl.col("tn").is_not_null()
-        & pl.col("fn").is_not_null()
-    )
-    no_counts = combined.filter(
-        pl.col("tp").is_null()
-        | pl.col("fp").is_null()
-        | pl.col("tn").is_null()
-        | pl.col("fn").is_null()
-    )
+    # split off here (via _epykit_scoring.split_for_ci), the DMC subset
+    # gets Wilson + bootstrap CIs added, and the no-counts subset is
+    # concatenated back unchanged.
+    has_counts, no_counts = split_for_ci(combined)
     logger.info("CI split: %d rows with counts, %d without",
                 has_counts.height, no_counts.height)
 
