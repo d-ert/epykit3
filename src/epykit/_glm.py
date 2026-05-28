@@ -929,8 +929,8 @@ def newcombe_diff_ci(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Newcombe (1998) hybrid Wilson-score CI for pi_a - pi_b on POOLED counts.
 
-    Used by the binomial-pool tests (lr, score, fisher, cmh) where no per-
-    replicate variance is accumulated. Uses Wilson-score CIs on each
+    Used by the binomial-pool tests (lr, fisher) where no per-replicate
+    variance is accumulated. Uses Wilson-score CIs on each
     pooled proportion, then combines them per Newcombe method 10.
     """
     from scipy import stats as sp_stats

@@ -343,7 +343,7 @@ def dmc(
         treatment/control sample lists.
     test : str
         One of ``"auto"``, ``"lr"``, ``"welch_t"``
-        (Welch t on raw betas), ``"cmh"``, ``"fisher"``, ``"glm"``.
+        (Welch t on raw betas), ``"fisher"``, ``"glm"``.
         ``"auto"`` resolves to ``"fisher"`` at n<2 and ``"lr"``
         (the recommended default) at n>=2.
 
@@ -415,6 +415,15 @@ def dmc(
             "test='lr' in finite samples; asymptotically equivalent under "
             "H0). Switch test='score' -> test='lr'; output schema is "
             "identical."
+        )
+
+    if test == "cmh":
+        raise ValueError(
+            "test='cmh' was removed in 0.7.5 (stratification semantics "
+            "confusing; dominated by GLM with batch covariate). For "
+            "stratified analysis use tl.dmc(formula='~ group + batch'), "
+            "which gives proper dispersion correction and handles "
+            "continuous covariates."
         )
 
     # --- New contrast / multi-group path -------------------------------------

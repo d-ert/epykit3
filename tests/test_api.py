@@ -263,7 +263,7 @@ def test_covariate_dmr_runs_via_design_kwarg(synth_md_filtered):
 def test_get_dmc_with_unknown_test_returns_none(synth_md_filtered):
     import epykit as ep
     ep.tl.dmc(synth_md_filtered, test="lr")
-    assert synth_md_filtered.get_dmc(test="cmh") is None
+    assert synth_md_filtered.get_dmc(test="glm") is None
 
 
 

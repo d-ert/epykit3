@@ -51,6 +51,12 @@ SemVer (`MAJOR.MINOR.PATCH`).
   finite samples; asymptotically equivalent under H₀. Migration:
   `test='score'` → `test='lr'`; output schema identical.
 
+- **`tl.dmc(test='cmh')`** removed. Stratification semantics (one
+  stratum per case-ctrl pair) were unusual; dominated by
+  `tl.dmc(formula='~ group + batch')`. Migration: use the formula
+  kwarg for stratified analysis. `_cmh_init/_cmh_update/_cmh_finalize`
+  helpers deleted (no other callers).
+
 ### Changed (BREAKING for `log2_odds_ratio` column name)
 
 - **`varm["dmc_lr"].log2_odds_ratio`** renamed to

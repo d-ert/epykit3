@@ -24,8 +24,6 @@ Tests
                   assumptions are doubtful.
   welch_t       -- Welch t on raw betas. Same boundary-beta caveat as
                   ``logit_t``.
-  cmh           -- Cochran-Mantel-Haenszel with one 2x2 stratum per
-                  (case_i, ctrl_j) pair.
   fisher        -- Fisher exact on reads pooled across replicates. Ignores
                   between-replicate variance; anti-conservative. Warns once
                   per session.
@@ -260,90 +258,6 @@ def fisher_exact_vectorized(
         pvals[valid] = np.minimum(2.0 * one_tail, 1.0)
 
     return pvals, log2_or
-
-
-# CMH test -- O(n_sites) memory, statistically correct for replicates
-
-def _cmh_init(n: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Allocate CMH accumulators. Memory: ~32 bytes x n_sites total."""
-    return (
-        np.zeros(n, dtype=np.float64),  # Sigma(a - E): obs minus expected
-        np.zeros(n, dtype=np.float64),  # Sigma V:      variance sum
-        np.zeros(n, dtype=np.float64),  # Sigma(ad/n):  MH OR numerator
-        np.zeros(n, dtype=np.float64),  # Sigma(bc/n):  MH OR denominator
-    )
-
-
-def _cmh_update(
-    ome: np.ndarray,
-    var_sum: np.ndarray,
-    or_num: np.ndarray,
-    or_den: np.ndarray,
-    meth_case: np.ndarray,
-    cov_case: np.ndarray,
-    meth_ctrl: np.ndarray,
-    cov_ctrl: np.ndarray,
-) -> None:
-    """In-place CMH accumulation from one case/control sample pair.
-
-    Sites where either sample has zero coverage contribute V=0 and
-    therefore do not influence the statistic -- this correctly handles
-    union-mode sites with partial coverage without any special casing.
-    """
-    a = meth_case.astype(np.float64)
-    b = (cov_case - meth_case).astype(np.float64)  # unmeth case
-    c = meth_ctrl.astype(np.float64)
-    d = (cov_ctrl - meth_ctrl).astype(np.float64)  # unmeth ctrl
-    n = a + b + c + d
-
-    # Sites need n > 1 for a non-degenerate variance term
-    valid = n > 1
-
-    row1 = a + b  # case coverage
-    row2 = c + d  # ctrl coverage
-    col1 = a + c  # total methylated
-    col2 = b + d  # total unmethylated
-
-    # Use safe denominator to avoid divide-by-zero warnings
-    n_safe = np.where(n > 0, n, 1.0)
-    E = np.where(valid, row1 * col1 / n_safe, 0.0)
-    # Safe denominators to avoid divide-by-zero warnings
-    n_sq_safe = np.where(n > 1, n * n * (n - 1.0), 1.0)
-    V = np.where(
-        valid,
-        row1 * row2 * col1 * col2 / n_sq_safe,
-        0.0,
-    )
-
-    ome[valid] += (a - E)[valid]
-    var_sum[valid] += V[valid]
-
-    # Mantel-Haenszel common odds ratio terms (using n_safe from above)
-    or_num += np.where(valid, a * d / n_safe, 0.0)
-    or_den += np.where(valid, b * c / n_safe, 0.0)
-
-
-def _cmh_finalize(
-    ome: np.ndarray,
-    var_sum: np.ndarray,
-    or_num: np.ndarray,
-    or_den: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Compute CMH p-value and MH log2 OR from accumulated sums."""
-    # Use safe denominator to avoid divide-by-zero warnings
-    var_safe = np.where(var_sum > 0, var_sum, 1.0)
-    cmh_stat = np.where(var_sum > 0, ome ** 2 / var_safe, np.nan)
-    pvals = np.where(
-        ~np.isnan(cmh_stat),
-        sp_stats.chi2.sf(cmh_stat, df=1),
-        np.nan,
-    )
-
-    with np.errstate(divide="ignore", invalid="ignore"):
-        mh_or = np.where(or_den > 0, or_num / or_den, np.nan)
-        log2_mh_or = np.where(mh_or > 0, np.log2(mh_or), np.nan)
-
-    return pvals, log2_mh_or
 
 
 # Welford online statistics -- O(n_sites) memory regardless of n_samples
@@ -1377,22 +1291,12 @@ def _process_one_chromosome(
             4 int64 running sums (Fisher) OR
             6 arrays per group (Welford: float64 mean, float64 M2, int32 n_valid)
 
-    The CMH path caches the case-sample int32 (meth, coverage) arrays in
-    memory because each case sample contributes to one stratum per control,
-    so the case data is reused. Memory overhead: ~8 bytes x n_sites x n_case,
-    which is bounded for typical experiments (n_case <= 10, ~300 MB on chr1).
-
     Statistical paths
     -----------------
     fisher
         Fisher exact on reads pooled across replicates. Emits a warning;
         anti-conservative because between-replicate variance is ignored.
         Provided for parity with single-rep tools and aggregate reporting.
-
-    cmh
-        Cochran-Mantel-Haenszel test with one 2x2 stratum per
-        (case_i, ctrl_j) pair. Preserves between-replicate variability
-        because each replicate contributes its own coverage marginal.
 
     logit_t / welch_t
         Welch t-test on per-replicate beta values (logit-transformed for
@@ -1428,13 +1332,9 @@ def _process_one_chromosome(
     if test == "fisher":
         # Fisher exact on per-group POOLED read counts.
         #
-        # The previous "fisher"/"cmh" path pooled control reads then ran
-        # one CMH stratum per case sample against the pool, producing a
-        # test that was structurally identical to Fisher on pooled reads
-        # but with the variance term deflated by the pooling (effective N
-        # inflated by Sigma coverage per control). The corrected code below
-        # makes the pooling explicit and routes it through the well-tested
-        # fisher_exact_vectorized() helper.
+        # Fisher exact on per-group POOLED read counts. The corrected code
+        # below makes the pooling explicit and routes it through the
+        # well-tested fisher_exact_vectorized() helper.
         #
         # NOTE: this test ignores between-replicate variability. The user
         # facing warning fires once per call from
@@ -1466,39 +1366,6 @@ def _process_one_chromosome(
         )
         del meth_case_sum, cov_case_sum, unmeth_case_sum
         del meth_ctrl_sum, cov_ctrl_sum, unmeth_ctrl_sum
-
-    elif test == "cmh":
-        # properly stratified CMH -- one 2x2 stratum per
-        # (case_i, ctrl_j) pair, so each replicate's coverage marginal
-        # enters its own variance term V. With n_case = n_ctrl = 1 this
-        # degenerates to a single 2x2 table and matches Fisher; with
-        # replicates the variance term grows correctly with n_case x n_ctrl,
-        # avoiding the inflated chi^2 of the old pooled-control approach.
-        #
-        # Memory: we cache the case samples in int32 (n_case x n_sites x 8 B)
-        # so each is contributed against every control sample without
-        # re-reading parquet n_ctrl times.
-        ome, var_sum, or_num, or_den = _cmh_init(n_sites)
-
-        case_data: list[tuple[np.ndarray, np.ndarray]] = []
-        for sample in samples_case:
-            meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
-            case_data.append((meth, cov))
-            _welford_update(mean_case, M2_case, n_valid_case, meth, cov)
-
-        for ctrl in samples_control:
-            meth_c, cov_c = _load_sample_chrom(methylstore_path, chrom, ctrl, canonical_pos)
-            _welford_update(mean_ctrl, M2_ctrl, n_valid_ctrl, meth_c, cov_c)
-            for meth_case_i, cov_case_i in case_data:
-                _cmh_update(
-                    ome, var_sum, or_num, or_den,
-                    meth_case_i, cov_case_i, meth_c, cov_c,
-                )
-            del meth_c, cov_c
-
-        del case_data
-        pvals, log2_ors = _cmh_finalize(ome, var_sum, or_num, or_den)
-        del ome, var_sum, or_num, or_den
 
     elif test == "lr":
         # Quasi-binomial likelihood-ratio test with McCullagh-Nelder overdispersion.
@@ -1791,8 +1658,7 @@ def _process_one_chromosome(
     else:
         raise NotImplementedError(
             f"Test '{test}' not implemented. "
-            "Choose 'lr', 'score', 'fisher', 'cmh', "
-            "'welch_t', or 'glm'."
+            "Choose 'lr', 'fisher', 'welch_t', or 'glm'."
         )
 
     # --- equal-weight per-replicate mean beta ---
@@ -1997,7 +1863,7 @@ def process_chromosomes_dmc(
         Path to filtered partitioned Parquet methylstore.
     samples_treatment, samples_control : list[str]
         Sample identifiers for treatment and control groups.
-    test : {"lr", "fisher", "cmh", "welch_t"}
+    test : {"lr", "fisher", "welch_t"}
         Statistical test.
             "lr"       (default) -- Quasi-binomial likelihood-ratio chi-square
                                    on per-group read counts with per-site
@@ -2007,8 +1873,6 @@ def process_chromosomes_dmc(
             "welch_t"            -- Welch t on raw betas. Variance-stabilising
                                    fallback when count-model assumptions are
                                    doubtful (e.g. very low coverage).
-            "cmh"                -- Cochran-Mantel-Haenszel with one stratum
-                                   per (case_i, ctrl_j) pair.
             "fisher"             -- Fisher exact on reads pooled across
                                    replicates (anti-conservative; warns).
     chromosomes : list[str], optional

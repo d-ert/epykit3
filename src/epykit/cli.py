@@ -6,7 +6,7 @@ dispersion. Closed-form on streaming (S0_g, S1_g, Sigmam^2/n_g) accumulators,
 recommended at n >= 2 replicates per group.
 
 CLI surface:
-* ``dmc`` -- per-CpG calling with ``--test {lr,score,glm,welch_t,cmh,fisher}``,
+* ``dmc`` -- per-CpG calling with ``--test {lr,glm,welch_t,fisher}``,
   ``--min-samples-treatment`` / ``--min-samples-control``
   filters, and ``--allow-n1`` to opt into the (anti-conservative) Fisher fallback when
   there are fewer than 2 replicates per group.
@@ -535,7 +535,7 @@ def main():
         "--test",
         choices=[
             "lr", "glm", "welch_t",
-            "cmh", "fisher",
+            "fisher",
         ],
         default="lr",
         help=(
@@ -546,7 +546,6 @@ def main():
             "glm -- Binomial GLM with covariates (requires a design via "
             "--formula). "
             "welch_t -- Welch t on raw betas. "
-            "cmh -- Cochran-Mantel-Haenszel on per-pair strata. "
             "fisher -- Fisher exact on reads pooled across replicates "
             "(anti-conservative, kept for backward compatibility; warns)."
         ),
@@ -622,7 +621,7 @@ def main():
         "--test",
         choices=[
             "lr", "glm", "welch_t",
-            "cmh", "fisher",
+            "fisher",
         ],
         default="lr",
         help="(tile only) Statistical test applied to tile-level counts. "
