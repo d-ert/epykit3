@@ -8,6 +8,11 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ### Added
 
+- **`benchmark/scripts/methylkit_stouffer_combine.R`** (new):
+  adjacent-CpG Stouffer combination for methylKit output. Mirrors
+  epykit's `neighbour_combine` knob for tuned-vs-tuned Phase 4
+  comparisons per PROTOCOL R1. Test SKIPS without Rscript on PATH.
+
 - **Benchmark consolidation**: the canonical benchmark suite is now
   `epykit3/benchmark/` (was previously split between `epykit3/benchmark/`
   and `benchmarkin_merges/FINAL_REPORT/`, the latter outside version
