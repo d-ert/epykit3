@@ -47,6 +47,10 @@ SemVer (`MAJOR.MINOR.PATCH`).
   migration hint. Migration: `test='bb_lr'` → `test='lr'`. Note:
   `irls_dispatch` stays (used by the `glm` engine).
 
+- **`tl.dmc(test='score')`** removed. Strictly dominated by `lr` in
+  finite samples; asymptotically equivalent under H₀. Migration:
+  `test='score'` → `test='lr'`; output schema identical.
+
 ### Changed (BREAKING for `log2_odds_ratio` column name)
 
 - **`varm["dmc_lr"].log2_odds_ratio`** renamed to

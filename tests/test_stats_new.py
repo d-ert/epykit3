@@ -301,7 +301,7 @@ def test_deconvolve_unknown_method_errors(synth_md_filtered):
 # ---- CI columns + bb_lr (merged from test_dmc_ci_and_rename.py) ----------
 
 
-@pytest.mark.parametrize("test", ["lr", "score", "welch_t"])
+@pytest.mark.parametrize("test", ["lr", "welch_t"])
 def test_dmc_emits_meth_diff_ci_columns(synth_md_filtered, test):
     """Every DMC test path emits meth_diff_ci_lo / meth_diff_ci_hi."""
     md = synth_md_filtered

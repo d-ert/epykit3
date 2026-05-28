@@ -113,10 +113,6 @@ def _auto_test_simple(md: MethylData, allow_n1: bool = False) -> str:
     the ``--test`` default for ``dmr`` (lr). See cli.py for the single source
     of truth.
 
-    The score test (``test="score"``) is still available for users who want
-    a marginally more powerful (but mildly anti-conservative at the
-    boundaries) statistic on the same accumulators.
-
     At n=1 (single replicate per group) there is no between-replicate
     variability for phi to estimate. By default this is treated as a hard error
     (statistical inference is not credible). Pass ``allow_n1=True`` to opt
@@ -346,7 +342,7 @@ def dmc(
         Analysis object containing the methylstore path and the
         treatment/control sample lists.
     test : str
-        One of ``"auto"``, ``"lr"``, ``"score"``, ``"welch_t"``
+        One of ``"auto"``, ``"lr"``, ``"welch_t"``
         (Welch t on raw betas), ``"cmh"``, ``"fisher"``, ``"glm"``.
         ``"auto"`` resolves to ``"fisher"`` at n<2 and ``"lr"``
         (the recommended default) at n>=2.
@@ -377,8 +373,8 @@ def dmc(
         binary path. Ignored when ``contrast`` is supplied and resolves
         without it.
     dispersion : {"site", "chrom", "shrink", "eb"}
-        McCullagh-Nelder dispersion strategy used by the ``"lr"`` and
-        ``"score"`` tests. Default ``"eb"`` shrinks the per-site Pearson
+        McCullagh-Nelder dispersion strategy used by the ``"lr"`` test.
+        Default ``"eb"`` shrinks the per-site Pearson
         residual estimate toward a chromosome-wide pool via empirical-Bayes
         weights (stable at low n / low coverage). Alternatives:
         ``"site"`` uses the noisy per-site estimate only; ``"chrom"`` uses
@@ -411,6 +407,14 @@ def dmc(
             "dispersion-df bug). Use test='lr' (recommended) which uses "
             "the same quasi-binomial dispersion but pools counts per group "
             "for higher power at small n."
+        )
+
+    if test == "score":
+        raise ValueError(
+            "test='score' was removed in 0.7.5 (strictly dominated by "
+            "test='lr' in finite samples; asymptotically equivalent under "
+            "H0). Switch test='score' -> test='lr'; output schema is "
+            "identical."
         )
 
     # --- New contrast / multi-group path -------------------------------------

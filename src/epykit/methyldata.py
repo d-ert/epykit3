@@ -168,7 +168,7 @@ class MethylData:
         Parameters
         ----------
         test : str, optional
-            Test backend name (``"lr"``, ``"score"``, ``"glm"``, ...). When
+            Test backend name (``"lr"``, ``"glm"``, ``"welch_t"``, ...). When
             ``None`` (default), returns the most-recently-written DMC table,
             as recorded by ``ep.tl.dmc`` in ``md.uns["dmc"]["last_key"]``.
         annotated : bool

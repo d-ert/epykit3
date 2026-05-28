@@ -688,11 +688,10 @@ def _score_finalize(
     shrink_pseudo_df : float
         Pseudo-df weight on phi_chrom in the ``"shrink"`` mode (default 4 ~=
         the typical real per-site df). Ignored otherwise.
-    statistic : {"lr", "score"}
-        Functional form of the test statistic. Both use the same per-group
-        sufficient statistics (S0_g = Sigma_j n_ij and S1_g = Sigma_j m_ij) and the
-        same dispersion correction, so the difference manifests only at
-        small effective sample sizes (n=6 is small):
+    statistic : {"lr"}
+        Functional form of the test statistic. Only ``"lr"`` (the
+        quasi-binomial likelihood-ratio chi-square) is supported.
+        The ``"score"`` statistic was removed in 0.7.5.
 
         ``"lr"`` (default)
             Quasi-binomial likelihood-ratio chi-square. Closed-form in
@@ -702,12 +701,6 @@ def _score_finalize(
             divided by the dispersion phi_i. Closer to nominal coverage near
             the boundaries (pi near 0 or 1) -- exactly where DMR tiles tend
             to live.
-
-        ``"score"`` (slightly more powerful)
-            Pearson score statistic U^2/V_pool with quasi-binomial inflation.
-            Asymptotically equivalent to the LR test but mildly
-            anti-conservative at the boundaries. Kept as an option for
-            users who want the small extra power.
     reference : {"adaptive", "chi2", "F"}
         Reference distribution used to convert the test statistic to a
         p-value.
@@ -743,9 +736,9 @@ def _score_finalize(
         raise ValueError(
             f"dispersion must be 'site', 'chrom', 'shrink', or 'eb'; got {dispersion!r}"
         )
-    if statistic not in {"lr", "score"}:
+    if statistic not in {"lr"}:
         raise ValueError(
-            f"statistic must be 'lr' or 'score'; got {statistic!r}"
+            f"statistic must be 'lr'; got {statistic!r}"
         )
     if reference == "methylkit":
         raise ValueError(
@@ -1117,7 +1110,7 @@ def _beta_binom_mom_from_welford_logit(
     # M2_case = 0 by binomial sampling chance. Position: logit_t is the
     # weak variance-stabilising fallback; we don't pretend it's
     # well-calibrated near beta = 0 / 1. For trustworthy inference use
-    # ``test="lr"`` (or ``"score"``), which gets variance from the
+    # ``test="lr"``, which gets variance from the
     # binomial count model and isn't affected by replicate collapse.
     both_zero_var = (
         (n_valid_case >= 2) & (M2_case <= 0.0)
@@ -1507,12 +1500,10 @@ def _process_one_chromosome(
         pvals, log2_ors = _cmh_finalize(ome, var_sum, or_num, or_den)
         del ome, var_sum, or_num, or_den
 
-    elif test in ("score", "lr"):
-        # Quasi-binomial count-model test with McCullagh-Nelder overdispersion.
-        # Both the score and likelihood-ratio statistics share the same
-        # streaming accumulators (sn, sm, sm^2/n, nv per group) and the same
-        # dispersion machinery; ``_score_finalize`` picks the functional form
-        # based on the ``statistic=`` argument it receives.
+    elif test == "lr":
+        # Quasi-binomial likelihood-ratio test with McCullagh-Nelder overdispersion.
+        # Uses streaming accumulators (sn, sm, sm^2/n, nv per group) and the same
+        # dispersion machinery; ``_score_finalize`` is called with statistic="lr".
         sn_case, sm_case, sm2n_case, nv_case = _score_init(n_sites)
         sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl = _score_init(n_sites)
 
@@ -1556,7 +1547,7 @@ def _process_one_chromosome(
             sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl,
             chrom_name=chrom,
             dispersion=dispersion,
-            statistic=test,
+            statistic="lr",
             reference=reference,
             sep_fallback=sep_fallback,
             sep_threshold=sep_threshold,
@@ -2006,17 +1997,13 @@ def process_chromosomes_dmc(
         Path to filtered partitioned Parquet methylstore.
     samples_treatment, samples_control : list[str]
         Sample identifiers for treatment and control groups.
-    test : {"lr", "score", "fisher", "cmh", "welch_t"}
+    test : {"lr", "fisher", "cmh", "welch_t"}
         Statistical test.
             "lr"       (default) -- Quasi-binomial likelihood-ratio chi-square
                                    on per-group read counts with per-site
                                    McCullagh-Nelder dispersion. Closed-form on
                                    the streaming accumulators (S0_g, S1_g,
                                    Sigmam^2/n_g). Recommended at n >= 2.
-            "score"              -- Pearson score statistic on the same
-                                   accumulators. Marginally more powerful
-                                   than "lr" but mildly anti-conservative
-                                   when pi is near 0 or 1.
             "welch_t"            -- Welch t on raw betas. Variance-stabilising
                                    fallback when count-model assumptions are
                                    doubtful (e.g. very low coverage).
@@ -2038,10 +2025,10 @@ def process_chromosomes_dmc(
         ``unite=False`` (union mode) to drop tests that effectively run on
         a singleton observation in one group.
     dispersion : {"site", "chrom", "shrink"}
-        McCullagh-Nelder dispersion strategy used by ``test="lr"`` and
-        ``test="score"``. Default ``"site"`` estimates a per-site phi_i from
-        the 4-df Pearson residual sum; ``"chrom"`` pools one phi across the
-        whole chromosome; ``"shrink"`` is a weighted average of the two.
+        McCullagh-Nelder dispersion strategy used by ``test="lr"``.
+        Default ``"site"`` estimates a per-site phi_i from the 4-df Pearson
+        residual sum; ``"chrom"`` pools one phi across the whole chromosome;
+        ``"shrink"`` is a weighted average of the two.
         See :func:`_score_finalize` for details. Ignored for other tests.
     reference : {"adaptive", "chi2", "F"}
         Reference distribution for the quasi-binomial test statistic.

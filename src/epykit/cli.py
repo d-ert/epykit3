@@ -534,7 +534,7 @@ def main():
     p_dmc.add_argument(
         "--test",
         choices=[
-            "lr", "score", "glm", "welch_t",
+            "lr", "glm", "welch_t",
             "cmh", "fisher",
         ],
         default="lr",
@@ -543,9 +543,6 @@ def main():
             "lr -- Quasi-binomial likelihood-ratio chi-square with per-site "
             "McCullagh-Nelder dispersion. Closed-form on streaming "
             "accumulators; recommended default at n>=2. "
-            "score -- Quasi-binomial score test on the same dispersion-corrected "
-            "accumulators as lr; marginally more powerful but mildly "
-            "anti-conservative at the boundaries. "
             "glm -- Binomial GLM with covariates (requires a design via "
             "--formula). "
             "welch_t -- Welch t on raw betas. "
@@ -624,7 +621,7 @@ def main():
     p_dmr.add_argument(
         "--test",
         choices=[
-            "lr", "score", "glm", "welch_t",
+            "lr", "glm", "welch_t",
             "cmh", "fisher",
         ],
         default="lr",
