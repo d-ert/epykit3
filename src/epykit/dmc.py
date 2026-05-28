@@ -2217,6 +2217,14 @@ _VALID_FDR_METHODS = {"fdr_bh", "fdr_by", "fdr_tsbh", "fdr_tsbky", "fdr_storey"}
 def _storey_pi0(pvals: np.ndarray, lam: float | None = None) -> float:
     """Estimate the proportion of true nulls pi0 using Storey's method.
 
+    This is the plug-in estimator at lam=0.5 (not the spline-smoother
+    variant). Returns ``(# p > lam) / (n * (1 - lam))``, clamped to
+    ``[1/n, 1]``.
+
+    The lower clamp ``1/n`` is Storey 2002's standard floor: when all
+    p-values fall below *lam* the raw estimate is 0, which would cause
+    +inf q-values via downstream BH-style correction.
+
     Parameters
     ----------
     pvals : 1-D float array, finite values only.
@@ -2226,7 +2234,7 @@ def _storey_pi0(pvals: np.ndarray, lam: float | None = None) -> float:
 
     Returns
     -------
-    pi0_hat : float in (0, 1].
+    pi0_hat : float in [1/n, 1].
     """
     if pvals.size == 0:
         return 1.0
@@ -2239,7 +2247,7 @@ def _storey_pi0(pvals: np.ndarray, lam: float | None = None) -> float:
         lam = 0.5
     n = pvals.size
     pi0 = float(np.sum(pvals > lam)) / (n * (1.0 - lam))
-    return float(min(1.0, max(0.0, pi0)))
+    return float(min(1.0, max(1.0 / n, pi0)))
 
 
 def combine_neighbour_pvalues(

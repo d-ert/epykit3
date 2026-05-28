@@ -194,6 +194,12 @@ SemVer (`MAJOR.MINOR.PATCH`).
   `tl.dmc(test='fisher')`; (b) accepts `empirical_strata=<obs_column>`
   to permute within strata for paired designs.
 
+- **P1-10**: `_storey_pi0` now clamps at `1/n` from below (Storey
+  2002 standard floor). Previously could return 0 when all p-values
+  fell below `lam`, causing +inf q-values via BH adjustment. Docstring
+  updated to note this is the plug-in estimator, not the spline-
+  smoother variant.
+
 ### Changed (breaking on the `lr+` schema)
 
 - **P0-1**: ``tl.dmc(..., neighbour_combine=True)`` no longer overwrites
