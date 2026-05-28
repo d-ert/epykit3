@@ -636,10 +636,14 @@ def dmc(
 
         # Neighbour-aware p-value combining (RADMeth-style, since 0.7.1).
         # When enabled, run the signed-Stouffer combiner over the per-CpG
-        # raw p-values, swap the combined p-value into the `pvalue` column
-        # (preserving the raw under `pvalue_raw`), and re-apply BH/Storey
-        # on the combined p-values. Sites without enough neighbours fall
-        # back to their raw p-value identity.
+        # raw p-values and emit the combined p-value as a sibling column
+        # `pvalue_combined` (with `qvalue_combined` from BH/Storey on the
+        # combined values, and `pvalue_combined_n_neighbours` /
+        # `qvalue_combined_reject` as audit columns). The canonical
+        # `pvalue` / `qvalue` columns remain the raw per-CpG values --
+        # downstream consumers that want the combined values must opt in
+        # by reading the `_combined` columns explicitly. Sites without
+        # enough neighbours fall back to their raw p-value identity.
         if neighbour_combine and len(result) > 0:
             from .dmc import combine_neighbour_pvalues
             result = combine_neighbour_pvalues(result, neighbour_bp=neighbour_bp)
