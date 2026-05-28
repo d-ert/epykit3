@@ -25,15 +25,44 @@ import epykit as ep
 
 
 def _permute_md(md, samples_treatment: list[str], samples_control: list[str]):
-    """Return a copy of md with group labels reassigned per the shuffle."""
+    """Return a copy of md with group labels reassigned per the shuffle.
+
+    Writes BOTH ``obs["treatment"]`` (i64, the canonical label that
+    :attr:`MethylData.treatment_ids` filters on) AND ``obs["group"]``
+    (the display string column). Updating only ``group`` -- as a prior
+    revision did -- silently left ``md_copy.treatment_ids`` pointing at
+    the original treatment samples, so every shuffle in the null
+    calibration sweep ran on the unpermuted assignment.
+
+    Sample IDs not in either input list (a defensive case; in current
+    callers all samples are assigned) keep their existing
+    ``group``/``treatment`` values.
+    """
     md_copy = copy.copy(md)
-    label_map = {s: "treatment" for s in samples_treatment}
-    label_map.update({s: "control" for s in samples_control})
-    new_groups = [
-        label_map.get(sid, grp)
-        for sid, grp in zip(md.obs["sample_id"].to_list(), md.obs["group"].to_list())
-    ]
-    md_copy.obs = md.obs.with_columns(pl.Series("group", new_groups))
+    treat_set = set(samples_treatment)
+    ctrl_set = set(samples_control)
+    sample_ids = md.obs["sample_id"].to_list()
+    orig_group = md.obs["group"].to_list()
+    has_treatment = "treatment" in md.obs.columns
+    orig_treatment = (
+        md.obs["treatment"].to_list() if has_treatment else [0] * len(sample_ids)
+    )
+    new_group: list[str] = []
+    new_treatment: list[int] = []
+    for sid, og, ot in zip(sample_ids, orig_group, orig_treatment):
+        if sid in treat_set:
+            new_group.append("treatment")
+            new_treatment.append(1)
+        elif sid in ctrl_set:
+            new_group.append("control")
+            new_treatment.append(0)
+        else:
+            new_group.append(og)
+            new_treatment.append(int(ot))
+    md_copy.obs = md.obs.with_columns(
+        pl.Series("group", new_group),
+        pl.Series("treatment", new_treatment, dtype=pl.Int64),
+    )
     return md_copy
 
 
