@@ -24,10 +24,6 @@ Tests
                   assumptions are doubtful.
   welch_t       -- Welch t on raw betas. Same boundary-beta caveat as
                   ``logit_t``.
-  bb_lr         -- True quasi-binomial LRT via a full per-site GLM on a
-                  binary-treatment design. The honest "fit-the-model"
-                  alternative to ``welch_t``; slower than ``lr`` and
-                  produces near-identical results on binary designs.
   cmh           -- Cochran-Mantel-Haenszel with one 2x2 stratum per
                   (case_i, ctrl_j) pair.
   fisher        -- Fisher exact on reads pooled across replicates. Ignores
@@ -1805,7 +1801,7 @@ def _process_one_chromosome(
         raise NotImplementedError(
             f"Test '{test}' not implemented. "
             "Choose 'lr', 'score', 'fisher', 'cmh', "
-            "'welch_t', 'bb_lr', or 'glm'."
+            "'welch_t', or 'glm'."
         )
 
     # --- equal-weight per-replicate mean beta ---
@@ -2748,8 +2744,7 @@ def shrink_meth_diff(
           ``meth_diff`` as ``(ci_hi - ci_lo) / (2 * 1.96)``. Works on
           every backend that emits ``meth_diff_ci_lo`` /
           ``meth_diff_ci_hi``.
-        * ``"coef_se"``: use ``coef_se`` directly (GLM /
-          ``bb_lr`` backends). Avoids the CI-width round-trip but is
+        * ``"coef_se"``: use ``coef_se`` directly (GLM backend). Avoids the CI-width round-trip but is
           on the *linear-predictor* scale (logit beta coefficients), so
           the shrinkage acts on logit-Deltabeta rather than Deltabeta. Prefer ``"ci"``
           unless you specifically want logit-scale shrinkage.
@@ -2786,7 +2781,7 @@ def shrink_meth_diff(
         if "coef_se" not in dmc_df.columns:
             raise ValueError(
                 "se_from='coef_se' requires the 'coef_se' column "
-                "(present on GLM / bb_lr DMC outputs)."
+                "(present on GLM DMC outputs)."
             )
         se = dmc_df.get_column("coef_se").to_numpy().astype(np.float64)
     else:

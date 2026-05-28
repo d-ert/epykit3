@@ -6,8 +6,8 @@ dispersion. Closed-form on streaming (S0_g, S1_g, Sigmam^2/n_g) accumulators,
 recommended at n >= 2 replicates per group.
 
 CLI surface:
-* ``dmc`` -- per-CpG calling with ``--test {lr,score,glm,welch_t,
-  bb_lr,cmh,fisher}``, ``--min-samples-treatment`` / ``--min-samples-control``
+* ``dmc`` -- per-CpG calling with ``--test {lr,score,glm,welch_t,cmh,fisher}``,
+  ``--min-samples-treatment`` / ``--min-samples-control``
   filters, and ``--allow-n1`` to opt into the (anti-conservative) Fisher fallback when
   there are fewer than 2 replicates per group.
 * ``dmr`` -- ``--method {tile,sliding_window}``. The tile path takes a

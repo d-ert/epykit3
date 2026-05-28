@@ -7,7 +7,7 @@ This package provides a complete WGBS analysis pipeline:
   - dmc:       Differential methylation calling per CpG. Default test is
                ``lr`` (quasi-binomial likelihood-ratio with McCullagh-
                Nelder dispersion). Other backends: score, glm, logit_t,
-               welch_t, bb_lr, cmh, fisher.
+               welch_t, cmh, fisher.
   - dmr:       DMR calling (tile-based default, sliding-window legacy) and
                Gaussian-kernel methylation smoothing
   - annotate:  Gene-feature and CpG-island context annotation
