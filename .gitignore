@@ -57,6 +57,18 @@ benchmark/data/study1b_simulator/timings_simulator.parquet
 benchmark/_converted_simulator/
 benchmark/_runs_simulator/
 
+# Phase 4 Task 6: re-run epykit on GSE263850 (Study 3 real cohort).
+# Track the post-Phase-3 cross-tool concordance artefacts + MANIFEST.
+# Per-engine bulk per-CpG/DMR parquets stay ignored (multi-GB each).
+!benchmark/data/study3/
+!benchmark/data/study3/epykit_post_phase3/
+!benchmark/data/study3/epykit_post_phase3/MANIFEST.txt
+benchmark/data/study3/epykit_post_phase3/dmc/
+benchmark/data/study3/epykit_post_phase3/dmr/
+!benchmark/data/study3/comparisons_post_phase3/
+!benchmark/data/study3/comparisons_post_phase3/*.parquet
+!benchmark/data/study3/comparisons_post_phase3/SUMMARY.md
+
 # Phase 2: filesystem-only archive of the pre-2026-05-27 benchmark dir
 # (~15 GB of regenerables; kept on disk only, not in git history)
 _legacy_benchmark/
