@@ -2096,7 +2096,11 @@ def process_chromosomes_dmc(
                 )
             except OSError:
                 size_ok = False
-            weak_hit = size_ok
+            # Restrict the weak-hit path to its documented use case:
+            # legacy manifests written before the input_sig field
+            # existed. If input_sig IS present but differs, that's a
+            # real cache-invalidation event -- fall through to recompute.
+            weak_hit = size_ok and not cached_manifest.get("input_sig")
 
         if strict_hit and all_present:
             logger.info(

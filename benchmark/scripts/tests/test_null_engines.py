@@ -126,18 +126,17 @@ def test_closure_produces_different_qvalues_per_shuffle(synth_md_filtered):
     sample across the group boundary, leave the rest alone. The
     resulting test compares 3-vs-5 to the original 4-vs-4.
 
-    ``ep.tl.dmc`` has a weak cache hit in ``src/epykit/dmc.py`` that can
-    short-circuit recomputation when the per-chrom parquets already
-    exist on disk; we wipe the DMC cache directory between the two
-    closure calls so this test isolates the closure behaviour from the
-    cache layer. The bug guarded against is independent of the cache:
-    before the fix, the two calls produced bit-identical q-values even
-    on the first invocation against a freshly-built methylstore (the
-    real Phase 4 Task 7 symptom).
+    Historically ``ep.tl.dmc`` had a weak-hit cache branch in
+    ``src/epykit/dmc.py`` that short-circuited recomputation whenever
+    the per-chrom parquets were already on disk -- even when the
+    cached manifest's ``input_sig`` differed from the current call.
+    That has been fixed: a differing ``input_sig`` now invalidates the
+    cache and triggers a recompute. We rely on that here -- no manual
+    cache wipe between the two closure calls. The bug originally
+    guarded against (permutation only touching obs.group, not
+    obs.treatment) is independent of the cache, but the cache fix is
+    what makes this regression observable without an rmtree workaround.
     """
-    import shutil
-    from pathlib import Path
-
     md = synth_md_filtered
     factory = ENGINE_REGISTRY["lr"]
     closure = factory(md)
@@ -147,19 +146,12 @@ def test_closure_produces_different_qvalues_per_shuffle(synth_md_filtered):
         "fixture sanity: need at least 2 samples per group"
     )
 
-    dmc_cache_dir = Path(md.store).parent / "dmc"
-
     # Assignment A: the original 4-vs-4.
     qvals_a = closure(samples_treatment=orig_treat, samples_control=orig_ctrl, seed=1)
 
-    # Wipe the cache to force recompute under assignment B. This isolates
-    # the regression -- we are testing the closure / permutation path,
-    # not the DMC cache layer.
-    if dmc_cache_dir.exists():
-        shutil.rmtree(dmc_cache_dir)
-
     # Assignment B: move the last original treatment into control. Now
-    # 3-vs-5 -- not a symmetric swap of A.
+    # 3-vs-5 -- not a symmetric swap of A. The DMC cache self-invalidates
+    # on input_sig mismatch, so no manual rmtree is needed.
     mixed_treat = orig_treat[:-1]
     mixed_ctrl = orig_ctrl + [orig_treat[-1]]
     qvals_b = closure(samples_treatment=mixed_treat, samples_control=mixed_ctrl, seed=1)
