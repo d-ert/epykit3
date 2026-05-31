@@ -1,37 +1,33 @@
 null_calibration -- Phase 4 Task 7 (run_phase4_null_calibration.py)
 
-Date           : 2026-05-29 00:20:24
+Date           : 2026-05-31 09:46:54
 epykit version : 0.7.2
 Engine tag     : v0.7.5-phase3-engines-frozen
-Git HEAD       : 75c2af82e321e8e83aaa145ad68965cfdef0b9b1
+Git HEAD       : 3399520c9409796f934cded6270050f635a536b4
 q-threshold    : 0.05
 
 Datasets:
   piao_distributed        scenario=cov10_3v3         engines=lr,lr_plus,welch_t,fisher            k=20  wall=0.0s
   simulator               scenario=sim_cov10_3v3     engines=lr,lr_plus,welch_t,fisher            k=20  wall=0.0s
-  gse263850               scenario=gse263850         engines=lr,lr_plus,welch_t,fisher,glm        k=10  wall=2202.4s
+  gse263850               scenario=gse263850         engines=lr,lr_plus,welch_t,fisher,glm        k=10  wall=0.0s
 
-Total wallclock: 2202.4s
+Total wallclock: 0.0s
 
 Per-(dataset, engine) outcome:
-  gse263850              lr_plus    FAIL wall=1513.3s
-      error: numpy._core._exceptions._ArrayMemoryError: Unable to allocate 168. MiB for an array with shape (22020939,) and data type int64
-  gse263850              glm        ok   wall=689.1s
 
 Summary table (benchmark/data/null_calibration/summary.parquet):
-  rows=12
-  gse263850              fisher     median_FDR=0.0161  IQR=[0.0161, 0.0161]  n_called_med=354848/22020939
-  gse263850              glm        median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/5401271
-  gse263850              lr         median_FDR=0.0023  IQR=[0.0023, 0.0023]  n_called_med=49643/22020939
-  gse263850              welch_t    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/21013487
-  piao_distributed       fisher     median_FDR=0.1841  IQR=[0.1841, 0.1841]  n_called_med=18413/100000
-  piao_distributed       lr         median_FDR=0.1925  IQR=[0.1925, 0.1925]  n_called_med=19245/100000
-  piao_distributed       lr_plus    median_FDR=0.1935  IQR=[0.1935, 0.1935]  n_called_med=19352/100000
-  piao_distributed       welch_t    median_FDR=0.1763  IQR=[0.1763, 0.1763]  n_called_med=15574/88328
-  simulator              fisher     median_FDR=0.1198  IQR=[0.1198, 0.1198]  n_called_med=11977/100000
-  simulator              lr         median_FDR=0.1371  IQR=[0.1371, 0.1371]  n_called_med=13708/100000
-  simulator              lr_plus    median_FDR=0.1466  IQR=[0.1466, 0.1466]  n_called_med=14655/100000
-  simulator              welch_t    median_FDR=0.0026  IQR=[0.0026, 0.0026]  n_called_med=246/93553
+  rows=11
+  gse263850              lr         median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=337/22020939
+  gse263850              lr_plus    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=337/22020939
+  gse263850              welch_t    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/21013534
+  piao_distributed       fisher     median_FDR=0.0000  IQR=[0.0000, 0.0001]  n_called_med=1/100000
+  piao_distributed       lr         median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/100000
+  piao_distributed       lr_plus    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/100000
+  piao_distributed       welch_t    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/88769
+  simulator              fisher     median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/100000
+  simulator              lr         median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/100000
+  simulator              lr_plus    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/100000
+  simulator              welch_t    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/94253
 
 Per-engine bulk parquets:
   benchmark/data/null_calibration/piao_distributed/cov10_3v3/<engine>.parquet
