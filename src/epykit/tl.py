@@ -511,7 +511,7 @@ def dmc(
         from pathlib import Path
         canonical_for_key = _canon(selected_test)
         resume_stage_name = f"dmc_{canonical_for_key}"
-        resume_root = md._analysis_root or md.store
+        resume_root = md.analysis_root or md.store
         resume_sig = input_signature(
             md.store,
             sorted(md.treatment_ids),

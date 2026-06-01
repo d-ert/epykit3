@@ -20,6 +20,8 @@ import numpy as np
 import polars as pl
 import pytest
 
+from epykit import MethylData
+
 
 
 # read_bismark + obs schema
@@ -343,6 +345,59 @@ def test_aggregate_regions_round_trip(synth_md_filtered, tmp_path):
     assert df["coverage"].eq(df["N_meth"] + df["N_unmeth"]).all()
     assert md.uns["regions"]["n_regions"] == len(bed_rows)
     assert any(h["step"] == "regions" for h in md.uns["_store_history"])
+
+
+def test_methyldata_analysis_root_is_public():
+    """analysis_root (no underscore) is the new public name in 1.0;
+    _analysis_root remains as a deprecated property alias."""
+    md = MethylData(
+        obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
+        store=None,
+    )
+    md.analysis_root = "/tmp/some/path"
+    assert md.analysis_root == "/tmp/some/path"
+
+    # Legacy attribute still readable but emits DeprecationWarning.
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        legacy = md._analysis_root
+    assert legacy == "/tmp/some/path"
+    assert any(
+        issubclass(w.category, DeprecationWarning)
+        and "_analysis_root" in str(w.message)
+        for w in caught
+    )
+
+
+def test_methyldata_analysis_root_setter_via_legacy_name_warns():
+    """Writing the legacy name still works but emits DeprecationWarning."""
+    md = MethylData(
+        obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
+        store=None,
+    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        md._analysis_root = "/legacy"
+    assert md.analysis_root == "/legacy"
+    assert any(
+        issubclass(w.category, DeprecationWarning)
+        and "_analysis_root" in str(w.message)
+        for w in caught
+    )
+
+
+def test_methyldata_analysis_root_kwarg_constructor():
+    """analysis_root is accepted as a constructor keyword argument
+    (the motivation for promoting it from underscore-prefixed to public)."""
+    import polars as pl
+    from epykit import MethylData
+
+    md = MethylData(
+        obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
+        store=None,
+        analysis_root="/tmp/some/path",
+    )
+    assert md.analysis_root == "/tmp/some/path"
 
 
 def test_aggregate_regions_then_dmc(synth_md_filtered, tmp_path):

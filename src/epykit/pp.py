@@ -51,8 +51,8 @@ def filter_coverage(
     # Derive output store path: explicit override, or from analysis_root cache, or legacy behavior
     if output_store:
         out = output_store
-    elif md._analysis_root:
-        out = str(Path(md._analysis_root) / ".cache" / "filtered")
+    elif md.analysis_root:
+        out = str(Path(md.analysis_root) / ".cache" / "filtered")
     else:
         out = f"{md.store}_filtered"
     
@@ -118,8 +118,8 @@ def normalize_coverage(md: MethylData, method: str = "median") -> None:
             "but downstream stats reflect the normalised store."
         )
 
-    if md._analysis_root:
-        out = str(Path(md._analysis_root) / ".cache" / "normalized")
+    if md.analysis_root:
+        out = str(Path(md.analysis_root) / ".cache" / "normalized")
     else:
         out = f"{md.store}_normalized"
 
@@ -248,7 +248,7 @@ def aggregate_regions(
         to ``name`` (column 4) if present, otherwise to
         ``"{chrom}:{start}-{end}"``.
     output_store : str, optional
-        Override output path. Defaults to ``<_analysis_root>/.cache/regions``
+        Override output path. Defaults to ``<analysis_root>/.cache/regions``
         when an analysis root is set, else ``<md.store>_regions``.
     min_cpgs_per_region : int
         Drop region rows with fewer than this many CpGs (per sample) after
@@ -272,8 +272,8 @@ def aggregate_regions(
 
     if output_store:
         out = output_store
-    elif md._analysis_root:
-        out = str(Path(md._analysis_root) / ".cache" / "regions")
+    elif md.analysis_root:
+        out = str(Path(md.analysis_root) / ".cache" / "regions")
     else:
         out = f"{md.store}_regions"
 
@@ -462,8 +462,8 @@ def smooth(
 
     samples = md.obs.get_column("sample_id").to_list()
 
-    if md._analysis_root:
-        smooth_path = str(Path(md._analysis_root) / ".cache" / "smoothed")
+    if md.analysis_root:
+        smooth_path = str(Path(md.analysis_root) / ".cache" / "smoothed")
     else:
         smooth_path = f"{md.store}_smoothed"
 
