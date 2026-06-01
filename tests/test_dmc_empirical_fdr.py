@@ -36,7 +36,7 @@ def small_md(tmp_path_factory):
         store_dir=str(out_dir / "store"),
     )
     ep.pp.filter_coverage(md, lo_count=3, hi_perc=99.9)
-    ep.pp.unite(md, type="intersect")
+    ep.pp.set_unite_type(md, type="intersect")
     truth = pl.read_parquet(result["truth"])
     return md, truth
 

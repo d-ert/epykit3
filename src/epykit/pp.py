@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from pathlib import Path
 
 import polars as pl
@@ -140,23 +141,53 @@ def normalize_coverage(md: MethylData, method: str = "median") -> None:
         _append_store_history(md, "normalized", out, n_sites)
 
 
-def unite(md: MethylData, type: str = "union") -> None:
+def set_unite_type(md: MethylData, type: str = "union") -> None:
     """Record the site-alignment strategy for downstream DMC processing.
 
-    This does **not** materialise the full intersection/union into memory.
-    ``ep.tl.dmc`` passes ``unite=True/False`` directly to
-    ``process_chromosomes_dmc``, which performs the per-chromosome join
-    lazily and in O(n_sites) memory -- identical to the old procedural API.
-    Eagerly computing the full intersection here (previously stored in
-    ``md.uns["site_intersect"]``) caused an OOM on whole-genome data because
-    it loaded all 338 M+ rows into RAM at once.
+    This is a *state-marker*: it writes ``md.uns["unite"] = {"type": type}``
+    and does not materialise the intersection or union. ``ep.tl.dmc`` reads
+    this state and passes ``unite=True/False`` to ``process_chromosomes_dmc``,
+    which performs the per-chromosome join lazily in O(n_sites) memory --
+    identical to the old procedural API.
+
+    Parameters
+    ----------
+    md : MethylData
+    type : {"intersect", "union"}
+        Site-set strategy:
+          * ``"intersect"`` -- only sites covered in every sample.
+          * ``"union"`` -- every site covered in at least one sample.
+
+    Notes
+    -----
+    Eagerly computing the full intersection (previously stored in
+    ``md.uns["site_intersect"]``) caused an OOM on whole-genome data
+    because it loaded all 338 M+ rows into RAM at once.
     """
     if type not in {"intersect", "union"}:
         raise ValueError("type must be 'intersect' or 'union'")
-
     # _united is a derived property -- recording in uns is enough.
     md.uns["unite"] = {"type": type}
     _append_store_history(md, "united", md.store, None)
+
+
+def unite(md: MethylData, type: str = "union") -> None:
+    """Deprecated alias for ``set_unite_type``.
+
+    The original ``unite()`` name suggested a verb that performs the
+    union, but this function only writes ``md.uns["unite"]`` and does
+    not materialise anything. Use ``set_unite_type()`` for an honest name.
+
+    Scheduled for removal in epykit 2.0.
+    """
+    warnings.warn(
+        "pp.unite() is deprecated; use pp.set_unite_type() for the same "
+        "semantics with an honest name. pp.unite() will be removed in 2.0.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    set_unite_type(md, type=type)
+
 
 def _read_bed(regions_bed: str, region_id_col: str | None = None) -> pl.DataFrame:
     """Parse a 3/4/6/12-column BED into a DataFrame with columns

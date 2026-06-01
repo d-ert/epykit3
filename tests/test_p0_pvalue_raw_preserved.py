@@ -13,7 +13,7 @@ import epykit as ep
 def test_neighbour_combine_does_not_overwrite_pvalue(synth_md):
     md = synth_md
     ep.pp.filter_coverage(md, lo_count=3, hi_perc=99.9)
-    ep.pp.unite(md, type="intersect")
+    ep.pp.set_unite_type(md, type="intersect")
 
     # First run: baseline lr, no combine. Capture per-CpG raw p.
     ep.tl.dmc(md, test="lr", neighbour_combine=False)
@@ -61,7 +61,7 @@ def test_empirical_fdr_uses_raw_p_under_neighbour_combine(synth_md):
     observed side -- otherwise the null pool (raw) is incompatible."""
     md = synth_md
     ep.pp.filter_coverage(md, lo_count=3, hi_perc=99.9)
-    ep.pp.unite(md, type="intersect")
+    ep.pp.set_unite_type(md, type="intersect")
 
     ep.tl.dmc(
         md, test="lr",

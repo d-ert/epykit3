@@ -45,7 +45,7 @@ def synth_md_n1(tmp_path):
         store_dir=str(tmp_path / "store"),
     )
     ep.pp.filter_coverage(md, lo_count=2, hi_perc=99.9)
-    ep.pp.unite(md, type="intersect")
+    ep.pp.set_unite_type(md, type="intersect")
     return md
 
 
@@ -95,7 +95,7 @@ def test_union_with_zero_min_samples_warns(synth_md, tmp_path):
     sites covered in only one sample per group is the textbook footgun."""
     import epykit as ep
     ep.pp.filter_coverage(synth_md, lo_count=5, hi_perc=99.9)
-    ep.pp.unite(synth_md, type="union")
+    ep.pp.set_unite_type(synth_md, type="union")
 
     with pytest.warns(UserWarning, match=r"unite='union'"):
         ep.tl.dmc(synth_md, test="lr",
@@ -106,7 +106,7 @@ def test_union_with_explicit_min_samples_does_not_warn(synth_md):
     """Providing sensible min_samples_* with union mode suppresses the warning."""
     import epykit as ep
     ep.pp.filter_coverage(synth_md, lo_count=5, hi_perc=99.9)
-    ep.pp.unite(synth_md, type="union")
+    ep.pp.set_unite_type(synth_md, type="union")
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")

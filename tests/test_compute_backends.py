@@ -123,7 +123,7 @@ def test_dmc_dask_matches_sequential(synth_bundle, tmp_path):
         store_dir=str(tmp_path / "seq_store"),
     )
     ep.pp.filter_coverage(md_seq, lo_count=5, hi_perc=99.9)
-    ep.pp.unite(md_seq, type="intersect")
+    ep.pp.set_unite_type(md_seq, type="intersect")
     ep.tl.dmc(md_seq, test="lr", backend="sequential")
     seq_df = _sort_canonical(md_seq.varm[md_seq.uns["dmc"]["last_key"]])
 
@@ -133,7 +133,7 @@ def test_dmc_dask_matches_sequential(synth_bundle, tmp_path):
         store_dir=str(tmp_path / "dask_store"),
     )
     ep.pp.filter_coverage(md_dask, lo_count=5, hi_perc=99.9)
-    ep.pp.unite(md_dask, type="intersect")
+    ep.pp.set_unite_type(md_dask, type="intersect")
     ep.tl.dmc(md_dask, test="lr", backend="dask", n_workers=2)
     dask_df = _sort_canonical(md_dask.varm[md_dask.uns["dmc"]["last_key"]])
 

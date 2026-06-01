@@ -81,7 +81,7 @@ def test_state_after_filter_coverage(synth_md):
 def test_state_after_unite(synth_md):
     import epykit as ep
     ep.pp.filter_coverage(synth_md, lo_count=5, hi_perc=99.9)
-    ep.pp.unite(synth_md, type="intersect")
+    ep.pp.set_unite_type(synth_md, type="intersect")
     assert synth_md._united is True
     assert "united" in synth_md.state
 
@@ -94,7 +94,7 @@ def test_state_persists_through_save_load_round_trip(synth_md, tmp_path):
     import epykit as ep
 
     ep.pp.filter_coverage(synth_md, lo_count=5, hi_perc=99.9)
-    ep.pp.unite(synth_md, type="intersect")
+    ep.pp.set_unite_type(synth_md, type="intersect")
 
     save_path = tmp_path / "saved_md"
     synth_md.save(str(save_path))
@@ -116,7 +116,7 @@ def test_save_load_round_trip_preserves_obs_varm_uns(synth_md, tmp_path):
 
     # Populate uns and varm.
     ep.pp.filter_coverage(synth_md, lo_count=5, hi_perc=99.9)
-    ep.pp.unite(synth_md, type="intersect")
+    ep.pp.set_unite_type(synth_md, type="intersect")
     ep.tl.dmc(synth_md, test="lr")
 
     save_path = tmp_path / "rt"
@@ -487,7 +487,59 @@ def test_aggregate_regions_then_dmc(synth_md_filtered, tmp_path):
     bed = _write_bed(tmp_path / "regions.bed", bed_rows)
     ep.pp.aggregate_regions(md, str(bed), min_cpgs_per_region=1)
     md.uns.pop("unite", None)
-    ep.pp.unite(md, type="intersect")
+    ep.pp.set_unite_type(md, type="intersect")
     ep.tl.dmc(md, test="lr")
     dmc = md.dmc
     assert dmc is not None and len(dmc) > 0
+
+
+# ---- set_unite_type / unite deprecation (Task 6) -------------------------
+
+
+def test_pp_set_unite_type_records_state():
+    """set_unite_type writes md.uns['unite']['type'] without materializing."""
+    import polars as pl
+    from epykit import MethylData
+    import epykit as ep
+
+    md = MethylData(
+        obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
+        store="/tmp/dummy",
+    )
+    ep.pp.set_unite_type(md, "intersect")
+    assert md.uns["unite"]["type"] == "intersect"
+
+
+def test_pp_set_unite_type_rejects_unknown_type():
+    """type must be 'intersect' or 'union'."""
+    import polars as pl
+    from epykit import MethylData
+    import epykit as ep
+
+    md = MethylData(
+        obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
+        store="/tmp/dummy",
+    )
+    with pytest.raises(ValueError, match="type must be 'intersect' or 'union'"):
+        ep.pp.set_unite_type(md, "merge")
+
+
+def test_pp_unite_is_deprecated_alias():
+    """pp.unite still works but emits DeprecationWarning."""
+    import polars as pl
+    from epykit import MethylData
+    import epykit as ep
+
+    md = MethylData(
+        obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
+        store="/tmp/dummy",
+    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        ep.pp.unite(md, "intersect")
+    assert md.uns["unite"]["type"] == "intersect"
+    assert any(
+        issubclass(w.category, DeprecationWarning)
+        and "set_unite_type" in str(w.message)
+        for w in caught
+    )
