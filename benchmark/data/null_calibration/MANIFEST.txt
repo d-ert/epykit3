@@ -1,9 +1,9 @@
 null_calibration -- Phase 4 Task 7 (run_phase4_null_calibration.py)
 
-Date           : 2026-05-31 09:46:54
+Date           : 2026-06-01 18:14:03
 epykit version : 0.7.2
 Engine tag     : v0.7.5-phase3-engines-frozen
-Git HEAD       : 3399520c9409796f934cded6270050f635a536b4
+Git HEAD       : 15a57b2db423bc33ce33db1b9bb171564bfe3eb9
 q-threshold    : 0.05
 
 Datasets:
@@ -16,7 +16,8 @@ Total wallclock: 0.0s
 Per-(dataset, engine) outcome:
 
 Summary table (benchmark/data/null_calibration/summary.parquet):
-  rows=11
+  rows=12
+  gse263850              glm        median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/5404573
   gse263850              lr         median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=337/22020939
   gse263850              lr_plus    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=337/22020939
   gse263850              welch_t    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/21013534
