@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-`epykit` is a Python-native WGBS methylation analysis pipeline (Bismark / MethylDackel `.cov` → DMC/DMR → annotation → HTML report). Core stack: `polars` lazy I/O over a partitioned Parquet methylstore, `numpy`/`scipy`/`numba` for stats, `statsmodels` + `patsy` for GLMs, `bioframe` for genomic intervals. Pre-1.0 (currently 0.7.2), MIT.
+`epykit` is a Python-native WGBS methylation analysis pipeline (Bismark / MethylDackel `.cov` → DMC/DMR → annotation → HTML report). Core stack: `polars` lazy I/O over a partitioned Parquet methylstore, `numpy`/`scipy`/`numba` for stats, `statsmodels` + `patsy` for GLMs, `bioframe` for genomic intervals. 1.0 (stable API), MIT.
 
 ## Common commands
 
