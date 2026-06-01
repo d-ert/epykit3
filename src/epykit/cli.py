@@ -256,14 +256,8 @@ def _cmd_dmr(args: argparse.Namespace):
                 min_samples_treatment=args.min_samples_treatment,
                 min_samples_control=args.min_samples_control,
             )
-    elif args.method in ("segment", "hmm"):
+    elif args.method == "segment":
         # --- Rule-based segmentation path: takes a DMC parquet ---
-        if args.method == "hmm":
-            warnings.warn(
-                "--method=hmm is deprecated; use --method=segment (same engine, "
-                "honest name). --method=hmm will be removed in 0.8.",
-                FutureWarning, stacklevel=1,
-            )
         if not args.dmc_results:
             raise ValueError("method=segment requires --dmc-results.")
         from .dmr_segment import call_dmr_rule_segment
@@ -589,7 +583,7 @@ def main():
     p_dmr = sub.add_parser("dmr", help="DMR calling (tile-based or sliding-window)")
     p_dmr.add_argument(
         "--method",
-        choices=["tile", "sliding_window", "segment", "hmm"],
+        choices=["tile", "sliding_window", "segment"],
         default="tile",
         help=(
             "DMR algorithm. "
@@ -598,8 +592,7 @@ def main():
             "'sliding_window' takes a precomputed DMC parquet and combines "
             "per-CpG p-values with signed Stouffer's Z (legacy). "
             "'segment' rule-based 3-state segmentation on meth_diff signal "
-            "with Stouffer-combined per-segment p-values. "
-            "'hmm' is a deprecated alias for 'segment' (removed in 0.8)."
+            "with Stouffer-combined per-segment p-values."
         ),
     )
     p_dmr.add_argument("--output", required=True)
