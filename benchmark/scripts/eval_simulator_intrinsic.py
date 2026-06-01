@@ -118,10 +118,47 @@ def _score_external(
         )
 
 
+def _score_one_seed(seed: int, coverage: int) -> list[dict]:
+    """Run methylkit + dss + dss_nosmooth scoring for one seed.
+
+    Returns a list of row dicts with seed/coverage already stamped.
+    Skips silently if any required input is missing.
+    """
+    seed_dir = SIM_ROOT / f"seed={seed}"
+    truth_pq = seed_dir / "truth.parquet"
+    methylkit_tsv = seed_dir / "methylkit.tsv"
+    dss_tsv = seed_dir / "dss.tsv"
+    dss_nosmooth_tsv = seed_dir / "dss_nosmooth.tsv"
+    if not (truth_pq.exists() and methylkit_tsv.exists() and dss_tsv.exists()):
+        logger.warning("seed=%d: missing inputs, skipping", seed)
+        return []
+    truth = pl.read_parquet(truth_pq)
+    rows: list[dict] = []
+    rows.extend(_score_external(
+        _load_methylkit(methylkit_tsv), "methylkit",
+        "simulator_intrinsic", coverage, truth,
+    ))
+    rows.extend(_score_external(
+        _load_dss(dss_tsv), "dss",
+        "simulator_intrinsic", coverage, truth,
+    ))
+    if dss_nosmooth_tsv.exists():
+        rows.extend(_score_external(
+            _load_dss(dss_nosmooth_tsv), "dss_nosmooth",
+            "simulator_intrinsic", coverage, truth,
+        ))
+    for r in rows:
+        r["seed"] = seed
+    return rows
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=2026000,
-                        help="Simulator seed (default: 2026000)")
+                        help="Simulator seed for single-seed mode (default: 2026000)")
+    parser.add_argument("--all-seeds", action="store_true",
+                        help="Iterate every seed=NNN/ with methylkit.tsv + dss.tsv present, "
+                             "emit eval_simulator_intrinsic_per_seed.parquet + iqr summary.")
     parser.add_argument("--coverage", type=int, default=10,
                         help="Coverage cell to evaluate (default: 10)")
     parser.add_argument("--verbose", "-v", action="store_true")
@@ -132,6 +169,56 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
+    # Multi-seed mode: aggregate every seed=NNN with methylkit.tsv + dss.tsv
+    # into a per-seed long-form parquet + an across-seed IQR summary.
+    if args.all_seeds:
+        seeds = sorted(
+            int(d.name.split("=")[1]) for d in SIM_ROOT.glob("seed=*")
+            if (d / "methylkit.tsv").exists() and (d / "dss.tsv").exists()
+        )
+        logger.info("multi-seed mode: %d seeds with methylkit + dss outputs", len(seeds))
+        all_rows: list[dict] = []
+        for seed in seeds:
+            seed_rows = _score_one_seed(seed, args.coverage)
+            all_rows.extend(seed_rows)
+            logger.info("seed=%d scored: %d rows", seed, len(seed_rows))
+        per_seed_df = pl.DataFrame(all_rows)
+        per_seed_pq = SIM_ROOT / "eval_simulator_intrinsic_per_seed.parquet"
+        per_seed_df.write_parquet(per_seed_pq)
+        logger.info("wrote %s (%d rows)", per_seed_pq, per_seed_df.height)
+
+        # Across-seed IQR table at the headline cell (q<0.05, all-bins).
+        headline = per_seed_df.filter(
+            (pl.col("threshold") == Q_THRESHOLD)
+            & (pl.col("threshold_kind") == "qvalue")
+            & (pl.col("meth_diff_bin") == "all")
+        )
+        # Compute FDR = FP / (FP + TP) per row before aggregating.
+        with_fdr = headline.with_columns(
+            (pl.col("fp") / (pl.col("tp") + pl.col("fp"))).alias("fdr"),
+        )
+        iqr = with_fdr.group_by("tool").agg([
+            pl.col("tpr").median().alias("tpr_median"),
+            pl.col("tpr").quantile(0.25).alias("tpr_q1"),
+            pl.col("tpr").quantile(0.75).alias("tpr_q3"),
+            pl.col("fpr").median().alias("fpr_median"),
+            pl.col("fpr").quantile(0.25).alias("fpr_q1"),
+            pl.col("fpr").quantile(0.75).alias("fpr_q3"),
+            pl.col("fdr").median().alias("fdr_median"),
+            pl.col("fdr").quantile(0.25).alias("fdr_q1"),
+            pl.col("fdr").quantile(0.75).alias("fdr_q3"),
+            pl.col("f1").median().alias("f1_median"),
+            pl.col("auroc").median().alias("auroc_median"),
+            pl.col("auroc").quantile(0.25).alias("auroc_q1"),
+            pl.col("auroc").quantile(0.75).alias("auroc_q3"),
+            pl.len().alias("n_seeds"),
+        ]).sort("tool")
+        iqr_pq = SIM_ROOT / "eval_simulator_intrinsic_iqr.parquet"
+        iqr.write_parquet(iqr_pq)
+        logger.info("wrote %s (%d tools across %d seeds)", iqr_pq, iqr.height, len(seeds))
+        return 0
+
+    # Single-seed mode (original Task 5 Step 4).
     seed_dir = SIM_ROOT / f"seed={args.seed}"
     truth_pq = seed_dir / "truth.parquet"
     methylkit_tsv = seed_dir / "methylkit.tsv"
