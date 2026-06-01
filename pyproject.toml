@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "epykit"
-version = "0.7.6"
+version = "1.0.0"
 description = "Parquet-backed WGBS methylation analysis pipeline (Bismark / MethylDackel → DMC/DMR → annotation)"
 readme = "README.md"
 authors = [ { name = "Deniz Ertuğrul", email = "denizert2000@gmail.com" } ]
@@ -23,7 +23,7 @@ keywords = [
   "scanpy",
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",

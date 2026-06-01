@@ -162,7 +162,7 @@ def test_resume_from_loads_dmc_into_varm(synth_md_filtered):
         store=md.store,
         assembly=md.assembly,
         context=md.context,
-        _analysis_root=md._analysis_root,
+        analysis_root=md.analysis_root,
     )
     assert "dmc_lr" not in md2.varm
     ok = md2.resume_from("dmc_lr")

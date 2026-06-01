@@ -4,6 +4,86 @@ All notable changes to **epykit** are tracked here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project uses
 SemVer (`MAJOR.MINOR.PATCH`).
 
+## [1.0.0] — 2026-06-02
+
+First stable release. API contract is now SemVer-stable. Three targeted
+breaking changes land at the major-version cutover; each ships with a
+deprecation shim so 0.7.6 code continues to run with warnings.
+
+### Breaking
+
+- **`tl.dmc(power_stack="auto")` now engages the full lr+ stack at any
+  sample size** (was: only flipped two of four knobs, and only at
+  `min_n <= 2`). Specifically, when `power_stack` is `"auto"` or
+  `"lr+"` (new alias), the function flips `neighbour_combine`,
+  `fdr_method` (`"fdr_bh"` → `"fdr_tsbh"`), and `sep_fallback` to
+  `True` regardless of `n`. The pre-1.0 conservative behavior is
+  preserved under `power_stack="conservative"`. `power_stack="off"`
+  (new alias) or `False` leaves knobs at user-passed values.
+  `power_stack=True` aliases `"lr+"`. Unknown strings raise
+  `ValueError`. **The DEFAULT value of `power_stack` remains `"off"`** —
+  bare `tl.dmc(test="lr")` produces bare-engine output, no change vs.
+  0.7.6. Users who explicitly set `power_stack="auto"` on data with
+  `min_n > 2` will see different qvalues vs. 0.7.6.
+
+- **`process_chromosomes_dmc`, `apply_multiple_testing_correction`,
+  `empirical_fdr_for_dmc`, `fisher_exact_vectorized`, `shrink_meth_diff`
+  removed from top-level `epykit.*` namespace.** Use the recommended
+  `tl.dmc` wrapper, or import explicitly via `from epykit.dmc import ...`.
+  A module-level `__getattr__` shim accepts the old top-level access
+  pattern for 1.0 with a `DeprecationWarning`; removed in 1.2.
+
+- **`pp.unite()` renamed to `pp.set_unite_type()`.** The old name
+  suggested a verb performing a union, but the function only writes
+  `md.uns["unite"]` (lazy state-marker). `pp.unite()` continues to work
+  as a deprecation wrapper through 1.x; removed in 2.0.
+
+- **`method="hmm"` removed from `tl.dmr` and the CLI `dmr` subcommand.**
+  Was deprecated in 0.7.5 with `FutureWarning` ("removal in 0.8"); now
+  raises `ValueError`. Use `method="segment"` (same engine, honest
+  name).
+
+### Added
+
+- **`MethylData.analysis_root`** (no leading underscore) is the new
+  public name for the analysis-root attribute. `MethylData._analysis_root`
+  continues to work as a deprecated property alias on read AND write,
+  emitting `DeprecationWarning`. Removed in 2.0.
+- **`Literal[...]` type annotations** on the `value` kwarg of
+  `export.to_bedgraph` and `export.to_bigwig` for IDE + mypy support.
+  Runtime validation behavior unchanged.
+- **Public docstring for `process_chromosomes_dmc(dispersion=...)`** now
+  documents the `"eb"` option (already the default in `tl.dmc`).
+- **`apply_multiple_testing_correction` docstring** now names the
+  `pl.DataFrame` vs `DMCStore` code paths explicitly.
+
+### Changed
+
+- **README and CLAUDE.md describe `lr+` as an opt-in power stack** rather
+  than as recommended defaults. Bare `lr` is the default; users opt in to
+  `lr+` via `power_stack="lr+"`.
+- **Project status:** classifier `Development Status :: 4 - Beta` →
+  `Development Status :: 5 - Production/Stable`.
+
+### Internal
+
+- Public-surface audit committed at
+  `docs/superpowers/specs/2026-06-01-public-surface-audit.md` —
+  inventory of all 47 top-level exports with per-export verdicts and a
+  1.1 backlog.
+- Phase 4 plan checkboxes synced to reflect what actually shipped
+  (Tasks 1-8 marked).
+
+### Known limitations (1.0.1 candidates)
+
+- **DMCStore save/load drops `pvalue_combined` columns** when
+  `neighbour_combine=True`. The combined columns are added in-memory
+  after per-chromosome Parquet files are written, so `md.save()` /
+  `md.load()` round-trips lose them. With the default `power_stack="off"`,
+  this only affects users who explicitly opt in to the power stack and
+  then save. To preserve combined p-values across save/load, re-run
+  the DMC step after loading or keep the in-memory result alive.
+
 ## Unreleased
 
 ## [0.7.6] — 2026-06-01
