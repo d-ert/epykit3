@@ -17,10 +17,13 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Literal
 
 import polars as pl
 
 from .methyldata import MethylData
+
+ValueKind = Literal["beta", "coverage", "N_meth"]
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +38,7 @@ def _chromosome_sort_key(chrom: str) -> tuple[int, str | int]:
     return (2, stripped)
 
 
-def _load_sample_beta(md: MethylData, sample: str, value: str) -> pl.DataFrame:
+def _load_sample_beta(md: MethylData, sample: str, value: ValueKind) -> pl.DataFrame:
     """Read a single sample's per-CpG rows. Returns chrom, pos, value."""
     if sample not in md.obs.get_column("sample_id").to_list():
         raise ValueError(
@@ -67,7 +70,7 @@ def to_bedgraph(
     sample: str,
     output: str,
     *,
-    value: str = "beta",
+    value: ValueKind = "beta",
 ) -> str:
     """Write a single sample's beta (or coverage) as a 4-column BedGraph.
 
@@ -130,7 +133,7 @@ def to_bigwig(
     sample: str,
     output: str,
     *,
-    value: str = "beta",
+    value: ValueKind = "beta",
     chrom_sizes: dict[str, int] | None = None,
 ) -> str:
     """Write a single sample's beta (or coverage) as a BigWig.

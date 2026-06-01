@@ -85,6 +85,15 @@ def test_dmrs_to_bed(synth_md_filtered, tmp_path):
         assert len(parts) == 6
 
 
+def test_to_bedgraph_rejects_unknown_value(synth_md_filtered, tmp_path):
+    """Runtime validation rejects unknown `value` strings before any I/O."""
+    from epykit.export import to_bedgraph
+
+    sample = synth_md_filtered.obs.get_column("sample_id")[0]
+    with pytest.raises(ValueError, match="value must be one of"):
+        to_bedgraph(synth_md_filtered, sample, str(tmp_path / "out.bg"), value="meth_diff")  # type: ignore[arg-type]
+
+
 def test_to_bigwig_skipped_without_pybigwig(synth_md_filtered, tmp_path):
     """If pyBigWig is missing, to_bigwig raises a clear ImportError."""
     pyBigWig = pytest.importorskip("pyBigWig")  # noqa: F841
