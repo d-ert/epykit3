@@ -115,6 +115,8 @@ If `methylkit_*.csv` or similar exists, inspect its columns and confirm `evaluat
 
 ### Task 1: Generate intrinsic-truth simulator data (N=20 seeds)
 
+> ✅ **SHIPPED in d438b81.** Sub-checkboxes below left as-is for historical reference.
+
 **Goal:** Run `simulate_piao.py` × 20 seeds at the headline cell (cov=10, n=3v3). This is the "simulator variance" the spec needs.
 
 **Compute:** ~few minutes (simulator is fast).
@@ -170,6 +172,8 @@ Commit: `chore(benchmark): generate simulator data for Phase 4 -- 20 headline se
 
 ### Task 2: Re-run epykit on Piao-as-distributed (Studies 1+2)
 
+> ✅ **SHIPPED in 450beab.** Sub-checkboxes below left as-is for historical reference.
+
 **Goal:** Get post-Phase-3 epykit numbers on the same data the existing `eval_summary.parquet` used. This is what gets diffed against the pre-Phase-1 baseline for the bug-fix audit.
 
 **Compute:** ~hours (epykit is fast; sweep is the bottleneck).
@@ -218,6 +222,8 @@ Commit: `feat(benchmark): Phase 4 -- re-run epykit on Piao-as-distributed (Study
 ---
 
 ### Task 3: Run epykit on the held-out simulator (N=20 seeds + frozen grid)
+
+> ✅ **SHIPPED in 597daf5.** Sub-checkboxes below left as-is for historical reference.
 
 **Goal:** Multi-seed variance for the headline cell + frozen-defaults validation on the grid.
 
@@ -270,6 +276,8 @@ Commit: `feat(benchmark): Phase 4 -- epykit on intrinsic-truth simulator (N=20 +
 
 ### Task 4: Apply methylKit Stouffer-combine tuning (the "tuned-vs-tuned" leg)
 
+> ✅ **SHIPPED in f2cb369 + 260a476.** Sub-checkboxes below left as-is for historical reference.
+
 **Goal:** Per PROTOCOL R1, the head-to-head must be tuned-vs-tuned. Apply `methylkit_stouffer_combine.R` to the existing methylKit TSVs.
 
 **Compute:** ~10 minutes total.
@@ -293,6 +301,8 @@ Commit: `feat(benchmark): Phase 4 -- methylKit Stouffer-tuned per PROTOCOL R1`.
 ---
 
 ### Task 5: Optional 1-seed parallel column (methylKit + DSS on simulator)
+
+> ✅ **SHIPPED in b34b17b + 3dd9b13.** Sub-checkboxes below left as-is for historical reference.
 
 **Skip if compute is tight.** This is the "intrinsic-truth gap" evidence from spec §2.1.
 
@@ -339,6 +349,8 @@ Commit: `feat(benchmark): Phase 4 -- 1-seed parallel column (methylKit + DSS on 
 
 ### Task 6: Re-run epykit on GSE263850 (Study 3)
 
+> ✅ **SHIPPED in f50f670.** Sub-checkboxes below left as-is for historical reference.
+
 **Goal:** Get post-Phase-3 epykit numbers on the real cohort. Reuse methylKit + DSS from disk.
 
 **Compute:** epykit ~1-2 hours.
@@ -365,6 +377,8 @@ Commit: `feat(benchmark): Phase 4 -- epykit re-run on GSE263850 + cross-tool con
 ---
 
 ### Task 7: Null calibration on all engines × datasets
+
+> ✅ **SHIPPED in c901484 + bfcef2b.** Sub-checkboxes below left as-is for historical reference.
 
 **Goal:** Spec §2.2 evidence that the low FPR numbers are calibrated, not just over-conservative. 20 label shuffles per (engine, scenario) cell.
 
@@ -420,6 +434,8 @@ Commit: `feat(benchmark): Phase 4 -- null calibration on Piao + simulator + GSE2
 ---
 
 ### Task 8: Generate the bug-fix audit table
+
+> ✅ **SHIPPED in e6ec481 + 369899d.** Sub-checkboxes below left as-is for historical reference.
 
 **Goal:** Spec §3 Limitations §10.5 — per-cell delta between pre-Phase-1 and post-Phase-3.
 
