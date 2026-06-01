@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import gc
 import logging
+from typing import Literal
 import polars as pl
 
 logger = logging.getLogger(__name__)
@@ -278,8 +279,8 @@ def dmc(
     # Separation-aware Fisher fallback (since 0.7.1) ---------------------
     sep_fallback: bool = False,
     sep_threshold: float = 0.9,
-    # Power stack convenience (since 0.7.2) --------------------------------
-    power_stack: str | bool = False,
+    # Power stack convenience (since 0.7.2, updated 1.0) ------------------
+    power_stack: Literal["auto", "lr+", "conservative", "off"] | bool = "off",
     # Explicit patsy reference level for categorical factors (since 0.7.5) -
     reference_level: str | None = None,
 ) -> None:
@@ -473,27 +474,45 @@ def dmc(
     )
     selected_test = _auto_test(md, allow_n1=allow_n1) if test == "auto" else test
 
-    # lr+ power-stack auto-engagement (since 0.7.2).
-    if power_stack == "auto" and selected_test == "lr":
+    # --- lr+ power-stack dispatch (1.0) ---
+    # The four knobs the stack controls:
+    #   neighbour_combine, fdr_method, sep_fallback, dispersion ("eb"
+    #   is already the default in this function).
+    # power_stack values:
+    #   "lr+" / True / "auto"  -> engage all four at any n
+    #   "conservative"          -> engage only at n <= 2 (pre-1.0 behavior)
+    #   "off" / False           -> leave knobs at user-passed values
+    if isinstance(power_stack, bool):
+        power_stack = "lr+" if power_stack else "off"
+    if power_stack not in {"auto", "lr+", "conservative", "off"}:
+        raise ValueError(
+            f"power_stack must be one of {{'auto','lr+','conservative','off'}} "
+            f"or a bool; got {power_stack!r}"
+        )
+
+    if selected_test == "lr" and power_stack in {"auto", "lr+", "conservative"}:
         _min_n = min(len(md.treatment_ids), len(md.control_ids))
-        if _min_n <= 2:
+        engage = (power_stack != "conservative") or (_min_n <= 2)
+        if engage:
             if not neighbour_combine:
                 neighbour_combine = True
                 logger.info(
-                    "Auto-enabling neighbour_combine (lr+ stack) for "
-                    "n=%d per group. Pass power_stack=False to disable.",
-                    _min_n,
+                    "Auto-enabling neighbour_combine (lr+ stack, "
+                    "power_stack=%s, n=%d). Pass power_stack='off' to "
+                    "disable.", power_stack, _min_n,
+                )
+            if fdr_method == "fdr_bh":
+                fdr_method = "fdr_tsbh"
+                logger.info(
+                    "Auto-switching fdr_method 'fdr_bh' -> 'fdr_tsbh' "
+                    "(lr+ stack, power_stack=%s).", power_stack,
                 )
             if not sep_fallback:
                 sep_fallback = True
                 logger.info(
-                    "Auto-enabling sep_fallback (lr+ stack) for "
-                    "n=%d per group. Pass power_stack=False to disable.",
-                    _min_n,
+                    "Auto-enabling sep_fallback (lr+ stack, "
+                    "power_stack=%s).", power_stack,
                 )
-    elif power_stack is True:
-        neighbour_combine = True
-        sep_fallback = True
 
     if selected_test == "fisher":
         _warn_fisher_once()
