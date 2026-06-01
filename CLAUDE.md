@@ -49,7 +49,18 @@ API mirrors scanpy: `ep.pp.*` (preprocessing — mutates `md.store`), `ep.tl.*` 
 
 Four per-CpG engines survive post-0.7.5: `"lr"` (quasi-binomial likelihood-ratio, default at n ≥ 2), `"welch_t"` (Welch t on raw β), `"fisher"` (pooled Fisher exact, n = 1 fallback), `"glm"` (IRLS binomial with covariates via Wilkinson formula in `_glm.py`). `"auto"` resolves to `"fisher"` at n < 2 and `"lr"` at n ≥ 2. Engines removed in 0.7.5 (raise `ValueError` with a migration hint): `"logit_t"` → use `"welch_t"`; `"bb_lr"` → use `"lr"`; `"score"` → use `"lr"`; `"cmh"` → use `formula='~ group + batch'`. Every engine outputs the same canonical schema (`chrom`, `pos`, `n_case`, `n_control`, `mean_beta_*`, `meth_diff`, `meth_diff_ci_{lo,hi}`, `pvalue`, `qvalue`, `log2_odds_ratio_pooled`) plus engine-specific extras (`coef_treatment` for GLM, `f_stat`/`df1`/`df2` for multi-group F-tests).
 
-**`lr+` power stack** is four opt-in enhancements on top of `lr` that are README- and benchmark-validated to close the gap to methylKit / RADMeth / DSS: `fdr_method="fdr_tsbh"`, `neighbour_combine=True`, `sep_fallback=True`, `dispersion="eb"`. When `neighbour_combine=True`, **`pvalue`/`qvalue` remain the raw per-CpG values; the combined values are added as `pvalue_combined`/`qvalue_combined`** (plus `pvalue_combined_n_neighbours` and `qvalue_combined_reject` as audit columns). Downstream code that wants the combined p-values must read the `_combined` columns explicitly. These options are currently Python-API-only — the CLI flags are pending.
+**`lr+` power stack** is four opt-in enhancements on top of `lr`, controlled
+via the `power_stack` kwarg in `tl.dmc`. The four knobs (`neighbour_combine`,
+`fdr_method="fdr_tsbh"`, `sep_fallback`, `dispersion="eb"`) are validated
+against methylKit / RADMeth / DSS in `benchmark/REPORT.md`. They are
+**opt-in**, not defaults — bare `lr` is what users get out of the box
+(`power_stack="off"` is the 1.0 default).
+
+`power_stack="lr+"` / `True` / `"auto"` engages all four at any n.
+`power_stack="conservative"` engages only at n ≤ 2 (legacy behavior).
+`power_stack="off"` / `False` leaves knobs at user-passed values.
+
+When `neighbour_combine=True`, **`pvalue`/`qvalue` remain the raw per-CpG values; the combined values are added as `pvalue_combined`/`qvalue_combined`** (plus `pvalue_combined_n_neighbours` and `qvalue_combined_reject` as audit columns). Downstream code that wants the combined p-values must read the `_combined` columns explicitly. CLI flags for the `lr+` knobs are deferred to 1.1.
 
 ### DMR engines (`dmr.py`)
 
@@ -65,7 +76,7 @@ Library code (everything under `epykit.*` except `epykit.cli`) emits progress th
 
 ### Benchmark directory
 
-`benchmark/` reproduces a head-to-head against eight published DMC/DMR tools on Piao et al. 2021 simulated data; `benchmark/REPORT.md` is the canonical TPR/FPR/F1 record and is what the `lr+` defaults are tuned against. Don't change `lr+` defaults without re-running the relevant `benchmark/scripts/ab_*.py` ablations. Raw simulated data and run caches are not bundled — see `benchmark/README.md` for the bootstrap.
+`benchmark/` reproduces a head-to-head against eight published DMC/DMR tools on Piao et al. 2021 simulated data; `benchmark/REPORT.md` is the canonical TPR/FPR/F1 record and is what the `lr+` knobs are validated against. Don't change `lr+` knob defaults without re-running the relevant `benchmark/scripts/ab_*.py` ablations. Raw simulated data and run caches are not bundled — see `benchmark/README.md` for the bootstrap.
 
 ## Module map (when to look where)
 
