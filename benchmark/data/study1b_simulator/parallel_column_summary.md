@@ -3,16 +3,30 @@
 Seed: 2026000  Coverage: 10  Threshold: q < 0.05, all bins
 Truth: `truth.parquet` (intrinsic `is_dmc`, 19,979 true positives / 100,000 total)
 
-## Headline metrics on the intrinsic-truth simulator
+## All seven (tool, FDR-procedure) combinations at the headline cell
 
-| tool                       | n_called | TPR    | FPR    | F1     | AUROC  |
-|----------------------------|---------:|-------:|-------:|-------:|-------:|
-| epykit_lr                  |    13708 | 0.6677 | 0.0046 | 0.7920 | 0.9267 |
-| methylkit                  |    15433 | 0.7268 | 0.0114 | 0.8201 | 0.9246 |
-| dss (smoothing=TRUE)       |        1 | 0.0000 | 0.0000 | 0.0000 | 0.6272 |
-| dss (smoothing=FALSE)      |    13406 | 0.6477 | 0.0058 | 0.7752 | 0.9071 |
+| tool                     | n_called | TPR    | FPR    | FDR       | F1     | AUROC  |
+|--------------------------|---------:|-------:|-------:|----------:|-------:|-------:|
+| epykit_lr                |    13708 | 0.6677 | 0.0046 | 0.0268   | 0.7920 | 0.9267 |
+| epykit_lrplus            |    20069 | 0.7446 | 0.0649 | 0.2588 ! | 0.7429 | 0.9052 |
+| epykit_welch_t           |      246 | 0.0123 | 0.0000 | 0.0000   | 0.0243 | 0.8784 |
+| epykit_fisher            |    11977 | 0.5924 | 0.0018 | 0.0119   | 0.7407 | 0.9008 |
+| methylkit                |    15433 | 0.7268 | 0.0114 | 0.0592 ! | 0.8201 | 0.9246 |
+| dss (smoothing=TRUE)     |        1 | 0.0000 | 0.0000 | 1.0000 ! | 0.0000 | 0.6272 |
+| dss (smoothing=FALSE)    |    13406 | 0.6477 | 0.0058 | 0.0348   | 0.7752 | 0.9071 |
 
-**DSS smoothing note.** DSS's paper-default `smoothing=TRUE` is calibrated for whole-genome real cohorts where adjacent CpGs share genomic-correlation structure. The intrinsic-truth simulator uses uniform 100-bp position spacing without that structure, so smoothing dilutes per-CpG signal aggressively — observed here as a drop from AUROC ≈ 0.91 (no smoothing) to AUROC ≈ 0.63 (smoothing). Both variants are reported; reviewers can choose which is the fairer comparison.
+**FDR column convention.** `FDR = FP / (FP + TP)`. The nominal q<0.05 threshold claims FDR is controlled at 0.05. Rows marked `!` exceed nominal — the procedure is not delivering the FDR control it promises on this dataset.
+
+**What this table shows.**
+
+- **epykit_lr** is the most conservative well-calibrated option. FDR ≈ 2.7%, well under nominal. Highest AUROC (0.927) — best per-CpG ranking. The right default at small n.
+- **epykit_lrplus** trades FDR control for sensitivity on this seed: TPR climbs to 0.745 (highest of any engine) but FDR balloons to 25.9% — five times nominal. The power stack (neighbour-combine + tsbh + eb dispersion) over-rejects under this seed's signal density. AUROC drops to 0.905 because the combined p-values rank slightly worse than raw lr.
+- **methylkit** sits in the middle: FDR 5.9% (just over nominal), TPR 0.727, AUROC 0.925 (tied with lr to 3 dp). A strong baseline; epykit_lr's ranking is essentially equivalent.
+- **dss with smoothing=TRUE** collapses (1 call total) because uniform-spacing simulator data has no genomic correlation structure for the smoother to use. Documented here as a dataset-mismatch failure, not a DSS bug.
+- **dss with smoothing=FALSE** matches epykit_lr's profile closely: FDR 3.5%, TPR 0.648, AUROC 0.907.
+- **epykit_welch_t** and **epykit_fisher** are documented small-n caveats: welch_t is over-conservative (calls 246 sites total), fisher pools reads (TPR 0.592 with FDR 1.2%).
+
+**Scope caveat.** This is a single simulator seed (n=1). The headline benchmark (`eval_summary_post_phase3.parquet`) covers 25 cells across coverage and replicate counts on Piao-as-distributed and shows a fuller picture of when each engine is appropriate.
 
 ## Same tools on Piao-as-distributed (`eval_summary_post_phase3.parquet`)
 
