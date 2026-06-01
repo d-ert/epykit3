@@ -968,9 +968,8 @@ def dmr(
 
     Parameters
     ----------
-    method : {"tile", "sliding_window", "segment", "hmm", "chain_merge"}
-        Which DMR algorithm to run. ``"hmm"`` is a deprecated alias for
-        ``"segment"`` and will be removed in 0.8.
+    method : {"tile", "sliding_window", "segment", "chain_merge"}
+        Which DMR algorithm to run.
     preset : {"strict", "default", "permissive"}, optional
         Parameter preset bundle for ``method="chain_merge"``. Applies
         ``(alpha, min_abs_meth_diff, dis_merge_bp, min_cpgs, pct_sig,
@@ -1201,15 +1200,6 @@ def dmr(
         }
         return
 
-    if method == "hmm":
-        import warnings
-        warnings.warn(
-            "method='hmm' is deprecated; use method='segment' (same engine, "
-            "honest name). method='hmm' will be removed in 0.8.",
-            FutureWarning, stacklevel=2,
-        )
-        method = "segment"
-
     if method == "segment":
         from .dmr_segment import call_dmr_rule_segment
         dmc_df = md.dmc
@@ -1290,7 +1280,7 @@ def dmr(
 
     raise ValueError(
         f"Unknown DMR method '{method}'. Expected 'tile', 'sliding_window', "
-        f"'segment', 'hmm' (deprecated alias for 'segment'), or 'chain_merge'."
+        f"'segment', or 'chain_merge'."
     )
 
 

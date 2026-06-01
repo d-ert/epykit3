@@ -55,12 +55,3 @@ def test_dmr_hmm_shim_warns_on_import_and_re_exports():
         assert "dmr_segment" in str(dep[0].message).lower(), (
             f"shim warning must point users to dmr_segment; got: {dep[0].message}"
         )
-
-
-def test_tl_dmr_method_hmm_aliased_to_segment(synth_md_filtered):
-    """method='hmm' must keep working but emit FutureWarning and dispatch to segment."""
-    md = synth_md_filtered
-    ep.tl.dmc(md, test="lr")
-    with pytest.warns(FutureWarning, match="segment"):
-        ep.tl.dmr(md, method="hmm", min_cpgs=3, min_abs_meth_diff=0.05)
-    assert "dmr" in md.uns

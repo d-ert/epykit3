@@ -1,16 +1,17 @@
 """HMM-DMR caller tests (backward-compat shim tests).
 
 These tests validate that the deprecated ``epykit.dmr_hmm`` import path
-and ``tl.dmr(method='hmm')`` continue to work after the rename to
-``dmr_segment`` in 0.7.5.
+still works (shim preserved for call_dmr_hmm), and that the 1.0 removal
+of ``tl.dmr(method='hmm')`` is correctly enforced.
 
 Two-pronged validation:
   1. On a hand-built DMC table with a contiguous hypo run, the shim
      (``call_dmr_hmm`` -> ``call_dmr_rule_segment``) emits a single DMR
      with the right boundaries and a ``dmr_type == "hypo"``.
-  2. On the seeded synth fixture, ``ep.tl.dmr(md, method="hmm")``
-     produces a frame schema-compatible with the tile DMR engine
-     (same columns). The call raises a FutureWarning.
+  2. ``ep.tl.dmr(md, method="hmm")`` raises ``ValueError`` (the
+     deprecation shim was removed in 1.0). The supported name is
+     ``method="segment"``, which produces a frame schema-compatible
+     with the tile DMR engine.
 """
 
 from __future__ import annotations
@@ -76,21 +77,6 @@ def test_hmm_dmr_no_calls_on_pure_noise():
     assert dmrs.height == 0
 
 
-def test_hmm_dmr_via_tl_dmr_method_hmm(synth_md_filtered):
-    """ep.tl.dmr(md, method='hmm') still works (with FutureWarning) and gives the right schema."""
-    md = synth_md_filtered
-    ep.tl.dmc(md, test="lr")
-    with pytest.warns(FutureWarning, match="segment"):
-        ep.tl.dmr(md, method="hmm", min_cpgs=4, min_abs_meth_diff=0.05)
-    assert "dmr" in md.uns
-    expected_cols = {"chrom", "start", "end", "n_cpgs", "meth_diff", "dmr_type"}
-    actual = set(md.uns["dmr"].columns)
-    assert expected_cols.issubset(actual), (
-        f"missing DMR columns: {expected_cols - actual}; got {actual}"
-    )
-    # method='hmm' now maps to 'segment' internally
-    assert md.uns["dmr_params"]["method"] == "segment"
-
 
 def test_hmm_dmr_rejects_dmc_missing_columns():
     """Shim function still raises for missing required columns."""
@@ -98,3 +84,27 @@ def test_hmm_dmr_rejects_dmc_missing_columns():
     bad = pl.DataFrame({"chrom": ["chr1"], "pos": [100]})  # no meth_diff
     with pytest.raises(ValueError, match="missing required columns"):
         call_dmr_hmm(bad)
+
+
+def test_dmr_method_hmm_raises(synth_md_filtered):
+    """method='hmm' was deprecated in 0.7.5 with FutureWarning; removed at 1.0.
+    Now raises ValueError via the unknown-method dispatch path."""
+    md = synth_md_filtered
+    ep.tl.dmc(md, test="lr")
+    with pytest.raises(ValueError, match="Unknown DMR method 'hmm'"):
+        ep.tl.dmr(md, method="hmm")
+
+
+def test_dmr_method_segment_still_works(synth_md_filtered):
+    """method='segment' (the proper name) continues to work."""
+    md = synth_md_filtered
+    ep.tl.dmc(md, test="lr")
+    ep.tl.dmr(md, method="segment")
+    assert "dmr" in md.uns
+    assert md.uns["dmr_params"]["method"] == "segment"
+    # Schema check: the segment engine's frame must be compatible with the tile engine's columns.
+    dmr_frame = md.uns["dmr"]
+    expected_cols = {"chrom", "start", "end", "n_cpgs", "meth_diff", "dmr_type"}
+    actual_cols = set(dmr_frame.columns)
+    missing = expected_cols - actual_cols
+    assert not missing, f"Segment DMR frame missing expected columns: {missing}"
