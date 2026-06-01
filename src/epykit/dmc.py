@@ -1944,11 +1944,13 @@ def process_chromosomes_dmc(
         p-value masked to NaN before FDR correction. Use this with
         ``unite=False`` (union mode) to drop tests that effectively run on
         a singleton observation in one group.
-    dispersion : {"site", "chrom", "shrink"}
-        McCullagh-Nelder dispersion strategy used by ``test="lr"``.
-        Default ``"site"`` estimates a per-site phi_i from the 4-df Pearson
-        residual sum; ``"chrom"`` pools one phi across the whole chromosome;
-        ``"shrink"`` is a weighted average of the two.
+    dispersion : {"site", "chrom", "shrink", "eb"}, default "site"
+        Per-site dispersion estimator for the LR engine. ``"site"`` uses
+        the unconstrained per-site method-of-moments estimate. ``"chrom"``
+        pools to a per-chromosome dispersion. ``"shrink"`` applies the
+        Smyth-style shrinkage toward the per-chromosome mean. ``"eb"``
+        (empirical Bayes) shrinks toward a beta-binomial prior fit across
+        chromosomes; this is the default in the high-level ``tl.dmc`` wrapper.
         See :func:`_score_finalize` for details. Ignored for other tests.
     reference : {"adaptive", "chi2", "F"}
         Reference distribution for the quasi-binomial test statistic.
@@ -2489,8 +2491,19 @@ def apply_multiple_testing_correction(
 ) -> Union[pl.DataFrame, DMCStore]:
     """Apply multiple testing correction (Benjamini-Hochberg default).
 
-    Accepts either an in-memory ``pl.DataFrame`` or a ``DMCStore``. For
-    a ``DMCStore``, BH runs in a streaming two-pass pattern so the only
+    This function accepts two input types and behaves accordingly:
+
+    * ``pl.DataFrame`` (in-memory result): returns a new DataFrame
+      with a ``qvalue`` column added (or overwritten). Suitable when
+      results fit in RAM.
+    * ``DMCStore`` (streaming, per-chromosome parquet): correction is
+      applied per chromosome, the store is updated in place, and the
+      same ``DMCStore`` handle is returned. Suitable for whole-genome
+      data where the full result frame would not fit in RAM.
+
+    The return type matches the input type.
+
+    For a ``DMCStore``, BH runs in a streaming two-pass pattern so the only
     full-table-sized allocation is the float64 pvalue vector itself
     (~176 MB at 22M sites) -- no DataFrame copies, no concat.
 
