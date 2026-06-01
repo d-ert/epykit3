@@ -400,6 +400,71 @@ def test_methyldata_analysis_root_kwarg_constructor():
     assert md.analysis_root == "/tmp/some/path"
 
 
+DEMOTED_DMC_NAMES = [
+    "process_chromosomes_dmc",
+    "apply_multiple_testing_correction",
+    "empirical_fdr_for_dmc",
+    "fisher_exact_vectorized",
+    "shrink_meth_diff",
+]
+
+
+def test_demoted_dmc_names_not_in_all():
+    """Five low-level DMC functions are removed from epykit.__all__ at 1.0.
+    They remain importable from epykit.dmc."""
+    import epykit
+    for name in DEMOTED_DMC_NAMES:
+        assert name not in epykit.__all__, (
+            f"{name} should be removed from __all__; users should import "
+            f"from epykit.dmc instead."
+        )
+
+
+def test_demoted_dmc_names_accessible_via_getattr_shim():
+    """The __getattr__ shim returns the function but emits DeprecationWarning."""
+    import epykit
+    from epykit import dmc as _dmc_mod
+
+    for name in DEMOTED_DMC_NAMES:
+        # Force the shim path by deleting any cached module-scope binding,
+        # then access via getattr. (The shim only fires when normal lookup
+        # misses, so the binding must NOT be present at module scope.)
+        if name in vars(epykit):
+            # If it's bound at module scope, the shim won't fire — that's
+            # a regression we want this test to catch.
+            del vars(epykit)[name]
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            obj = getattr(epykit, name)
+        assert obj is getattr(_dmc_mod, name), (
+            f"epykit.{name} via shim should return the same object as "
+            f"epykit.dmc.{name}."
+        )
+        assert any(
+            issubclass(w.category, DeprecationWarning) for w in caught
+        ), f"Accessing epykit.{name} should emit DeprecationWarning."
+
+
+def test_demoted_dmc_names_importable_via_submodule_without_warning():
+    """Documented post-1.0 import path emits no warning."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        from epykit.dmc import (  # noqa: F401
+            process_chromosomes_dmc,
+            apply_multiple_testing_correction,
+            empirical_fdr_for_dmc,
+            fisher_exact_vectorized,
+            shrink_meth_diff,
+        )
+    deprecation_warnings = [
+        w for w in caught if issubclass(w.category, DeprecationWarning)
+    ]
+    assert not deprecation_warnings, (
+        f"Submodule imports should not warn; got: "
+        f"{[str(w.message) for w in deprecation_warnings]}"
+    )
+
+
 def test_aggregate_regions_then_dmc(synth_md_filtered, tmp_path):
     """Downstream `tl.dmc` runs on the region-aggregated store without errors."""
     import epykit as ep
