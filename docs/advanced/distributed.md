@@ -114,6 +114,46 @@ JAX compiles the IRLS kernel with XLA on first invocation, which adds a
 one-time compilation overhead. Subsequent chromosomes reuse the compiled kernel
 and run faster than the CuPy path for large design matrices.
 
+## Temporary Directory Configuration
+
+By default, epykit uses the system temporary directory (`%TEMP%` on Windows,
+`/tmp` on Linux/macOS) for intermediate staging files. On Windows, the default
+`C:\Users\...\AppData\Local\Temp` drive is often too small for whole-genome
+WGBS staging — especially when processing chromosomes in parallel.
+
+Use `ep.set_tmp_dir` to redirect all staging to a larger drive:
+
+```python
+import epykit as ep
+
+# Redirect temporary files to a drive with more headroom
+ep.set_tmp_dir("D:/epykit_tmp")
+
+# All subsequent tl.dmc / tl.dmr calls write staging files to D:/epykit_tmp
+md = ep.read_bismark("samples.csv", treatment_group="tumor",
+                     control_group="normal", assembly="hg38")
+ep.tl.dmc(md, backend="dask", n_workers=4)
+```
+
+`ep.set_tmp_dir` sets `tempfile.tempdir` and mirrors the path into the
+`TMPDIR`, `TEMP`, and `TMP` environment variables so that Dask and Ray workers
+inherit the setting without any additional configuration.
+
+To query the current temporary directory (useful in notebooks and scripts that
+conditionally redirect):
+
+```python
+current_tmp = ep.get_tmp_dir()
+print(current_tmp)
+```
+
+`ep.get_tmp_dir()` returns the path set by `ep.set_tmp_dir`, or `None` if the
+default system temporary directory is in use.
+
+!!! note "Applies globally per process"
+    `ep.set_tmp_dir` affects all subsequent `TemporaryDirectory()` calls in the
+    process. Setting it once at the top of a script is the recommended pattern.
+
 ## When to Use Distributed Backends
 
 | Scenario | Recommendation |
