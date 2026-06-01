@@ -54,6 +54,10 @@ benchmark/data/study1/epykit_post_phase3/*.parquet
 # Phase 4 Task 5: 1-seed methylKit + DSS parallel column (intrinsic-truth).
 !benchmark/data/study1b_simulator/eval_simulator_intrinsic.parquet
 !benchmark/data/study1b_simulator/parallel_column_summary.md
+!benchmark/data/study1b_simulator/eval_simulator_intrinsic_per_seed.parquet
+!benchmark/data/study1b_simulator/eval_simulator_intrinsic_iqr.parquet
+!benchmark/data/study1b_simulator/eval_external_timings_per_seed.parquet
+!benchmark/data/study1b_simulator/eval_external_timings_iqr.parquet
 benchmark/data/study1b_simulator/seed=*/
 benchmark/data/study1b_simulator/frozen_grid/
 benchmark/data/study1b_simulator/timings_simulator.parquet
