@@ -6,7 +6,73 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ## Unreleased
 
+## [0.7.6] — 2026-06-01
+
+Cache-semantics correctness fix + benchmark null-calibration fixes.
+Rolls up all Phase 2-3-4 work since 0.7.2 into a single release. Engine
+math itself is unchanged from the `v0.7.5-phase3-engines-frozen` tag —
+the only library-side change in this release is to the per-CpG DMC
+cache invalidation logic. Benchmark-side changes wire the `glm` engine
+correctly into the null-calibration framework and fix a sample-label
+shuffling bug that had been making every null-calibration shuffle run
+on the original case/control assignment.
+
+### Fixed
+
+- **`process_chromosomes_dmc`: weak-hit cache must not fire when
+  `input_sig` differs.** Previously, when the cached manifest carried an
+  `input_sig` field that did not match the current call, the function
+  served the stale per-chromosome parquets and silently upgraded the
+  manifest's `input_sig` in place. The weak-hit was intended to recover
+  gracefully from legacy manifests written before the `input_sig` field
+  existed, but the implementation also masked real input changes —
+  affecting any user calling `tl.dmc` repeatedly on the same methylstore
+  with different sample labels, test parameters, or covariates. The fix
+  restricts the weak-hit to its documented use case (manifests with no
+  `input_sig` at all) and falls through to the recompute path when
+  `input_sig` is present but differs. New regression tests in
+  `tests/test_dmc_streaming_store.py` cover both the recompute path and
+  the legacy-manifest path. Discovered via Phase 4 null-calibration
+  development; benefits all repeated-DMC use cases (cross-validation,
+  sensitivity analyses, custom permutation sweeps).
+
+- **`benchmark/scripts/_null_engines.py:_permute_md`: write
+  `obs["treatment"]`, not just `obs["group"]`.** `MethylData.treatment_ids`
+  reads from `obs["treatment"]` (i64), so writing only the display string
+  column `obs["group"]` silently left every null-calibration shuffle
+  running on the original case/control assignment. All shuffles in every
+  Phase 4 cell produced identical p- and q-values; the IQR collapsed to
+  the median. Fix writes both columns; the slow regression test
+  `test_closure_produces_different_qvalues_per_shuffle` asserts that two
+  closure invocations with different label assignments produce different
+  q-value arrays.
+
+- **`benchmark/scripts/_null_engines.py`: glm closure builds the design
+  matrix.** Previously the glm registry entry called
+  `ep.tl.dmc(md, test="glm")` with no `formula` or `contrast` argument,
+  hitting the binary-path branch that requires explicit `design_full` /
+  `design_reduced` / `coef_idx`. The fix routes glm through
+  `formula="~ group", contrast="group"`, letting `build_design`
+  construct the full and reduced designs from the permuted `obs.group`
+  column. The glm engine now produces real per-shuffle variation in the
+  null-calibration sweep.
+
 ### Added
+
+- **`benchmark/scripts/run_phase4_null_calibration.py`** (new):
+  orchestrator for the Phase 4 null-calibration sweep across every
+  surviving engine × dataset × scenario cell. Builds per-dataset
+  methylstores, dispatches per-cell calibration via
+  `run_null_calibration.py`, aggregates per-cell parquets into a single
+  `summary.parquet` with `(engine, dataset, scenario,
+  observed_fdr_median, observed_fdr_q1, observed_fdr_q3,
+  observed_fdr_ci_lo, observed_fdr_ci_hi)` columns. CLI accepts
+  `--dataset`, `--engines`, `--skip-piao/--simulator/--gse`,
+  `--keep-store`, `--skip-aggregate`, `--only-aggregate`. Companion test
+  suite at `benchmark/scripts/tests/test_run_phase4_null_calibration.py`
+  covers the spec registry, aggregation kernel, manifest writer, and
+  per-engine parquet path layout. Final sweep produced 12 of 13 cells
+  (fisher@gse263850 deferred pending parallel backend).
 
 - **`benchmark/scripts/bug_fix_audit.py`** (new): diffs pre/post-fix
   `eval_summary.parquet` per (tool, scenario, metric); attributes each

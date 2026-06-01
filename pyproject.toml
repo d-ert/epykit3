@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "epykit"
-version = "0.7.2"
+version = "0.7.6"
 description = "Parquet-backed WGBS methylation analysis pipeline (Bismark / MethylDackel → DMC/DMR → annotation)"
 readme = "README.md"
 authors = [ { name = "Deniz Ertuğrul", email = "denizert2000@gmail.com" } ]
