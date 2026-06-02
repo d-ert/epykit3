@@ -908,6 +908,15 @@ We therefore recommend that users:
   simulator's internal flags. Recovered counts (19,999 DMCs, 35 DMRs)
   match the paper's design but the truth is technically not independent
   of the highest-coverage observation.
+* **Null calibration coverage.** The null-calibration sweep (§3.5) covers
+  12 of 13 engine × dataset cells. The `fisher@gse263850` cell — the
+  small-n Fisher engine on the 12-sample GSE263850 cohort — was deferred
+  because the closure requires a parallel backend to be tractable at
+  K = 20 label shuffles on 15.6 M CpGs. The `fisher` engine is documented
+  as the small-n fallback (`n < 2` per group); its null behaviour on a
+  12-sample real cohort is the least informative cell in the sweep, and
+  the remaining 12 cells confirm engine calibration at nominal
+  q ∈ {0.01, 0.05, 0.10}.
 
 # 5. Conclusion
 
