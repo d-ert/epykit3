@@ -357,6 +357,15 @@ def _cmd_dmr(args: argparse.Namespace):
         print(f"  Hyper: {n_hyper:,}  Hypo: {n_hypo:,}  Mixed: {n_mixed:,}")
         print(dmr_results.head(10))
 
+    if not _csv_suppressed(args) and len(dmr_results) > 0:
+        from .methyldata import MethylData
+        from .export import dmr_to_tsv
+        md_tmp = MethylData(obs=pl.DataFrame({"sample_id": []}), store="")
+        md_tmp.uns["dmr"] = dmr_results
+        tsv_path = args.csv_path or _auto_csv_path(args.output)
+        dmr_to_tsv(md_tmp, tsv_path)
+        print(f"DMR CSV: {tsv_path}")
+
 
 def _cmd_annotate(args: argparse.Namespace):
     """Handler for 'annotate' subcommand."""
@@ -764,6 +773,14 @@ def main():
     # Shared filters
     p_dmr.add_argument("--alpha",                type=float, default=0.05)
     p_dmr.add_argument("--min-abs-meth-diff",    type=float, default=0.1)
+    p_dmr.add_argument(
+        "--no-csv", action="store_true", dest="no_csv", default=False,
+        help="Suppress the sibling .tsv auto-emit.",
+    )
+    p_dmr.add_argument(
+        "--csv", dest="csv_path", default=None,
+        help="Override sibling TSV/CSV path. .csv suffix -> comma delim.",
+    )
     p_dmr.set_defaults(func=_cmd_dmr)
 
     # annotate

@@ -334,3 +334,49 @@ def test_cli_dmc_no_csv_suppresses_sibling(tmp_path, synth_bundle, monkeypatch):
 
     assert out_parquet.exists()
     assert not sibling_tsv.exists()
+
+
+def test_cli_dmr_auto_emits_sibling_tsv(tmp_path, synth_bundle, monkeypatch):
+    """`epykit dmr --output X.parquet` writes X.tsv next to it."""
+    import sys
+    import epykit as ep
+    from epykit.cli import main
+
+    md_setup = ep.read_bismark(
+        synth_bundle.samplesheet,
+        treatment_group="treatment",
+        control_group="control",
+        assembly="synth",
+        store_dir=str(tmp_path / "store"),
+    )
+    populated_store = md_setup.store
+
+    # First make a DMC parquet, since chain_merge consumes one.
+    dmc_parquet = tmp_path / "dmc.parquet"
+    monkeypatch.setattr(sys, "argv", [
+        "epykit", "dmc",
+        "--methylstore", populated_store,
+        "--samplesheet", synth_bundle.samplesheet,
+        "--treatment-group", "treatment",
+        "--control-group", "control",
+        "--output", str(dmc_parquet),
+        "--test", "lr",
+        "--no-csv",  # don't pollute tmp_path with the dmc sibling
+    ])
+    main()
+
+    dmr_parquet = tmp_path / "dmr.parquet"
+    sibling = tmp_path / "dmr.tsv"
+    monkeypatch.setattr(sys, "argv", [
+        "epykit", "dmr",
+        "--method", "chain_merge",
+        "--dmc-results", str(dmc_parquet),
+        "--output", str(dmr_parquet),
+        "--preset", "permissive",
+    ])
+    main()
+
+    assert dmr_parquet.exists()
+    assert sibling.exists()
+    header = sibling.read_text(encoding="utf-8").splitlines()[0].split("\t")
+    assert "chrom" in header and "start" in header
