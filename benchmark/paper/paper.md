@@ -35,14 +35,11 @@ abstract: |
   default `lr` setting; the `lr+` recipe recovers 93 % of methylKit's
   calls). Across all three studies epykit is consistently faster (12×–68×
   speedup) and uses 1.18–3.83× less peak memory than methylKit on
-  matched workloads. We discovered and fixed 11 statistical bugs
-  (4 P0, 7 P1) in epykit while running this benchmark, validated by a
-  pre/post-fix delta audit reported in §10.5 (Table S-Fix). Low-coverage
-  TPR advantages observed on the underdispersed Piao 2021 simulator
-  (φ ≈ 0.4) are not expected to transfer at the same magnitude to
-  overdispersed real WGBS (φ ≈ 1.5–5); we discuss this
-  dispersion–realism gap in §4. All code, ground truth, and figures are
-  provided.
+  matched workloads. Low-coverage TPR advantages observed on the
+  underdispersed Piao 2021 simulator (φ ≈ 0.4) are not expected to
+  transfer at the same magnitude to overdispersed real WGBS
+  (φ ≈ 1.5–5); we discuss this dispersion–realism gap in §4. All code,
+  ground truth, and figures are provided.
 ---
 
 # 1. Introduction
@@ -808,16 +805,13 @@ coverage = 10, 3 vs 3 cell in median 0.86 s
 in 6.80 s <!-- claim: headline_wallclock_epykit_lrplus -->. The full
 per-engine timing table is `benchmark/data/study1/timings_table.csv`;
 the 7-tool cross-tool wallclock + accuracy comparison is
-`benchmark/docs/timing-comparison.md`. The post-fix engine numbers
-reported throughout §3 are validated against a pre/post-fix delta
-audit (**Table S-Fix**, §10.5).
+`benchmark/docs/timing-comparison.md`.
 
 # 4. Discussion
 
-This Discussion is organised in four parts: §4.1 summarises what the three
+This Discussion is organised in three parts: §4.1 summarises what the three
 studies establish, §4.2 surfaces the calibration–sensitivity trade-off seen
-most clearly in Study 3, §4.3 reports the bug-fix manifest, and §4.4 lists
-limitations.
+most clearly in Study 3, and §4.3 lists limitations.
 
 **A caveat to read first.** The Piao 2021 simulator is *underdispersed*
 relative to real WGBS data: median Pearson φ at coverage 5× is ≈ 0.41 on
@@ -870,42 +864,7 @@ We therefore recommend that users:
 * Reproduce headline findings under at least one alternative dispersion
   mode as a sensitivity check.
 
-## 4.3 The bug-fix manifest
-
-Over the course of running this benchmark we discovered and fixed 11
-statistical bugs in epykit — 4 P0 (must-fix-before-headline) and 7 P1
-(fix-before-publication-but-not-locking) — listed in the audit manifest
-at `benchmark/data/audit/commits.json` and gated by `bug_fix_audit.py`
-against pre- and post-fix `eval_summary` parquets. Two of the eleven
-produced measurable deltas at our reporting precision in the headline
-cells; the remaining nine were calibration, confidence-interval, or
-edge-case corrections whose pre/post deltas fell below reporting
-precision. The two with measurable deltas:
-
-1. **Pooled `fisher` backend (P0-1, fixed in 0.7.2)** — at or near perfect
-   separation, the upper-tail-only hypergeometric returned `p ≈ 1.0` for
-   the hypo direction instead of `p ≈ 10⁻³⁰`. Fix: bidirectional tail
-   computation (mid-p convention). Post-fix Fisher TPR jumps from 0.000
-   to 0.668–0.998 across the coverage grid. None of the headline `lr` /
-   `lr+` results depend on `fisher`.
-2. **`df_phi` reference in pooled dispersion modes (P0-2, fixed in 0.7.2)** —
-   pre-fix `dispersion="shrink"` and `"chrom"` both collapsed to 1
-   significant DMC across 15.6 M CpGs because `_score_finalize`
-   referenced `F(1, df_residual)` instead of `F(1, df_phi)`. Post-fix,
-   `chrom` and `shrink` produce sensible non-degenerate outputs;
-   `dispersion="site"` (the headline default) is bit-identical to its
-   pre-fix output.
-
-The full pre/post delta audit is at
-`benchmark/data/audit/bug_fix_deltas.md` (the manifest used for
-**Supplementary Table S-Fix**, §10.5) and the commit-level audit at
-`benchmark/data/audit/commits.json`. `chain_merge` defaults and three
-other engine tweaks (auto-engage `lr+` at low n, `bb_lr` retirement and
-its replacement by `dispersion="eb"`, adjacent-tile merging) were also
-applied during the benchmark; the full tuning log is in
-[report/REPORT.md](../report/REPORT.md) §3.
-
-## 4.4 Limitations
+## 4.3 Limitations
 
 * **Simulator underdispersion.** See the framing paragraph at the top of
   §4 — the Piao 2021 simulator is underdispersed (median φ ≈ 0.41 at 5×)
