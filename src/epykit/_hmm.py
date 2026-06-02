@@ -235,8 +235,7 @@ def segment(
         )
 
     log_post = log_alpha + log_beta
-    log_post -= _logsumexp(log_post, axis=1, keepdims=True) if False else \
-                _logsumexp(log_post, axis=1)[:, None]
+    log_post -= _logsumexp(log_post, axis=1)[:, None]
     posteriors = np.exp(log_post)
 
     # ---- Viterbi ----

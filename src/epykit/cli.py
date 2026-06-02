@@ -816,7 +816,10 @@ def main():
 
     args = ap.parse_args()
     _configure_logging(verbosity=args.verbose - args.quiet)
-    args.func(args)
+    try:
+        args.func(args)
+    except FileNotFoundError as exc:
+        raise SystemExit(f"error: {exc}")
 
 
 if __name__ == "__main__":

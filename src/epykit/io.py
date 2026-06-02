@@ -13,6 +13,14 @@ from .methyldata import MethylData
 logger = logging.getLogger(__name__)
 
 
+def _epykit_version() -> str:
+    try:
+        from . import __version__
+        return __version__
+    except ImportError:
+        return "0.0.0+unknown"
+
+
 def _build_obs_from_samplesheet(
     samplesheet: str,
     treatment_group: str | None,
@@ -24,8 +32,11 @@ def _build_obs_from_samplesheet(
     Shared by every read_* entry point so format-specific code can focus
     on the conversion step.
     """
-    with open(samplesheet) as handle:
-        rows = list(csv.DictReader(handle))
+    try:
+        with open(samplesheet) as handle:
+            rows = list(csv.DictReader(handle))
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"samplesheet not found: {samplesheet}") from exc
 
     required = {"sample_id", "group", "path"}
     if not rows:
@@ -109,7 +120,7 @@ def _read_methylation_samplesheet(
         "samplesheet": samplesheet,
         "pipeline": pipeline,
         "source_format": source_format,
-        "epykit_version": "0.1.0",
+        "epykit_version": _epykit_version(),
     }
     if n_sites_raw is not None:
         uns["n_sites_raw"] = n_sites_raw
@@ -361,7 +372,7 @@ def read_nfcore_methylseq(
         "pipeline": "nf-core/methylseq",
         "nfcore_run": str(run),
         "samplesheet": str(samplesheet_path),
-        "epykit_version": "0.1.0",
+        "epykit_version": _epykit_version(),
         "n_sites_raw": n_sites_raw,
         "_store_history": [{"step": "raw", "path": cache_store_dir, "n_sites": n_sites_raw}],
     }
