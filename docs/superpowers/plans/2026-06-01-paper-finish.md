@@ -1,5 +1,7 @@
 # epykit Paper-Track Finish Implementation Plan
 
+> ⚠️ **SUPERSEDED by [`2026-06-02-paper-finish-revised.md`](2026-06-02-paper-finish-revised.md).** Most of the heavy lifting this plan describes (20-seed simulator sweep, per-seed scoring, WIP script commits) was already done in parallel sessions before this plan was executed. The revised plan reflects the actual remaining work as of 2026-06-02 and is the one to execute. This file is retained for historical context only.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Land the paper-side work for epykit 1.0 — commit the WIP simulator sweep, optionally run the 20-seed parallel column, generate the timings table, populate `claims.yaml`, rewrite `paper.md` to match spec §6 framing, gate via `regen_all.py --verify`, then merge to `main`. Runs on a `paper` branch off `p0-fixes` independently of the `1.0-prep` branch (which covers `src/epykit/**`).
