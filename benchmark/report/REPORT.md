@@ -2,8 +2,13 @@
 
 **Companion to** [paper.md](../paper/paper.md).
 **Date:** 2026-05-22.
-**Software:** epykit 0.7.2; methylKit 1.34.0 (Study 2) / 1.36.0 (Study 3) /
+**Software:** epykit 1.0.0; methylKit 1.34.0 (Study 2) / 1.36.0 (Study 3) /
 0.99.2 (Study 1 baseline transcriptions from Piao et al. 2021).
+
+> epykit benchmarks were executed at commit `60a71e0` (engine tag
+> `v0.7.5-phase3-engines-frozen`, 2026-05-28); the package version string was
+> `0.7.2` at run time and the engine code is unchanged through the `1.0.0`
+> release, so the results apply to 1.0.0.
 
 This report contains the complete numeric tables behind the paper, the
 full per-stage performance breakdown, the dispersion-estimator sensitivity
@@ -292,7 +297,7 @@ consume identical combined-strand counts (Methods §2.2 of [paper.md](../paper/p
 
 | Metric | methylKit | epykit | Ratio (ep / mk) |
 |---|---:|---:|---:|
-| tool version | 1.36.0 | 0.6.0 | — |
+| tool version | 1.36.0 | 1.0.0 | — |
 | ncpus_logical | 24 | 16 | 0.667 |
 | pipeline_wall_sec | 13,033.0 | 1,072.5 | **0.0823 (12.2×)** |
 | pipeline_cpu_sec | 13,080.3 | 1,374.9 | 0.105 |

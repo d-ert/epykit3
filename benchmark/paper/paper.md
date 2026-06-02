@@ -64,11 +64,12 @@ frames are no longer the right abstraction.
 **epykit** is a Python-native pipeline that addresses both: per-CpG counts
 are stored as per-chromosome, per-sample Parquet partitions and queried
 lazily with polars [@polars]; per-CpG and DMR calling are exposed through a
-scanpy-style `pp` / `tl` / `pl` namespace; and the package offers eight
-statistical backends for DMC calling (`lr`, `score`, `glm`, `logit_t`,
-`welch_t`, `bb_lr`, `cmh`, `fisher`) plus four DMR engines (tile-based,
-sliding window with signed Stouffer combining, HMM segmentation, and a
-DSS-compatible chain-merge caller).
+scanpy-style `pp` / `tl` / `pl` namespace; and the package offers four
+statistical backends for DMC calling (`lr`, `welch_t`, `fisher`, and a
+covariate-aware binomial `glm`), consolidated from a broader set during
+pre-1.0 development (§2.5.1), plus four DMR engines (a DSS-compatible
+chain-merge caller, tile-based aggregation, sliding window with signed
+Stouffer combining, and HMM segmentation).
 
 A credible WGBS-pipeline introduction requires evidence on three fronts:
 (i) competitive accuracy against the full established panel under controlled

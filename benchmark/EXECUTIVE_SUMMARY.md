@@ -57,7 +57,7 @@ side-by-side, and (iii) whether it behaves correctly on real biological data.
 * **Default.** Use `epykit.tl.dmc(test="lr")`. At n ≥ 3 per group on
   simulated data it is statistically equivalent to methylKit; on real data
   it is more conservative in the small-p tail.
-* **Low replicates (n ≤ 2).** Use `lr+` (auto-engages from v0.7.2).
+* **Low replicates (n ≤ 2).** Use `lr+` (opt-in via `power_stack="lr+"`).
 * **n = 1 (no replicates).** Use the bug-fixed `fisher` backend.
 * **DMRs on real biological data.** Use `dmr_chain_merge` with
   paper-matched `alpha = 1e-5, delta = 0, minlen = 50, minCG = 3,

@@ -117,7 +117,7 @@ chain_merge + a DSS-from-scratch upper bound resolved the picture.
 
 | Tool | Version |
 |---|---|
-| epykit | 0.7.2 (Studies 1, 2); 0.6.0 (Study 3) |
+| epykit | 1.0.0 (all studies; run at commit 60a71e0, engine tag v0.7.5-phase3-engines-frozen) |
 | methylKit | 1.34.0 (Study 2); 1.36.0 (Study 3); 0.99.2 (Study 1 baseline) |
 | R | 4.5.0 (Studies 2, 3) |
 | Python | 3.12 |

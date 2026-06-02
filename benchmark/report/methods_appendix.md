@@ -12,7 +12,7 @@ studies.
 | Tool | Version | Where used |
 |---|---|---|
 | Python | 3.12 | All studies |
-| epykit | 0.7.2 (Studies 1, 2); 0.6.0 (Study 3) | All studies |
+| epykit | 1.0.0 (all studies) | All studies |
 | polars | 1.x | All studies (lazy I/O) |
 | NumPy, SciPy, statsmodels | latest at time of run | All studies |
 | psutil | ≥ 5.9 | Study 2 perf sampling |
@@ -20,9 +20,12 @@ studies.
 | methylKit | 1.34.0 (Study 2); 1.36.0 (Study 3); 0.99.2 (Study 1 baseline tables, transcribed) | All studies |
 | Other Study 1 baselines | methylSig 0.4.4, DSS 2.12.0, RADMeth, BiSeq, Fisher (pooled), BSmooth, metilene — versions from Piao et al. 2021 | Study 1 (transcribed) |
 
-Study 3's epykit version (0.6.0) predates the `df_phi` dispersion-estimator
-fix; this affected only the alternative dispersion modes (`shrink`,
-`chrom`), not the default `lr / site` mode used for headline numbers.
+All three studies were executed at commit `60a71e0` (engine tag
+`v0.7.5-phase3-engines-frozen`, 2026-05-28); the package version string was
+`0.7.2` at run time and the engine code is unchanged through the `1.0.0`
+release, so the results apply to 1.0.0. (An earlier Study-3 pass on epykit
+0.6.0 predated the `df_phi` dispersion-estimator fix; it was superseded by
+the frozen-engine re-run reported here.)
 
 ---
 

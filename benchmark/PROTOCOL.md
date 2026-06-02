@@ -20,7 +20,7 @@ sensitivity panel.**
 | Tool | Version | Notes |
 |---|---|---|
 | Python | 3.12 | All studies |
-| epykit | **0.7.2** | All studies — Study 3 to be re-run from 0.6.0 to lift the version mismatch |
+| epykit | **1.0.0** | All studies, including the Study 3 re-run (executed at commit 60a71e0, engine tag v0.7.5-phase3-engines-frozen; version string 0.7.2 at run time, engine code unchanged through 1.0.0) |
 | polars | 1.x (latest at time of run; record exact in `_seeds.json`) | I/O |
 | NumPy, SciPy, statsmodels | latest at time of run | Recorded by `pip freeze` into `run_env.txt` per scenario |
 | psutil | ≥ 5.9 | Per-scenario peak RSS, 50 ms sampling |
@@ -131,7 +131,7 @@ These rules govern what gets reported in `EXECUTIVE_SUMMARY.md` and `paper/paper
 | **R3. Same DMR semantics on both sides for each comparison.** | When comparing chain_merge to methylKit-tile, the report must explicitly note these are different region-definition semantics. When comparing chain_merge to DSS-callDMR, both share semantics — that's the appropriate apples-to-apples cell. | Comparing 102 chain_merge DMRs vs 37 1-kbp tiles by call count is methodologically meaningless. |
 | **R4. Promote the discovery narrative.** | The "tile → chain_merge" pivot (8 % → 53 % paper-DMR recall) is described in the main text of paper.md as a methodological discovery, not buried in `benchmark/docs/historical/`. | A reviewer reading the GitHub history will find this anyway; better to own it. |
 | **R5. Top-K agreement is part of the main report.** | Top-5 / 10 / 25 / 50 / 100 DMC and DMR agreement between epykit and methylKit goes into the body of paper.md, not as appendix-only. Top-5 = 0/5 must be stated honestly. | A reviewer who reads `top_k_report.md` and finds it isn't in the headline will read the paper's framing as evasive. |
-| **R6. Version mismatch surfaced.** | The paper's Methods §1 explicitly names the epykit version per study; once Study 3 is re-run, all three studies are at 0.7.2. | Buried footnotes don't survive review. |
+| **R6. Version mismatch surfaced.** | The paper's Methods §1 explicitly names the epykit version per study; Study 3 was re-run, so all three studies are at 1.0.0 (engine-frozen at v0.7.5-phase3-engines-frozen). | Buried footnotes don't survive review. |
 | **R7. Limitations section is non-trivial.** | `paper/paper.md` ends with a Limitations subsection that names: (a) one fixed simulator instance, (b) one tissue × one genome for real data, (c) Study 1 panel baselines transcribed not re-run, (d) Study 3's `mincov=10` deviates from the Piao recipe `mincov=0` for fairness, (e) bugs discovered during benchmarking. | Honest limitations sections protect against rejection; vague ones invite it. |
 | **R8. Every claim is traceable to a script.** | Each numeric claim in EXECUTIVE_SUMMARY.md and paper.md gets a `<!-- source: scripts/X.py -->` comment immediately above. The script reads the same locked outputs and produces the same number. | Reproducibility is non-negotiable for peer review. |
 
@@ -242,7 +242,7 @@ This protocol is consumed by the four execution phases in
 |---|---|---|
 | 1 | (this file is Phase 1) | this file |
 | 2 — Study 2 re-runs + variance | §4.1, §4.2, §4.3 (tile + Stouffer tuned methylKit row), §6 | `scripts/wilson_bootstrap_ci.py`, `scripts/methylkit_stouffer_combine.R`, updated `_runs/`, updated `HEAD_TO_HEAD.md` |
-| 3 — Study 3 real-data re-runs | §3.2, §4.3, §5 R3–R6 | re-run epykit at 0.7.2; fix `convert_fwd.log`; verify DSS-from-scratch; top-K tables |
+| 3 — Study 3 real-data re-runs | §3.2, §4.3, §5 R3–R6 | re-run epykit (engine tag v0.7.5-phase3-engines-frozen); fix `convert_fwd.log`; verify DSS-from-scratch; top-K tables |
 | 4 — Rewrite | §5 all rules; §6 variance; §7 metrics | new `EXECUTIVE_SUMMARY.md`, `paper/paper.md`, `report/REPORT.md` |
 | 5 — Independent audit | (the audit reads this protocol to check the rewrites for compliance) | audit report |
 
