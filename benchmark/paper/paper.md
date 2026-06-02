@@ -316,7 +316,7 @@ q ∈ {0.01, 0.05, 0.10}. A well-calibrated engine produces observed FDR
 
 The full sweep covers 13 cells; 12 ran successfully
 (`benchmark/data/null_calibration/summary.parquet`). The
-`fisher@gse263850` cell was deferred — see §10.5 limitations. Per-cell
+`fisher@gse263850` cell was deferred — see §4.3 limitations. Per-cell
 columns: `observed_fdr_median`, `observed_fdr_q1`, `observed_fdr_q3`,
 plus bootstrap 95 % CI bounds. Results appear in §3 (Table S-Calib).
 
@@ -796,7 +796,7 @@ shuffle resolution, attributable to the simulator's clean noise model.
 
 The full sweep covers 13 cells; 12 ran successfully. The
 `fisher@gse263850` cell was deferred and is documented as a limitation
-(§10.5). The full table (`benchmark/data/null_calibration/summary.parquet`)
+(§4.3). The full table (`benchmark/data/null_calibration/summary.parquet`)
 appears as **Supplementary Table S-Calib**.
 
 **Performance headline.** epykit's bare `lr` engine completes the same
