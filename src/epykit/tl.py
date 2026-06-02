@@ -152,6 +152,7 @@ def qc(
     run_sample_correlation: bool = False,
     correlation_method: str = "spearman",
     expected_sex_col: str | None = None,
+    csv: str | None = None,
 ) -> None:
     """Populate md.obs with per-sample QC metrics and cache QC tables in md.uns.
 
@@ -247,6 +248,10 @@ def qc(
     md.obs = obs
     md.uns["qc_global_methylation"] = global_report
     md.uns["qc_coverage_uniformity"] = cov_report
+
+    if csv is not None:
+        from .export import qc_to_tsv
+        qc_to_tsv(md, csv)
 
 
 def dmc(
@@ -982,6 +987,7 @@ def dmr(
     backend: str = "sequential",
     n_workers: int | None = None,
     merge_adjacent: bool = True,
+    csv: str | None = None,
 ) -> None:
     """Run DMR calling and store result in ``md.uns['dmr']``.
 
@@ -1189,6 +1195,9 @@ def dmr(
             "n_perm": n_perm if empirical_fdr else None,
             "perm_seed": perm_seed if empirical_fdr else None,
         }
+        if csv is not None:
+            from .export import dmr_to_tsv
+            dmr_to_tsv(md, csv)
         return
 
     if method == "sliding_window":
@@ -1242,6 +1251,9 @@ def dmr(
             "min_abs_meth_diff": min_abs_meth_diff,
             "min_mean_qvalue": min_mean_qvalue,
         }
+        if csv is not None:
+            from .export import dmr_to_tsv
+            dmr_to_tsv(md, csv)
         return
 
     if method == "segment":
@@ -1264,6 +1276,9 @@ def dmr(
             "min_abs_meth_diff": min_abs_meth_diff,
             "alpha": alpha,
         }
+        if csv is not None:
+            from .export import dmr_to_tsv
+            dmr_to_tsv(md, csv)
         return
 
     if method == "chain_merge":
@@ -1319,6 +1334,9 @@ def dmr(
             "use_q_for_sig": use_q_for_sig,
             "min_mean_qvalue": min_mean_qvalue,
         }
+        if csv is not None:
+            from .export import dmr_to_tsv
+            dmr_to_tsv(md, csv)
         return
 
     raise ValueError(

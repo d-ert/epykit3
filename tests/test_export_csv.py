@@ -236,3 +236,26 @@ def test_tl_dvc_csv_kwarg_writes_file(tmp_path, synth_md_filtered):
     assert out.exists()
     header = out.read_text(encoding="utf-8").splitlines()[0].split("\t")
     assert "chrom" in header and "pos" in header
+
+
+def test_tl_dmr_csv_kwarg_writes_file(tmp_path, synth_md_filtered):
+    ep.tl.dmc(synth_md_filtered, test="lr")
+    out = tmp_path / "dmr.tsv"
+    ep.tl.dmr(synth_md_filtered, method="chain_merge", csv=str(out))
+
+    assert out.exists()
+    header = out.read_text(encoding="utf-8").splitlines()[0].split("\t")
+    assert "chrom" in header and "start" in header and "end" in header
+
+
+def test_tl_qc_csv_kwarg_writes_md_obs(tmp_path, synth_md_filtered):
+    out = tmp_path / "qc.tsv"
+    ep.tl.qc(synth_md_filtered, csv=str(out))
+
+    assert out.exists()
+    text = out.read_text(encoding="utf-8")
+    header = text.splitlines()[0].split("\t")
+    assert "sample_id" in header
+    # Body has one row per sample
+    n_rows = len(text.splitlines()) - 1
+    assert n_rows == len(synth_md_filtered.obs)
