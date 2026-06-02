@@ -157,7 +157,7 @@ rather than accuracy.
 
 | Tool | Version | Backend(s) tested | Studies |
 | --- | --- | --- | --- |
-| epykit | 0.7.2 | `lr`, `lr+`, `bb_lr`, `welch_t`, `fisher`; DMR: `tile`, `chain_merge` | 1, 2, 3 |
+| epykit | 1.0.0 | DMC: `lr`, `welch_t`, `fisher`, `glm` (4 surviving engines after the 0.7.5 freeze); `lr+` is the opt-in power stack engaged via `power_stack="lr+"`. DMR: `tile`, `sliding_window`, `segment`, `chain_merge`. | 1, 2, 3 |
 | methylKit | 1.34.0 (Study 2) / 1.36.0 (Study 3) / 0.99.2 (Study 1 baseline) | `calculateDiffMeth` + `tileMethylCounts` | 1, 2, 3 |
 | methylSig | 0.4.4 | (Piao 2021 baseline) | 1 |
 | DSS | 2.12.0 | (Piao 2021 baseline) | 1 |
@@ -177,9 +177,40 @@ For Studies 2 and 3, both methylKit and epykit were run on the same
 machine under the same harness; numbers are not taken from prior
 publications.
 
+**Parameter freeze (per `benchmark/PROTOCOL.md` §4).** All thresholds,
+recipes, and post-processing steps below are locked before the re-do runs.
+
+Default DMC recipes (headline row, Studies 1 & 2):
+
+| Tool | Recipe |
+|---|---|
+| epykit | `ep.tl.dmc(test="lr", dispersion="site", fdr_method="fdr_bh", allow_n1=True)` |
+| methylKit | `methRead(..., mincov=10) → normalizeCoverage(method="median") → unite(destrand=FALSE) → calculateDiffMeth(mc.cores=1)` |
+
+**Cutoff (both):** `qvalue < 0.05` AND `|meth_diff| ≥ 0.25` (fractional;
+= 25 on methylKit's percent scale). Tuned recipes use epykit's `lr+`
+(`neighbour_combine` + `sep_fallback` + `fdr_method="fdr_tsbh"`) and a
+methylKit post-hoc adjacent-3-CpG Stouffer combine (`scripts/methylkit_stouffer_combine.R`);
+both are clearly labelled as sensitivity panels, never as headline.
+
+Default DMR recipes:
+
+| Engine | Recipe | Used in |
+|---|---|---|
+| epykit `chain_merge` | `alpha=1e-5, delta=0, minlen=50, minCG=3, pct.sig=0.5, dis_merge_bp=100` (DSS-compatible) | Headline for Study 3 |
+| epykit `tile` | 1 kbp fixed tiles, ≥ 5 CpGs per tile | Studies 1, 2 (Piao framework) |
+| methylKit `tileMethylCounts` | `win.size=1000, step.size=1000, cov.bases=5` | Studies 1, 2 (default) |
+| DSS `DMLfit.multiFactor` + `callDMR` | `p.threshold=1e-5, minCG=3, minlen=50, dis.merge=100` | Study 3 ceiling caller |
+
 Both pipelines in Study 3 apply identical parameters: `min_cov = 10`,
 `hi_perc = 99.9` (top-percentile clipping), BH FDR, |meth_diff| ≥ 10 % at
-q < 0.05 for DMCs, and 500 bp tiles with ≥ 5 CpGs for DMRs.
+q < 0.05 for DMCs.
+
+**Performance reporting.** Wallclock and peak RSS per tool at the
+headline cell are summarised in `benchmark/data/study1/timings_table.csv`
+(epykit DMC engines, internal comparison) and
+`benchmark/docs/timing-comparison.md` (cross-tool 7-way comparison
+including methylKit and DSS). Headline numbers appear in §3.
 
 ## 2.5 The `lr` and `lr+` engines
 
@@ -207,9 +238,28 @@ or low-replicate regimes:
    π₀ = 1 implicit in plain BH with a data-driven estimate; reduces to BH
    when π₀ = 1.
 
-Defaults preserve back-compatible baseline `lr` behaviour. The recommended
-`lr+` recipe enables all four with default parameters; see the technical
-report ([report/REPORT.md](../report/REPORT.md)) for full specification.
+In epykit 1.0, bare `lr` is the default — none of these four enhancements
+engages unless explicitly requested. Users opt in to the full stack via
+`power_stack="lr+"` (an alias for setting all four knobs at once), or
+combine knobs individually as needed. `power_stack="conservative"`
+reproduces the pre-1.0 carve-out that auto-engaged two of the knobs at
+`min_n ≤ 2`. See the technical report
+([report/REPORT.md](../report/REPORT.md)) for full knob specification.
+
+### 2.5.1 Engines removed in 0.7.5
+
+Four DMC engines available in epykit ≤ 0.7.4 were removed at the 0.7.5
+engine-freeze cutover and now raise `ValueError` with a migration hint:
+
+| Removed | Replacement | Note |
+|---|---|---|
+| `logit_t` | `welch_t` | Welch t-test on β; same statistical model, honest name |
+| `bb_lr` | `lr` (or `lr+` for the full power stack) | The bare LR engine subsumes the beta-binomial special case |
+| `score` | `lr` | LR subsumes the score test, with better small-sample calibration |
+| `cmh` | `glm` with `formula="~ group + batch"` | A fully-specified GLM is the modern replacement for stratified CMH |
+
+The freeze fixes the engine surface at four tests; only the opt-in
+power-stack knobs and CI computations have changed since.
 
 ## 2.6 Evaluation metrics
 
@@ -232,6 +282,46 @@ For Study 3 (no ground truth) we report direction agreement, Pearson and
 Spearman correlation on effect sizes, Jaccard overlap on significance
 calls, and per-stage wall-clock and peak-RSS measured by `psutil` sampling
 both subprocess trees at 50 ms.
+
+## 2.7 Held-out simulator (Phase 4)
+
+The ground-truth construction of §2.3 reconstructs `is_dmc` from the
+highest-coverage simulator output — useful as a calibration check but
+circular as a truth definition (truth and tested data come from the same
+generative model). To break this loop we re-implemented the Piao 2021
+simulator in Python (`benchmark/scripts/simulate_piao.py`) and generated
+20 independent seeds at coverage 10 (seeds `2026000`–`2026019`). Each
+seed carries an explicit `is_dmc` flag set at simulation time — intrinsic
+truth, not threshold-reconstructed.
+
+Validation: marginal distributions of read counts and effect sizes match
+a Piao 2021 reference sample to within Monte Carlo error
+(`benchmark/scripts/tests/test_simulate_piao.py`).
+
+Outputs live under `benchmark/data/study1b_simulator/seed=2026XXX/`. Per-seed
+scoring against intrinsic truth is summarised in
+`eval_simulator_intrinsic_per_seed.parquet` (540 rows: 20 seeds × tools
+× thresholds × effect-size bins) and across-seed IQRs in
+`eval_simulator_intrinsic_iqr.parquet`. Results appear in §3 (Table S-Sim).
+
+In Phase 4 we also ran methylKit and DSS (smoothing on and off) on each
+of the 20 simulator seeds via `benchmark/scripts/run_external_simulator_sweep.py`
+to enable a like-for-like multi-seed intrinsic-truth comparison
+(`benchmark/data/study1b_simulator/parallel_column_summary.md`).
+
+## 2.8 Null calibration
+
+For each surviving DMC engine × dataset pair, we shuffle the case/control
+assignment K = 20 times under the null (no real difference between
+groups), re-run the engine, and record the observed FDR at nominal
+q ∈ {0.01, 0.05, 0.10}. A well-calibrated engine produces observed FDR
+≤ nominal across shuffles.
+
+The full sweep covers 13 cells; 12 ran successfully
+(`benchmark/data/null_calibration/summary.parquet`). The
+`fisher@gse263850` cell was deferred — see §10.5 limitations. Per-cell
+columns: `observed_fdr_median`, `observed_fdr_q1`, `observed_fdr_q3`,
+plus bootstrap 95 % CI bounds. Results appear in §3 (Table S-Calib).
 
 # 3. Results
 
