@@ -814,6 +814,23 @@ audit (**Table S-Fix**, §10.5).
 
 # 4. Discussion
 
+This Discussion is organised in four parts: §4.1 summarises what the three
+studies establish, §4.2 surfaces the calibration–sensitivity trade-off seen
+most clearly in Study 3, §4.3 reports the bug-fix manifest, and §4.4 lists
+limitations.
+
+**A caveat to read first.** The Piao 2021 simulator is *underdispersed*
+relative to real WGBS data: median Pearson φ at coverage 5× is ≈ 0.41 on
+the simulator versus ≈ 1.5–5 on biological samples. epykit's bare `lr`
+engine clamps at the binomial floor (φ = 1), which is nearly correct on
+the simulator and partly explains its dominance in the small-effect bin
+at low coverage (§3.1, Figure 2). On real WGBS with genuine
+overdispersion the gap should narrow, and could reverse for the
+small-effect bin. The held-out simulator (§3.4) and null calibration
+(§3.5) are the additional checks we ran to bracket this question;
+Study 3 (§3.3) is the real-data reality check. Readers should treat the
+simulator headline numbers as upper bounds for real-data behaviour.
+
 ## 4.1 What the three studies establish
 
 Together, the three studies cover the relevant evaluation surface for a new
@@ -853,37 +870,49 @@ We therefore recommend that users:
 * Reproduce headline findings under at least one alternative dispersion
   mode as a sensitivity check.
 
-## 4.3 Two bugs we found and fixed
+## 4.3 The bug-fix manifest
 
-The benchmark surfaced two genuine calibration bugs in epykit, which we
-report openly:
+Over the course of running this benchmark we discovered and fixed 11
+statistical bugs in epykit — 4 P0 (must-fix-before-headline) and 7 P1
+(fix-before-publication-but-not-locking) — listed in the audit manifest
+at `benchmark/data/audit/commits.json` and gated by `bug_fix_audit.py`
+against pre- and post-fix `eval_summary` parquets. Two of the eleven
+produced measurable deltas at our reporting precision in the headline
+cells; the remaining nine were calibration, confidence-interval, or
+edge-case corrections whose pre/post deltas fell below reporting
+precision. The two with measurable deltas:
 
-1. **Pooled `fisher` backend (v0.7.0)** — at or near perfect separation,
-   the upper-tail-only hypergeometric returned `p ≈ 1.0` for the hypo
-   direction instead of `p ≈ 10⁻³⁰`. Fix: bidirectional tail computation.
-   Post-fix Fisher TPR jumps from 0.000 to 0.668–0.998 across the coverage
-   grid. None of the headline `lr` / `lr+` results depend on `fisher`.
-2. **`df_phi` reference in pooled dispersion modes** — pre-fix
-   `dispersion="shrink"` and `"chrom"` both collapsed to 1 significant DMC
-   across 15.6 M CpGs because `_score_finalize` referenced F(1, df_residual)
-   instead of F(1, df_phi). Post-fix, `chrom` and `shrink` produce sensible
-   non-degenerate outputs; `dispersion="site"` (the default and the one
-   used for all headline numbers) is bit-identical to its pre-fix output.
+1. **Pooled `fisher` backend (P0-1, fixed in 0.7.2)** — at or near perfect
+   separation, the upper-tail-only hypergeometric returned `p ≈ 1.0` for
+   the hypo direction instead of `p ≈ 10⁻³⁰`. Fix: bidirectional tail
+   computation (mid-p convention). Post-fix Fisher TPR jumps from 0.000
+   to 0.668–0.998 across the coverage grid. None of the headline `lr` /
+   `lr+` results depend on `fisher`.
+2. **`df_phi` reference in pooled dispersion modes (P0-2, fixed in 0.7.2)** —
+   pre-fix `dispersion="shrink"` and `"chrom"` both collapsed to 1
+   significant DMC across 15.6 M CpGs because `_score_finalize`
+   referenced `F(1, df_residual)` instead of `F(1, df_phi)`. Post-fix,
+   `chrom` and `shrink` produce sensible non-degenerate outputs;
+   `dispersion="site"` (the headline default) is bit-identical to its
+   pre-fix output.
 
-`chain_merge` defaults and three other engine tweaks (auto-engage `lr+` at
-low n, `bb_lr` guardrails, adjacent-tile merging) were also tuned during
-the benchmark. The full fix log is in [report/REPORT.md](../report/REPORT.md) §3.
+The full pre/post delta audit is at
+`benchmark/data/audit/bug_fix_deltas.md` (the manifest used for
+**Supplementary Table S-Fix**, §10.5) and the commit-level audit at
+`benchmark/data/audit/commits.json`. `chain_merge` defaults and three
+other engine tweaks (auto-engage `lr+` at low n, `bb_lr` retirement and
+its replacement by `dispersion="eb"`, adjacent-tile merging) were also
+applied during the benchmark; the full tuning log is in
+[report/REPORT.md](../report/REPORT.md) §3.
 
 ## 4.4 Limitations
 
-* **Simulator underdispersion.** The Piao 2021 simulator is underdispersed
-  (median φ ≈ 0.41 at 5×). epykit's `lr` clamps at the binomial floor
-  φ = 1, which is nearly correct on this data; tools that model
-  overdispersion (methylKit, DSS, RADMeth) lose power by estimating
-  φ > 1. On real WGBS (φ ≈ 1.5–5 depending on context) the low-coverage
-  TPR advantage of `lr` would be smaller or could reverse. `dispersion="eb"`
-  is designed for such heterogeneous regimes but is a no-op on this
-  simulator.
+* **Simulator underdispersion.** See the framing paragraph at the top of
+  §4 — the Piao 2021 simulator is underdispersed (median φ ≈ 0.41 at 5×)
+  relative to real WGBS (φ ≈ 1.5–5), and `lr`'s binomial-floor clamp is
+  part of why it dominates the low-coverage small-effect bin in §3.1.
+  `dispersion="eb"` is designed for heterogeneous regimes but is a no-op
+  on this simulator.
 * **Baseline software versions.** Study 1 baseline numbers are from 2021
   software releases. Relative ordering at low coverage / small n is robust
   across recent versions of those tools, but absolute numbers may have
