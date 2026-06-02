@@ -5,6 +5,7 @@ import csv
 from pathlib import Path
 
 import polars as pl
+import epykit as ep
 from epykit import export
 
 
@@ -205,3 +206,33 @@ def test_qc_to_tsv_writes_md_obs(tmp_path):
     header = text.splitlines()[0].split("\t")
     assert set(header) == {"sample_id", "group", "mean_coverage"}
     assert "s1\t" in text and "s2\t" in text
+
+
+def test_tl_dmc_csv_kwarg_writes_file(tmp_path, synth_md_filtered):
+    out = tmp_path / "dmc.significant.tsv"
+    ep.tl.dmc(synth_md_filtered, test="lr", csv=str(out))
+
+    assert out.exists()
+    text = out.read_text(encoding="utf-8")
+    # Header from md.varm['dmc_lr']: chrom, pos, ... qvalue ...
+    header = text.splitlines()[0].split("\t")
+    assert "chrom" in header and "pos" in header and "qvalue" in header
+
+
+def test_tl_dmc_csv_full_writes_every_row(tmp_path, synth_md_filtered):
+    full_out = tmp_path / "dmc.tsv"
+    ep.tl.dmc(synth_md_filtered, test="lr", csv=str(full_out), csv_full=True)
+
+    n_full = len(full_out.read_text(encoding="utf-8").splitlines()) - 1
+    n_varm = len(synth_md_filtered.varm["dmc_lr"])
+    assert n_full == n_varm
+
+
+def test_tl_dvc_csv_kwarg_writes_file(tmp_path, synth_md_filtered):
+    ep.tl.dvc(synth_md_filtered, test="bartlett")
+    out = tmp_path / "dvc.significant.tsv"
+    ep.tl.dvc(synth_md_filtered, test="bartlett", csv=str(out))
+    # File should exist; may be empty (no significant DVCs in the fixture)
+    assert out.exists()
+    header = out.read_text(encoding="utf-8").splitlines()[0].split("\t")
+    assert "chrom" in header and "pos" in header

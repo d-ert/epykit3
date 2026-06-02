@@ -288,6 +288,10 @@ def dmc(
     power_stack: Literal["auto", "lr+", "conservative", "off"] | bool = "off",
     # Explicit patsy reference level for categorical factors (since 0.7.5) -
     reference_level: str | None = None,
+    # CSV/TSV output convenience (since 1.0) ------------------------------------
+    csv: str | None = None,
+    csv_full: bool = False,
+    csv_alpha: float = 0.05,
 ) -> None:
     """Run DMC calling and store result in md.varm['dmc_<test>'].
 
@@ -468,6 +472,9 @@ def dmc(
             "The transitional column is NaN-filled.",
             FutureWarning, stacklevel=2,
         )
+        if csv is not None:
+            from .export import dmc_to_tsv
+            dmc_to_tsv(md, csv, alpha=csv_alpha, full=csv_full)
         return
 
     # Unconditional n=1 guard: applies whether test is "auto" or explicit.
@@ -581,6 +588,9 @@ def dmc(
                         "last_key": resume_stage_name,
                         "resumed": True,
                     }
+                    if csv is not None:
+                        from .export import dmc_to_tsv
+                        dmc_to_tsv(md, csv, alpha=csv_alpha, full=csv_full)
                     return
 
     # Smoothed-input mode: materialise a temp methylstore of smoothed
@@ -787,6 +797,10 @@ def dmc(
         "The transitional column is NaN-filled.",
         FutureWarning, stacklevel=2,
     )
+
+    if csv is not None:
+        from .export import dmc_to_tsv
+        dmc_to_tsv(md, csv, alpha=csv_alpha, full=csv_full)
 
 
 def _run_dmc_contrast(
@@ -1534,6 +1548,9 @@ def dvc(
     *,
     backend: str = "sequential",
     n_workers: int | None = None,
+    csv: str | None = None,
+    csv_full: bool = False,
+    csv_alpha: float = 0.05,
 ) -> None:
     """Differential-Variability CpG calling (iEVORA-style).
 
@@ -1584,6 +1601,10 @@ def dvc(
         "n_dvc": int(result.get_column("is_dvc").sum()) if len(result) else 0,
         "unite": unite,
     }
+
+    if csv is not None:
+        from .export import dvc_to_tsv
+        dvc_to_tsv(md, csv, alpha=csv_alpha, full=csv_full)
 
 
 def dvr(
