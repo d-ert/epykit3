@@ -18,11 +18,33 @@ CLI surface:
 
 import argparse
 import logging
+import os
 import sys
 import warnings
 from pathlib import Path
 from .convert import convert_sample
 from . import filter, dmc
+
+
+def _auto_csv_path(parquet_path: str, *, suffix: str = "") -> str:
+    """Derive a sibling .tsv path from a --output parquet path.
+
+    ``dmc.parquet`` -> ``dmc.significant.tsv`` (suffix=".significant")
+    ``dmr.parquet`` -> ``dmr.tsv``             (suffix="")
+    Strips a ``.parquet`` extension if present; otherwise appends.
+    """
+    p = Path(parquet_path)
+    stem = p.stem if p.suffix.lower() == ".parquet" else p.name
+    return str(p.with_name(f"{stem}{suffix}.tsv"))
+
+
+def _csv_suppressed(args) -> bool:
+    """True if the user opted out of the CLI auto-emit."""
+    if getattr(args, "no_csv", False):
+        return True
+    if os.environ.get("EPYKIT_NO_AUTO_CSV") in ("1", "true", "True"):
+        return True
+    return False
 
 
 def _add_min_samples_args(p: argparse.ArgumentParser, scope_help_prefix: str = "") -> None:
@@ -199,6 +221,27 @@ def _cmd_dmc(args: argparse.Namespace):
     n_sig = int((results["qvalue"] < 0.05).sum()) if "qvalue" in results.columns else 0
     print(f"  Total sites tested: {len(results):,}")
     print(f"  Significant (q<0.05): {n_sig:,}")
+
+    if not _csv_suppressed(args) and len(results.columns) > 0:
+        import polars as pl
+        from .methyldata import MethylData
+        from .export import dmc_to_tsv
+        # Build a transient MethylData carrying just the dmc result so the
+        # writer can re-use the same delegation path the API uses.
+        obs = pl.DataFrame({"sample_id": treatment_samples + control_samples})
+        md_tmp = MethylData(obs=obs, store=str(args.methylstore))
+        md_tmp.varm["dmc_lr"] = results
+        md_tmp.uns["dmc"] = {"last_key": "dmc_lr"}
+
+        sig_path = args.csv_path or _auto_csv_path(
+            args.output, suffix=".significant"
+        )
+        dmc_to_tsv(md_tmp, sig_path, alpha=args.csv_alpha)
+        print(f"  Significant CSV:    {sig_path}")
+        if args.csv_full:
+            full_path = _auto_csv_path(args.output)
+            dmc_to_tsv(md_tmp, full_path, full=True)
+            print(f"  Full CSV:           {full_path}")
 
 
 def _cmd_dmr(args: argparse.Namespace):
@@ -596,6 +639,25 @@ def main():
             "Default is to refuse -- between-replicate variance is ignored "
             "and p-values are anti-conservative under this fallback."
         ),
+    )
+    p_dmc.add_argument(
+        "--no-csv", action="store_true", dest="no_csv", default=False,
+        help="Suppress the sibling .significant.tsv auto-emit.",
+    )
+    p_dmc.add_argument(
+        "--csv", dest="csv_path", default=None,
+        help=(
+            "Override sibling TSV/CSV path. Suffix .csv selects comma "
+            "delimiter; otherwise tab. Implies the file is written."
+        ),
+    )
+    p_dmc.add_argument(
+        "--csv-alpha", dest="csv_alpha", type=float, default=0.05,
+        help="qvalue threshold for significant-only CSV. Default 0.05.",
+    )
+    p_dmc.add_argument(
+        "--csv-full", dest="csv_full", action="store_true", default=False,
+        help="Also write the full (unfiltered) TSV next to the parquet.",
     )
     p_dmc.set_defaults(func=_cmd_dmc)
 

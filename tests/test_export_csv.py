@@ -259,3 +259,78 @@ def test_tl_qc_csv_kwarg_writes_md_obs(tmp_path, synth_md_filtered):
     # Body has one row per sample
     n_rows = len(text.splitlines()) - 1
     assert n_rows == len(synth_md_filtered.obs)
+
+
+def test_cli_dmc_auto_emits_sibling_significant_tsv(tmp_path, synth_bundle, monkeypatch):
+    """`epykit dmc --output X.parquet` writes X.significant.tsv next to it."""
+    import sys
+    import epykit as ep
+    from epykit.cli import main
+
+    # Populate the methylstore so the CLI dmc command has data to process.
+    # read_bismark returns a MethylData whose .store points at the raw parquet
+    # partition tree (sample=.../chrom=.../part-0.parquet) — that is the path
+    # process_chromosomes_dmc expects as --methylstore.
+    md_setup = ep.read_bismark(
+        synth_bundle.samplesheet,
+        treatment_group="treatment",
+        control_group="control",
+        assembly="synth",
+        store_dir=str(tmp_path / "store"),
+    )
+    populated_store = md_setup.store  # e.g. <store_dir>/.cache/raw/
+
+    out_parquet = tmp_path / "dmc.parquet"
+    sibling_tsv = tmp_path / "dmc.significant.tsv"
+
+    monkeypatch.setattr(sys, "argv", [
+        "epykit", "dmc",
+        "--methylstore", populated_store,
+        "--samplesheet", synth_bundle.samplesheet,
+        "--treatment-group", "treatment",
+        "--control-group", "control",
+        "--output", str(out_parquet),
+        "--test", "lr",
+    ])
+    main()
+
+    assert out_parquet.exists()
+    assert sibling_tsv.exists()
+    # Should contain a header line and some data rows
+    lines = sibling_tsv.read_text(encoding="utf-8").splitlines()
+    assert len(lines) >= 1
+    assert "chrom" in lines[0]
+
+
+def test_cli_dmc_no_csv_suppresses_sibling(tmp_path, synth_bundle, monkeypatch):
+    import sys
+    import epykit as ep
+    from epykit.cli import main
+
+    # Populate the store the same way as the auto-emit test.
+    md_setup = ep.read_bismark(
+        synth_bundle.samplesheet,
+        treatment_group="treatment",
+        control_group="control",
+        assembly="synth",
+        store_dir=str(tmp_path / "store"),
+    )
+    populated_store = md_setup.store
+
+    out_parquet = tmp_path / "dmc.parquet"
+    sibling_tsv = tmp_path / "dmc.significant.tsv"
+
+    monkeypatch.setattr(sys, "argv", [
+        "epykit", "dmc",
+        "--methylstore", populated_store,
+        "--samplesheet", synth_bundle.samplesheet,
+        "--treatment-group", "treatment",
+        "--control-group", "control",
+        "--output", str(out_parquet),
+        "--test", "lr",
+        "--no-csv",
+    ])
+    main()
+
+    assert out_parquet.exists()
+    assert not sibling_tsv.exists()
