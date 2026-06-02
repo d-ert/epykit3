@@ -1,26 +1,46 @@
-"""HMM-DMR caller tests.
+"""HMM-DMR caller tests (backward-compat shim tests).
+
+These tests validate that the deprecated ``epykit.dmr_hmm`` import path
+still works (shim preserved for call_dmr_hmm), and that the 1.0 removal
+of ``tl.dmr(method='hmm')`` is correctly enforced.
 
 Two-pronged validation:
-  1. On a hand-built DMC table with a contiguous hypo run, the HMM
-     caller emits a single DMR with the right boundaries and a
-     ``dmr_type == "hypo"``.
-  2. On the seeded synth fixture, ``ep.tl.dmr(md, method="hmm")``
-     produces a frame schema-compatible with the tile DMR engine
-     (same columns).
+  1. On a hand-built DMC table with a contiguous hypo run, the shim
+     (``call_dmr_hmm`` -> ``call_dmr_rule_segment``) emits a single DMR
+     with the right boundaries and a ``dmr_type == "hypo"``.
+  2. ``ep.tl.dmr(md, method="hmm")`` raises ``ValueError`` (the
+     deprecation shim was removed in 1.0). The supported name is
+     ``method="segment"``, which produces a frame schema-compatible
+     with the tile DMR engine.
 """
 
 from __future__ import annotations
+
+import warnings
 
 import numpy as np
 import polars as pl
 import pytest
 
 import epykit as ep
-from epykit.dmr_hmm import call_dmr_hmm
+
+
+def _import_call_dmr_hmm():
+    """Import call_dmr_hmm via the deprecated shim, suppressing the DeprecationWarning."""
+    import sys
+    # Unload dmr_hmm to force re-evaluation of the shim warning.
+    for mod in list(sys.modules.keys()):
+        if "dmr_hmm" in mod:
+            del sys.modules[mod]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        from epykit.dmr_hmm import call_dmr_hmm  # noqa: PLC0415
+        return call_dmr_hmm
 
 
 def test_hmm_dmr_recovers_planted_hypo_run():
-    """A run of negative-meth_diff CpGs becomes one DMR."""
+    """A run of negative-meth_diff CpGs becomes one DMR (via deprecated shim)."""
+    call_dmr_hmm = _import_call_dmr_hmm()
     n = 200
     positions = (np.arange(n) * 100 + 1000).astype(np.int32)
     # Methylation difference: zero everywhere except a planted hypo run.
@@ -37,14 +57,15 @@ def test_hmm_dmr_recovers_planted_hypo_run():
     hypo = dmrs.filter(pl.col("dmr_type") == "hypo")
     assert hypo.height >= 1, "no hypo DMR called for planted hypo run"
     row = hypo.row(0, named=True)
-    # Loose boundary tolerance (HMM smoothing margins). Planted: pos 6000-13900.
+    # Loose boundary tolerance (segmentation smoothing margins). Planted: pos 6000-13900.
     assert row["start"] <= positions[60]
     assert row["end"] >= positions[120]
     assert row["meth_diff"] < -0.10
 
 
 def test_hmm_dmr_no_calls_on_pure_noise():
-    """A flat-zero meth_diff signal yields no DMRs."""
+    """A flat-zero meth_diff signal yields no DMRs (via deprecated shim)."""
+    call_dmr_hmm = _import_call_dmr_hmm()
     n = 200
     positions = (np.arange(n) * 100 + 1000).astype(np.int32)
     dmc = pl.DataFrame({
@@ -56,21 +77,34 @@ def test_hmm_dmr_no_calls_on_pure_noise():
     assert dmrs.height == 0
 
 
-def test_hmm_dmr_via_tl_dmr_method_hmm(synth_md_filtered):
-    """ep.tl.dmr(md, method='hmm') populates md.uns['dmr'] with the right schema."""
-    md = synth_md_filtered
-    ep.tl.dmc(md, test="lr")
-    ep.tl.dmr(md, method="hmm", min_cpgs=4, min_abs_meth_diff=0.05)
-    assert "dmr" in md.uns
-    expected_cols = {"chrom", "start", "end", "n_cpgs", "meth_diff", "dmr_type"}
-    actual = set(md.uns["dmr"].columns)
-    assert expected_cols.issubset(actual), (
-        f"missing DMR columns: {expected_cols - actual}; got {actual}"
-    )
-    assert md.uns["dmr_params"]["method"] == "hmm"
-
 
 def test_hmm_dmr_rejects_dmc_missing_columns():
+    """Shim function still raises for missing required columns."""
+    call_dmr_hmm = _import_call_dmr_hmm()
     bad = pl.DataFrame({"chrom": ["chr1"], "pos": [100]})  # no meth_diff
     with pytest.raises(ValueError, match="missing required columns"):
         call_dmr_hmm(bad)
+
+
+def test_dmr_method_hmm_raises(synth_md_filtered):
+    """method='hmm' was deprecated in 0.7.5 with FutureWarning; removed at 1.0.
+    Now raises ValueError via the unknown-method dispatch path."""
+    md = synth_md_filtered
+    ep.tl.dmc(md, test="lr")
+    with pytest.raises(ValueError, match="Unknown DMR method 'hmm'"):
+        ep.tl.dmr(md, method="hmm")
+
+
+def test_dmr_method_segment_still_works(synth_md_filtered):
+    """method='segment' (the proper name) continues to work."""
+    md = synth_md_filtered
+    ep.tl.dmc(md, test="lr")
+    ep.tl.dmr(md, method="segment")
+    assert "dmr" in md.uns
+    assert md.uns["dmr_params"]["method"] == "segment"
+    # Schema check: the segment engine's frame must be compatible with the tile engine's columns.
+    dmr_frame = md.uns["dmr"]
+    expected_cols = {"chrom", "start", "end", "n_cpgs", "meth_diff", "dmr_type"}
+    actual_cols = set(dmr_frame.columns)
+    missing = expected_cols - actual_cols
+    assert not missing, f"Segment DMR frame missing expected columns: {missing}"

@@ -58,6 +58,27 @@ def test_cli_dmr_help_shows_method_and_allow_n1():
     assert "tile" in res.stdout
     assert "sliding_window" in res.stdout
     assert "--allow-n1" in res.stdout
+    # "hmm" must NOT appear in the choices list after the 1.0 removal.
+    assert "hmm" not in res.stdout, "'hmm' still appears in dmr --help choices"
+
+
+def test_cli_dmr_method_hmm_rejected():
+    """CLI rejects --method=hmm now that the deprecation shim is gone.
+
+    argparse enforces the choices list and exits non-zero with an 'invalid
+    choice' message when an unlisted value is passed.  The library-level
+    tl.dmr(method='hmm') raises ValueError as of 1.0; this test confirms the
+    CLI surface is consistent (no shim translating hmm -> segment at the
+    argparse layer).
+    """
+    res = _epykit("dmr", "--method", "hmm", "--output", "out.parquet", check=False)
+    assert res.returncode != 0, (
+        "CLI should reject --method=hmm with a non-zero exit code"
+    )
+    # argparse prints 'invalid choice' on stderr.
+    assert "invalid choice" in res.stderr.lower() or "hmm" in res.stderr, (
+        f"Expected an argparse rejection message mentioning 'hmm'; got: {res.stderr[:300]!r}"
+    )
 
 
 def test_cli_smooth_help_says_gaussian_not_bsmooth():

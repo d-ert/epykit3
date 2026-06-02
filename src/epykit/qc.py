@@ -396,6 +396,76 @@ def _resolve_x_chrom_dir(store: Path, sample: str) -> Path | None:
     return None
 
 
+def _classify_sex_from_values(
+    sample_ids: list[str],
+    values: np.ndarray,
+    *,
+    fixed_threshold: float = 0.25,
+    dip_p_threshold: float = 0.10,
+) -> dict[str, str | None]:
+    """Classify sex from per-sample mean chrX beta values.
+
+    Uses 1D largest-gap clustering (KMeans-2 approximation). When the
+    distribution is unimodal according to Hartigan's dip test (p >
+    *dip_p_threshold*), the clustering is skipped and each sample is
+    classified against the fixed *fixed_threshold* with a UserWarning.
+
+    Parameters
+    ----------
+    sample_ids
+        Sample identifiers, aligned with *values*.
+    values
+        Per-sample mean chrX beta (finite values only).
+    fixed_threshold
+        Beta cut-off used when dip-test indicates unimodality.
+    dip_p_threshold
+        Dip-test p-value above which unimodality is assumed.
+
+    Returns
+    -------
+    dict mapping each sample_id to ``"male"`` / ``"female"`` or ``None``.
+    """
+    import warnings
+
+    if len(values) == 0:
+        return {sid: None for sid in sample_ids}
+
+    if len(values) >= 2:
+        # Gate clustering on Hartigan's dip test.
+        _use_cluster = True
+        try:
+            import diptest  # optional extra
+            dip_stat, dip_p = diptest.diptest(np.asarray(values, dtype=float))
+            if dip_p > dip_p_threshold:
+                warnings.warn(
+                    "single-sex cohort detected (Hartigan dip test p={:.3f}); "
+                    "sex inferred from chrX-beta fixed threshold ({}) only.".format(
+                        dip_p, fixed_threshold
+                    ),
+                    UserWarning,
+                    stacklevel=3,
+                )
+                _use_cluster = False
+        except ImportError:
+            pass  # diptest not installed; proceed with clustering
+
+        if _use_cluster:
+            # 1D kmeans-2: sort and find the largest gap; assign two clusters.
+            sorted_vals = np.sort(values)
+            gaps = np.diff(sorted_vals)
+            cut_idx = int(np.argmax(gaps)) + 1
+            cut = (sorted_vals[cut_idx - 1] + sorted_vals[cut_idx]) / 2.0
+        else:
+            cut = fixed_threshold
+    else:
+        cut = fixed_threshold  # single sample: fixed fallback
+
+    return {
+        sid: ("male" if v < cut else "female")
+        for sid, v in zip(sample_ids, values)
+    }
+
+
 def sex_check(
     methylstore_path: str,
     samples: list[str],
@@ -476,23 +546,11 @@ def sex_check(
         [r["mean_chrx_beta"] for r in records if np.isfinite(r["mean_chrx_beta"])],
         dtype=np.float64,
     )
-    if len(values) >= 2:
-        # 1D kmeans-2: sort and find the largest gap; assign two clusters.
-        sorted_vals = np.sort(values)
-        gaps = np.diff(sorted_vals)
-        cut_idx = int(np.argmax(gaps)) + 1
-        cut = (sorted_vals[cut_idx - 1] + sorted_vals[cut_idx]) / 2.0
-    elif len(values) == 1:
-        cut = 0.25  # fixed fallback
-    else:
-        cut = None
+    valid_samples = [r["sample_id"] for r in records if np.isfinite(r["mean_chrx_beta"])]
+    sex_map = _classify_sex_from_values(valid_samples, values)
 
     for r in records:
-        v = r["mean_chrx_beta"]
-        if cut is None or not np.isfinite(v):
-            r["inferred_sex"] = None
-        else:
-            r["inferred_sex"] = "male" if v < cut else "female"
+        r["inferred_sex"] = sex_map.get(r["sample_id"])
         exp = r.get("expected_sex")
         r["mismatch"] = bool(
             exp is not None and r["inferred_sex"] is not None

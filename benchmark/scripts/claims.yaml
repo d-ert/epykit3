@@ -1,0 +1,9 @@
+# Phase 3 seed: empty. Phase 4 populates during the locked re-run.
+# Schema per entry:
+#   - claim_id: <id>
+#     parquet:  <path>
+#     column:   <col>
+#     filter:   {col: val, ...}
+#     expected: <float>
+#     precision: <float>
+[]

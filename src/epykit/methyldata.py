@@ -7,6 +7,7 @@ import os
 import shutil
 from pathlib import Path
 from typing import Optional
+import warnings
 
 import polars as pl
 
@@ -32,7 +33,31 @@ class MethylData:
     varm: dict[str, pl.DataFrame] = field(default_factory=dict)
     uns: dict = field(default_factory=dict)
 
-    _analysis_root: Optional[str] = field(default=None, repr=False)
+    analysis_root: Optional[str] = field(default=None, repr=False)
+
+    # --- Deprecated alias -------------------------------------------
+
+    @property
+    def _analysis_root(self) -> Optional[str]:
+        """Deprecated; use ``analysis_root`` (the public name).
+
+        Removed in 2.0.
+        """
+        warnings.warn(
+            "MethylData._analysis_root is deprecated; use the public name "
+            "MethylData.analysis_root. _analysis_root will be removed in 2.0.",
+            DeprecationWarning, stacklevel=2,
+        )
+        return self.analysis_root
+
+    @_analysis_root.setter
+    def _analysis_root(self, value: Optional[str]) -> None:
+        warnings.warn(
+            "MethylData._analysis_root is deprecated; use the public name "
+            "MethylData.analysis_root. _analysis_root will be removed in 2.0.",
+            DeprecationWarning, stacklevel=2,
+        )
+        self.analysis_root = value
 
     # --- State (derived from uns) -------------------------------------
 
@@ -98,7 +123,7 @@ class MethylData:
     def completed_stages(self) -> list[str]:
         """Names of stages recorded in the top-level pipeline manifest.
 
-        Reads ``<_analysis_root>/.epykit_manifest.json`` (the 0.4.0
+        Reads ``<analysis_root>/.epykit_manifest.json`` (the 0.4.0
         checkpoint/resume manifest). Always reflects what is on disk --
         unlike :py:attr:`state`, which is derived from ``uns`` and can
         diverge after a manual ``md.uns.pop()``.
@@ -108,7 +133,7 @@ class MethylData:
         the ``store_dir`` argument).
         """
         from ._cache import manifest_read
-        root = self._analysis_root or self.store
+        root = self.analysis_root or self.store
         if not root:
             return []
         try:
@@ -131,7 +156,7 @@ class MethylData:
         """
         from ._cache import manifest_find
         from pathlib import Path
-        root = self._analysis_root or self.store
+        root = self.analysis_root or self.store
         if not root:
             return False
         entry = manifest_find(root, stage)
@@ -168,7 +193,7 @@ class MethylData:
         Parameters
         ----------
         test : str, optional
-            Test backend name (``"lr"``, ``"score"``, ``"glm"``, ...). When
+            Test backend name (``"lr"``, ``"glm"``, ``"welch_t"``, ...). When
             ``None`` (default), returns the most-recently-written DMC table,
             as recorded by ``ep.tl.dmc`` in ``md.uns["dmc"]["last_key"]``.
         annotated : bool
@@ -239,20 +264,20 @@ class MethylData:
           absolute), the data is written there verbatim. ``load(path)``
           reads from the same place -- save and load are symmetric.
         * If ``path`` is a bare name (no separators) **and**
-          ``_analysis_root`` is set, the data is written under
-          ``<_analysis_root>/results/<path>``. This is the
+          ``analysis_root`` is set, the data is written under
+          ``<analysis_root>/results/<path>``. This is the
           "analysis-project" convenience layout.
-        * If ``path`` is a bare name with no ``_analysis_root``, it's
+        * If ``path`` is a bare name with no ``analysis_root``, it's
           treated as a relative path in the current directory.
 
         The previous behaviour silently re-rooted every call (even
-        absolute paths) under ``<_analysis_root>/results/<basename>``,
+        absolute paths) under ``<analysis_root>/results/<basename>``,
         which broke save/load symmetry.
         """
         p = Path(path)
         has_components = p.is_absolute() or len(p.parts) > 1
-        if self._analysis_root and not has_components:
-            out = Path(self._analysis_root) / "results" / p.name
+        if self.analysis_root and not has_components:
+            out = Path(self.analysis_root) / "results" / p.name
         else:
             out = p
         out.mkdir(parents=True, exist_ok=True)
@@ -283,6 +308,13 @@ class MethylData:
                 and dmc_store_path is not None
                 and (Path(dmc_store_path) / ".epykit_dmc_manifest.json").exists()
             )
+            # neighbour_combine adds pvalue_combined/qvalue_combined (+ audit
+            # columns) to the in-memory frame AFTER the DMCStore chrom
+            # parquets were written -- linking the on-disk files would
+            # silently drop them. Fall back to a single-file write so the
+            # extra columns survive the round-trip.
+            if is_dmcstore_backed and "pvalue_combined" in df.columns:
+                is_dmcstore_backed = False
             if is_dmcstore_backed:
                 store_dir = Path(dmc_store_path)
                 target_dir = out / f"varm_{name}"
@@ -327,7 +359,7 @@ class MethylData:
             # _filtered / _united / _smoothed are derived from uns; don't
             # persist them. They are recomputed on load() from the loaded
             # uns dict (which includes _store_history, unite, smooth_path).
-            "_analysis_root": self._analysis_root,
+            "_analysis_root": self.analysis_root,
             "varm_keys": list(self.varm.keys()),
             # Per-varm storage format: "parquet" (single file) or
             # "dmcstore" (chrom-partitioned dir). Older saves omit this
@@ -377,7 +409,7 @@ class MethylData:
             # uns -- nothing to pass through the constructor. Older saves
             # that include those keys in meta are silently ignored.
         )
-        md._analysis_root = meta.get("_analysis_root")
+        md.analysis_root = meta.get("_analysis_root")
         return md
 
     # --- Exports / reports --------------------------------------------

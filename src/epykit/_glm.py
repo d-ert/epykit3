@@ -48,6 +48,7 @@ def build_design(
     treatment_col: str = "treatment",
     require_treatment_col: bool = True,
     return_design_info: bool = False,
+    reference_level: Optional[str] = None,
 ) -> tuple[np.ndarray, np.ndarray, int, list[str], str]:
     """Build full + reduced model matrices from ``md.obs``.
 
@@ -83,6 +84,12 @@ def build_design(
         When True, the function returns a 6-tuple with the patsy
         ``DesignInfo`` object appended. Allows callers to resolve
         contrast strings via :func:`resolve_contrast`.
+    reference_level
+        When set, the *first* term in the (possibly synthesised) formula
+        that matches a column present in ``obs`` as a string/categorical
+        dtype is wrapped as ``C(col, Treatment(reference='level'))``.
+        This overrides patsy's default alphabetical reference level.
+        Pass ``None`` (default) to preserve the existing behaviour.
 
     Returns
     -------
@@ -124,6 +131,32 @@ def build_design(
             "(or use the default binary path with a treatment column on md.obs)."
         )
 
+    # ---- Apply reference_level via patsy Treatment coding ------------------
+    if reference_level is not None:
+        # Find the first term that (a) corresponds to a column in obs and
+        # (b) has a string/categorical dtype -- i.e. a genuine factor for
+        # which setting the reference level makes sense.
+        obs_str_cols: set[str] = {
+            c for c, d in zip(obs.columns, obs.dtypes)
+            if d in (pl.Utf8, pl.Categorical, pl.String)
+        }
+        wrapped_terms: list[str] = []
+        _did_wrap = False
+        for term in terms:
+            # Only wrap simple column names (no interaction ':' or transforms).
+            if not _did_wrap and term in obs_str_cols and ":" not in term:
+                term = f"C({term}, Treatment(reference='{reference_level}'))"
+                _did_wrap = True
+            wrapped_terms.append(term)
+        if not _did_wrap:
+            logger.warning(
+                "build_design: reference_level=%r was specified but no "
+                "string/categorical column matching a formula term was found "
+                "in obs (terms=%r). reference_level has no effect.",
+                reference_level, terms,
+            )
+        terms = wrapped_terms
+
     formula_used = "~ " + " + ".join(terms)
 
     # ---- Reorder obs rows to samples_ordered -------------------------------
@@ -164,6 +197,12 @@ def build_design(
     X_full = np.asarray(X_design, dtype=np.float64)
     design_info = X_design.design_info
     term_names: list[str] = list(design_info.column_names)
+
+    logger.info(
+        "build_design: columns=%s reference_level=%r",
+        term_names,
+        reference_level,
+    )
 
     n_samples, p_full = X_full.shape
     if p_full >= n_samples:
@@ -413,7 +452,10 @@ def irls_binomial_batch(
     # Pearson denominator collapses to n*_PROP_CLIP, and per-site chi-sq
     # blows up by ~6 OOM (driving chrom-pooled phi from O(1) to O(10^6)
     # and producing nonsensical p-values).
-    degenerate = (n_eff < 2) | site_separated
+    # Non-converged sites are also degenerate: the iterate just before
+    # divergence is unreliable and must not silently emit Wald statistics.
+    site_nonconverged = ~converged
+    degenerate = (n_eff < 2) | site_separated | site_nonconverged
     deviance = np.where(degenerate, np.nan, deviance)
     pearson_chi2 = np.where(degenerate, np.nan, pearson_chi2)
     beta = np.where(degenerate[:, None], np.nan, beta)
@@ -432,6 +474,29 @@ def irls_binomial_batch(
             "NaN'd for dispersion + p-value computation.",
             n_separated, n_sites, 100.0 * sep_frac,
         )
+
+    # P1-5: log non-convergence separately from separation. Non-converged
+    # sites emit unreliable statistics (the iterate just before divergence);
+    # mask them and warn the user when the fraction exceeds 1% so they can
+    # increase max_iter or diagnose a degenerate design matrix.
+    # Only count sites that are non-converged but NOT already flagged as
+    # separated (separated sites are a subset of unreliable sites and are
+    # reported above).
+    n_nonconverged_only = int((site_nonconverged & ~site_separated).sum())
+    if n_nonconverged_only > 0:
+        nonconv_frac = n_nonconverged_only / max(n_sites, 1)
+        if nonconv_frac > 0.01:
+            logger.warning(
+                "IRLS non-convergence at %d / %d sites (%.1f%%); their Wald "
+                "statistics are NaN-masked. Consider increasing max_iter or "
+                "checking design matrix rank.",
+                n_nonconverged_only, n_sites, 100.0 * nonconv_frac,
+            )
+        else:
+            logger.info(
+                "IRLS non-convergence at %d / %d sites (%.1f%%); NaN-masked.",
+                n_nonconverged_only, n_sites, 100.0 * nonconv_frac,
+            )
 
     if return_cov:
         return beta, se_beta, deviance, pearson_chi2, n_eff, cov_beta
@@ -493,8 +558,8 @@ def compute_dispersion_phi(
     shrink_pseudo_df: float = 4.0,
     min_disp_sites: int = 100,
     chrom_name: str = "?",
-) -> tuple[np.ndarray, float]:
-    """McCullagh-Nelder dispersion in the three modes used elsewhere.
+) -> tuple[np.ndarray, float, np.ndarray]:
+    """McCullagh-Nelder dispersion in the four modes used elsewhere.
 
     Parameters
     ----------
@@ -507,6 +572,7 @@ def compute_dispersion_phi(
         ``"chrom"``: single chromosome-pooled phi.
         ``"shrink"``: James-Stein-style weighted average of per-site and
         chromosome estimates.
+        ``"eb"``: empirical-Bayes shrinkage with data-driven weight.
     min_dispersion
         Clamp on phi (default 1.0). Underdispersion (phi < 1) usually
         reflects model misspecification rather than truly less-than-
@@ -514,8 +580,19 @@ def compute_dispersion_phi(
 
     Returns
     -------
-    phi_eff      (n_sites,) per-site dispersion used by the test
-    phi_hat      scalar chromosome-pooled phi (logged / returned for audit)
+    phi_eff
+        (n_sites,) per-site dispersion used by the test
+    phi_hat
+        scalar chromosome-pooled phi (logged / returned for audit)
+    df_phi
+        (n_sites,) effective df backing each phi estimate. This is the
+        correct dfd for the F-reference in ``reference_pvalues``:
+          * "site":  df_per_site (per-site residual df)
+          * "chrom": chrom-pooled df (often >> 1e5 ~= chi^2(1))
+          * "shrink"/"eb": df_per_site + shrink weight (~= 8 at typical n=3+3)
+        Using df_per_site for the pooled modes was a pre-fix bug that
+        crushed every p-value because F(1, 4) is much more conservative
+        than F(1, 1e5) ~= chi^2(1) at typical test statistics.
     """
     if dispersion not in {"site", "chrom", "shrink", "eb"}:
         raise ValueError(
@@ -528,6 +605,7 @@ def compute_dispersion_phi(
     if n_usable < min_disp_sites:
         phi_hat = float(min_dispersion)
         phi_raw = float(min_dispersion)
+        df_chrom = 1.0
         if dispersion == "chrom":
             logger.warning(
                 "%s: only %d sites usable for dispersion estimation; "
@@ -538,26 +616,30 @@ def compute_dispersion_phi(
         pearson_sum = float(pearson_per_site[usable].sum())
         df_sum = float(df_per_site[usable].sum())
         df_sum = max(df_sum, 1.0)
+        df_chrom = df_sum
         phi_raw = pearson_sum / df_sum
         phi_hat = float(max(min_dispersion, phi_raw))
         logger.info(
-            "%s: chrom-pooled phi = %.3f (raw %.3f, %d sites); dispersion='%s'",
-            chrom_name, phi_hat, phi_raw, n_usable, dispersion,
+            "%s: chrom-pooled phi = %.3f (raw %.3f, %d sites, df=%s); dispersion='%s'",
+            chrom_name, phi_hat, phi_raw, n_usable, f"{int(df_chrom):,}", dispersion,
         )
+
+    df_safe = np.where(df_per_site > 0, df_per_site, 1.0)
 
     if dispersion == "chrom":
         phi_eff = np.full(pearson_per_site.shape, phi_hat, dtype=np.float64)
-        return phi_eff, phi_hat
+        df_phi  = np.full(pearson_per_site.shape, df_chrom, dtype=np.float64)
+        return phi_eff, phi_hat, df_phi
 
-    # site / shrink: per-site estimate
-    df_safe = np.where(df_per_site > 0, df_per_site, 1.0)
+    # site / shrink / eb: per-site estimate (or weighted average involving it)
     with np.errstate(invalid="ignore", divide="ignore"):
         phi_site = pearson_per_site / df_safe
     phi_site = np.where(usable, phi_site, min_dispersion)
     phi_site = np.maximum(phi_site, min_dispersion)
 
     if dispersion == "site":
-        return phi_site, phi_hat
+        # Per-site phi is estimated from this site's df_per_site Pearson sum.
+        return phi_site, phi_hat, df_safe.astype(np.float64).copy()
 
     if dispersion == "eb":
         n_usable_eb = int(usable.sum())
@@ -576,11 +658,14 @@ def compute_dispersion_phi(
         den = df_safe + w_eb
         phi_eff = np.maximum(num / den, min_dispersion)
         phi_eff = np.where(usable, phi_eff, phi_hat)
+        # Effective df of the weighted average. Where we fell back to phi_chrom,
+        # use the chrom-pool df.
+        df_phi = np.where(usable, df_safe + float(w_eb), df_chrom).astype(np.float64)
         logger.info(
-            "%s: bb_lr empirical-Bayes shrinkage w_eb=%.2f",
+            "%s: empirical-Bayes shrinkage w_eb=%.2f",
             chrom_name, w_eb,
         )
-        return phi_eff, phi_hat
+        return phi_eff, phi_hat, df_phi
 
     # shrink
     w = float(shrink_pseudo_df)
@@ -588,7 +673,8 @@ def compute_dispersion_phi(
     den = df_safe + w
     phi_eff = np.maximum(num / den, min_dispersion)
     phi_eff = np.where(usable, phi_eff, phi_hat)
-    return phi_eff, phi_hat
+    df_phi = np.where(usable, df_safe + w, df_chrom).astype(np.float64)
+    return phi_eff, phi_hat, df_phi
 
 
 def reference_pvalues(
@@ -691,10 +777,13 @@ def resolve_contrast(
         return C, contrast
 
     # Factor name -- collect every term beginning with "<factor>["
+    # Also match C(factor, ...)[...] terms produced when reference_level wraps
+    # the factor column with a Treatment(...) coding spec.
     factor_terms = [
         (i, t) for i, t in enumerate(term_names)
         if t.startswith(f"{contrast}[") or t == f"C({contrast})"
         or t.startswith(f"C({contrast})[")
+        or t.startswith(f"C({contrast},")
     ]
     if not factor_terms:
         raise ValueError(
@@ -908,8 +997,8 @@ def newcombe_diff_ci(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Newcombe (1998) hybrid Wilson-score CI for pi_a - pi_b on POOLED counts.
 
-    Used by the binomial-pool tests (lr, score, fisher, cmh) where no per-
-    replicate variance is accumulated. Uses Wilson-score CIs on each
+    Used by the binomial-pool tests (lr, fisher) where no per-replicate
+    variance is accumulated. Uses Wilson-score CIs on each
     pooled proportion, then combines them per Newcombe method 10.
     """
     from scipy import stats as sp_stats

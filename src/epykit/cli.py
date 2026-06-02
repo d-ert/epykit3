@@ -6,8 +6,8 @@ dispersion. Closed-form on streaming (S0_g, S1_g, Sigmam^2/n_g) accumulators,
 recommended at n >= 2 replicates per group.
 
 CLI surface:
-* ``dmc`` -- per-CpG calling with ``--test {lr,score,glm,logit_t,welch_t,
-  bb_lr,cmh,fisher}``, ``--min-samples-treatment`` / ``--min-samples-control``
+* ``dmc`` -- per-CpG calling with ``--test {lr,glm,welch_t,fisher}``,
+  ``--min-samples-treatment`` / ``--min-samples-control``
   filters, and ``--allow-n1`` to opt into the (anti-conservative) Fisher fallback when
   there are fewer than 2 replicates per group.
 * ``dmr`` -- ``--method {tile,sliding_window}``. The tile path takes a
@@ -256,6 +256,18 @@ def _cmd_dmr(args: argparse.Namespace):
                 min_samples_treatment=args.min_samples_treatment,
                 min_samples_control=args.min_samples_control,
             )
+    elif args.method == "segment":
+        # --- Rule-based segmentation path: takes a DMC parquet ---
+        if not args.dmc_results:
+            raise ValueError("method=segment requires --dmc-results.")
+        from .dmr_segment import call_dmr_rule_segment
+        dmc_results = pl.read_parquet(args.dmc_results)
+        dmr_results = call_dmr_rule_segment(
+            dmc_results,
+            min_cpgs=args.min_cpgs,
+            min_abs_meth_diff=args.min_abs_meth_diff,
+            alpha=args.alpha,
+        )
     else:
         # --- Legacy sliding-window path: takes a DMC parquet ---
         if not args.dmc_results:
@@ -516,8 +528,8 @@ def main():
     p_dmc.add_argument(
         "--test",
         choices=[
-            "lr", "score", "glm", "logit_t", "welch_t",
-            "bb_lr", "cmh", "fisher",
+            "lr", "glm", "welch_t",
+            "fisher",
         ],
         default="lr",
         help=(
@@ -525,16 +537,9 @@ def main():
             "lr -- Quasi-binomial likelihood-ratio chi-square with per-site "
             "McCullagh-Nelder dispersion. Closed-form on streaming "
             "accumulators; recommended default at n>=2. "
-            "score -- Quasi-binomial score test on the same dispersion-corrected "
-            "accumulators as lr; marginally more powerful but mildly "
-            "anti-conservative at the boundaries. "
             "glm -- Binomial GLM with covariates (requires a design via "
             "--formula). "
-            "logit_t -- Welch t on logit(beta), variance-stabilising fallback. "
             "welch_t -- Welch t on raw betas. "
-            "bb_lr -- True quasi-binomial LRT on a binary-treatment GLM with "
-            "per-site dispersion. "
-            "cmh -- Cochran-Mantel-Haenszel on per-pair strata. "
             "fisher -- Fisher exact on reads pooled across replicates "
             "(anti-conservative, kept for backward compatibility; warns)."
         ),
@@ -578,14 +583,16 @@ def main():
     p_dmr = sub.add_parser("dmr", help="DMR calling (tile-based or sliding-window)")
     p_dmr.add_argument(
         "--method",
-        choices=["tile", "sliding_window"],
+        choices=["tile", "sliding_window", "segment"],
         default="tile",
         help=(
             "DMR algorithm. "
             "'tile' (default) pools reads across "
             "CpGs within each fixed-size tile and runs one test per tile. "
             "'sliding_window' takes a precomputed DMC parquet and combines "
-            "per-CpG p-values with signed Stouffer's Z (legacy)."
+            "per-CpG p-values with signed Stouffer's Z (legacy). "
+            "'segment' rule-based 3-state segmentation on meth_diff signal "
+            "with Stouffer-combined per-segment p-values."
         ),
     )
     p_dmr.add_argument("--output", required=True)
@@ -606,8 +613,8 @@ def main():
     p_dmr.add_argument(
         "--test",
         choices=[
-            "lr", "score", "glm", "logit_t", "welch_t",
-            "bb_lr", "cmh", "fisher",
+            "lr", "glm", "welch_t",
+            "fisher",
         ],
         default="lr",
         help="(tile only) Statistical test applied to tile-level counts. "

@@ -62,7 +62,7 @@ class DMCStore:
     path : Path
         Directory holding ``chrom=*.parquet`` files and the manifest.
     test : str
-        Statistical test name (``"lr"``, ``"score"``, ...). Mirrors
+        Statistical test name (``"lr"``, ``"fisher"``, ...). Mirrors
         :func:`process_chromosomes_dmc`'s ``test`` argument; used for
         diagnostics and cache keys.
     """

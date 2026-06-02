@@ -55,35 +55,112 @@ _DVC_EMPTY_SCHEMA = {
 }
 
 
-def _bartlett_per_site(
-    var_a: np.ndarray, n_a: np.ndarray,
-    var_b: np.ndarray, n_b: np.ndarray,
-) -> np.ndarray:
-    """Vectorised Bartlett test for equal variances across two groups.
+def _per_site_variance_test(
+    group_a: np.ndarray, group_b: np.ndarray
+) -> tuple[float, float]:
+    """Brown-Forsythe variance equality test (median-centred Levene).
 
-    Returns p-values per site. NaN where either group has fewer than 2
-    observations or zero variance.
+    Equivalent to ``scipy.stats.levene(group_a, group_b, center='median')``.
+    Robust to non-normality; correct for bounded U-shaped beta values.
+
+    Parameters
+    ----------
+    group_a, group_b:
+        1-D float arrays of per-replicate beta values (NaN-ignored).
+
+    Returns
+    -------
+    (f_stat, p_val) -- both NaN if either group has fewer than 2 finite values.
     """
-    n_a_safe = np.maximum(n_a - 1, 0)
-    n_b_safe = np.maximum(n_b - 1, 0)
-    N = n_a_safe + n_b_safe
+    a = np.asarray(group_a, dtype=np.float64)
+    b = np.asarray(group_b, dtype=np.float64)
+    a = a[np.isfinite(a)]
+    b = b[np.isfinite(b)]
+    if len(a) < 2 or len(b) < 2:
+        return float("nan"), float("nan")
+    # Pass 1: median-centred absolute deviations (Brown-Forsythe).
+    z_a = np.abs(a - np.median(a))
+    z_b = np.abs(b - np.median(b))
+    # Pass 2: one-way F-test on the deviation arrays.
+    f_stat, p_val = sp_stats.f_oneway(z_a, z_b)
+    return float(f_stat), float(p_val)
+
+
+def _brown_forsythe_vectorised(
+    betas_a: list[np.ndarray],
+    betas_b: list[np.ndarray],
+    n_sites: int,
+) -> np.ndarray:
+    """Brown-Forsythe p-values computed vectorially across all sites.
+
+    Parameters
+    ----------
+    betas_a:
+        List of length n_samples_a; each element is a float64 array of
+        length n_sites with NaN where coverage == 0.
+    betas_b:
+        Same for the control group.
+    n_sites:
+        Number of CpG sites (length of each array in betas_a/betas_b).
+
+    Returns
+    -------
+    p_var : np.ndarray of shape (n_sites,), dtype float64.
+        NaN where either group has fewer than 2 finite observations.
+    """
+    # Stack to (n_samples x n_sites) matrices; NaN = missing.
+    mat_a = np.stack(betas_a, axis=0)   # shape (na, n_sites)
+    mat_b = np.stack(betas_b, axis=0)   # shape (nb, n_sites)
+
+    # Median per site ignoring NaN.
+    with np.errstate(invalid="ignore"):
+        med_a = np.nanmedian(mat_a, axis=0)   # (n_sites,)
+        med_b = np.nanmedian(mat_b, axis=0)
+
+    # Absolute deviations from group median.
+    z_a = np.abs(mat_a - med_a[np.newaxis, :])   # (na, n_sites)
+    z_b = np.abs(mat_b - med_b[np.newaxis, :])   # (nb, n_sites)
+
+    # Count finite observations per site per group.
+    finite_a = np.isfinite(mat_a)   # (na, n_sites)
+    finite_b = np.isfinite(mat_b)
+    n_a = finite_a.sum(axis=0).astype(np.float64)   # (n_sites,)
+    n_b = finite_b.sum(axis=0).astype(np.float64)
+
+    valid = (n_a >= 2) & (n_b >= 2)
+    p_var = np.full(n_sites, np.nan, dtype=np.float64)
+    if not np.any(valid):
+        return p_var
+
+    # NaN deviations for masked sites (coverage 0).
+    z_a = np.where(finite_a, z_a, np.nan)
+    z_b = np.where(finite_b, z_b, np.nan)
+
+    # Vectorised one-way F-test over deviation arrays per site.
+    # mean_i = nanmean of z_i; grand_mean = weighted combo.
+    mean_a = np.nanmean(z_a, axis=0)   # (n_sites,)
+    mean_b = np.nanmean(z_b, axis=0)
+    N = n_a + n_b
+    grand_mean = (n_a * mean_a + n_b * mean_b) / np.maximum(N, 1)
+
+    # Between-group SS (df=1 for two groups).
+    ss_between = (
+        n_a * (mean_a - grand_mean) ** 2
+        + n_b * (mean_b - grand_mean) ** 2
+    )
+    # Within-group SS (df = N - 2 for two groups).
+    ss_within_a = np.nansum((z_a - mean_a[np.newaxis, :]) ** 2, axis=0)
+    ss_within_b = np.nansum((z_b - mean_b[np.newaxis, :]) ** 2, axis=0)
+    ss_within = ss_within_a + ss_within_b
+    df_within = N - 2
+
     with np.errstate(invalid="ignore", divide="ignore"):
-        pooled = (n_a_safe * var_a + n_b_safe * var_b) / np.maximum(N, 1)
-        chi2 = (
-            N * np.log(np.maximum(pooled, 1e-300))
-            - n_a_safe * np.log(np.maximum(var_a, 1e-300))
-            - n_b_safe * np.log(np.maximum(var_b, 1e-300))
-        )
-        # Bartlett correction term
-        c = 1.0 + (1.0 / (3.0 * 1.0)) * (
-            (1.0 / np.maximum(n_a_safe, 1)) + (1.0 / np.maximum(n_b_safe, 1))
-            - (1.0 / np.maximum(N, 1))
-        )
-        chi2_corrected = chi2 / c
-    valid = (n_a >= 2) & (n_b >= 2) & (var_a > 0) & (var_b > 0)
-    pvals = np.full_like(chi2_corrected, np.nan, dtype=np.float64)
-    pvals[valid] = sp_stats.chi2.sf(chi2_corrected[valid], df=1)
-    return pvals
+        ms_between = ss_between   # df_between = 1
+        ms_within = np.where(df_within > 0, ss_within / df_within, np.nan)
+        f_stat = np.where(ms_within > 0, ms_between / ms_within, np.nan)
+
+    p_var[valid] = sp_stats.f.sf(f_stat[valid], dfn=1, dfd=df_within[valid])
+    return p_var
 
 
 def _process_one_chromosome_dvc(
@@ -101,33 +178,43 @@ def _process_one_chromosome_dvc(
         return pl.DataFrame(schema=_DVC_EMPTY_SCHEMA)
     canonical_pos = canonical_df.select("pos")
 
+    # Accumulate per-sample beta arrays for Brown-Forsythe (median-centred
+    # Levene). Each list holds one float64 array of length n_sites; NaN
+    # where coverage == 0. Memory overhead is O(n_sites * n_replicates)
+    # which is tolerable (n_replicates typically 2-20).
+    betas_t: list[np.ndarray] = []
+    betas_c: list[np.ndarray] = []
+
+    # We still use Welford accumulators for the mean-shift (Welch t) filter —
+    # no need to iterate again.
     mean_t, M2_t, n_t = _welford_init(n_sites)
     mean_c, M2_c, n_c = _welford_init(n_sites)
 
     for s in samples_treatment:
         meth, cov = _load_sample_chrom(methylstore_path, chrom, s, canonical_pos)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            beta = np.where(cov > 0, meth.astype(np.float64) / cov, np.nan)
+        betas_t.append(beta)
         _welford_update(mean_t, M2_t, n_t, meth, cov)
         del meth, cov
     for s in samples_control:
         meth, cov = _load_sample_chrom(methylstore_path, chrom, s, canonical_pos)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            beta = np.where(cov > 0, meth.astype(np.float64) / cov, np.nan)
+        betas_c.append(beta)
         _welford_update(mean_c, M2_c, n_c, meth, cov)
         del meth, cov
 
     var_t = np.where(n_t > 1, M2_t / np.maximum(n_t - 1, 1), np.nan)
     var_c = np.where(n_c > 1, M2_c / np.maximum(n_c - 1, 1), np.nan)
 
-    if test == "bartlett":
-        p_var = _bartlett_per_site(var_t, n_t, var_c, n_c)
-    elif test in ("levene", "brown_forsythe"):
-        raise ValueError(
-            f"DVC test={test!r} requires per-replicate centered deviations, "
-            "which the Welford streaming budget doesn't keep. Use "
-            "test='bartlett' (closed-form on Welford accumulators) or "
-            "implement a per-replicate accumulator."
-        )
+    if test in ("brown_forsythe", "bartlett"):
+        # "bartlett" accepted as a legacy alias; always run Brown-Forsythe.
+        p_var = _brown_forsythe_vectorised(betas_t, betas_c, n_sites)
     else:
         raise ValueError(
-            f"DVC test={test!r} not supported. Use 'bartlett'."
+            f"DVC test={test!r} not supported. "
+            "Use 'brown_forsythe' (default) or legacy alias 'bartlett'."
         )
 
     # Welch t on means (mean filter)
@@ -171,7 +258,7 @@ def process_chromosomes_dvc(
     samples_treatment: list[str],
     samples_control: list[str],
     *,
-    test: str = "bartlett",
+    test: str = "brown_forsythe",
     chromosomes: Optional[list[str]] = None,
     unite: bool = True,
     mean_filter_alpha: float = 0.05,
@@ -184,13 +271,16 @@ def process_chromosomes_dvc(
     Returns a DataFrame in ``_DVC_EMPTY_SCHEMA`` with both the variance
     test p/q-values and the mean-test p/q-values (so the caller can apply
     the iEVORA signature filter at any threshold).
+
+    The variance equality test is Brown-Forsythe (median-centred Levene),
+    robust to the U-shaped, bounded [0,1] distribution of beta values.
+    Pass ``test='bartlett'`` only for backward compatibility — it is silently
+    redirected to Brown-Forsythe.
     """
-    if test != "bartlett":
+    if test not in ("brown_forsythe", "bartlett"):
         raise ValueError(
-            f"DVC test must be 'bartlett' (the only Welford-compatible "
-            f"variance-equality test); got {test!r}. Levene / Brown-Forsythe "
-            "need per-replicate centered deviations that aren't kept under "
-            "the streaming accumulator."
+            f"DVC test={test!r} not supported. "
+            "Use 'brown_forsythe' (default) or legacy alias 'bartlett'."
         )
     store = Path(methylstore_path)
     all_samples = samples_treatment + samples_control

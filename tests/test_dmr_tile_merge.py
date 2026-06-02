@@ -1,5 +1,9 @@
 """Tests for _merge_adjacent_tiles in dmr.py."""
+import math
+
+import numpy as np
 import polars as pl
+import scipy.stats as sp_stats
 from epykit.dmr import _merge_adjacent_tiles
 
 
@@ -106,3 +110,54 @@ def test_tile_empty_input():
     out = _merge_adjacent_tiles(df)
     assert len(out) == 0
     assert set(out.columns) == set(df.columns)
+
+
+def test_three_tile_chain_uses_correct_stouffer_denominator():
+    """Three adjacent hyper tiles: combined p must be Stouffer-correct,
+    not iterative-pairwise with a stale sqrt(2)."""
+    # Three tiles with the same one-sided p (chosen so the math is easy).
+    # Each two-sided p = 0.01 -> abs_z = norm.isf(0.005) ~ 2.5758
+    # Sum z = 3 * 2.5758 = 7.7274
+    # Correct Stouffer-combined z (n=3) = 7.7274 / sqrt(3) ~ 4.4615
+    # Two-sided p = 2 * norm.sf(4.4615) ~ 8.13e-6
+    p_each = 0.01
+    abs_z = sp_stats.norm.isf(p_each / 2.0)
+    expected_z = 3 * abs_z / math.sqrt(3)
+    expected_p = 2.0 * sp_stats.norm.sf(expected_z)
+
+    df = _mk([
+        {"chrom": "chr1", "start":    0, "end": 1000, "n_cpgs": 10,
+         "meth_diff": 0.3, "pvalue": p_each, "dmr_type": "hyper"},
+        {"chrom": "chr1", "start": 1000, "end": 2000, "n_cpgs":  9,
+         "meth_diff": 0.3, "pvalue": p_each, "dmr_type": "hyper"},
+        {"chrom": "chr1", "start": 2000, "end": 3000, "n_cpgs": 11,
+         "meth_diff": 0.3, "pvalue": p_each, "dmr_type": "hyper"},
+    ])
+    out = _merge_adjacent_tiles(df)
+    assert len(out) == 1
+    got_p = out["pvalue"][0]
+    assert np.isclose(got_p, expected_p, rtol=1e-6), (
+        f"Combined p={got_p:.3e}, expected Stouffer-3 {expected_p:.3e}. "
+        f"Current code uses iterative pairwise /sqrt(2) and one-sided "
+        f"isf on a two-sided p; both are wrong."
+    )
+
+
+def test_two_tile_merge_uses_two_sided_isf():
+    """Even a 2-tile merge needs isf(p/2), not isf(p), because the
+    input pvalue is two-sided."""
+    p_each = 0.001
+    abs_z = sp_stats.norm.isf(p_each / 2.0)
+    expected_z = (abs_z + abs_z) / math.sqrt(2)
+    expected_p = 2.0 * sp_stats.norm.sf(expected_z)
+
+    df = _mk([
+        {"chrom": "chr1", "start":    0, "end": 1000, "n_cpgs": 10,
+         "meth_diff": 0.3, "pvalue": p_each, "dmr_type": "hyper"},
+        {"chrom": "chr1", "start": 1000, "end": 2000, "n_cpgs": 10,
+         "meth_diff": 0.3, "pvalue": p_each, "dmr_type": "hyper"},
+    ])
+    out = _merge_adjacent_tiles(df)
+    assert len(out) == 1
+    got_p = out["pvalue"][0]
+    assert np.isclose(got_p, expected_p, rtol=1e-6)

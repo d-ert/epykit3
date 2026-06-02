@@ -20,6 +20,8 @@ import numpy as np
 import polars as pl
 import pytest
 
+from epykit import MethylData
+
 
 
 # read_bismark + obs schema
@@ -79,7 +81,7 @@ def test_state_after_filter_coverage(synth_md):
 def test_state_after_unite(synth_md):
     import epykit as ep
     ep.pp.filter_coverage(synth_md, lo_count=5, hi_perc=99.9)
-    ep.pp.unite(synth_md, type="intersect")
+    ep.pp.set_unite_type(synth_md, type="intersect")
     assert synth_md._united is True
     assert "united" in synth_md.state
 
@@ -92,7 +94,7 @@ def test_state_persists_through_save_load_round_trip(synth_md, tmp_path):
     import epykit as ep
 
     ep.pp.filter_coverage(synth_md, lo_count=5, hi_perc=99.9)
-    ep.pp.unite(synth_md, type="intersect")
+    ep.pp.set_unite_type(synth_md, type="intersect")
 
     save_path = tmp_path / "saved_md"
     synth_md.save(str(save_path))
@@ -114,7 +116,7 @@ def test_save_load_round_trip_preserves_obs_varm_uns(synth_md, tmp_path):
 
     # Populate uns and varm.
     ep.pp.filter_coverage(synth_md, lo_count=5, hi_perc=99.9)
-    ep.pp.unite(synth_md, type="intersect")
+    ep.pp.set_unite_type(synth_md, type="intersect")
     ep.tl.dmc(synth_md, test="lr")
 
     save_path = tmp_path / "rt"
@@ -134,6 +136,41 @@ def test_save_load_round_trip_preserves_obs_varm_uns(synth_md, tmp_path):
     for key in ("filter", "unite", "dmc"):
         if key in synth_md.uns:
             assert key in md2.uns
+
+
+def test_save_load_preserves_neighbour_combine_columns(synth_md, tmp_path):
+    """When ``neighbour_combine=True``, the in-memory varm frame gains
+    ``pvalue_combined`` / ``qvalue_combined`` (+ audit columns) *after*
+    the DMCStore chrom parquets were written. The save() path that
+    hardlinks from the DMCStore must not silently drop them -- if it
+    does, load() returns a frame with the wrong shape and downstream
+    code that reads the combined p-values gets KeyError."""
+    import epykit as ep
+
+    ep.pp.filter_coverage(synth_md, lo_count=5, hi_perc=99.9)
+    ep.pp.set_unite_type(synth_md, type="intersect")
+    ep.tl.dmc(synth_md, test="lr", neighbour_combine=True)
+
+    last_key = synth_md.uns["dmc"]["last_key"]
+    in_mem = synth_md.varm[last_key]
+    combined_cols = {
+        "pvalue_combined",
+        "qvalue_combined",
+        "pvalue_combined_n_neighbours",
+        "qvalue_combined_reject",
+    }
+    assert combined_cols.issubset(set(in_mem.columns)), (
+        "precondition: neighbour_combine must add combined columns in-memory"
+    )
+
+    save_path = tmp_path / "rt_combined"
+    synth_md.save(str(save_path))
+    md2 = ep.load(str(save_path))
+
+    loaded = md2.varm[last_key]
+    missing = combined_cols - set(loaded.columns)
+    assert not missing, f"save/load dropped combined columns: {sorted(missing)}"
+    assert loaded.shape == in_mem.shape, "shape drift across save/load"
 
 
 def test_save_load_does_not_persist_boolean_state_in_meta(synth_md, tmp_path):
@@ -174,14 +211,14 @@ def test_dmc_property_uses_last_key_pointer(synth_md_filtered):
     import epykit as ep
 
     ep.tl.dmc(synth_md_filtered, test="lr")
-    ep.tl.dmc(synth_md_filtered, test="logit_t")
+    ep.tl.dmc(synth_md_filtered, test="welch_t")
 
     # Last writer wins.
-    assert synth_md_filtered.uns["dmc"]["last_key"] == "dmc_logit_t"
+    assert synth_md_filtered.uns["dmc"]["last_key"] == "dmc_welch_t"
     df_via_property = synth_md_filtered.dmc
-    df_via_explicit_logit_t = synth_md_filtered.get_dmc(test="logit_t")
-    # Both should reference the same logit_t table (or its annotated variant).
-    assert df_via_property is df_via_explicit_logit_t or df_via_property.shape == df_via_explicit_logit_t.shape
+    df_via_explicit_welch_t = synth_md_filtered.get_dmc(test="welch_t")
+    # Both should reference the same welch_t table (or its annotated variant).
+    assert df_via_property is df_via_explicit_welch_t or df_via_property.shape == df_via_explicit_welch_t.shape
 
 
 def test_get_dmc_prefers_annotated_when_available(synth_md_filtered):
@@ -263,7 +300,7 @@ def test_covariate_dmr_runs_via_design_kwarg(synth_md_filtered):
 def test_get_dmc_with_unknown_test_returns_none(synth_md_filtered):
     import epykit as ep
     ep.tl.dmc(synth_md_filtered, test="lr")
-    assert synth_md_filtered.get_dmc(test="cmh") is None
+    assert synth_md_filtered.get_dmc(test="glm") is None
 
 
 
@@ -345,6 +382,124 @@ def test_aggregate_regions_round_trip(synth_md_filtered, tmp_path):
     assert any(h["step"] == "regions" for h in md.uns["_store_history"])
 
 
+def test_methyldata_analysis_root_is_public():
+    """analysis_root (no underscore) is the new public name in 1.0;
+    _analysis_root remains as a deprecated property alias."""
+    md = MethylData(
+        obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
+        store=None,
+    )
+    md.analysis_root = "/tmp/some/path"
+    assert md.analysis_root == "/tmp/some/path"
+
+    # Legacy attribute still readable but emits DeprecationWarning.
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        legacy = md._analysis_root
+    assert legacy == "/tmp/some/path"
+    assert any(
+        issubclass(w.category, DeprecationWarning)
+        and "_analysis_root" in str(w.message)
+        for w in caught
+    )
+
+
+def test_methyldata_analysis_root_setter_via_legacy_name_warns():
+    """Writing the legacy name still works but emits DeprecationWarning."""
+    md = MethylData(
+        obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
+        store=None,
+    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        md._analysis_root = "/legacy"
+    assert md.analysis_root == "/legacy"
+    assert any(
+        issubclass(w.category, DeprecationWarning)
+        and "_analysis_root" in str(w.message)
+        for w in caught
+    )
+
+
+def test_methyldata_analysis_root_kwarg_constructor():
+    """analysis_root is accepted as a constructor keyword argument
+    (the motivation for promoting it from underscore-prefixed to public)."""
+    import polars as pl
+    from epykit import MethylData
+
+    md = MethylData(
+        obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
+        store=None,
+        analysis_root="/tmp/some/path",
+    )
+    assert md.analysis_root == "/tmp/some/path"
+
+
+DEMOTED_DMC_NAMES = [
+    "process_chromosomes_dmc",
+    "apply_multiple_testing_correction",
+    "empirical_fdr_for_dmc",
+    "fisher_exact_vectorized",
+    "shrink_meth_diff",
+]
+
+
+def test_demoted_dmc_names_not_in_all():
+    """Five low-level DMC functions are removed from epykit.__all__ at 1.0.
+    They remain importable from epykit.dmc."""
+    import epykit
+    for name in DEMOTED_DMC_NAMES:
+        assert name not in epykit.__all__, (
+            f"{name} should be removed from __all__; users should import "
+            f"from epykit.dmc instead."
+        )
+
+
+def test_demoted_dmc_names_accessible_via_getattr_shim():
+    """The __getattr__ shim returns the function but emits DeprecationWarning."""
+    import epykit
+    from epykit import dmc as _dmc_mod
+
+    for name in DEMOTED_DMC_NAMES:
+        # Force the shim path by deleting any cached module-scope binding,
+        # then access via getattr. (The shim only fires when normal lookup
+        # misses, so the binding must NOT be present at module scope.)
+        if name in vars(epykit):
+            # If it's bound at module scope, the shim won't fire — that's
+            # a regression we want this test to catch.
+            del vars(epykit)[name]
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            obj = getattr(epykit, name)
+        assert obj is getattr(_dmc_mod, name), (
+            f"epykit.{name} via shim should return the same object as "
+            f"epykit.dmc.{name}."
+        )
+        assert any(
+            issubclass(w.category, DeprecationWarning) for w in caught
+        ), f"Accessing epykit.{name} should emit DeprecationWarning."
+
+
+def test_demoted_dmc_names_importable_via_submodule_without_warning():
+    """Documented post-1.0 import path emits no warning."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        from epykit.dmc import (  # noqa: F401
+            process_chromosomes_dmc,
+            apply_multiple_testing_correction,
+            empirical_fdr_for_dmc,
+            fisher_exact_vectorized,
+            shrink_meth_diff,
+        )
+    deprecation_warnings = [
+        w for w in caught if issubclass(w.category, DeprecationWarning)
+    ]
+    assert not deprecation_warnings, (
+        f"Submodule imports should not warn; got: "
+        f"{[str(w.message) for w in deprecation_warnings]}"
+    )
+
+
 def test_aggregate_regions_then_dmc(synth_md_filtered, tmp_path):
     """Downstream `tl.dmc` runs on the region-aggregated store without errors."""
     import epykit as ep
@@ -367,7 +522,59 @@ def test_aggregate_regions_then_dmc(synth_md_filtered, tmp_path):
     bed = _write_bed(tmp_path / "regions.bed", bed_rows)
     ep.pp.aggregate_regions(md, str(bed), min_cpgs_per_region=1)
     md.uns.pop("unite", None)
-    ep.pp.unite(md, type="intersect")
+    ep.pp.set_unite_type(md, type="intersect")
     ep.tl.dmc(md, test="lr")
     dmc = md.dmc
     assert dmc is not None and len(dmc) > 0
+
+
+# ---- set_unite_type / unite deprecation (Task 6) -------------------------
+
+
+def test_pp_set_unite_type_records_state():
+    """set_unite_type writes md.uns['unite']['type'] without materializing."""
+    import polars as pl
+    from epykit import MethylData
+    import epykit as ep
+
+    md = MethylData(
+        obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
+        store="/tmp/dummy",
+    )
+    ep.pp.set_unite_type(md, "intersect")
+    assert md.uns["unite"]["type"] == "intersect"
+
+
+def test_pp_set_unite_type_rejects_unknown_type():
+    """type must be 'intersect' or 'union'."""
+    import polars as pl
+    from epykit import MethylData
+    import epykit as ep
+
+    md = MethylData(
+        obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
+        store="/tmp/dummy",
+    )
+    with pytest.raises(ValueError, match="type must be 'intersect' or 'union'"):
+        ep.pp.set_unite_type(md, "merge")
+
+
+def test_pp_unite_is_deprecated_alias():
+    """pp.unite still works but emits DeprecationWarning."""
+    import polars as pl
+    from epykit import MethylData
+    import epykit as ep
+
+    md = MethylData(
+        obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
+        store="/tmp/dummy",
+    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        ep.pp.unite(md, "intersect")
+    assert md.uns["unite"]["type"] == "intersect"
+    assert any(
+        issubclass(w.category, DeprecationWarning)
+        and "set_unite_type" in str(w.message)
+        for w in caught
+    )

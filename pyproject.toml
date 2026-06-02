@@ -4,11 +4,37 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "epykit"
-version = "0.6.0"
+version = "1.0.0"
 description = "Parquet-backed WGBS methylation analysis pipeline (Bismark / MethylDackel → DMC/DMR → annotation)"
-authors = [ { name = "epykit user" } ]
+readme = "README.md"
+authors = [ { name = "Deniz Ertuğrul", email = "denizert2000@gmail.com" } ]
 requires-python = ">=3.9"
 license = { text = "MIT" }
+keywords = [
+  "methylation",
+  "WGBS",
+  "bisulfite-sequencing",
+  "DMC",
+  "DMR",
+  "bioinformatics",
+  "epigenetics",
+  "parquet",
+  "polars",
+  "scanpy",
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
 dependencies = [
   "polars>=0.20.0",
   "pyarrow>=11.0.0",
@@ -25,6 +51,13 @@ dependencies = [
   "scikit-learn>=1.6.1",
 ]
 
+[project.urls]
+Homepage = "https://github.com/d-ert/epykit"
+Repository = "https://github.com/d-ert/epykit"
+Documentation = "https://d-ert.github.io/epykit/"
+Issues = "https://github.com/d-ert/epykit/issues"
+Changelog = "https://github.com/d-ert/epykit/blob/main/CHANGELOG.md"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.4.2",
@@ -35,7 +68,7 @@ report = [
   "plotly>=5.20",
 ]
 export = [
-  "pyBigWig>=0.3.22",
+  "pyBigWig>=0.3.22; sys_platform != 'win32'",
 ]
 anndata = [
   "anndata>=0.10",
@@ -70,19 +103,28 @@ gpu = [
 gpu_jax = [
   "jax[cuda12]>=0.4.30",
 ]
+# Plan 3 P1-9: dip-test for sex_check unimodal fallback
+qc = [
+  "diptest",
+]
 all = [
   "jinja2>=3.1",
   "plotly>=5.20",
-  "pyBigWig>=0.3.22",
+  "pyBigWig>=0.3.22; sys_platform != 'win32'",
   "anndata>=0.10",
   "mudata>=0.2",
   "umap-learn>=0.5",
   "scipy>=1.11",
   "dask[distributed]>=2024.1",
+  "diptest",
 ]
 
 [project.scripts]
 epykit = "epykit.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["epykit*"]
 
 [tool.setuptools.package-data]
 epykit = ["py.typed", "templates/*.j2", "templates/*.css"]
@@ -135,3 +177,9 @@ follow_imports = "silent"
 ignore_missing_imports = true
 no_strict_optional = true
 warn_unused_ignores = true
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "ruff>=0.15.14",
+]

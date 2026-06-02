@@ -83,7 +83,7 @@ def synth_md_filtered(synth_md):
     """MethylData that has been filter_coverage'd; ready for DMC."""
     import epykit as ep
     ep.pp.filter_coverage(synth_md, lo_count=5, hi_perc=99.9)
-    ep.pp.unite(synth_md, type="intersect")
+    ep.pp.set_unite_type(synth_md, type="intersect")
     return synth_md
 
 

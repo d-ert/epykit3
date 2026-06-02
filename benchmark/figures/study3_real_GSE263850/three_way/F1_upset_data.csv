@@ -1,0 +1,15 @@
+intersection,count,criterion
+DSS+epykit+paper,1296,any_bp
+DSS+paper,572,any_bp
+epykit,186,any_bp
+DSS,152,any_bp
+DSS+epykit,126,any_bp
+paper,99,any_bp
+epykit+paper,6,any_bp
+DSS+paper,891,J0.5
+DSS+epykit+paper,635,J0.5
+epykit,433,J0.5
+DSS,222,J0.5
+paper,143,J0.5
+DSS+epykit,88,J0.5
+epykit+paper,25,J0.5

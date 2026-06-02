@@ -7,7 +7,7 @@ This package provides a complete WGBS analysis pipeline:
   - dmc:       Differential methylation calling per CpG. Default test is
                ``lr`` (quasi-binomial likelihood-ratio with McCullagh-
                Nelder dispersion). Other backends: score, glm, logit_t,
-               welch_t, bb_lr, cmh, fisher.
+               welch_t, fisher.
   - dmr:       DMR calling (tile-based default, sliding-window legacy) and
                Gaussian-kernel methylation smoothing
   - annotate:  Gene-feature and CpG-island context annotation
@@ -47,13 +47,6 @@ from ._config import set_tmp_dir, get_tmp_dir
 
 from .convert import convert_sample
 from ._dmc_store import DMCStore
-from .dmc import (
-    process_chromosomes_dmc,
-    apply_multiple_testing_correction,
-    empirical_fdr_for_dmc,
-    fisher_exact_vectorized,
-    shrink_meth_diff,
-)
 from .dmr import (
     DMR_PRESETS,
     call_dmr_chain_merge,
@@ -104,12 +97,10 @@ __all__ = [
     "set_tmp_dir", "get_tmp_dir",
     # ingestion
     "convert_sample",
-    # DMC engines (advanced users; tl.dmc is the recommended entry)
-    "process_chromosomes_dmc",
-    "apply_multiple_testing_correction",
-    "empirical_fdr_for_dmc",
-    "fisher_exact_vectorized",
-    "shrink_meth_diff",
+    # DMCStore is the streaming-store handle returned by tl.dmc(..., return_store=True).
+    # The lower-level dmc engine functions (process_chromosomes_dmc, apply_multiple_testing_correction,
+    # empirical_fdr_for_dmc, fisher_exact_vectorized, shrink_meth_diff) moved to
+    # epykit.dmc submodule in 1.0. Import them via `from epykit.dmc import ...`.
     "DMCStore",
     # DMR engines
     "call_dmr_sliding_window",
@@ -152,3 +143,34 @@ __all__ = [
     "read_nfcore_methylseq_qc",
     "generate_report",
 ]
+
+# --- Deprecation shim for demoted top-level names (1.0; removed in 1.2) ---
+_DEMOTED_TO_DMC = frozenset({
+    "process_chromosomes_dmc",
+    "apply_multiple_testing_correction",
+    "empirical_fdr_for_dmc",
+    "fisher_exact_vectorized",
+    "shrink_meth_diff",
+})
+
+
+def __getattr__(name: str):
+    """Module-level __getattr__ provides backward compat for names removed
+    from `__all__` at 1.0.
+
+    Returns the function from the appropriate submodule and emits
+    DeprecationWarning pointing users at the new import path. Shim is
+    scheduled for removal in 1.2.
+    """
+    if name in _DEMOTED_TO_DMC:
+        import warnings
+        from . import dmc as _dmc_mod
+        warnings.warn(
+            f"epykit.{name} is no longer a top-level export; use "
+            f"`from epykit.dmc import {name}` instead, or use the "
+            f"recommended `epykit.tl.dmc` wrapper. This shim will be "
+            f"removed in epykit 1.2.",
+            DeprecationWarning, stacklevel=2,
+        )
+        return getattr(_dmc_mod, name)
+    raise AttributeError(f"module 'epykit' has no attribute {name!r}")

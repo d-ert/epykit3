@@ -120,7 +120,7 @@ def test_combined_strand_bed_end_to_end_dmc(tmp_path):
         store_dir=str(tmp_path / "ms"),
     )
     ep.pp.filter_coverage(md, lo_count=5, hi_perc=99.9)
-    ep.pp.unite(md, type="intersect")
+    ep.pp.set_unite_type(md, type="intersect")
     ep.tl.dmc(md, test="lr")
     dmc = md.varm["dmc_lr"]
     assert dmc.height > 0

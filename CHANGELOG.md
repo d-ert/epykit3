@@ -4,7 +4,396 @@ All notable changes to **epykit** are tracked here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project uses
 SemVer (`MAJOR.MINOR.PATCH`).
 
-## [Unreleased] — 0.7.2
+## [1.0.0] — 2026-06-02
+
+First stable release. API contract is now SemVer-stable. Three targeted
+breaking changes land at the major-version cutover; each ships with a
+deprecation shim so 0.7.6 code continues to run with warnings.
+
+### Breaking
+
+- **`tl.dmc(power_stack="auto")` now engages the full lr+ stack at any
+  sample size** (was: only flipped two of four knobs, and only at
+  `min_n <= 2`). Specifically, when `power_stack` is `"auto"` or
+  `"lr+"` (new alias), the function flips `neighbour_combine`,
+  `fdr_method` (`"fdr_bh"` → `"fdr_tsbh"`), and `sep_fallback` to
+  `True` regardless of `n`. The pre-1.0 conservative behavior is
+  preserved under `power_stack="conservative"`. `power_stack="off"`
+  (new alias) or `False` leaves knobs at user-passed values.
+  `power_stack=True` aliases `"lr+"`. Unknown strings raise
+  `ValueError`. **The DEFAULT value of `power_stack` remains `"off"`** —
+  bare `tl.dmc(test="lr")` produces bare-engine output, no change vs.
+  0.7.6. Users who explicitly set `power_stack="auto"` on data with
+  `min_n > 2` will see different qvalues vs. 0.7.6.
+
+- **`process_chromosomes_dmc`, `apply_multiple_testing_correction`,
+  `empirical_fdr_for_dmc`, `fisher_exact_vectorized`, `shrink_meth_diff`
+  removed from top-level `epykit.*` namespace.** Use the recommended
+  `tl.dmc` wrapper, or import explicitly via `from epykit.dmc import ...`.
+  A module-level `__getattr__` shim accepts the old top-level access
+  pattern for 1.0 with a `DeprecationWarning`; removed in 1.2.
+
+- **`pp.unite()` renamed to `pp.set_unite_type()`.** The old name
+  suggested a verb performing a union, but the function only writes
+  `md.uns["unite"]` (lazy state-marker). `pp.unite()` continues to work
+  as a deprecation wrapper through 1.x; removed in 2.0.
+
+- **`method="hmm"` removed from `tl.dmr` and the CLI `dmr` subcommand.**
+  Was deprecated in 0.7.5 with `FutureWarning` ("removal in 0.8"); now
+  raises `ValueError`. Use `method="segment"` (same engine, honest
+  name).
+
+### Added
+
+- **`MethylData.analysis_root`** (no leading underscore) is the new
+  public name for the analysis-root attribute. `MethylData._analysis_root`
+  continues to work as a deprecated property alias on read AND write,
+  emitting `DeprecationWarning`. Removed in 2.0.
+- **`Literal[...]` type annotations** on the `value` kwarg of
+  `export.to_bedgraph` and `export.to_bigwig` for IDE + mypy support.
+  Runtime validation behavior unchanged.
+- **Public docstring for `process_chromosomes_dmc(dispersion=...)`** now
+  documents the `"eb"` option (already the default in `tl.dmc`).
+- **`apply_multiple_testing_correction` docstring** now names the
+  `pl.DataFrame` vs `DMCStore` code paths explicitly.
+
+### Changed
+
+- **README and CLAUDE.md describe `lr+` as an opt-in power stack** rather
+  than as recommended defaults. Bare `lr` is the default; users opt in to
+  `lr+` via `power_stack="lr+"`.
+- **Project status:** classifier `Development Status :: 4 - Beta` →
+  `Development Status :: 5 - Production/Stable`.
+
+### Fixed
+
+- **`MethylData.save()` preserves `pvalue_combined` / `qvalue_combined`
+  columns** added by `neighbour_combine=True`. The DMCStore-backed
+  save path hardlinks per-chromosome Parquet files, but the combined
+  columns are added in-memory *after* those files were written, so the
+  hardlink path was silently dropping them. `save()` now detects the
+  `pvalue_combined` column on the in-memory frame and falls back to
+  the single-file Parquet write so the four combined / audit columns
+  survive a save/load round-trip. Regression test
+  `test_save_load_preserves_neighbour_combine_columns`.
+
+### Internal
+
+- Public-surface audit committed at
+  `docs/superpowers/specs/2026-06-01-public-surface-audit.md` —
+  inventory of all 47 top-level exports with per-export verdicts and a
+  1.1 backlog.
+- Phase 4 plan checkboxes synced to reflect what actually shipped
+  (Tasks 1-8 marked).
+
+## Unreleased
+
+## [0.7.6] — 2026-06-01
+
+Cache-semantics correctness fix + benchmark null-calibration fixes.
+Rolls up all Phase 2-3-4 work since 0.7.2 into a single release. Engine
+math itself is unchanged from the `v0.7.5-phase3-engines-frozen` tag —
+the only library-side change in this release is to the per-CpG DMC
+cache invalidation logic. Benchmark-side changes wire the `glm` engine
+correctly into the null-calibration framework and fix a sample-label
+shuffling bug that had been making every null-calibration shuffle run
+on the original case/control assignment.
+
+### Fixed
+
+- **`process_chromosomes_dmc`: weak-hit cache must not fire when
+  `input_sig` differs.** Previously, when the cached manifest carried an
+  `input_sig` field that did not match the current call, the function
+  served the stale per-chromosome parquets and silently upgraded the
+  manifest's `input_sig` in place. The weak-hit was intended to recover
+  gracefully from legacy manifests written before the `input_sig` field
+  existed, but the implementation also masked real input changes —
+  affecting any user calling `tl.dmc` repeatedly on the same methylstore
+  with different sample labels, test parameters, or covariates. The fix
+  restricts the weak-hit to its documented use case (manifests with no
+  `input_sig` at all) and falls through to the recompute path when
+  `input_sig` is present but differs. New regression tests in
+  `tests/test_dmc_streaming_store.py` cover both the recompute path and
+  the legacy-manifest path. Discovered via Phase 4 null-calibration
+  development; benefits all repeated-DMC use cases (cross-validation,
+  sensitivity analyses, custom permutation sweeps).
+
+- **`benchmark/scripts/_null_engines.py:_permute_md`: write
+  `obs["treatment"]`, not just `obs["group"]`.** `MethylData.treatment_ids`
+  reads from `obs["treatment"]` (i64), so writing only the display string
+  column `obs["group"]` silently left every null-calibration shuffle
+  running on the original case/control assignment. All shuffles in every
+  Phase 4 cell produced identical p- and q-values; the IQR collapsed to
+  the median. Fix writes both columns; the slow regression test
+  `test_closure_produces_different_qvalues_per_shuffle` asserts that two
+  closure invocations with different label assignments produce different
+  q-value arrays.
+
+- **`benchmark/scripts/_null_engines.py`: glm closure builds the design
+  matrix.** Previously the glm registry entry called
+  `ep.tl.dmc(md, test="glm")` with no `formula` or `contrast` argument,
+  hitting the binary-path branch that requires explicit `design_full` /
+  `design_reduced` / `coef_idx`. The fix routes glm through
+  `formula="~ group", contrast="group"`, letting `build_design`
+  construct the full and reduced designs from the permuted `obs.group`
+  column. The glm engine now produces real per-shuffle variation in the
+  null-calibration sweep.
+
+### Added
+
+- **`benchmark/scripts/run_phase4_null_calibration.py`** (new):
+  orchestrator for the Phase 4 null-calibration sweep across every
+  surviving engine × dataset × scenario cell. Builds per-dataset
+  methylstores, dispatches per-cell calibration via
+  `run_null_calibration.py`, aggregates per-cell parquets into a single
+  `summary.parquet` with `(engine, dataset, scenario,
+  observed_fdr_median, observed_fdr_q1, observed_fdr_q3,
+  observed_fdr_ci_lo, observed_fdr_ci_hi)` columns. CLI accepts
+  `--dataset`, `--engines`, `--skip-piao/--simulator/--gse`,
+  `--keep-store`, `--skip-aggregate`, `--only-aggregate`. Companion test
+  suite at `benchmark/scripts/tests/test_run_phase4_null_calibration.py`
+  covers the spec registry, aggregation kernel, manifest writer, and
+  per-engine parquet path layout. Final sweep produced 12 of 13 cells
+  (fisher@gse263850 deferred pending parallel backend).
+
+- **`benchmark/scripts/bug_fix_audit.py`** (new): diffs pre/post-fix
+  `eval_summary.parquet` per (tool, scenario, metric); attributes each
+  delta to a P0/P1 fix via `Affects: engine@scenario` trailers parsed
+  from commits JSON. Unattributed changed cells cause non-zero exit.
+
+- **`benchmark/scripts/regen_all.py`** (new): `--verify` acceptance
+  gate reads `claims.yaml` and `<!-- claim: id -->` HTML comments in
+  `paper.md`, asserts cited parquets match expected values to stated
+  precision, exits non-zero on mismatch. Empty `claims.yaml` seed
+  landed; Phase 4 populates during the locked re-run.
+
+- **`benchmark/scripts/methylkit_stouffer_combine.R`** (new):
+  adjacent-CpG Stouffer combination for methylKit output. Mirrors
+  epykit's `neighbour_combine` knob for tuned-vs-tuned Phase 4
+  comparisons per PROTOCOL R1. Test SKIPS without Rscript on PATH.
+
+- **Benchmark consolidation**: the canonical benchmark suite is now
+  `epykit3/benchmark/` (was previously split between `epykit3/benchmark/`
+  and `benchmarkin_merges/FINAL_REPORT/`, the latter outside version
+  control). One repo, one tag, reproducible via
+  `uv run pytest benchmark/scripts/tests/` for the new script tests.
+  Data (raw inputs, ground truth, eval_summary, per-scenario methylkit
+  results) are intentionally NOT bundled — regenerated by re-running
+  the scripts against the user's local `raw_sim_data/`.
+
+- **`benchmark/scripts/simulate_piao.py`** (new): Python re-implementation
+  of Piao et al. 2021's binomial DMC simulator with an intrinsic
+  ``is_dmc`` flag (replaces the threshold-reconstructed truth that
+  caused AUROC tautology). Outputs Piao-compatible AMP files +
+  ``truth.parquet`` matching ``dmc_truth.parquet`` schema. Baseline
+  beta uses ``Beta(0.75, 1.35)`` fit to Piao's marginals (1%/3% match).
+
+- **`benchmark/scripts/wilson_bootstrap_ci.py`** (new): Wilson 95% CIs
+  for proportion metrics (TPR/FPR) and percentile bootstrap CIs for
+  rank/threshold metrics (AUROC, F1). Operates on the existing
+  ``eval_summary.parquet`` schema without re-running engines.
+
+- **`benchmark/scripts/evaluate.py`** (new): `--ci-only` mode appends
+  Wilson 95% CIs (TPR/FPR) and bootstrap CIs (AUROC/F1, NaN without
+  per-CpG cache) to `eval_summary.parquet` in place. Wires the Phase 2
+  `wilson_bootstrap_ci.py` helper into the eval pipeline.
+
+- **`benchmark/scripts/run_null_calibration.py`** (new): Label-shuffle
+  empirical FDR runner. Decoupled from epykit (takes an
+  ``engine_fn`` callable) so it tests with mock engines for CI and
+  wraps ``ep.tl.dmc`` for real use.
+
+- **`benchmark/scripts/_null_engines.py`** (new): real-engine
+  closures (`lr`, `lr_plus`, `welch_t`, `fisher`, `glm`) for
+  `run_null_calibration.py`. Each factory captures a `MethylData`
+  object once and returns a closure matching the Phase 2
+  `engine_fn(samples_treatment, samples_control, seed)→qvals` contract.
+  `run_null_calibration.py main()` rewritten to dispatch via the
+  registry with `--engine` + `--methylstore` args.
+
+### Removed
+
+- **DMC engine surface collapsed to `{auto, lr, welch_t, fisher, glm}`.** 
+  Dropped: `logit_t` (broken near β=0/1), `bb_lr` (TPR < 8% at n ≤ 4 + 
+  dispersion bug), `score` (dominated by `lr`), `cmh` (dominated by 
+  `glm + batch`). All four raise `ValueError` with a one-line migration 
+  hint. Removed from README, docs, CLAUDE.md, and CLI help.
+
+- **`tl.dmc(test='logit_t')`** removed. The engine was documented by
+  epykit's own source as miscalibrated near β=0/1; no paper claim
+  depends on it. Calls now raise `ValueError` with a migration hint.
+  Migration: `test='logit_t'` → `test='welch_t'` or `test='lr'`.
+
+- **`tl.dmc(test='bb_lr')`** removed. TPR < 8% at n ≤ 4 in the
+  published benchmark; also affected by the P1-2 dispersion-df bug
+  (now closed by removal). Calls now raise `ValueError` with a
+  migration hint. Migration: `test='bb_lr'` → `test='lr'`. Note:
+  `irls_dispatch` stays (used by the `glm` engine).
+
+- **`tl.dmc(test='score')`** removed. Strictly dominated by `lr` in
+  finite samples; asymptotically equivalent under H₀. Migration:
+  `test='score'` → `test='lr'`; output schema identical.
+
+- **`tl.dmc(test='cmh')`** removed. Stratification semantics (one
+  stratum per case-ctrl pair) were unusual; dominated by
+  `tl.dmc(formula='~ group + batch')`. Migration: use the formula
+  kwarg for stratified analysis. `_cmh_init/_cmh_update/_cmh_finalize`
+  helpers deleted (no other callers).
+
+### Changed (BREAKING for `log2_odds_ratio` column name)
+
+- **`varm["dmc_lr"].log2_odds_ratio`** renamed to
+  `log2_odds_ratio_pooled` (same value, clearer name). Same rename
+  applies to `fisher`.
+- **`varm["dmc_glm"].log2_odds_ratio`** renamed to
+  `coef_treatment_log2` (it was always the logit coefficient in log₂
+  units, not log₂ of an odds ratio; the old name was misleading).
+- A transitional `log2_odds_ratio` column is NaN-filled in 0.7.5 with
+  a `FutureWarning` on the producing call. Column removed in 0.8.
+
+### Changed (BREAKING for `epykit.dmr_hmm` import path)
+
+- **Renamed** `epykit.dmr_hmm` → `epykit.dmr_segment`; function
+  `call_dmr_hmm` → `call_dmr_rule_segment`. The engine uses fixed
+  state means / transition priors (not Baum-Welch fitted), so calling
+  it an HMM was misleading. Old import path remains as a deprecated
+  shim until 0.8. `tl.dmr(method='hmm')` works with `FutureWarning`.
+
+### Fixed (P2 manifest, folded into the rename)
+
+- **P2-4**: `call_dmr_rule_segment` now emits per-segment Stouffer-
+  combined p-values (BH-corrected per chromosome) instead of NaN.
+  The pre-0.7.5 implementation emitted NaN p/q-values for every
+  called segment, breaking any downstream filter on qvalue.
+
+### Fixed (P1 manifest)
+
+- **P1-9**: `sex_check` now gates the 1D largest-gap clustering on
+  Hartigan's dip test (`diptest.diptest`). On unimodal distributions
+  (single-sex cohorts, dip p > 0.10), falls back to a fixed chrX-beta
+  threshold (0.25) and emits `UserWarning`. Bimodal mixed-sex cohorts
+  are unchanged. Clustering logic extracted into the internal helper
+  `_classify_sex_from_values`. Adds `diptest` to the `qc` extra in
+  `pyproject.toml`.
+
+- **P1-7**: `tl.dvc` per-site variance test replaced from Bartlett with
+  Brown-Forsythe (median-centred Levene). Bartlett assumes normality; beta
+  methylation values are bounded [0,1] and U-shaped. Brown-Forsythe matches
+  `scipy.stats.levene(center='median')` to 1e-6. `process_chromosomes_dvc`
+  default changed to `test='brown_forsythe'`; `test='bartlett'` accepted as
+  a backward-compatible alias (silently redirected). DVC not in paper; no
+  headline impact.
+
+### Fixed (P0 manifest, paper preparation)
+
+- **P0-3 (docs)**: `tl.dmc(..., dispersion=...)` docstring previously said
+  the default was `"site"`; the actual code default is `"eb"`. The
+  empirical-Bayes shrinkage is the intended default. Docstring corrected;
+  PROTOCOL.md and EXECUTIVE_SUMMARY downstream notes follow separately. See
+  `docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md`.
+
+- **P0-6 (docs)**: `combine_neighbour_pvalues` docstring now explicitly
+  owns the Stouffer independence assumption violation under spatial
+  autocorrelation. The 0.7.x FDR safety net is the sign-agreement gate,
+  not the Stouffer null; Brown's-method replacement deferred to v0.8.
+
+- **P0-5 (`dmr._merge_adjacent_tiles`)**: three Stouffer-combination bugs
+  fixed: (a) input p-values are two-sided so the magnitude conversion is
+  ``isf(p/2)``, not ``isf(p)``; (b) chains of length > 2 now use the
+  correct ``sum_z / sqrt(n)`` denominator (was iterative pairwise
+  ``/sqrt(2)`` which over-conserves on long chains); (c) running
+  ``(sum_z, n)`` accumulator added. Affects tile-based DMR p-values
+  in any run where `merge_adjacent=True` (the default for
+  `call_dmr_tile_based`).
+
+- **P0-2 (`dmr.empirical_fdr_for_dmr`)**: empirical p-value denominator
+  changed from ``|pooled null DMRs| + 1`` to ``n_perm + 1`` (per-permutation
+  tail count). The old pooled-null formula was anti-conservative -- more
+  permutations grew the denominator and shrank emp_p without adding
+  evidence. Affects any DMR run that used ``empirical_fdr=True``;
+  empirical p-values will rise (more conservative).
+
+- **P0-2b (`dmc.empirical_fdr_for_dmc`)**: DMC analogue of P0-2.
+  Empirical p-value denominator changed from
+  ``|pooled null p-values| + 1`` to ``n_perm + 1`` (per-permutation
+  tail count). The old pooled-null formula was anti-conservative.
+  Affects any DMC run that used ``empirical_fdr=True``; empirical
+  p-values will rise (more conservative).
+
+- **P0-4 (`dmc._score_finalize` adaptive-F branch)**: ``df_phi`` is now
+  floored at 50 when the F branch fires (``phi_eff > 1.0``). Previously, in
+  ``dispersion="eb"`` mode with small empirical-Bayes weight (the
+  homogeneous-dispersion case), ``df_phi`` collapsed to ~4 and F(1, 4) was
+  ~250x more conservative than chi^2(1) at typical test statistics --
+  this drove the artifactually low FPR in eb mode in 0.7.2. The
+  chi^2 branch (clamped phi) is unaffected. Expected impact on
+  benchmark numbers: ``lr / eb`` FPR rises modestly, TPR essentially
+  unchanged. Null-calibration smoke (n=1934, n_per_group=3, no true DMCs):
+  observed FDR at q<0.05 = 0.0000 (BH conservative at low n, as expected).
+  If you benchmarked under 0.7.2 with `dispersion="eb"` (the default), the previously reported FPR is artificially suppressed and should be recomputed.
+  See the bug-fix audit table in Phase 2 for per-cell deltas.
+
+### Fixed (P1 manifest)
+
+- **P1-1**: `fisher_exact_vectorized` two-sided p now uses the mid-p
+  convention (sum of hypergeometric pmf over all tables with pmf ≤
+  pmf(observed)), matching `scipy.stats.fisher_exact(alternative=
+  'two-sided')` to 1e-12. Previously doubled the smaller one-sided
+  tail. Affects small-table cells; headline cov≥10/n≥3 unchanged.
+
+- **P1-2** (`bb_lr` `df_resid` vs `df_phi`): **closed by removal** of
+  `test='bb_lr'`. The engine incorrectly discarded `df_phi` from
+  `compute_dispersion_phi` and passed `df_resid_safe` to
+  `reference_pvalues` instead, causing miscalibrated F-distributed
+  p-values under `dispersion != "site"`. Removed in 0.7.5 together
+  with the broader TPR < 8% finding. Migration: `test='lr'`.
+
+- **P1-3**: `lr` and `fisher` engines now emit Newcombe (1998) hybrid
+  Wilson-score CIs for `meth_diff_ci_{lo,hi}`, matching
+  `statsmodels.confint_proportions_2indep(method='newcombe')`.
+  Previously emitted Welch-normal Wald CIs (symmetric, can violate
+  [-1,1] near boundary β). `welch_t` and `glm` CIs unchanged.
+
+- **P1-4**: `tl.dmc(formula=..., reference_level='level')` lets users
+  set the categorical reference level explicitly via patsy's
+  `Treatment(reference=...)`. Default behaviour unchanged (alphabetical
+  reference). `_glm.build_design` now logs resolved column names and
+  the chosen reference at INFO level.
+
+- **P1-5**: IRLS non-convergence is now surfaced. Non-converged sites
+  have their Wald statistics NaN-masked (previously only `separated`
+  sites were NaN'd); fraction non-converged > 1% is logged at WARNING.
+  Fraction ≤ 1% is logged at INFO. Separated sites that are also
+  non-converged are counted only once (under the separation diagnostic).
+
+- **P1-6**: DMR empirical FDR now (a) raises `ValueError` at
+  n_treat=1, n_ctrl=1 (no valid permutations), pointing the user at
+  `tl.dmc(test='fisher')`; (b) accepts `empirical_strata=<obs_column>`
+  to permute within strata for paired designs.
+
+- **P1-10**: `_storey_pi0` now clamps at `1/n` from below (Storey
+  2002 standard floor). Previously could return 0 when all p-values
+  fell below `lam`, causing +inf q-values via BH adjustment. Docstring
+  updated to note this is the plug-in estimator, not the spline-
+  smoother variant.
+
+### Changed (breaking on the `lr+` schema)
+
+- **P0-1**: ``tl.dmc(..., neighbour_combine=True)`` no longer overwrites
+  the per-CpG ``pvalue`` column with the Stouffer-combined value. The
+  raw per-CpG p-value stays in ``pvalue``; the combined value is in
+  ``pvalue_combined`` and its BH q-value in ``qvalue_combined``.
+  Downstream code reading ``pvalue`` (BH correction, empirical FDR,
+  DMR engines) now sees the raw per-CpG value, not the combined.
+  If you want the combined q-value, read ``qvalue_combined``.
+  ``empirical_fdr_for_dmc`` raises ``ValueError`` if it sees a stale
+  schema where ``pvalue`` was overwritten.
+
+  Affects: anyone who consumed ``md.dmc["pvalue"]`` after
+  ``neighbour_combine=True``. Migration: switch reads to
+  ``md.dmc["pvalue_combined"]`` / ``md.dmc["qvalue_combined"]``.
+
+## [0.7.2] — 2026-05-21
 
 Eight targeted fixes identified by a full benchmark comparison against
 methylKit, DSS, RADMeth, BiSeq, methylSig, and Fisher (Piao et al.
@@ -99,7 +488,7 @@ unaffected; only implicit defaults change.
 
 ---
 
-## [Unreleased] — 0.7.1
+## [0.7.1] — 2026-05-21
 
 Targeted improvements to the `lr` DMC engine that close its
 asymptotic-quasi-binomial gap to methylKit / RADMeth / DSS at low
@@ -149,7 +538,7 @@ exactly.
 
 - **Benchmark and write-up.** End-to-end reproduction of the Piao
   et al. 2021 (IJERPH 18:7975) simulated benchmark under
-  `comparison_test/benchmark/`, including ground-truth
+  `benchmark/`, including ground-truth
   reconstruction (35 reference DMRs / 19,999 true DMCs, both
   matching the paper's design exactly), baseline-table
   transcription, 7 figures, and a paper-style manuscript.
@@ -177,7 +566,7 @@ exactly.
   near-perfect-separation 2 × 2 tables. Fixed in 0.7.2 with a
   dual-tail hypergeometric computation.
 
-## [Unreleased] — 0.7.0
+## [0.7.0] — 2026-05-21
 
 Adds a DSS-compatible DMR caller, DSS-style raw-count smoothing for DMC,
 annotatr-style multi-annotation (nearest TSS + all overlapping genes /
@@ -412,7 +801,7 @@ matrix-completion imputation, pyGenomeTracks-style track plot.
 
 ---
 
-## [Unreleased] — 0.3.0
+## [0.3.0]
 
 ### Added
 

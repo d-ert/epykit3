@@ -37,19 +37,20 @@ pytestmark = pytest.mark.slow
 # (4 vs 4 samples, Deltabeta=0.40, cov~20, replicate_sd=0.03, ~75 k post-filter
 # CpGs, BH on 500 true DMCs).
 #
-# Observed power on the calibration run was LR ~= 0.60, score ~= 0.58,
-# fisher ~= 0.45. At 4-vs-4 with df_resid ~= 6 in the F(1, df_resid)
-# reference distribution, the achievable BH-q<0.05 power on 75 k tests
-# tops out roughly there -- bumping the fixture knobs further would risk
-# making the test trivially easy.
+# Observed power on the calibration run was LR ~= 0.60, fisher ~= 0.45.
+# At 4-vs-4 with df_resid ~= 6 in the F(1, df_resid) reference distribution,
+# the achievable BH-q<0.05 power on 75 k tests tops out roughly there --
+# bumping the fixture knobs further would risk making the test trivially easy.
 #
 # Thresholds are set ~5-10 % below observed to tolerate any future
 # Monte Carlo wobble while still catching real regressions (especially
 # the dispersion-df / logit-t variance bugs flagged in the prior audit).
 POWER_MIN_LR = 0.55
-POWER_MIN_SCORE = 0.50
 POWER_MIN_GLM = 0.45
-POWER_MIN_LOGIT_T = 0.20      # logit_t loses power on bounded betas
+POWER_MIN_WELCH_T = 0.03      # welch_t at n=4 per group has very poor variance
+                               # estimates (the code emits a warning); the test
+                               # only guards against a complete collapse (power≈0)
+                               # rather than a meaningful detection threshold.
 POWER_MIN_FISHER = 0.35       # high power per site, anti-conservative
 
 FDR_MAX_STRICT = 0.10         # well-calibrated tests at alpha=0.05
@@ -80,23 +81,15 @@ def test_dmc_lr_power_and_fdr(synth_md_filtered, synth_bundle: SynthBundle):
     assert fdr   <= FDR_MAX_STRICT, f"LR FDR too high: {fdr:.3f}"
 
 
-def test_dmc_score_power_and_fdr(synth_md_filtered, synth_bundle: SynthBundle):
-    df = _run_dmc(synth_md_filtered, test="score")
-    power = power_at_threshold(df, synth_bundle.truth, alpha=0.05)
-    fdr   = fdr_at_threshold(df, synth_bundle.truth, alpha=0.05)
-    assert power >= POWER_MIN_SCORE, f"score power too low: {power:.3f}"
-    assert fdr   <= FDR_MAX_STRICT + 0.02, f"score FDR too high: {fdr:.3f}"
-
-
-def test_dmc_logit_t_power_and_fdr(synth_md_filtered, synth_bundle: SynthBundle):
-    """Welch t on logit(beta) is the most variance-stabilising fallback.
-    Power is intentionally lower than LR/score but FDR should stay calibrated.
+def test_dmc_welch_t_power_and_fdr(synth_md_filtered, synth_bundle: SynthBundle):
+    """Welch t on raw betas. Power is intentionally lower than LR
+    but FDR should stay calibrated.
     """
-    df = _run_dmc(synth_md_filtered, test="logit_t")
+    df = _run_dmc(synth_md_filtered, test="welch_t")
     power = power_at_threshold(df, synth_bundle.truth, alpha=0.05)
     fdr   = fdr_at_threshold(df, synth_bundle.truth, alpha=0.05)
-    assert power >= POWER_MIN_LOGIT_T, f"logit_t power too low: {power:.3f}"
-    assert fdr   <= FDR_MAX_STRICT + 0.05, f"logit_t FDR too high: {fdr:.3f}"
+    assert power >= POWER_MIN_WELCH_T, f"welch_t power too low: {power:.3f}"
+    assert fdr   <= FDR_MAX_STRICT + 0.05, f"welch_t FDR too high: {fdr:.3f}"
 
 
 def test_dmc_fisher_runs_and_is_powerful_but_anti_conservative(

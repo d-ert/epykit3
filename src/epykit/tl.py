@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import gc
 import logging
+from typing import Literal
 import polars as pl
 
 logger = logging.getLogger(__name__)
@@ -38,10 +39,11 @@ def _auto_test(
     covariates: list[str] | None = None,
     allow_n1: bool = False,
 ) -> str:
-    """Pick a sensible test based on group size, accounting for covariates.
+    """Auto-dispatcher: post-0.7.5 surface is closed to {fisher, lr}.
+    fisher at n=1 (only engine that works), lr at n>=2.
 
     When a covariate design is supplied, we MUST use the binomial GLM path
-    (``"glm"``) because the closed-form ``lr`` / ``score`` paths don't admit
+    (``"glm"``) because the closed-form ``lr`` path doesn't admit
     covariates. The choice is therefore unconditional whenever the user
     asks for adjustment.
 
@@ -112,10 +114,6 @@ def _auto_test_simple(md: MethylData, allow_n1: bool = False) -> str:
     The default returned here MUST match the CLI ``--test`` default (lr) and
     the ``--test`` default for ``dmr`` (lr). See cli.py for the single source
     of truth.
-
-    The score test (``test="score"``) is still available for users who want
-    a marginally more powerful (but mildly anti-conservative at the
-    boundaries) statistic on the same accumulators.
 
     At n=1 (single replicate per group) there is no between-replicate
     variability for phi to estimate. By default this is treated as a hard error
@@ -281,8 +279,10 @@ def dmc(
     # Separation-aware Fisher fallback (since 0.7.1) ---------------------
     sep_fallback: bool = False,
     sep_threshold: float = 0.9,
-    # Power stack convenience (since 0.7.2) --------------------------------
-    power_stack: str | bool = False,
+    # Power stack convenience (since 0.7.2, updated 1.0) ------------------
+    power_stack: Literal["auto", "lr+", "conservative", "off"] | bool = "off",
+    # Explicit patsy reference level for categorical factors (since 0.7.5) -
+    reference_level: str | None = None,
 ) -> None:
     """Run DMC calling and store result in md.varm['dmc_<test>'].
 
@@ -346,11 +346,14 @@ def dmc(
         Analysis object containing the methylstore path and the
         treatment/control sample lists.
     test : str
-        One of ``"auto"``, ``"lr"``, ``"score"``, ``"logit_t"``,
-        ``"welch_t"`` (Welch t on raw betas),
-        ``"bb_lr"`` (true quasi-binomial LRT), ``"cmh"``, ``"fisher"``,
+        One of ``"auto"``, ``"lr"``, ``"welch_t"``, ``"fisher"``, or
         ``"glm"``. ``"auto"`` resolves to ``"fisher"`` at n<2 and ``"lr"``
         (the recommended default) at n>=2.
+
+        Engines removed in 0.7.5 (raise ``ValueError`` with a migration
+        hint): ``"logit_t"`` (use ``"welch_t"``), ``"bb_lr"`` (use
+        ``"lr"``), ``"score"`` (use ``"lr"``), ``"cmh"`` (use
+        ``formula='~ group + batch'``).
 
         When ``formula`` and/or ``contrast`` are supplied, the test is
         forced to a GLM-based path regardless of ``test=``.
@@ -377,11 +380,15 @@ def dmc(
         Name of the binary 0/1 column in ``md.obs`` used by the legacy
         binary path. Ignored when ``contrast`` is supplied and resolves
         without it.
-    dispersion : {"site", "chrom", "shrink"}
-        McCullagh-Nelder dispersion strategy used by the ``"lr"`` and
-        ``"score"`` tests. Default ``"site"`` estimates a per-site phi_i
-        from the 4-df Pearson residual sum. See :func:`_score_finalize`
-        in ``dmc.py`` for the alternatives.
+    dispersion : {"site", "chrom", "shrink", "eb"}
+        McCullagh-Nelder dispersion strategy used by the ``"lr"`` test.
+        Default ``"eb"`` shrinks the per-site Pearson
+        residual estimate toward a chromosome-wide pool via empirical-Bayes
+        weights (stable at low n / low coverage). Alternatives:
+        ``"site"`` uses the noisy per-site estimate only; ``"chrom"`` uses
+        the chromosome-pooled phi for every site; ``"shrink"`` is a James-Stein-style weighted average of per-site and
+        chromosome estimates with a fixed pseudo-df weight. See
+        :func:`_score_finalize` in ``dmc.py`` for the math.
     chromosomes : list[str], optional
         Restrict to a subset of chromosomes. Auto-detected when None.
     min_samples_treatment, min_samples_control : int
@@ -394,6 +401,38 @@ def dmc(
     """
     if min_samples_treatment is None:
         min_samples_treatment = 0
+
+    if test == "logit_t":
+        raise ValueError(
+            "test='logit_t' was removed in 0.7.5 (miscalibrated near β=0/1). "
+            "Use test='welch_t' for the replicate-aware β-mean test or "
+            "test='lr' for the recommended default."
+        )
+
+    if test == "bb_lr":
+        raise ValueError(
+            "test='bb_lr' was removed in 0.7.5 (TPR < 8% at n ≤ 4 + a "
+            "dispersion-df bug). Use test='lr' (recommended) which uses "
+            "the same quasi-binomial dispersion but pools counts per group "
+            "for higher power at small n."
+        )
+
+    if test == "score":
+        raise ValueError(
+            "test='score' was removed in 0.7.5 (strictly dominated by "
+            "test='lr' in finite samples; asymptotically equivalent under "
+            "H0). Switch test='score' -> test='lr'; output schema is "
+            "identical."
+        )
+
+    if test == "cmh":
+        raise ValueError(
+            "test='cmh' was removed in 0.7.5 (stratification semantics "
+            "confusing; dominated by GLM with batch covariate). For "
+            "stratified analysis use tl.dmc(formula='~ group + batch'), "
+            "which gives proper dispersion correction and handles "
+            "continuous covariates."
+        )
 
     # --- New contrast / multi-group path -------------------------------------
     if formula is not None or contrast is not None:
@@ -413,6 +452,16 @@ def dmc(
             min_samples_treatment=min_samples_treatment,
             min_samples_control=min_samples_control,
             dispersion=dispersion, reference=reference,
+            reference_level=reference_level,
+        )
+        # P1-11 deprecation notice for GLM / contrast path.
+        import warnings as _warnings
+        _warnings.warn(
+            "The 'log2_odds_ratio' column is deprecated and will be removed in "
+            "0.8. Use 'log2_odds_ratio_pooled' for pooled-count tests (lr, "
+            "fisher) or 'coef_treatment_log2' for the glm backend. The "
+            "transitional column is NaN-filled in 0.7.5.",
+            FutureWarning, stacklevel=2,
         )
         return
 
@@ -425,27 +474,45 @@ def dmc(
     )
     selected_test = _auto_test(md, allow_n1=allow_n1) if test == "auto" else test
 
-    # lr+ power-stack auto-engagement (since 0.7.2).
-    if power_stack == "auto" and selected_test == "lr":
+    # --- lr+ power-stack dispatch (1.0) ---
+    # The four knobs the stack controls:
+    #   neighbour_combine, fdr_method, sep_fallback, dispersion ("eb"
+    #   is already the default in this function).
+    # power_stack values:
+    #   "lr+" / True / "auto"  -> engage all four at any n
+    #   "conservative"          -> engage only at n <= 2 (pre-1.0 behavior)
+    #   "off" / False           -> leave knobs at user-passed values
+    if isinstance(power_stack, bool):
+        power_stack = "lr+" if power_stack else "off"
+    if power_stack not in {"auto", "lr+", "conservative", "off"}:
+        raise ValueError(
+            f"power_stack must be one of {{'auto','lr+','conservative','off'}} "
+            f"or a bool; got {power_stack!r}"
+        )
+
+    if selected_test == "lr" and power_stack in {"auto", "lr+", "conservative"}:
         _min_n = min(len(md.treatment_ids), len(md.control_ids))
-        if _min_n <= 2:
+        engage = (power_stack != "conservative") or (_min_n <= 2)
+        if engage:
             if not neighbour_combine:
                 neighbour_combine = True
                 logger.info(
-                    "Auto-enabling neighbour_combine (lr+ stack) for "
-                    "n=%d per group. Pass power_stack=False to disable.",
-                    _min_n,
+                    "Auto-enabling neighbour_combine (lr+ stack, "
+                    "power_stack=%s, n=%d). Pass power_stack='off' to "
+                    "disable.", power_stack, _min_n,
+                )
+            if fdr_method == "fdr_bh":
+                fdr_method = "fdr_tsbh"
+                logger.info(
+                    "Auto-switching fdr_method 'fdr_bh' -> 'fdr_tsbh' "
+                    "(lr+ stack, power_stack=%s).", power_stack,
                 )
             if not sep_fallback:
                 sep_fallback = True
                 logger.info(
-                    "Auto-enabling sep_fallback (lr+ stack) for "
-                    "n=%d per group. Pass power_stack=False to disable.",
-                    _min_n,
+                    "Auto-enabling sep_fallback (lr+ stack, "
+                    "power_stack=%s).", power_stack,
                 )
-    elif power_stack is True:
-        neighbour_combine = True
-        sep_fallback = True
 
     if selected_test == "fisher":
         _warn_fisher_once()
@@ -463,7 +530,7 @@ def dmc(
         from pathlib import Path
         canonical_for_key = _canon(selected_test)
         resume_stage_name = f"dmc_{canonical_for_key}"
-        resume_root = md._analysis_root or md.store
+        resume_root = md.analysis_root or md.store
         resume_sig = input_signature(
             md.store,
             sorted(md.treatment_ids),
@@ -588,21 +655,27 @@ def dmc(
 
         # Neighbour-aware p-value combining (RADMeth-style, since 0.7.1).
         # When enabled, run the signed-Stouffer combiner over the per-CpG
-        # raw p-values, swap the combined p-value into the `pvalue` column
-        # (preserving the raw under `pvalue_raw`), and re-apply BH/Storey
-        # on the combined p-values. Sites without enough neighbours fall
-        # back to their raw p-value identity.
+        # raw p-values and emit the combined p-value as a sibling column
+        # `pvalue_combined` (with `qvalue_combined` from BH/Storey on the
+        # combined values, and `pvalue_combined_n_neighbours` /
+        # `qvalue_combined_reject` as audit columns). The canonical
+        # `pvalue` / `qvalue` columns remain the raw per-CpG values --
+        # downstream consumers that want the combined values must opt in
+        # by reading the `_combined` columns explicitly. Sites without
+        # enough neighbours fall back to their raw p-value identity.
         if neighbour_combine and len(result) > 0:
             from .dmc import combine_neighbour_pvalues
             result = combine_neighbour_pvalues(result, neighbour_bp=neighbour_bp)
-            result = result.with_columns(
-                pl.col("pvalue").alias("pvalue_raw"),
-                pl.col("qvalue").alias("qvalue_raw"),
-            ).with_columns(
-                pl.col("pvalue_combined").alias("pvalue"),
-            ).drop("pvalue_combined")
-            # Re-apply the same FDR method on the new pvalue column.
-            result = apply_multiple_testing_correction(result, method=fdr_method)
+            # Keep `pvalue` / `qvalue` as the raw per-CpG values.
+            # `combine_neighbour_pvalues` already added a `pvalue_combined`
+            # column; produce `qvalue_combined` next to it via BH on the
+            # combined p-values. Downstream consumers that want the
+            # combined values must opt in by reading `pvalue_combined` /
+            # `qvalue_combined`.
+            result = apply_multiple_testing_correction(
+                result, method=fdr_method,
+                pvalue_col="pvalue_combined", qvalue_col="qvalue_combined",
+            )
 
         if empirical_fdr and len(result) > 0:
             result = empirical_fdr_for_dmc(
@@ -698,6 +771,18 @@ def dmc(
                 resume_stage_name, exc,
             )
 
+    # P1-11 deprecation notice – emitted once per tl.dmc call (not per-row,
+    # not per-chromosome).  The transitional 'log2_odds_ratio' column is
+    # NaN-filled in 0.7.5; it will be removed in 0.8.
+    import warnings as _warnings
+    _warnings.warn(
+        "The 'log2_odds_ratio' column is deprecated and will be removed in "
+        "0.8. Use 'log2_odds_ratio_pooled' for pooled-count tests (lr, "
+        "fisher) or 'coef_treatment_log2' for the glm backend. The "
+        "transitional column is NaN-filled in 0.7.5.",
+        FutureWarning, stacklevel=2,
+    )
+
 
 def _run_dmc_contrast(
     md: MethylData,
@@ -712,6 +797,7 @@ def _run_dmc_contrast(
     min_samples_control: int,
     dispersion: str,
     reference: str,
+    reference_level: str | None = None,
 ) -> None:
     """Internal: multi-group / continuous-covariate primary-effect DMC.
 
@@ -743,6 +829,7 @@ def _run_dmc_contrast(
             treatment_col=treatment_col,
             require_treatment_col=need_treatment,
             return_design_info=True,
+            reference_level=reference_level,
         )
     )
 
@@ -868,6 +955,7 @@ def dmr(
     n_perm: int = 100,
     perm_seed: int = 42,
     perm_n_jobs: int = 1,
+    empirical_strata: str | None = None,
     *,
     backend: str = "sequential",
     n_workers: int | None = None,
@@ -899,7 +987,7 @@ def dmr(
 
     Parameters
     ----------
-    method : {"tile", "sliding_window", "hmm", "chain_merge"}
+    method : {"tile", "sliding_window", "segment", "chain_merge"}
         Which DMR algorithm to run.
     preset : {"strict", "default", "permissive"}, optional
         Parameter preset bundle for ``method="chain_merge"``. Applies
@@ -1018,6 +1106,18 @@ def dmr(
                     "designs (label-shuffling invalidates stratification). "
                     "Use a stratified-permutation scheme manually if needed."
                 )
+            # Build strata map from obs column when empirical_strata= supplied.
+            strata_map: dict[str, list[str]] | None = None
+            if empirical_strata is not None and empirical_strata in md.obs.columns:
+                all_samples = list(md.treatment_ids) + list(md.control_ids)
+                obs_indexed = md.obs.filter(
+                    pl.col("sample_id").is_in(all_samples)
+                )
+                strata_map = {}
+                for row in obs_indexed.iter_rows(named=True):
+                    strata_map.setdefault(row[empirical_strata], []).append(
+                        row["sample_id"]
+                    )
             if len(dmr_df) > 0:
                 dmr_df = empirical_fdr_for_dmr(
                     methylstore_path=md.store,
@@ -1027,6 +1127,7 @@ def dmr(
                     n_perm=n_perm,
                     seed=perm_seed,
                     n_jobs=perm_n_jobs,
+                    empirical_strata=strata_map,
                     tile_size_bp=tile_size_bp,
                     test=selected_test,
                     chromosomes=chromosomes,
@@ -1118,14 +1219,14 @@ def dmr(
         }
         return
 
-    if method == "hmm":
-        from .dmr_hmm import call_dmr_hmm
+    if method == "segment":
+        from .dmr_segment import call_dmr_rule_segment
         dmc_df = md.dmc
         if dmc_df is None:
             raise ValueError(
-                "method='hmm' needs a DMC table on md. Run ep.tl.dmc(md) first."
+                "method='segment' needs a DMC table on md. Run ep.tl.dmc(md) first."
             )
-        dmr_df = call_dmr_hmm(
+        dmr_df = call_dmr_rule_segment(
             dmc_df,
             min_cpgs=min_cpgs,
             min_abs_meth_diff=min_abs_meth_diff,
@@ -1133,7 +1234,7 @@ def dmr(
         )
         md.uns["dmr"] = dmr_df
         md.uns["dmr_params"] = {
-            "method": "hmm",
+            "method": "segment",
             "min_cpgs": min_cpgs,
             "min_abs_meth_diff": min_abs_meth_diff,
             "alpha": alpha,
@@ -1198,7 +1299,7 @@ def dmr(
 
     raise ValueError(
         f"Unknown DMR method '{method}'. Expected 'tile', 'sliding_window', "
-        f"'hmm', or 'chain_merge'."
+        f"'segment', or 'chain_merge'."
     )
 
 
@@ -1598,6 +1699,7 @@ def annotate(
     *,
     refgene: str | None = None,
     gene_type_filter: str | list[str] | tuple[str, ...] | None = None,
+    features: list[str] | tuple[str, ...] | None = None,
 ) -> None:
     """Annotate DMC/DMR outputs.
 
@@ -1627,6 +1729,14 @@ def annotate(
         ``all_overlapping_features`` (one-to-many). Set False to skip them
         and keep only the legacy single-best gene-name columns. See
         :func:`epykit.annotate.annotate_features` for details.
+    features : sequence of str or None, keyword-only
+        Override the feature classes built by
+        :func:`epykit.annotate.annotate_features`. Default ``None`` lets
+        the lower-level function pick its own default (the full HOMER set:
+        promoter / 5UTR / exon / intron / 3UTR / TTS / noncoding). Pass a
+        narrower tuple to skip categories -- e.g.
+        ``("promoter", "exon", "intron")`` for the pre-0.x coarse
+        breakdown when downstream code expects only those buckets.
     """
     if gtf and refgene:
         raise ValueError("Provide only one of gtf or refgene, not both")
@@ -1655,15 +1765,16 @@ def annotate(
             # source. We forward whichever the caller set.
             annotation_path = gtf if gtf is not None else refgene
             forwarded_source = "gtf" if gtf is not None else "refgene"
-            ann = annotate_features(
-                ann,
-                annotation_path,
+            af_kwargs = dict(
                 source=forwarded_source,
                 promoter_upstream_bp=promoter_upstream_bp,
                 promoter_downstream_bp=promoter_downstream_bp,
                 multi_annotation=multi_annotation,
                 gene_type_filter=gene_type_filter,
             )
+            if features is not None:
+                af_kwargs["features"] = features
+            ann = annotate_features(ann, annotation_path, **af_kwargs)
         if cpg_islands:
             ann = annotate_cpg_islands(ann, cpg_island_bed=cpg_islands)
 
@@ -1673,15 +1784,16 @@ def annotate(
     if "dmr" in md.uns and isinstance(md.uns["dmr"], pl.DataFrame) and feature_source_present:
         annotation_path = gtf if gtf is not None else refgene
         forwarded_source = "gtf" if gtf is not None else "refgene"
-        md.uns["dmr"] = annotate_features(
-            md.uns["dmr"],
-            annotation_path,
+        af_kwargs = dict(
             source=forwarded_source,
             promoter_upstream_bp=promoter_upstream_bp,
             promoter_downstream_bp=promoter_downstream_bp,
             multi_annotation=multi_annotation,
             gene_type_filter=gene_type_filter,
         )
+        if features is not None:
+            af_kwargs["features"] = features
+        md.uns["dmr"] = annotate_features(md.uns["dmr"], annotation_path, **af_kwargs)
 
     md.uns["annotation"] = {
         "gtf": gtf,
@@ -1693,6 +1805,7 @@ def annotate(
         "promoter_downstream_bp": promoter_downstream_bp,
         "multi_annotation": multi_annotation,
         "gene_type_filter": gene_type_filter,
+        "features": list(features) if features is not None else None,
     }
 
     # Clear GTF cache if requested (default: True)

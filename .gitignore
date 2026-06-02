@@ -2,8 +2,103 @@ raw_data/
 figures/
 mkdocs.yml
 
+# benchmark: commit only the resulting reports + figures + scripts.
+# Everything under benchmark/data/ (raw inputs, intermediate parquets,
+# baseline tables, methylkit per-scenario TSVs, eval_summary.parquet,
+# ground truth) is regenerable from scripts/ and NOT bundled in git.
+# Same for shinygo_lists/, idk_if_needed/, and binary artefacts
+# (.docx, .pptx) -- the markdown copies are the canonical reports.
+benchmark/raw_sim_data/
+benchmark/_converted/
+benchmark/_runs/
+benchmark/_converted_post_phase3/
+benchmark/_runs_post_phase3/
+benchmark/results/
+benchmark/data/**
+benchmark/shinygo_lists/
+benchmark/idk_if_needed/
+benchmark/**/*.docx
+benchmark/**/*.pptx
+# Override the global 'figures/' rule for benchmark/figures/ -- those
+# are the publication figures and ARE committed.
+!benchmark/figures/
+!benchmark/figures/**
+# seed manifest -- reproducibility-critical, tracked
+!benchmark/data/seeds.json
+# Phase 4 methylKit Stouffer-tuned manifest -- paper trail, tracked
+# (re-include parent dirs first; ** above excludes them)
+!benchmark/data/study2/
+!benchmark/data/study2/methylkit_tuned/
+!benchmark/data/study2/methylkit_tuned/MANIFEST.txt
+# but keep the bulk *_tuned.tsv outputs ignored
+benchmark/data/study2/methylkit_tuned/*.tsv
 
+# Phase 4 Task 2: re-run epykit on Piao-as-distributed.
+# Track the paper-critical post-Phase-3 eval summary and its MANIFEST.
+# Per-cell intermediate parquets stay ignored as bulk artefacts.
+!benchmark/data/study1/
+!benchmark/data/study1/eval_summary_post_phase3.parquet
+!benchmark/data/study1/epykit_post_phase3/
+!benchmark/data/study1/epykit_post_phase3/MANIFEST.txt
+benchmark/data/study1/epykit_post_phase3/*/
+benchmark/data/study1/epykit_post_phase3/*.parquet
 
+# Phase 4 Task 3: epykit on the held-out intrinsic-truth simulator.
+# Track the three paper-critical eval parquets + the MANIFEST. Per-cell
+# AMP txt + methylstore caches and the bulk timings parquet stay ignored.
+!benchmark/data/study1b_simulator/
+!benchmark/data/study1b_simulator/eval_per_seed.parquet
+!benchmark/data/study1b_simulator/eval_frozen_grid.parquet
+!benchmark/data/study1b_simulator/eval_seed_iqr.parquet
+!benchmark/data/study1b_simulator/MANIFEST.txt
+# Phase 4 Task 5: 1-seed methylKit + DSS parallel column (intrinsic-truth).
+!benchmark/data/study1b_simulator/eval_simulator_intrinsic.parquet
+!benchmark/data/study1b_simulator/parallel_column_summary.md
+!benchmark/data/study1b_simulator/eval_simulator_intrinsic_per_seed.parquet
+!benchmark/data/study1b_simulator/eval_simulator_intrinsic_iqr.parquet
+!benchmark/data/study1b_simulator/eval_external_timings_per_seed.parquet
+!benchmark/data/study1b_simulator/eval_external_timings_iqr.parquet
+benchmark/data/study1b_simulator/seed=*/
+benchmark/data/study1b_simulator/frozen_grid/
+benchmark/data/study1b_simulator/timings_simulator.parquet
+benchmark/_converted_simulator/
+benchmark/_runs_simulator/
+
+# Phase 4 Task 6: re-run epykit on GSE263850 (Study 3 real cohort).
+# Track the post-Phase-3 cross-tool concordance artefacts + MANIFEST.
+# Per-engine bulk per-CpG/DMR parquets stay ignored (multi-GB each).
+!benchmark/data/study3/
+!benchmark/data/study3/epykit_post_phase3/
+!benchmark/data/study3/epykit_post_phase3/MANIFEST.txt
+benchmark/data/study3/epykit_post_phase3/dmc/
+benchmark/data/study3/epykit_post_phase3/dmr/
+!benchmark/data/study3/comparisons_post_phase3/
+!benchmark/data/study3/comparisons_post_phase3/*.parquet
+!benchmark/data/study3/comparisons_post_phase3/SUMMARY.md
+
+# Phase 4 Task 8: bug-fix audit table for Limitations S10.5.
+# Track the commits.json (extracted commit messages with Affects: trailers),
+# the per-cell delta parquet, and its markdown rendering. Tiny artefacts,
+# all committed as the paper trail for pre/post-fix attribution.
+!benchmark/data/audit/
+!benchmark/data/audit/commits.json
+!benchmark/data/audit/bug_fix_deltas.parquet
+!benchmark/data/audit/bug_fix_deltas.md
+
+# Phase 4 Task 7: null calibration on every (engine, dataset) cell.
+# Track the summary parquet + MANIFEST. Per-engine bulk per-shuffle
+# parquets stay ignored as regenerable artefacts.
+!benchmark/data/null_calibration/
+!benchmark/data/null_calibration/MANIFEST.txt
+!benchmark/data/null_calibration/summary.parquet
+benchmark/data/null_calibration/piao_distributed/
+benchmark/data/null_calibration/simulator/
+benchmark/data/null_calibration/gse263850/
+benchmark/_runs_null_calibration/
+
+# Phase 2: filesystem-only archive of the pre-2026-05-27 benchmark dir
+# (~15 GB of regenerables; kept on disk only, not in git history)
+_legacy_benchmark/
 
 
 

@@ -1,7 +1,8 @@
 # Choosing a DMC Test
 
-epykit ships 8 statistical backends for per-CpG differential methylation
-calling. This guide helps you pick the right one for your analysis scenario.
+epykit ships 4 statistical backends for per-CpG differential methylation
+calling (plus an `auto` dispatcher). This guide helps you pick the right one
+for your analysis scenario.
 
 ## Decision Guide
 
@@ -59,18 +60,15 @@ The `lr` test with default settings (no power stack, standard BH) provides a
 conservative baseline with well-controlled FPR. Use this when strict FDR
 control matters more than sensitivity.
 
-### Quick exploration: welch_t or logit_t
+### Quick exploration: welch_t
 
 ```python
 ep.tl.dmc(md, test="welch_t")
-# or
-ep.tl.dmc(md, test="logit_t")
 ```
 
-These transformation-based tests are fast because they skip the binomial model
-entirely. They compare mean beta values (or logit-transformed betas) using a
-Welch t-test. Useful for rapid exploration but less powerful than `lr` for
-formal analysis.
+This transformation-based test is fast because it skips the binomial model
+entirely. It compares mean beta values using a Welch t-test. Useful for rapid
+exploration but less powerful than `lr` for formal analysis.
 
 ### Single replicate: fisher
 
@@ -89,49 +87,36 @@ produces anti-conservative p-values.
     interpreted as evidence of differential methylation. Use only as an
     exploratory tool.
 
-### Stratified design: cmh
-
-```python
-ep.tl.dmc(md, test="cmh")
-```
-
-The Cochran-Mantel-Haenszel test is designed for stratified 2x2 tables. Use it
-when your samples are grouped into strata (e.g., matched pairs, batches) and
-you want to test for a common odds ratio across strata.
-
 ### Cross-validation with R packages
 
 If you need to reproduce or compare results with R-based tools:
 
 - `ep.tl.dmc(md, test="lr")` produces results comparable to **methylKit**'s
   logistic regression test.
-- `ep.tl.dmc(md, test="bb_lr")` produces results comparable to **DSS**'s
-  beta-binomial likelihood-ratio test.
+
+!!! note "Engines removed in 0.7.5"
+    `cmh` (use `formula='~ group + batch'`), `bb_lr` (use `lr`),
+    `score` (use `lr`), `logit_t` (use `welch_t`). All raise `ValueError`
+    with a one-line migration hint.
 
 ## Comparison Table
 
 | Test | Speed | Power | FPR Control | Covariate Support | Min Replicates |
 |------|-------|-------|-------------|-------------------|----------------|
 | `lr` | Fast | High | Good | No (use `glm`) | 2 |
-| `score` | Fast | Slightly higher than `lr` | Mildly anti-conservative | No | 2 |
 | `glm` | Moderate | High | Good | Yes (full formula) | 2 |
-| `logit_t` | Very fast | Moderate | Good | No | 2 |
 | `welch_t` | Very fast | Moderate | Good | No | 2 |
-| `bb_lr` | Moderate | High | Good | No | 2 |
-| `cmh` | Fast | Moderate | Good | No (stratified only) | 2 per stratum |
 | `fisher` | Fast | Low (no bio variance) | Anti-conservative | No | 1 |
 
 **Speed**: relative wall time per chromosome. "Very fast" = no iterative model
-fitting. "Moderate" = iterative (IRLS for GLM, numerical optimisation for
-bb_lr).
+fitting. "Moderate" = iterative (IRLS for GLM).
 
 **Power**: ability to detect true positives at a given FDR threshold. Assessed
 on simulated WGBS data with known ground truth.
 
 **FPR Control**: how well the test controls false positive rate at the nominal
-level. "Good" = well-calibrated. "Mildly anti-conservative" = slightly
-inflated at small n. "Anti-conservative" = systematically inflated (fisher at
-n=1).
+level. "Good" = well-calibrated. "Anti-conservative" = systematically inflated
+(fisher at n=1).
 
 ## Recipes by Scenario
 
@@ -142,7 +127,6 @@ n=1).
 | Small sample size (n = 2) | `lr` with power stack | `power_stack=True` (EB dispersion stabilises small-n estimates) |
 | Single replicate (n = 1) | `fisher` | `allow_n1=True` |
 | Quick exploratory look | `welch_t` | No special parameters |
-| Matched-pair or batch-stratified | `cmh` | Strata defined via samplesheet |
+| Batch-stratified / covariate design | `glm` | `formula="~ group + batch"` |
 | Reproduce methylKit results | `lr` | Default parameters |
-| Reproduce DSS results | `bb_lr` | Default parameters |
 | Publication with strict FDR | `lr` | `fdr_method="fdr_bh"`, no power stack |

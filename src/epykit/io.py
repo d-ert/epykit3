@@ -135,7 +135,7 @@ def _read_methylation_samplesheet(
         context=context,
         uns=uns,
     )
-    md._analysis_root = str(analysis_root)
+    md.analysis_root = str(analysis_root)
     return md
 
 
@@ -383,5 +383,5 @@ def read_nfcore_methylseq(
         context=context,
         uns=uns,
     )
-    md._analysis_root = str(analysis_root)
+    md.analysis_root = str(analysis_root)
     return md

@@ -94,7 +94,7 @@ def test_dispersion_pool_excludes_separated():
     _beta, _se, _dev, pearson, n_eff = irls_binomial_batch(meth, cov, X)
     df_per_site = n_eff.astype(np.float64) - float(X.shape[1])
 
-    _phi_eff, phi_hat = compute_dispersion_phi(
+    _phi_eff, phi_hat, _df_phi = compute_dispersion_phi(
         pearson_per_site=pearson,
         df_per_site=df_per_site,
         dispersion="chrom",
@@ -117,7 +117,7 @@ def test_dispersion_handles_all_separated():
     cov = np.full((50, 6), 20, dtype=np.int32)
     _beta, _se, _dev, pearson, n_eff = irls_binomial_batch(meth, cov, X)
     df_per_site = n_eff.astype(np.float64) - float(X.shape[1])
-    _phi_eff, phi_hat = compute_dispersion_phi(
+    _phi_eff, phi_hat, _df_phi = compute_dispersion_phi(
         pearson_per_site=pearson,
         df_per_site=df_per_site,
         dispersion="chrom",

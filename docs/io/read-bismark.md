@@ -99,3 +99,27 @@ ep.pp.unite(md)
 ```
 
 See the [Preprocessing overview](../preprocessing/index.md) for the recommended workflow.
+
+## Low-Level Single-Sample Conversion
+
+`ep.read_bismark` ingests a full samplesheet. For programmatic single-sample
+conversion — for example, in pipeline wrappers or when building a methylstore
+incrementally — use `ep.convert_sample` directly:
+
+```python
+import epykit as ep
+
+ep.convert_sample(
+    input_path="tumor_1.cov.gz",
+    sample_id="tumor_1",
+    store_dir="results/methylstore",
+    format="bismark",          # "bismark" | "methyldackel" | "combined_strand_bed"
+    context="CpG",
+)
+```
+
+`ep.convert_sample` writes one per-sample, per-chromosome Parquet partition
+into `store_dir` using the same layout that `ep.read_bismark` produces. It is
+the primitive that `read_bismark` (and the `epykit convert` CLI command) call
+in a loop, and it is the right entry point when you need fine-grained control
+over which samples are ingested or when samples arrive asynchronously.

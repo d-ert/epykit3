@@ -1,0 +1,38 @@
+name: tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    name: pytest (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.9", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          # uv.lock is gitignored (library project), so key cache off pyproject.toml.
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install epykit + test deps
+        run: uv sync --python ${{ matrix.python-version }} --extra dev --extra all
+
+      - name: Run pytest (skip slow)
+        env:
+          PYTHONIOENCODING: utf-8
+        run: uv run --python ${{ matrix.python-version }} pytest -m "not slow" --strict-markers -ra

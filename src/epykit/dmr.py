@@ -1021,7 +1021,13 @@ def _aggregate_sample_to_tiles(
 
 
 def _merge_adjacent_tiles(dmr_df: pl.DataFrame) -> pl.DataFrame:
-    """Merge adjacent significant tiles on the same chromosome with same direction."""
+    """Merge adjacent significant tiles on the same chromosome with same direction.
+
+    The combined p-value uses signed Stouffer with the correct two-sided
+    -> one-sided conversion ``z = isf(p/2)`` and a running ``(sum_z, n)``
+    accumulator so chains of length > 2 combine as ``sum_z / sqrt(n)``,
+    not by iterative pairwise /sqrt(2).
+    """
     if dmr_df.is_empty():
         return dmr_df
 
@@ -1029,11 +1035,25 @@ def _merge_adjacent_tiles(dmr_df: pl.DataFrame) -> pl.DataFrame:
     rows = sorted_df.to_dicts()
     merged: list[dict] = []
     current: dict | None = None
+    current_sum_z = 0.0
+    current_n_z = 0
+
+    def _abs_z(p: float) -> float:
+        # Two-sided p -> magnitude of one-sided z; clamp p to avoid inf.
+        return float(sp_stats.norm.isf(max(p, 1e-300) / 2.0))
+
+    def _finalise(c: dict, sum_z: float, n_z: int) -> dict:
+        if n_z > 0:
+            z_comb = sum_z / math.sqrt(n_z)
+            c["pvalue"] = float(2.0 * sp_stats.norm.sf(abs(z_comb)))
+        return c
 
     for row in rows:
         if current is None:
             current = dict(row)
             current["_count"] = 1
+            current_sum_z = _abs_z(row["pvalue"])
+            current_n_z = 1
             continue
         if (
             row["chrom"] == current["chrom"]
@@ -1050,18 +1070,17 @@ def _merge_adjacent_tiles(dmr_df: pl.DataFrame) -> pl.DataFrame:
             for col in ("n_case", "n_control"):
                 if col in current and current[col] is not None and row.get(col) is not None:
                     current[col] = max(current[col], row[col])
-            z1 = sp_stats.norm.isf(max(current["pvalue"], 1e-300))
-            z2 = sp_stats.norm.isf(max(row["pvalue"], 1e-300))
-            current["pvalue"] = float(sp_stats.norm.sf(
-                (z1 + z2) / math.sqrt(2)
-            ))
+            current_sum_z += _abs_z(row["pvalue"])
+            current_n_z += 1
             current["_count"] = prev_n + 1
         else:
-            merged.append(current)
+            merged.append(_finalise(current, current_sum_z, current_n_z))
             current = dict(row)
             current["_count"] = 1
+            current_sum_z = _abs_z(row["pvalue"])
+            current_n_z = 1
     if current is not None:
-        merged.append(current)
+        merged.append(_finalise(current, current_sum_z, current_n_z))
 
     for m in merged:
         m.pop("_count", None)
@@ -1080,7 +1099,7 @@ def call_dmr_tile_based(
     samples_treatment: list[str] | None = None,
     samples_control: list[str] | None = None,
     tile_size_bp: int = 1000,
-    test: str = "logit_t",
+    test: str = "lr",
     chromosomes: list[str] | None = None,
     min_cpgs_per_tile: int = 5,
     alpha: float = 0.05,
@@ -1129,9 +1148,9 @@ def call_dmr_tile_based(
     tile_size_bp : int
         Tile width in bp (default 1000). Adjacent tiles do not overlap.
     test : str
-        Statistical test for tile-level counts. Defaults to ``"logit_t"``
-        -- Welch t on logit(beta), a robust fallback at the tile level
-        where counts are large.
+        Statistical test for tile-level counts. Defaults to ``"lr"``
+        (quasi-binomial likelihood-ratio), the recommended default
+        when tile-level pooled counts are available.
     chromosomes : list[str], optional
         Chromosomes to process. Auto-detected when None.
     min_cpgs_per_tile : int
@@ -1265,6 +1284,20 @@ def call_dmr_tile_based(
         schema={"chrom": pl.Utf8, "pos": pl.Int32, "n_cpgs": pl.Int32},
     )
 
+    # P1-11: DMC output no longer has a real-valued 'log2_odds_ratio' column;
+    # the backend-specific names are 'log2_odds_ratio_pooled' (lr/fisher) and
+    # 'coef_treatment_log2' (glm).  Normalise to 'log2_odds_ratio' for the
+    # DMR output schema (DMR schema rename is deferred to 0.8).
+    _log2_src = (
+        "coef_treatment_log2"
+        if "coef_treatment_log2" in tile_dmc.columns
+        else "log2_odds_ratio_pooled"
+    )
+    if _log2_src in tile_dmc.columns:
+        tile_dmc = tile_dmc.with_columns(
+            pl.col(_log2_src).alias("log2_odds_ratio")
+        )
+
     dmr_df = (
         tile_dmc
         .join(n_cpgs_df, on=["chrom", "pos"], how="left")
@@ -1319,6 +1352,7 @@ def empirical_fdr_for_dmr(
     n_perm: int = 100,
     seed: int = 42,
     n_jobs: int = 1,
+    empirical_strata: "dict[str, list[str]] | None" = None,
     **dmr_kwargs,
 ) -> pl.DataFrame:
     """Empirical (permutation) FDR for tile-based DMRs.
@@ -1343,6 +1377,12 @@ def empirical_fdr_for_dmr(
     n_jobs
         joblib parallel worker count. -1 uses all cores. Falls back to
         serial execution when joblib is not installed.
+    empirical_strata : dict[str, list[str]] or None
+        When supplied, a mapping from stratum label to the list of sample
+        IDs belonging to that stratum.  Labels are shuffled **within** each
+        stratum rather than globally.  Build this dict from ``md.obs`` in
+        the caller (see :func:`epykit.tl.dmr`).  When ``None`` (default),
+        the standard global shuffle is used.
     **dmr_kwargs
         Forwarded to ``call_dmr_tile_based`` for each permutation; should
         match the observed run's settings (tile_size_bp, test, alpha,
@@ -1364,14 +1404,28 @@ def empirical_fdr_for_dmr(
         ])
 
     n_treat = len(samples_treatment)
+    n_ctrl = len(samples_control)
+    if n_treat == 1 and n_ctrl == 1:
+        raise ValueError(
+            "empirical DMR FDR requires n>=2 per group; got n_treat=1, "
+            "n_ctrl=1. Use Fisher-derived p-values directly via "
+            "tl.dmc(test='fisher')."
+        )
+
     pool = list(samples_treatment) + list(samples_control)
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(seed)  # noqa: F841  (kept for reproducibility docs)
 
     def _run_one_perm(perm_idx: int) -> np.ndarray:
         # Local RNG so parallel workers stay deterministic.
         local_rng = np.random.default_rng(seed + perm_idx + 1)
-        shuffled = pool.copy()
-        local_rng.shuffle(shuffled)
+        if empirical_strata is not None:
+            # Shuffle within each stratum and re-assemble the pool.
+            shuffled: list[str] = []
+            for group_samples in empirical_strata.values():
+                shuffled.extend(local_rng.permutation(group_samples).tolist())
+        else:
+            shuffled = pool.copy()
+            local_rng.shuffle(shuffled)
         perm_treat = shuffled[:n_treat]
         perm_ctrl = shuffled[n_treat:]
         # Force test='lr' or whatever observed used; do not run annotation.
@@ -1411,19 +1465,32 @@ def empirical_fdr_for_dmr(
             "p-values default to 1 / (1 + n_perm).",
             n_perm,
         )
-    null_pool = (
-        np.concatenate(null_pvals_list) if any(len(a) for a in null_pvals_list)
-        else np.array([1.0])
-    )
-    null_sorted = np.sort(null_pool)
+
+    # Per-permutation tail count (max-T style):
+    # For each observed DMR with p = p_obs, count the number of
+    # permutations that produced at least one null DMR with p <= p_obs.
+    # Denominator is n_perm + 1 (not |pooled null| + 1) so the empirical
+    # p-value floor is 1 / (n_perm + 1), independent of how many DMRs
+    # each permutation emitted. This is the standard region-statistic
+    # FDR; pooling p-values across perms would inflate the denominator
+    # and anti-conservatively shrink emp_p.
     obs_p = observed_dmr.get_column("pvalue").to_numpy()
-    # For each observed p, count null DMRs with raw pvalue <= obs_p.
-    # Plus-one in num/den is the standard "add 1" correction so empirical
-    # p never hits 0 with finite permutations.
-    counts = np.searchsorted(null_sorted, obs_p, side="right")
-    total_null = max(len(null_sorted), 1)
-    emp_p = (counts + 1.0) / (total_null + 1.0)
+    obs_finite_mask = np.isfinite(obs_p)
+    obs_safe = np.where(obs_finite_mask, obs_p, 1.0)
+
+    # min_null_p_per_perm[i] = min p across all null DMRs from perm i
+    # (1.0 if perm produced no DMRs). The number of perms with at least
+    # one null <= p_obs is then sum(min_null_p_per_perm <= p_obs).
+    min_null_p_per_perm = np.array([
+        float(arr.min()) if len(arr) > 0 else 1.0
+        for arr in null_pvals_list
+    ], dtype=np.float64)
+    min_null_sorted = np.sort(min_null_p_per_perm)
+    # For each obs p, count perms with min_null <= obs p.
+    counts = np.searchsorted(min_null_sorted, obs_safe, side="right")
+    emp_p = (counts + 1.0) / (n_perm + 1.0)
     emp_p = np.clip(emp_p, 0.0, 1.0)
+    emp_p = np.where(obs_finite_mask, emp_p, np.nan)
 
     # BH-adjust to empirical q-value
     from statsmodels.stats.multitest import multipletests

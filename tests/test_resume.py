@@ -138,11 +138,11 @@ def test_dmc_resume_invalidated_when_params_change(synth_md_filtered):
     ep.tl.dmc(md, test="lr", resumable=True)
     assert md.uns["dmc"].get("resumed") is not True
 
-    # Different test name -> different stage key (dmc_score vs dmc_lr) ->
+    # Different test name -> different stage key (dmc_welch_t vs dmc_lr) ->
     # cache miss, fresh computation.
-    ep.tl.dmc(md, test="score", resumable=True)
+    ep.tl.dmc(md, test="welch_t", resumable=True)
     assert md.uns["dmc"].get("resumed") is not True
-    assert md.uns["dmc"]["test_used"] == "score"
+    assert md.uns["dmc"]["test_used"] == "welch_t"
 
 
 # ---- 3. MethylData.resume_from -----------------------------------------
@@ -162,7 +162,7 @@ def test_resume_from_loads_dmc_into_varm(synth_md_filtered):
         store=md.store,
         assembly=md.assembly,
         context=md.context,
-        _analysis_root=md._analysis_root,
+        analysis_root=md.analysis_root,
     )
     assert "dmc_lr" not in md2.varm
     ok = md2.resume_from("dmc_lr")

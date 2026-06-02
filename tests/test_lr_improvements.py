@@ -15,12 +15,14 @@ import numpy as np
 import polars as pl
 import pytest
 
+import epykit as ep
 from epykit.dmc import (
     _storey_pi0,
     _apply_storey_qvalues,
     apply_multiple_testing_correction,
     combine_neighbour_pvalues,
 )
+from tests.fixtures.synth import SimConfig, generate
 
 pytestmark = pytest.mark.slow
 
@@ -183,3 +185,126 @@ def test_neighbour_combine_never_inflates_pvalue():
     # Allow tiny floating-point slack.
     assert (comb <= raw + 1e-12).all(), \
         "combine_neighbour_pvalues must never produce a p larger than raw"
+
+
+# --- power_stack dispatch (1.0 breaking change) -----------------------------
+
+
+def _make_md_for_power_stack(n_per_group: int, tmp_path_local):
+    """Build a small MethylData with n_per_group samples per group.
+
+    Uses the same Bismark/.cov -> read_bismark -> filter_coverage pattern
+    as the conftest synth_md_filtered fixture, but with a configurable
+    n_per_group and a small chromosome set to keep runtime short.
+    """
+    cfg = SimConfig(
+        n_per_group=n_per_group,
+        chromosomes=("chr1",),
+        cpgs_per_chrom=500,
+        n_scattered_dmcs=50,
+        n_dmrs=2,
+        dmr_size_cpgs=5,
+        seed=123,
+    )
+    result = generate(cfg, tmp_path_local / f"n{n_per_group}")
+    md = ep.read_bismark(
+        result["samplesheet"],
+        treatment_group="treatment",
+        control_group="control",
+        store_dir=str(tmp_path_local / f"store_n{n_per_group}"),
+    )
+    ep.pp.filter_coverage(md, lo_count=2, hi_perc=99.9)
+    ep.pp.set_unite_type(md, type="intersect")
+    return md
+
+
+def test_power_stack_auto_engages_all_four_at_any_n(tmp_path, caplog):
+    """power_stack='auto' flips neighbour_combine, fdr_method, sep_fallback
+    even when n > 2 (1.0 breaking change vs 0.7.6)."""
+    import logging
+    caplog.set_level(logging.INFO, logger="epykit.tl")
+    md = _make_md_for_power_stack(n_per_group=5, tmp_path_local=tmp_path)
+    ep.tl.dmc(md, test="lr", power_stack="auto")
+
+    # neighbour_combine ON -> emits pvalue_combined column.
+    assert "pvalue_combined" in md.varm["dmc_lr"].columns, (
+        "power_stack='auto' at n=5 must engage neighbour_combine "
+        "(1.0 breaking change)"
+    )
+    # fdr_method auto-flipped: INFO log line.
+    log_text = " ".join(r.message for r in caplog.records)
+    assert "fdr_method" in log_text and "fdr_tsbh" in log_text, (
+        f"Expected INFO log for fdr_method flip; got: {log_text!r}"
+    )
+
+
+def test_power_stack_lr_plus_alias(tmp_path):
+    """power_stack='lr+' is an explicit alias for the full stack."""
+    md = _make_md_for_power_stack(n_per_group=5, tmp_path_local=tmp_path)
+    ep.tl.dmc(md, test="lr", power_stack="lr+")
+    assert "pvalue_combined" in md.varm["dmc_lr"].columns, (
+        "power_stack='lr+' must engage neighbour_combine"
+    )
+
+
+def test_power_stack_conservative_preserves_pre_1_0_behavior(tmp_path):
+    """power_stack='conservative' engages only at n <= 2 (pre-1.0 'auto')."""
+    md_small = _make_md_for_power_stack(n_per_group=2, tmp_path_local=tmp_path)
+    md_large = _make_md_for_power_stack(n_per_group=5, tmp_path_local=tmp_path)
+    ep.tl.dmc(md_small, test="lr", power_stack="conservative")
+    ep.tl.dmc(md_large, test="lr", power_stack="conservative")
+    assert "pvalue_combined" in md_small.varm["dmc_lr"].columns, (
+        "power_stack='conservative' at n=2 must engage neighbour_combine"
+    )
+    assert "pvalue_combined" not in md_large.varm["dmc_lr"].columns, (
+        "power_stack='conservative' at n=5 must NOT engage neighbour_combine"
+    )
+
+
+def test_power_stack_off_leaves_knobs_at_user_values(tmp_path):
+    """power_stack='off' (or False) does not flip anything."""
+    md = _make_md_for_power_stack(n_per_group=5, tmp_path_local=tmp_path)
+    ep.tl.dmc(md, test="lr", power_stack="off",
+              neighbour_combine=False, fdr_method="fdr_bh",
+              sep_fallback=False)
+    assert "pvalue_combined" not in md.varm["dmc_lr"].columns, (
+        "power_stack='off' must leave neighbour_combine=False"
+    )
+
+
+def test_power_stack_true_is_lr_plus_alias(tmp_path):
+    """Bare True aliases 'lr+'."""
+    md = _make_md_for_power_stack(n_per_group=5, tmp_path_local=tmp_path)
+    ep.tl.dmc(md, test="lr", power_stack=True)
+    assert "pvalue_combined" in md.varm["dmc_lr"].columns, (
+        "power_stack=True must alias 'lr+' and engage neighbour_combine"
+    )
+
+
+def test_power_stack_false_is_off_alias(tmp_path):
+    """Bare False aliases 'off' (no flips)."""
+    md = _make_md_for_power_stack(n_per_group=5, tmp_path_local=tmp_path)
+    ep.tl.dmc(md, test="lr", power_stack=False,
+              neighbour_combine=False, fdr_method="fdr_bh",
+              sep_fallback=False)
+    assert "pvalue_combined" not in md.varm["dmc_lr"].columns, (
+        "power_stack=False must alias 'off' and leave neighbour_combine=False"
+    )
+
+
+def test_power_stack_unknown_string_raises(tmp_path):
+    """Unknown power_stack strings raise ValueError before running."""
+    md = _make_md_for_power_stack(n_per_group=5, tmp_path_local=tmp_path)
+    with pytest.raises(ValueError, match="power_stack must be one of"):
+        ep.tl.dmc(md, test="lr", power_stack="ultra")
+
+
+def test_power_stack_default_is_off_no_breaking_change(tmp_path):
+    """Spec §1 decision 1: bare tl.dmc(test='lr') with no power_stack arg
+    produces bare-engine output (no neighbour_combine, no tsbh, no sep_fallback).
+    This pins the default behavior and prevents accidental regression to the
+    'auto'-as-default change that contradicted the spec."""
+    md = _make_md_for_power_stack(n_per_group=5, tmp_path_local=tmp_path)
+    ep.tl.dmc(md, test="lr")  # NO power_stack arg
+    # No power-stack engagement -> no combined columns added.
+    assert "pvalue_combined" not in md.varm["dmc_lr"].columns
