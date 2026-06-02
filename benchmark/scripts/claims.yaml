@@ -1,4 +1,4 @@
-# Phase 3 seed: empty. Phase 4 populates during the locked re-run.
+# Phase 3 seed: populated 2026-06-02 with paper headline cells.
 # Schema per entry:
 #   - claim_id: <id>
 #     parquet:  <path>
@@ -6,4 +6,163 @@
 #     filter:   {col: val, ...}
 #     expected: <float>
 #     precision: <float>
-[]
+
+# ── Study 1: Piao-as-distributed, coverage=10, meth_diff_bin=all, q<0.05 ──────
+
+- claim_id: study1_lr_auroc_cov10
+  parquet: benchmark/data/study1/eval_summary_post_phase3.parquet
+  column: auroc
+  filter:
+    tool: epykit_lr
+    scenario: dmc_coverage
+    parameter_value: 10
+    meth_diff_bin: "all"
+    threshold_kind: qvalue
+    threshold: 0.05
+  expected: 0.999949
+  precision: 0.001
+
+- claim_id: study1_lr_tpr_cov10
+  parquet: benchmark/data/study1/eval_summary_post_phase3.parquet
+  column: tpr
+  filter:
+    tool: epykit_lr
+    scenario: dmc_coverage
+    parameter_value: 10
+    meth_diff_bin: "all"
+    threshold_kind: qvalue
+    threshold: 0.05
+  expected: 0.962248
+  precision: 0.005
+
+- claim_id: study1_lr_f1_cov10
+  parquet: benchmark/data/study1/eval_summary_post_phase3.parquet
+  column: f1
+  filter:
+    tool: epykit_lr
+    scenario: dmc_coverage
+    parameter_value: 10
+    meth_diff_bin: "all"
+    threshold_kind: qvalue
+    threshold: 0.05
+  expected: 0.980736
+  precision: 0.005
+
+- claim_id: study1_lrplus_auroc_cov10
+  parquet: benchmark/data/study1/eval_summary_post_phase3.parquet
+  column: auroc
+  filter:
+    tool: epykit_lrplus
+    scenario: dmc_coverage
+    parameter_value: 10
+    meth_diff_bin: "all"
+    threshold_kind: qvalue
+    threshold: 0.05
+  expected: 0.999976
+  precision: 0.001
+
+- claim_id: study1_lrplus_tpr_cov10
+  parquet: benchmark/data/study1/eval_summary_post_phase3.parquet
+  column: tpr
+  filter:
+    tool: epykit_lrplus
+    scenario: dmc_coverage
+    parameter_value: 10
+    meth_diff_bin: "all"
+    threshold_kind: qvalue
+    threshold: 0.05
+  expected: 0.999700
+  precision: 0.005
+
+- claim_id: study1_fisher_auroc_cov10
+  parquet: benchmark/data/study1/eval_summary_post_phase3.parquet
+  column: auroc
+  filter:
+    tool: epykit_fisher
+    scenario: dmc_coverage
+    parameter_value: 10
+    meth_diff_bin: "all"
+    threshold_kind: qvalue
+    threshold: 0.05
+  expected: 0.999951
+  precision: 0.001
+
+# ── Study 1b: Simulator intrinsic, seed=2026000, cov=10, meth_diff_bin=all, q<0.05 ──
+
+- claim_id: simulator_methylkit_auroc_seed0_cov10
+  parquet: benchmark/data/study1b_simulator/eval_simulator_intrinsic_per_seed.parquet
+  column: auroc
+  filter:
+    tool: methylkit
+    seed: 2026000
+    threshold_kind: qvalue
+    threshold: 0.05
+    meth_diff_bin: "all"
+  expected: 0.924632
+  precision: 0.001
+
+- claim_id: simulator_dss_nosmooth_auroc_seed0_cov10
+  parquet: benchmark/data/study1b_simulator/eval_simulator_intrinsic_per_seed.parquet
+  column: auroc
+  filter:
+    tool: dss_nosmooth
+    seed: 2026000
+    threshold_kind: qvalue
+    threshold: 0.05
+    meth_diff_bin: "all"
+  expected: 0.907052
+  precision: 0.001
+
+- claim_id: simulator_dss_smooth_auroc_seed0_cov10
+  parquet: benchmark/data/study1b_simulator/eval_simulator_intrinsic_per_seed.parquet
+  column: auroc
+  filter:
+    tool: dss
+    seed: 2026000
+    threshold_kind: qvalue
+    threshold: 0.05
+    meth_diff_bin: "all"
+  expected: 0.627174
+  precision: 0.001
+
+# ── Null calibration: empirical FDR (gse263850 real dataset, 10 shuffles) ──────
+
+- claim_id: null_calib_lr_gse263850_fdr_median
+  parquet: benchmark/data/null_calibration/summary.parquet
+  column: observed_fdr_median
+  filter:
+    engine: lr
+    dataset: gse263850
+  expected: 0.0000153036
+  precision: 0.00001
+
+- claim_id: null_calib_lrplus_gse263850_fdr_median
+  parquet: benchmark/data/null_calibration/summary.parquet
+  column: observed_fdr_median
+  filter:
+    engine: lr_plus
+    dataset: gse263850
+  expected: 0.0000153036
+  precision: 0.00001
+
+# ── Timings: wall-clock seconds at coverage=10 (dmc_coverage scenario) ─────────
+
+- claim_id: headline_wallclock_epykit_lr
+  parquet: benchmark/data/study1/timings_post_phase3.parquet
+  column: wall_s
+  filter:
+    tool: epykit_lr
+    scenario: dmc_coverage
+    parameter_value: 10
+  expected: 0.858232
+  precision: 0.5
+
+- claim_id: headline_wallclock_epykit_lrplus
+  parquet: benchmark/data/study1/timings_post_phase3.parquet
+  column: wall_s
+  filter:
+    tool: epykit_lrplus
+    scenario: dmc_coverage
+    parameter_value: 10
+  expected: 6.798283
+  precision: 0.5
