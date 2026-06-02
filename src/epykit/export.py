@@ -7,6 +7,7 @@ Functions
 * ``dmcs_to_bed``  : DMC table -> BED, optionally filtered by alpha / |Deltabeta|.
 * ``dmrs_to_bed``  : DMR table -> BED.
 * ``dmr_to_tsv``   : DMR table -> TSV/CSV (full table, sorted by chrom/start).
+* ``dmc_to_tsv``   : DMC table -> TSV/CSV (significant or full, with lr+ combined-p support).
 
 All BedGraph / BED writers work with no extra dependencies. ``to_bigwig``
 imports ``pyBigWig`` lazily and raises a friendly error if missing
@@ -348,10 +349,49 @@ def dmr_to_tsv(md: MethylData, path: str) -> str:
     return _write_table(df.sort(sort_cols), path)
 
 
+def dmc_to_tsv(
+    md: MethylData,
+    path: str,
+    *,
+    alpha: float = 0.05,
+    full: bool = False,
+    test: str | None = None,
+) -> str:
+    """Write the DMC table as TSV/CSV.
+
+    Default: significant-only (qvalue < alpha) sorted by qvalue ascending.
+    full=True: every row, sorted by (chrom, pos). When the frame carries
+    `qvalue_combined` (from the lr+ neighbour-combine knob), that column
+    drives the significance filter and the sort; otherwise `qvalue`.
+
+    Delimiter is derived from the path suffix (.csv -> comma, else tab).
+    """
+    df = _resolve_dmc_table(md, test)
+    q_col = "qvalue_combined" if "qvalue_combined" in df.columns else "qvalue"
+    p_col = "pvalue_combined" if "pvalue_combined" in df.columns else "pvalue"
+
+    if full:
+        out_df = df.sort(["chrom", "pos"])
+    else:
+        # Significance gate: prefer qvalue (combined or raw); fall back to
+        # pvalue when no qvalue column is present at all.
+        gate_col = q_col if q_col in df.columns else p_col
+        out_df = (
+            df.filter(
+                pl.col(gate_col).is_not_null()
+                & pl.col(gate_col).is_not_nan()
+                & (pl.col(gate_col) < alpha)
+            )
+            .sort(gate_col)
+        )
+    return _write_table(out_df, path)
+
+
 __all__ = [
     "to_bedgraph",
     "to_bigwig",
     "dmcs_to_bed",
     "dmrs_to_bed",
     "dmr_to_tsv",
+    "dmc_to_tsv",
 ]
