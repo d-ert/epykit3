@@ -1,0 +1,163 @@
+site_name: epykit
+site_description: Parquet-backed WGBS methylation analysis pipeline -- from Bismark / MethylDackel coverage to DMCs, DMRs, annotation, and shareable HTML reports.
+site_url: https://d-ert.github.io/epykit3/
+site_author: Deniz Ertürk
+repo_url: https://github.com/d-ert/epykit3
+repo_name: d-ert/epykit3
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2025-2026 Deniz Ertürk
+
+docs_dir: docs
+site_dir: site
+
+exclude_docs: |
+  superpowers/
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.action.edit
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/d-ert/epykit3
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - pymdownx.caret
+
+plugins:
+  - search
+
+watch:
+  - docs
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Core Concepts: getting-started/concepts.md
+      - Samplesheet Format: getting-started/samplesheet.md
+  - I/O:
+      - Overview: io/index.md
+      - Read Bismark: io/read-bismark.md
+      - Read MethylDackel: io/read-methyldackel.md
+      - Read combined-strand BED: io/read-combined-strand-bed.md
+      - Read nf-core/methylseq: io/read-nfcore.md
+      - Save and Load: io/load-save.md
+  - Preprocessing:
+      - Overview: preprocessing/index.md
+      - Filter Coverage: preprocessing/filter-coverage.md
+      - Normalize Coverage: preprocessing/normalize-coverage.md
+      - Unite Sites: preprocessing/unite.md
+      - Smoothing: preprocessing/smooth.md
+      - Aggregate Regions: preprocessing/aggregate-regions.md
+  - Analysis:
+      - Overview: analysis/index.md
+      - QC: analysis/qc.md
+      - DMC Calling: analysis/dmc.md
+      - DMR Calling: analysis/dmr.md
+      - lr+ Power Stack: analysis/lr-plus.md
+      - Covariate / Multi-group: analysis/covariates.md
+      - Annotation: analysis/annotate.md
+      - Differential Variability: analysis/dvc.md
+      - Allele-specific Methylation: analysis/asm.md
+      - Methylation Entropy: analysis/entropy.md
+      - Partially Methylated Domains: analysis/pmd.md
+      - Hypo-/low-methylated Regions: analysis/hmr.md
+      - Epigenetic Age Clocks: analysis/age-clock.md
+      - Cell-type Deconvolution: analysis/deconvolve.md
+  - Plotting:
+      - Overview: plotting/index.md
+      - Differential: plotting/differential.md
+      - DMR Plots: plotting/dmr-plots.md
+      - Clustering: plotting/clustering.md
+      - Genomic: plotting/genomic.md
+      - Metaplots: plotting/metaplots.md
+      - QC Plots: plotting/qc-plots.md
+      - Annotation Plots: plotting/annotation-plots.md
+      - Figure Grid: plotting/figure-grid.md
+  - Query: query/index.md
+  - Export:
+      - Overview: export/index.md
+      - AnnData / MuData: export/anndata.md
+      - methylKit: export/methylkit.md
+      - Genome Browsers: export/genome-browsers.md
+      - MultiQC: export/multiqc.md
+      - HTML Report: export/html-report.md
+  - CLI: cli/index.md
+  - Cookbook:
+      - End-to-end Pipeline: cookbook/end-to-end.md
+      - Comparing DMC Tests: cookbook/comparing-dmc-tests.md
+      - nf-core Integration: cookbook/nfcore-integration.md
+  - Advanced:
+      - Methylstore Internals: advanced/methylstore.md
+      - Low-level Engines: advanced/low-level-engines.md
+      - Shrinkage: advanced/shrinkage.md
+      - Imputation: advanced/imputation.md
+      - Distributed Execution: advanced/distributed.md
+  - Reference:
+      - MethylData API: reference/methyldata.md
+      - Changelog: reference/changelog.md

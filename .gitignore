@@ -1,6 +1,5 @@
 raw_data/
 figures/
-mkdocs.yml
 
 # benchmark: commit only the resulting reports + figures + scripts.
 # Everything under benchmark/data/ (raw inputs, intermediate parquets,
