@@ -319,9 +319,38 @@ def dmrs_to_bed(
     return str(out.resolve())
 
 
+def _separator_for(path: str) -> str:
+    """Tab unless the path ends in .csv (case-insensitive)."""
+    return "," if str(path).lower().endswith(".csv") else "\t"
+
+
+def _write_table(df: pl.DataFrame, path: str) -> str:
+    """Write `df` to `path` using the suffix-derived delimiter.
+
+    Returns the resolved absolute path. Creates parent directories.
+    """
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    df.write_csv(str(out), separator=_separator_for(path))
+    logger.info("Wrote table: %s (%d rows)", out, len(df))
+    return str(out.resolve())
+
+
+def dmr_to_tsv(md: MethylData, path: str) -> str:
+    """Write the DMR table (md.uns['dmr']) as TSV/CSV.
+
+    Full table, sorted by (chrom, start). Delimiter is derived from the
+    path suffix (.csv -> comma, otherwise tab).
+    """
+    df = _resolve_dmr_table(md)
+    sort_cols = ["chrom", "start"] if "start" in df.columns else ["chrom"]
+    return _write_table(df.sort(sort_cols), path)
+
+
 __all__ = [
     "to_bedgraph",
     "to_bigwig",
     "dmcs_to_bed",
     "dmrs_to_bed",
+    "dmr_to_tsv",
 ]
