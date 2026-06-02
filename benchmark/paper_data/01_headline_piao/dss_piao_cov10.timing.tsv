@@ -1,0 +1,4 @@
+phase	wall_s	cpu_s
+read+bsseq	2.34	2.11
+DMLfit.multiFactor	9	9
+DMLtest.multiFactor	0.490000000000002	0.48

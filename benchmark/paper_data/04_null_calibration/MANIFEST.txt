@@ -1,0 +1,51 @@
+null_calibration -- Phase 4 Task 7 (run_phase4_null_calibration.py)
+
+Date           : 2026-06-01 18:14:03
+epykit version : 0.7.2
+Engine tag     : v0.7.5-phase3-engines-frozen
+Git HEAD       : 15a57b2db423bc33ce33db1b9bb171564bfe3eb9
+q-threshold    : 0.05
+
+Datasets:
+  piao_distributed        scenario=cov10_3v3         engines=lr,lr_plus,welch_t,fisher            k=20  wall=0.0s
+  simulator               scenario=sim_cov10_3v3     engines=lr,lr_plus,welch_t,fisher            k=20  wall=0.0s
+  gse263850               scenario=gse263850         engines=lr,lr_plus,welch_t,fisher,glm        k=10  wall=0.0s
+
+Total wallclock: 0.0s
+
+Per-(dataset, engine) outcome:
+
+Summary table (benchmark/data/null_calibration/summary.parquet):
+  rows=12
+  gse263850              glm        median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/5404573
+  gse263850              lr         median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=337/22020939
+  gse263850              lr_plus    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=337/22020939
+  gse263850              welch_t    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/21013534
+  piao_distributed       fisher     median_FDR=0.0000  IQR=[0.0000, 0.0001]  n_called_med=1/100000
+  piao_distributed       lr         median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/100000
+  piao_distributed       lr_plus    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/100000
+  piao_distributed       welch_t    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/88769
+  simulator              fisher     median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/100000
+  simulator              lr         median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/100000
+  simulator              lr_plus    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/100000
+  simulator              welch_t    median_FDR=0.0000  IQR=[0.0000, 0.0000]  n_called_med=0/94253
+
+Per-engine bulk parquets:
+  benchmark/data/null_calibration/piao_distributed/cov10_3v3/<engine>.parquet
+  benchmark/data/null_calibration/simulator/sim_cov10_3v3/<engine>.parquet
+  benchmark/data/null_calibration/gse263850/<engine>.parquet
+These are gitignored as bulk artefacts; regenerable via
+run_phase4_null_calibration.py. summary.parquet + this MANIFEST are tracked.
+
+Sealed Phase-3 helpers invoked as subprocess (never modified):
+  benchmark/scripts/run_null_calibration.py
+  benchmark/scripts/_null_engines.py
+  benchmark/scripts/wilson_bootstrap_ci.py
+
+Methodology:
+  For each (dataset, engine) cell we relabel the 6-sample cohort
+  via k uniformly-random 3v3 assignments (rng=np.random.default_rng(seed)),
+  rerun the engine, and record the proportion of CpGs called
+  significant at q<{q}. Under a calibrated test with no true
+  DMCs in the shuffled design, this proportion ~= q. <<{q} means
+  the test is conservative; >>0.05 means anti-conservative.

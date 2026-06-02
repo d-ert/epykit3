@@ -1,0 +1,79 @@
+[
+  {
+    "_note": "Hand-crafted from `git log main..v0.7.5-phase3-engines-frozen` (51 commits, 11 with Affects: trailers). Semantic placeholders in the original trailers (`@all`, `@small-table-cells`, `@degenerate-cells`, `@all-significant-cells`) are expanded here into the literal scenarios that appear in `eval_summary_pre_phase1.parquet` and `eval_summary_post_phase3.parquet` (dmc_coverage, dmc_replicate, dmr_coverage). `epykit_lrplus` cells are attributed to the same lr-engine fixes because `lr+` is the lr engine with neighbour-combine + tsbh + sep_fallback + eb dispersion layered on top -- any change in the underlying lr code path propagates to lrplus. The original commit messages are preserved verbatim in the `_original_body` field for audit; only the `body` field used by bug_fix_audit.py is rewritten with literal scenarios.",
+    "_range": "main..v0.7.5-phase3-engines-frozen",
+    "_extraction_recipe": "If a future re-run needs to regenerate this file from git, the safe one-liner uses ASCII US (\\x1f) and RS (\\x1e) separators that cannot appear in commit messages: `git log --format='%H%x1f%s%x1f%b%x1e' <range>` then split on RS, then on US into (hash, subject, body). Avoid embedding JSON quotes in the --format string; multi-line bodies with quotes/backslashes break that approach."
+  },
+  {
+    "hash": "fe218c742e08a91e5cf748f51f0ba7bdd63ed8bf",
+    "subject": "fix(dmc) P1-1: Fisher two-sided uses mid-p convention",
+    "body": "Affects: fisher@dmc_coverage, fisher@dmc_replicate",
+    "_original_body": "Affects: fisher@small-table-cells"
+  },
+  {
+    "hash": "b676550972616c0db1b3f3e08204956870bc6b51",
+    "subject": "fix(dmc) P1-3: wire Newcombe CI into lr and fisher meth_diff_ci_{lo,hi}",
+    "body": "Affects: lr@dmc_coverage, lr@dmc_replicate, fisher@dmc_coverage, fisher@dmc_replicate, lrplus@dmc_coverage, lrplus@dmc_replicate",
+    "_original_body": "Affects: lr@all, fisher@all"
+  },
+  {
+    "hash": "13cc6f33e063db92ae038c5d13be128f4d189529",
+    "subject": "fix(_glm) P1-5: NaN-mask non-converged IRLS sites + log fraction",
+    "body": "Affects: glm@dmc_coverage, glm@dmc_replicate",
+    "_original_body": "Affects: glm@degenerate-cells"
+  },
+  {
+    "hash": "dbb7160b13401b45398f163d9a426a1850108476",
+    "subject": "fix(dvc) P1-7: Brown-Forsythe replaces Bartlett on bounded beta",
+    "body": "Affects: dvc@dmc_coverage, dvc@dmc_replicate",
+    "_original_body": "Affects: dvc@all"
+  },
+  {
+    "hash": "f2f9e4e49374f8db02aa081e119763bdacb189f0",
+    "subject": "fix(dmc) P1-10: _storey_pi0 clamped at 1/n (Storey 2002 floor)",
+    "body": "Affects: lr@dmc_coverage, lr@dmc_replicate, lrplus@dmc_coverage, lrplus@dmc_replicate",
+    "_original_body": "Affects: lr@all-significant-cells (edge case)"
+  },
+  {
+    "hash": "d619e90c4b2a1e2d07a601ffa9968a3e9c91cae5",
+    "subject": "refactor(dmc) P1-11: rename log2_odds_ratio per backend",
+    "body": "Affects: lr@dmc_coverage, lr@dmc_replicate, fisher@dmc_coverage, fisher@dmc_replicate, lrplus@dmc_coverage, lrplus@dmc_replicate, glm@dmc_coverage, glm@dmc_replicate",
+    "_original_body": "Affects: lr@all, fisher@all, glm@all"
+  },
+  {
+    "hash": "846691be12ed068cfd3c97804b87a27746e89261",
+    "subject": "refactor(dmr) P1-8 + P2-4: rename dmr_hmm -> dmr_segment with real per-segment p-values",
+    "body": "Affects: dmr_segment@dmr_coverage",
+    "_original_body": "Affects: segment@all"
+  },
+  {
+    "hash": "8f341c23ea66f75805ec7a0fc1910f3decdd1810",
+    "subject": "fix(dmr): P0-5 -- correct Stouffer math in _merge_adjacent_tiles",
+    "body": "Affects: dmr_tile@dmr_coverage, dmr_merge@dmr_coverage, dmr_sliding_window@dmr_coverage, dmr_chain_merge@dmr_coverage",
+    "_original_body": "(no original Affects: trailer; P0-5 fixes the tile-merge Stouffer combine that underlies dmr_tile and its downstream merge/sliding/chain_merge engines)"
+  },
+  {
+    "hash": "0861996e34a44b07bc4d9ebb25af8532e060600c",
+    "subject": "fix(dmc): P0-2b -- per-permutation tail in empirical_fdr_for_dmc",
+    "body": "Affects: lr@dmc_coverage, lr@dmc_replicate, fisher@dmc_coverage, fisher@dmc_replicate, lrplus@dmc_coverage, lrplus@dmc_replicate",
+    "_original_body": "(no original Affects: trailer; P0-2b fixes empirical_fdr_for_dmc that is exercised under all DMC engines when empirical_fdr is enabled)"
+  },
+  {
+    "hash": "911b4f3a741f41649c771cc4a97f5bc660237c01",
+    "subject": "fix(dmc): P0-1 -- preserve raw `pvalue` under neighbour_combine",
+    "body": "Affects: lrplus@dmc_coverage, lrplus@dmc_replicate",
+    "_original_body": "(no original Affects: trailer; P0-1 only fires when neighbour_combine=True, which is on by default only in the lr+ stack)"
+  },
+  {
+    "hash": "b8835ee62405f58e3dac87c09727b1f5ddf0a479",
+    "subject": "fix(dmr): P0-2 -- per-permutation tail in empirical_fdr_for_dmr",
+    "body": "Affects: dmr_tile@dmr_coverage, dmr_merge@dmr_coverage, dmr_sliding_window@dmr_coverage, dmr_chain_merge@dmr_coverage, dmr_segment@dmr_coverage",
+    "_original_body": "(no original Affects: trailer; P0-2 fixes empirical_fdr_for_dmr that is exercised under all DMR engines when empirical_fdr is enabled)"
+  },
+  {
+    "hash": "c53178d3f88c447194d52b65edae30b1de145b57",
+    "subject": "fix(dmc): P0-4 -- floor df_phi at 50 in adaptive-F reference",
+    "body": "Affects: glm@dmc_coverage, glm@dmc_replicate",
+    "_original_body": "(no original Affects: trailer; P0-4 affects the adaptive-F reference in GLM multi-group)"
+  }
+]
