@@ -144,6 +144,72 @@ completed on 2026-05-19; Study 2 on 2026-05-19; Study 3 on 2026-05-21.
   cores enabled, methylKit's DMR grid would drop from ~6 h to ~1–1.5 h
   but epykit would still be ~10× faster.
 
+## Single-command Linux re-run (Track 1 Layer B)
+
+The plan to re-run every benchmark from scratch on a Linux machine is
+end-to-end driven by `scripts/regen_all.py --run-all`. The full sweep
+covers:
+
+* The Piao simulator at five `phi` values `{0.0, 0.01, 0.05, 0.1, 0.2}`
+  spanning binomial through real-WGBS-like overdispersion.
+* Twenty seeds (2026000..2026019) per phi cell.
+* epykit's four DMC engines (lr, lr+, welch_t, fisher) on every cell.
+* methylKit, DSS, dmrseq, BSmooth as locally-re-run R baselines.
+* `k=1000`-shuffle null calibration on bare `lr` and `lr+` with Q-Q +
+  KS plots.
+* Both `truth_mode` labelings (intrinsic and threshold).
+* DMR-caller parameter sensitivity sweep at ±50% of the default preset.
+
+Setup once, on the Linux box:
+
+```bash
+git clone <repo> && cd epykit
+docker build -t epykit-py -f Dockerfile.python .
+docker build -t epykit-r  -f Dockerfile.r .
+
+# One-shot R environment lockfile generation (writes benchmark/renv.lock).
+docker run --rm -v "$PWD":/work -w /work epykit-r \
+    Rscript benchmark/renv/install_packages.R
+
+# Re-build the R image so it picks up the new lockfile.
+docker build -t epykit-r -f Dockerfile.r .
+```
+
+Then run the full sweep:
+
+```bash
+# Sanity-check the dispatcher emits the plan you expect.
+docker run --rm -v "$PWD":/work -w /work epykit-py \
+    python benchmark/scripts/regen_all.py --run-all --dry-run --verbose
+
+# Engine-regression slice (~30 s) -- catches any drift before the big run.
+docker run --rm -v "$PWD":/work -w /work epykit-py \
+    python benchmark/scripts/regen_small.py --update
+git add benchmark/scripts/regen_small_hashes.json && git commit -m \
+    "benchmark: snapshot Linux engine-regression hashes"
+
+# The full pipeline.
+docker run --rm -v "$PWD":/work -w /work epykit-py \
+    python benchmark/scripts/regen_all.py --run-all --verbose
+```
+
+The dispatcher runs steps linearly; a failing step records the
+failure and continues so a single broken comparator doesn't nuke
+the whole run. `--only <step>` re-runs a single named step;
+`--skip <step>` skips one or more steps. See `regen_all.py --help`
+for the full step list.
+
+After everything completes, commit the regenerated `benchmark/data/`
+outputs:
+
+```bash
+git add benchmark/data && git commit -m "benchmark: full Linux re-run"
+```
+
+The TSV mirror under `benchmark/paper_data/` is re-derived from the
+parquet sources via the converter (kept as a separate step so the
+parquet sources are the single source of truth).
+
 ## Contact
 
 Open an issue in the epykit repository for questions about specific
