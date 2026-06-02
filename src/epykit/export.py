@@ -8,6 +8,8 @@ Functions
 * ``dmrs_to_bed``  : DMR table -> BED.
 * ``dmr_to_tsv``   : DMR table -> TSV/CSV (full table, sorted by chrom/start).
 * ``dmc_to_tsv``   : DMC table -> TSV/CSV (significant or full, with lr+ combined-p support).
+* ``dvc_to_tsv``   : DVC table -> TSV/CSV (significant or full, filtered on q_variance).
+* ``qc_to_tsv``    : per-sample QC summary (md.obs) -> TSV/CSV verbatim.
 
 All BedGraph / BED writers work with no extra dependencies. ``to_bigwig``
 imports ``pyBigWig`` lazily and raises a friendly error if missing
@@ -393,6 +395,50 @@ def dmc_to_tsv(
     return _write_table(out_df, path)
 
 
+def dvc_to_tsv(
+    md: MethylData,
+    path: str,
+    *,
+    alpha: float = 0.05,
+    full: bool = False,
+) -> str:
+    """Write the DVC table (md.varm['dvc']) as TSV/CSV.
+
+    Default: significant-only (q_variance < alpha) sorted by q_variance
+    ascending. full=True keeps every row in (chrom, pos) order.
+    Delimiter is derived from the path suffix.
+    """
+    df = md.varm.get("dvc")
+    if df is None or len(df) == 0:
+        raise ValueError(
+            "No DVC results on this MethylData. Run ep.tl.dvc(md) first."
+        )
+    if full:
+        sort_cols = ["chrom", "pos"] if "pos" in df.columns else ["chrom"]
+        out_df = df.sort(sort_cols)
+    else:
+        gate = "q_variance" if "q_variance" in df.columns else "p_variance"
+        out_df = (
+            df.filter(
+                pl.col(gate).is_not_null()
+                & pl.col(gate).is_not_nan()
+                & (pl.col(gate) < alpha)
+            )
+            .sort(gate)
+        )
+    return _write_table(out_df, path)
+
+
+def qc_to_tsv(md: MethylData, path: str) -> str:
+    """Write the per-sample QC summary (md.obs) as TSV/CSV.
+
+    After ep.tl.qc(md), md.obs carries the per-sample metrics joined onto
+    the existing samplesheet columns. This writer dumps it verbatim.
+    Delimiter is derived from the path suffix.
+    """
+    return _write_table(md.obs, path)
+
+
 __all__ = [
     "to_bedgraph",
     "to_bigwig",
@@ -400,4 +446,6 @@ __all__ = [
     "dmrs_to_bed",
     "dmr_to_tsv",
     "dmc_to_tsv",
+    "dvc_to_tsv",
+    "qc_to_tsv",
 ]

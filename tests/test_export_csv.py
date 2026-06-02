@@ -142,3 +142,66 @@ def test_dmc_to_tsv_uses_qvalue_combined_when_present(tmp_path):
     assert len(rows) == 2
     qc = sorted(float(r["qvalue_combined"]) for r in rows)
     assert qc == [1e-8, 1e-6]
+
+
+def _stub_md_with_dvc(tmp_path: Path):
+    from epykit.methyldata import MethylData
+    obs = pl.DataFrame({
+        "sample_id": ["s1", "s2"], "group": ["case", "ctrl"],
+    })
+    store = tmp_path / "store"
+    store.mkdir()
+    md = MethylData(obs=obs, store=str(store))
+    md.varm["dvc"] = pl.DataFrame({
+        "chrom": ["chr1", "chr1", "chr2"],
+        "pos":   [100, 200, 50],
+        "var_log_ratio": [1.2, 0.1, 0.9],
+        "p_variance": [1e-5, 0.6, 1e-3],
+        "q_variance": [1e-4, 0.7, 1e-2],
+        "is_dvc": [True, False, True],
+    })
+    return md
+
+
+def test_dvc_to_tsv_significant_only(tmp_path):
+    md = _stub_md_with_dvc(tmp_path)
+    out = tmp_path / "dvc.tsv"
+    export.dvc_to_tsv(md, str(out))
+
+    rows = list(csv.DictReader(
+        out.read_text(encoding="utf-8").splitlines(), delimiter="\t",
+    ))
+    assert len(rows) == 2
+    qs = [float(r["q_variance"]) for r in rows]
+    assert qs == sorted(qs)
+
+
+def test_dvc_to_tsv_full(tmp_path):
+    md = _stub_md_with_dvc(tmp_path)
+    out = tmp_path / "dvc.full.tsv"
+    export.dvc_to_tsv(md, str(out), full=True)
+
+    rows = list(csv.DictReader(
+        out.read_text(encoding="utf-8").splitlines(), delimiter="\t",
+    ))
+    assert len(rows) == 3
+
+
+def test_qc_to_tsv_writes_md_obs(tmp_path):
+    from epykit.methyldata import MethylData
+    obs = pl.DataFrame({
+        "sample_id": ["s1", "s2"],
+        "group": ["case", "ctrl"],
+        "mean_coverage": [12.3, 8.1],
+    })
+    store = tmp_path / "store"
+    store.mkdir()
+    md = MethylData(obs=obs, store=str(store))
+
+    out = tmp_path / "qc.tsv"
+    export.qc_to_tsv(md, str(out))
+
+    text = out.read_text(encoding="utf-8")
+    header = text.splitlines()[0].split("\t")
+    assert set(header) == {"sample_id", "group", "mean_coverage"}
+    assert "s1\t" in text and "s2\t" in text
