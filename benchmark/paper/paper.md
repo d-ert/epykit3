@@ -21,8 +21,9 @@ abstract: |
   15.6 M CpGs, hg38). On the simulated grid, epykit's quasi-binomial
   likelihood-ratio engine (`lr`) matches the strongest baselines (methylKit,
   RADMeth, DSS) at every coverage ≥ 5× to three decimal places of TPR, FPR,
-  F1 and AUROC, and a `lr+` variant with four opt-in enhancements pushes
-  TPR ≥ 0.999 at every coverage and replicate count ≥ 4. At n = 2 total
+  F1 and AUROC, and an opt-in `lr+` variant (engaged via
+  `power_stack="lr+"`, four tunable enhancements layered on the bare `lr`)
+  pushes TPR ≥ 0.999 at every coverage and replicate count ≥ 4. At n = 2 total
   samples — the regime where methylKit's overdispersion estimate becomes
   degenerate — epykit recovers ~2× more true DMCs at the same FPR. On the
   region-level benchmark, epykit's `chain_merge` DMR caller recovers 97 % /
@@ -34,9 +35,14 @@ abstract: |
   default `lr` setting; the `lr+` recipe recovers 93 % of methylKit's
   calls). Across all three studies epykit is consistently faster (12×–68×
   speedup) and uses 1.18–3.83× less peak memory than methylKit on
-  matched workloads. We report one fixed calibration bug in epykit's
-  pooled `fisher` backend and one fixed bug in the dispersion-estimator df
-  reference. All code, ground truth, and figures are provided.
+  matched workloads. We discovered and fixed 11 statistical bugs
+  (4 P0, 7 P1) in epykit while running this benchmark, validated by a
+  pre/post-fix delta audit reported in §10.5 (Table S-Fix). Low-coverage
+  TPR advantages observed on the underdispersed Piao 2021 simulator
+  (φ ≈ 0.4) are not expected to transfer at the same magnitude to
+  overdispersed real WGBS (φ ≈ 1.5–5); we discuss this
+  dispersion–realism gap in §4. All code, ground truth, and figures are
+  provided.
 ---
 
 # 1. Introduction
