@@ -10,9 +10,10 @@ CLI surface:
   ``--min-samples-treatment`` / ``--min-samples-control``
   filters, and ``--allow-n1`` to opt into the (anti-conservative) Fisher fallback when
   there are fewer than 2 replicates per group.
-* ``dmr`` -- ``--method {tile,sliding_window}``. The tile path takes a
-  methylstore + samplesheet and pools reads per tile; the sliding-window path
-  takes a DMC parquet and combines per-CpG p-values.
+* ``dmr`` -- ``--method {chain_merge,tile,sliding_window,segment}`` (default
+  ``chain_merge``). chain_merge / sliding_window / segment take a DMC parquet
+  (``--dmc-results``); the tile path takes a methylstore + samplesheet and
+  pools reads per tile.
 """
 
 import argparse
@@ -106,7 +107,6 @@ def _cli_n1_and_footgun_checks(args, unit: str = "sites") -> None:
             f"(treatment={len(treatment_samples)}, control={len(control_samples)}). "
             f"Pass --allow-n1 to opt into the Fisher fallback."
         )
-    import warnings
     if args.test == "fisher":
         warnings.warn(
             "test='fisher' is anti-conservative; prefer 'lr' at n >= 2.",
@@ -204,9 +204,29 @@ def _cmd_dmc(args: argparse.Namespace):
 def _cmd_dmr(args: argparse.Namespace):
     """Handler for 'dmr' subcommand."""
     import polars as pl
-    from .dmr import call_dmr_sliding_window, call_dmr_tile_based
+    from .dmr import (
+        call_dmr_chain_merge,
+        call_dmr_sliding_window,
+        call_dmr_tile_based,
+    )
 
-    if args.method == "tile":
+    if args.method == "chain_merge":
+        # --- DSS-style chain-merge path: takes a DMC parquet ---
+        if not args.dmc_results:
+            raise ValueError("method=chain_merge requires --dmc-results.")
+
+        dmc_results = pl.read_parquet(args.dmc_results)
+        dmr_results = call_dmr_chain_merge(
+            dmc_results,
+            preset=args.preset,
+            alpha=args.alpha,
+            min_abs_meth_diff=args.min_abs_meth_diff,
+            dis_merge_bp=args.dis_merge_bp,
+            pct_sig=args.pct_sig,
+            minlen_bp=args.minlen_bp,
+            use_q_for_sig=args.use_q_for_sig,
+        )
+    elif args.method == "tile":
         # --- tile-based path. Needs methylstore + samplesheet. ---
         if not args.methylstore or not args.samplesheet:
             raise ValueError(
@@ -580,15 +600,19 @@ def main():
     p_dmc.set_defaults(func=_cmd_dmc)
 
     # dmr
-    p_dmr = sub.add_parser("dmr", help="DMR calling (tile-based or sliding-window)")
+    p_dmr = sub.add_parser(
+        "dmr", help="DMR calling (chain-merge, tile, segment, or sliding-window)")
     p_dmr.add_argument(
         "--method",
-        choices=["tile", "sliding_window", "segment"],
-        default="tile",
+        choices=["chain_merge", "tile", "sliding_window", "segment"],
+        default="chain_merge",
         help=(
             "DMR algorithm. "
-            "'tile' (default) pools reads across "
-            "CpGs within each fixed-size tile and runs one test per tile. "
+            "'chain_merge' (default) chains contiguous significant CpGs from "
+            "a precomputed DMC parquet into DSS-style regions; tune via "
+            "--preset. "
+            "'tile' pools reads across CpGs within each fixed-size tile and "
+            "runs one test per tile. "
             "'sliding_window' takes a precomputed DMC parquet and combines "
             "per-CpG p-values with signed Stouffer's Z (legacy). "
             "'segment' rule-based 3-state segmentation on meth_diff signal "
@@ -648,11 +672,32 @@ def main():
 
     # Sliding-window-method options
     p_dmr.add_argument("--dmc-results",
-                       help="(sliding_window only) Parquet file from 'epykit dmc'")
+                       help="(chain_merge, sliding_window, segment) "
+                            "Parquet file from 'epykit dmc'")
     p_dmr.add_argument("--window-bp",            type=int,   default=500)
     p_dmr.add_argument("--step-bp",              type=int,   default=250)
     p_dmr.add_argument("--min-cpgs",             type=int,   default=5)
     p_dmr.add_argument("--min-sites-significant",type=int,   default=3)
+
+    # Chain-merge-method options (DSS callDMR semantics). Knob defaults match
+    # call_dmr_chain_merge's signature so --preset bundles apply unless a knob
+    # is overridden explicitly. min_cpgs comes from the preset / engine default.
+    p_dmr.add_argument(
+        "--preset", choices=["strict", "default", "permissive"], default=None,
+        help="(chain_merge only) Parameter bundle from DMR_PRESETS. Explicit "
+             "knob flags override the bundled value.",
+    )
+    p_dmr.add_argument("--dis-merge-bp",  type=int,   default=500,
+                       help="(chain_merge only) Max bp gap between consecutive "
+                            "significant CpGs in a chain. Highest-leverage knob.")
+    p_dmr.add_argument("--pct-sig",       type=float, default=0.5,
+                       help="(chain_merge only) Min fraction of CpGs in a span "
+                            "that must be significant.")
+    p_dmr.add_argument("--minlen-bp",     type=int,   default=50,
+                       help="(chain_merge only) Min DMR span length in bp.")
+    p_dmr.add_argument("--use-q-for-sig", action="store_true", default=False,
+                       help="(chain_merge only) Gate significance on qvalue "
+                            "instead of pvalue when a qvalue column is present.")
 
     # Shared filters
     p_dmr.add_argument("--alpha",                type=float, default=0.05)

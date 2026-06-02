@@ -81,6 +81,60 @@ def test_cli_dmr_method_hmm_rejected():
     )
 
 
+def test_cli_dmr_help_shows_chain_merge_default():
+    """chain_merge is the tl.dmr library default; the CLI must expose it as a
+    --method choice, surface --preset, and document it as the default."""
+    res = _epykit("dmr", "--help", check=False)
+    assert res.returncode == 0, res.stderr
+    assert "chain_merge" in res.stdout, "chain_merge missing from dmr --method choices"
+    assert "--preset" in res.stdout, "--preset missing from dmr help"
+    assert "default" in res.stdout.lower()
+
+
+def test_cli_dmr_chain_merge_requires_dmc_results():
+    """chain_merge without --dmc-results must fail with a non-zero exit."""
+    res = _epykit(
+        "dmr", "--method", "chain_merge", "--output", "out.parquet", check=False
+    )
+    assert res.returncode != 0, "chain_merge without --dmc-results should fail"
+    assert "dmc-results" in (res.stderr + res.stdout).lower()
+
+
+def test_cli_dmr_chain_merge_end_to_end(tmp_path):
+    """chain_merge CLI path turns a synthetic DMC parquet into DMRs.
+
+    Fast: builds a tiny in-memory DMC table (the only columns chain_merge
+    reads are chrom/pos/meth_diff/pvalue) rather than walking a methylstore.
+    """
+    import polars as pl
+
+    dmc = pl.DataFrame(
+        {
+            "chrom": ["chr1"] * 5,
+            "pos": [100, 150, 200, 250, 300],
+            "meth_diff": [0.3, 0.3, 0.3, 0.3, 0.3],
+            "pvalue": [1e-4] * 5,
+        }
+    )
+    dmc_path = tmp_path / "dmc.parquet"
+    dmc.write_parquet(str(dmc_path))
+
+    out = tmp_path / "dmr.parquet"
+    res = _epykit(
+        "dmr", "--method", "chain_merge",
+        "--dmc-results", str(dmc_path),
+        "--output", str(out),
+        check=False,
+    )
+    assert res.returncode == 0, f"stdout={res.stdout}\nstderr={res.stderr}"
+    assert out.exists()
+
+    df = pl.read_parquet(str(out))
+    for col in ("chrom", "start", "end", "dmr_type"):
+        assert col in df.columns, f"DMR output missing {col!r} column"
+    assert len(df) >= 1, "chain_merge should call at least one DMR on this cluster"
+
+
 def test_cli_smooth_help_says_gaussian_not_bsmooth():
     """B5: the smooth subcommand help should no longer mislead users into
     thinking they're getting BSmooth LOESS."""

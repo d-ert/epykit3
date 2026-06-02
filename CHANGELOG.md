@@ -43,7 +43,19 @@ deprecation shim so 0.7.6 code continues to run with warnings.
   raises `ValueError`. Use `method="segment"` (same engine, honest
   name).
 
+- **CLI `dmr --method` default changed from `"tile"` to `"chain_merge"`**,
+  matching the `tl.dmr` library default (set in 0.7.2) so the API and CLI
+  converge. `chain_merge` consumes a precomputed DMC parquet via
+  `--dmc-results`; scripts that relied on the implicit tile path must now
+  pass `--method tile` explicitly.
+
 ### Added
+
+- **CLI `chain_merge` DMR surface.** `epykit dmr --method chain_merge
+  --dmc-results <dmc.parquet> [--preset strict|default|permissive]
+  [--dis-merge-bp N] [--pct-sig F] [--minlen-bp N] [--use-q-for-sig]`
+  exposes the DSS-style chain-merge caller, which was previously
+  library-only — closing the `tl.dmr` / CLI parity gap.
 
 - **`MethylData.analysis_root`** (no leading underscore) is the new
   public name for the analysis-root attribute. `MethylData._analysis_root`
@@ -654,7 +666,6 @@ unchanged — every new capability is opt-in via an explicit kwarg.
 
 ### Deferred to 0.8+
 
-CLI surface for `chain_merge` (`epykit dmr --method chain_merge ...`),
 RefSeq / UCSC functional-element annotation tracks beyond gene models,
 DMR caller for mixed designs (random-effects), Zarr storage backing,
 single-cell sparse stores.
