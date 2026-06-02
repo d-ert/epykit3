@@ -47,6 +47,19 @@ def _csv_suppressed(args) -> bool:
     return False
 
 
+def _write_table_local(df, path: str) -> str:
+    """Write a raw Polars frame to ``path`` with suffix-derived delimiter.
+
+    Mirror of ``export._write_table`` for handlers that hold a frame directly
+    and don't need to wrap it in a stub ``MethylData``.
+    """
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    sep = "," if str(path).lower().endswith(".csv") else "\t"
+    df.write_csv(str(out), separator=sep)
+    return str(out.resolve())
+
+
 def _add_min_samples_args(p: argparse.ArgumentParser, scope_help_prefix: str = "") -> None:
     """Register ``--min-samples-treatment`` and ``--min-samples-control``."""
     p.add_argument(
@@ -391,6 +404,11 @@ def _cmd_annotate(args: argparse.Namespace):
 
     sites.write_parquet(args.output)
     print(f"Annotated results written to {args.output}")
+
+    if not _csv_suppressed(args):
+        tsv_path = args.csv_path or _auto_csv_path(args.output)
+        _write_table_local(sites, tsv_path)
+        print(f"Annotated CSV: {tsv_path}")
 
 
 def _cmd_qc_report(args: argparse.Namespace):
@@ -800,6 +818,14 @@ def main():
     )
     p_ann.add_argument("--promoter-upstream-bp",   type=int, default=2000)
     p_ann.add_argument("--promoter-downstream-bp", type=int, default=200)
+    p_ann.add_argument(
+        "--no-csv", action="store_true", dest="no_csv", default=False,
+        help="Suppress the sibling .tsv auto-emit.",
+    )
+    p_ann.add_argument(
+        "--csv", dest="csv_path", default=None,
+        help="Override sibling TSV/CSV path. .csv suffix -> comma delim.",
+    )
     p_ann.set_defaults(func=_cmd_annotate)
 
     # qc-report

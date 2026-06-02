@@ -380,3 +380,48 @@ def test_cli_dmr_auto_emits_sibling_tsv(tmp_path, synth_bundle, monkeypatch):
     assert sibling.exists()
     header = sibling.read_text(encoding="utf-8").splitlines()[0].split("\t")
     assert "chrom" in header and "start" in header
+
+
+def test_cli_annotate_auto_emits_sibling_tsv(tmp_path, synth_bundle, monkeypatch):
+    """`epykit annotate --output X.parquet` writes X.tsv next to it."""
+    import sys
+    import epykit as ep
+    from epykit.cli import main
+
+    md_setup = ep.read_bismark(
+        synth_bundle.samplesheet,
+        treatment_group="treatment",
+        control_group="control",
+        assembly="synth",
+        store_dir=str(tmp_path / "store"),
+    )
+    populated_store = md_setup.store
+
+    dmc_parquet = tmp_path / "dmc.parquet"
+    monkeypatch.setattr(sys, "argv", [
+        "epykit", "dmc",
+        "--methylstore", populated_store,
+        "--samplesheet", synth_bundle.samplesheet,
+        "--treatment-group", "treatment",
+        "--control-group", "control",
+        "--output", str(dmc_parquet),
+        "--test", "lr",
+        "--no-csv",
+    ])
+    main()
+
+    annotated = tmp_path / "annotated.parquet"
+    sibling = tmp_path / "annotated.tsv"
+    # No --gtf / --cpg-islands -> annotate is a pass-through, but the sibling
+    # TSV must still be written.
+    monkeypatch.setattr(sys, "argv", [
+        "epykit", "annotate",
+        "--input", str(dmc_parquet),
+        "--output", str(annotated),
+    ])
+    main()
+
+    assert annotated.exists()
+    assert sibling.exists()
+    header = sibling.read_text(encoding="utf-8").splitlines()[0].split("\t")
+    assert "chrom" in header and "pos" in header
