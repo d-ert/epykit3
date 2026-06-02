@@ -6,6 +6,7 @@ Functions
 * ``to_bigwig``    : same, BigWig via pyBigWig (optional dep).
 * ``dmcs_to_bed``  : DMC table -> BED, optionally filtered by alpha / |Deltabeta|.
 * ``dmrs_to_bed``  : DMR table -> BED.
+* ``dmr_to_tsv``   : DMR table -> TSV/CSV (full table, sorted by chrom/start).
 
 All BedGraph / BED writers work with no extra dependencies. ``to_bigwig``
 imports ``pyBigWig`` lazily and raises a friendly error if missing

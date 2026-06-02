@@ -5,9 +5,6 @@ import csv
 from pathlib import Path
 
 import polars as pl
-import pytest
-
-import epykit as ep
 from epykit import export
 
 
