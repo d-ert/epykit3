@@ -37,6 +37,7 @@ benchmark/data/study2/methylkit_tuned/*.tsv
 # Per-cell intermediate parquets stay ignored as bulk artefacts.
 !benchmark/data/study1/
 !benchmark/data/study1/eval_summary_post_phase3.parquet
+!benchmark/data/study1/timings_table.csv
 !benchmark/data/study1/epykit_post_phase3/
 !benchmark/data/study1/epykit_post_phase3/MANIFEST.txt
 benchmark/data/study1/epykit_post_phase3/*/
