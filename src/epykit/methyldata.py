@@ -308,6 +308,13 @@ class MethylData:
                 and dmc_store_path is not None
                 and (Path(dmc_store_path) / ".epykit_dmc_manifest.json").exists()
             )
+            # neighbour_combine adds pvalue_combined/qvalue_combined (+ audit
+            # columns) to the in-memory frame AFTER the DMCStore chrom
+            # parquets were written -- linking the on-disk files would
+            # silently drop them. Fall back to a single-file write so the
+            # extra columns survive the round-trip.
+            if is_dmcstore_backed and "pvalue_combined" in df.columns:
+                is_dmcstore_backed = False
             if is_dmcstore_backed:
                 store_dir = Path(dmc_store_path)
                 target_dir = out / f"varm_{name}"

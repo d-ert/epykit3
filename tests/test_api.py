@@ -138,6 +138,41 @@ def test_save_load_round_trip_preserves_obs_varm_uns(synth_md, tmp_path):
             assert key in md2.uns
 
 
+def test_save_load_preserves_neighbour_combine_columns(synth_md, tmp_path):
+    """When ``neighbour_combine=True``, the in-memory varm frame gains
+    ``pvalue_combined`` / ``qvalue_combined`` (+ audit columns) *after*
+    the DMCStore chrom parquets were written. The save() path that
+    hardlinks from the DMCStore must not silently drop them -- if it
+    does, load() returns a frame with the wrong shape and downstream
+    code that reads the combined p-values gets KeyError."""
+    import epykit as ep
+
+    ep.pp.filter_coverage(synth_md, lo_count=5, hi_perc=99.9)
+    ep.pp.set_unite_type(synth_md, type="intersect")
+    ep.tl.dmc(synth_md, test="lr", neighbour_combine=True)
+
+    last_key = synth_md.uns["dmc"]["last_key"]
+    in_mem = synth_md.varm[last_key]
+    combined_cols = {
+        "pvalue_combined",
+        "qvalue_combined",
+        "pvalue_combined_n_neighbours",
+        "qvalue_combined_reject",
+    }
+    assert combined_cols.issubset(set(in_mem.columns)), (
+        "precondition: neighbour_combine must add combined columns in-memory"
+    )
+
+    save_path = tmp_path / "rt_combined"
+    synth_md.save(str(save_path))
+    md2 = ep.load(str(save_path))
+
+    loaded = md2.varm[last_key]
+    missing = combined_cols - set(loaded.columns)
+    assert not missing, f"save/load dropped combined columns: {sorted(missing)}"
+    assert loaded.shape == in_mem.shape, "shape drift across save/load"
+
+
 def test_save_load_does_not_persist_boolean_state_in_meta(synth_md, tmp_path):
     """methyldata.json should *not* hard-code _filtered etc. (by design,
     that they are derived properties)."""
