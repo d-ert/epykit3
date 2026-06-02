@@ -6,7 +6,7 @@ epykit ingests Bismark / MethylDackel coverage output into a partitioned Parquet
 
 > **Status:** version 1.0.0 — stable API. MIT licensed.
 
-[Documentation](https://d-ert.github.io/epykit/) | [Changelog](CHANGELOG.md)
+[Documentation](https://d-ert.github.io/epykit3/) | [Changelog](CHANGELOG.md)
 
 
 ---
