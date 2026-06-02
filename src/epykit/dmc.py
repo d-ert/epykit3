@@ -204,9 +204,29 @@ _TEST_RECOMMENDATIONS = {
 # Shared epsilon for boundary clipping in logit / log-OR computations.
 _BETA_EPSILON: float = 1e-6
 
-# F(1, 50) within ~1% of chi^2(1) at the 5% critical region.
 # Used in _score_finalize to floor df_phi when reference="adaptive" or "F".
+#
+# Empirical justification. The F(1, nu) tail probability is heavier than
+# chi^2(1) at finite nu and converges to chi^2(1) as nu -> infinity. The
+# bug the floor was introduced to fix (epykit 0.7.2 EB-mode FPR
+# inflation) was that EB shrinkage can leave df_phi ~ 4, where F(1, 4)
+# is ~540% inflated relative to chi^2(1) at the p = 0.05 critical
+# region (chi^2 95th percentile ~ 3.841): F(1, 4).sf(3.841) ~ 0.121 vs
+# chi^2(1).sf(3.841) = 0.050. Lifting the floor to nu = 50 reduces the
+# F-vs-chi^2 disagreement to ~ 11% relative at p = 0.05, which is
+# below the per-CpG calibration noise floor observed on real data
+# (see benchmark/scripts/run_null_calibration.py outputs).
+#
+# This constant is therefore *empirically* justified, not derived from
+# a first-principles asymptotic. ``tests/test_principled_df.py`` pins
+# the agreement number so a future change to the floor cannot silently
+# move the calibration. The user's Linux re-run (Track 1 Layer B)
+# regenerates the calibration figure that ultimately validates the
+# choice in the methods appendix.
 DF_PHI_FLOOR: float = 50.0
+# Documented agreement at the chi^2(1) 95th percentile, used by the
+# pin test. Update only with a calibration figure backing the change.
+_DF_PHI_FLOOR_F_VS_CHI2_TOL_AT_P05: float = 0.12
 
 
 

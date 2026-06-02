@@ -1,6 +1,8 @@
 """Test the real-engine closures: each surviving DMC engine wraps
-into the engine_fn(samples_treatment, samples_control, seed)->qvals
-contract."""
+into the engine_fn(samples_treatment, samples_control, seed) -> (pvals, qvals)
+contract. The legacy single-array (qvals only) contract was extended
+in Phase 1.2 of the GB resubmission plan so the null-calibration
+runner can build a Q-Q + KS bundle in addition to the FDR summary."""
 from __future__ import annotations
 
 import numpy as np
@@ -18,23 +20,31 @@ SURVIVING_DMC = ["lr", "lr_plus", "welch_t", "fisher", "glm"]
 @pytest.mark.slow
 @pytest.mark.parametrize("engine_name", SURVIVING_DMC)
 def test_dmc_engine_closure_runs(synth_md_filtered, engine_name):
-    """Each registered DMC engine: callable, returns 1D q-value array
-    in [0, 1] (or NaN), deterministic across two seeded runs."""
+    """Each registered DMC engine: callable, returns ``(pvalues, qvalues)``
+    as 1D arrays in [0, 1] (or NaN), deterministic across two seeded runs.
+    """
     md = synth_md_filtered
     factory = ENGINE_REGISTRY[engine_name]
     closure = factory(md)
     treat = list(md.treatment_ids)
     ctrl = list(md.control_ids)
-    out_a = closure(samples_treatment=treat, samples_control=ctrl, seed=42)
-    out_b = closure(samples_treatment=treat, samples_control=ctrl, seed=42)
-    assert isinstance(out_a, np.ndarray)
-    assert out_a.ndim == 1
-    np.testing.assert_array_equal(out_a, out_b, err_msg=f"{engine_name}: not deterministic")
-    finite = out_a[np.isfinite(out_a)]
-    if len(finite) > 0:
-        assert ((finite >= 0) & (finite <= 1)).all(), (
-            f"q-values out of [0, 1] for {engine_name}"
-        )
+    pvals_a, qvals_a = closure(samples_treatment=treat, samples_control=ctrl, seed=42)
+    pvals_b, qvals_b = closure(samples_treatment=treat, samples_control=ctrl, seed=42)
+    for label, arr in [("pvals_a", pvals_a), ("qvals_a", qvals_a)]:
+        assert isinstance(arr, np.ndarray), f"{engine_name}: {label} not an ndarray"
+        assert arr.ndim == 1, f"{engine_name}: {label} ndim={arr.ndim}"
+    np.testing.assert_array_equal(
+        qvals_a, qvals_b, err_msg=f"{engine_name}: qvals not deterministic"
+    )
+    np.testing.assert_array_equal(
+        pvals_a, pvals_b, err_msg=f"{engine_name}: pvals not deterministic"
+    )
+    for label, arr in [("pvals_a", pvals_a), ("qvals_a", qvals_a)]:
+        finite = arr[np.isfinite(arr)]
+        if len(finite) > 0:
+            assert ((finite >= 0) & (finite <= 1)).all(), (
+                f"{engine_name}: {label} out of [0, 1]"
+            )
 
 
 def test_permute_md_updates_treatment_column(synth_md):
@@ -147,14 +157,14 @@ def test_closure_produces_different_qvalues_per_shuffle(synth_md_filtered):
     )
 
     # Assignment A: the original 4-vs-4.
-    qvals_a = closure(samples_treatment=orig_treat, samples_control=orig_ctrl, seed=1)
+    _pa, qvals_a = closure(samples_treatment=orig_treat, samples_control=orig_ctrl, seed=1)
 
     # Assignment B: move the last original treatment into control. Now
     # 3-vs-5 -- not a symmetric swap of A. The DMC cache self-invalidates
     # on input_sig mismatch, so no manual rmtree is needed.
     mixed_treat = orig_treat[:-1]
     mixed_ctrl = orig_ctrl + [orig_treat[-1]]
-    qvals_b = closure(samples_treatment=mixed_treat, samples_control=mixed_ctrl, seed=1)
+    _pb, qvals_b = closure(samples_treatment=mixed_treat, samples_control=mixed_ctrl, seed=1)
 
     assert qvals_a.size > 0 and qvals_b.size > 0, "expected non-empty q-value arrays"
     assert not np.array_equal(qvals_a, qvals_b), (
