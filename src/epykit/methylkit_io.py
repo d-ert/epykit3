@@ -119,7 +119,7 @@ def to_methylkit_tabix(
         # Best-effort tabix indexing.
         tbi_path: Optional[str] = None
         try:
-            import pysam  # type: ignore
+            import pysam
             tbi = pysam.tabix_index(
                 str(out_path), preset=None, seq_col=1, start_col=2,
                 end_col=2, force=True,

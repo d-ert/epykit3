@@ -25,7 +25,6 @@ import math
 from pathlib import Path
 from typing import Mapping, Optional
 
-import numpy as np
 import polars as pl
 
 from .bam_io import read_methylation_calls

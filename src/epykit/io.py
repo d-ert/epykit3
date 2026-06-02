@@ -6,22 +6,11 @@ from pathlib import Path
 
 import polars as pl
 
+from ._cache import count_store_rows as _count_store_rows
 from .convert import ensure_converted_sample
 from .methyldata import MethylData
 
 logger = logging.getLogger(__name__)
-
-
-def _count_store_rows(store_dir: str) -> int | None:
-    try:
-        import pyarrow.parquet as pq
-
-        total = 0
-        for path in Path(store_dir).rglob("part-*.parquet"):
-            total += pq.read_metadata(str(path)).num_rows
-        return total
-    except Exception:
-        return None
 
 
 def _build_obs_from_samplesheet(

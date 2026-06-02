@@ -14,7 +14,7 @@ import csv
 import logging
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import polars as pl
 
@@ -55,7 +55,7 @@ _QUALIMAP_PATTERNS = {
 
 def _parse_bismark_report(path: Path) -> dict:
     txt = path.read_text(errors="replace")
-    out = {}
+    out: dict[str, Any] = {}
     for key, pat in _BISMARK_PATTERNS.items():
         m = pat.search(txt)
         if m:
@@ -155,7 +155,7 @@ def parse_bismark_mbias(path: str) -> pl.DataFrame:
 
 def _parse_qualimap(path: Path) -> dict:
     txt = path.read_text(errors="replace")
-    out = {}
+    out: dict[str, Any] = {}
     for key, pat in _QUALIMAP_PATTERNS.items():
         m = pat.search(txt)
         if m:

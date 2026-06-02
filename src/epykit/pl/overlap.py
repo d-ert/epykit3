@@ -12,8 +12,8 @@ For 2 sets the same function falls back to a clean 2-circle Venn diagram
 
 from __future__ import annotations
 
-from itertools import chain, combinations
-from typing import Iterable, Mapping
+from itertools import combinations
+from typing import Any, Iterable, Mapping
 
 import numpy as np
 import polars as pl
@@ -147,7 +147,7 @@ def _venn2(labels, set_keys, *, ax, figsize, save, md):
 
 # UpSet for 3+ sets
 
-def _upset(labels, set_keys, *, min_size, sort_by, ax, figsize, save, md):
+def _upset(labels, set_keys, *, min_size, sort_by, ax, figsize, save, md) -> Any:
     if ax is not None:
         # An UpSet needs three coupled axes; if the caller passed `ax`
         # we honour it for the bar chart only and skip the matrix /
@@ -203,8 +203,8 @@ def _upset(labels, set_keys, *, min_size, sort_by, ax, figsize, save, md):
     ax_bar.tick_params(axis="x", which="both", bottom=False, labelbottom=False)
     ax_bar.spines["top"].set_visible(False)
     ax_bar.spines["right"].set_visible(False)
-    for x, s in zip(xs, sizes):
-        ax_bar.text(x, s, f"{s:,}", ha="center", va="bottom", fontsize=8)
+    for xi, si in zip(xs, sizes):
+        ax_bar.text(float(xi), si, f"{si:,}", ha="center", va="bottom", fontsize=8)
 
     # Matrix: y is set, x is combo. Filled dot = set is in combo.
     label_to_y = {lbl: i for i, lbl in enumerate(labels)}

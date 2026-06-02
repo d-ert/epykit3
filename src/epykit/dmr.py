@@ -483,7 +483,6 @@ def call_dmr_sliding_window(
             raise ValueError(f"DMC results missing required columns: {missing}")
         p_col = "qvalue" if "qvalue" in available_cols else "pvalue"
         chrom_iter = _iter_dmc_store_chroms(dmc_results, p_col)
-        n_chroms = len(dmc_results.chroms())
     else:
         required = {"chrom", "pos", "meth_diff", "pvalue"}
         missing  = required - set(dmc_results.columns)
@@ -491,7 +490,6 @@ def call_dmr_sliding_window(
             raise ValueError(f"DMC results missing required columns: {missing}")
         p_col = "qvalue" if "qvalue" in dmc_results.columns else "pvalue"
         chrom_iter = _iter_dataframe_chroms(dmc_results, p_col)
-        n_chroms = dmc_results["chrom"].n_unique()
 
     logger.info(
         "call_dmr_sliding_window: window=%d bp, step=%d bp, "

@@ -39,10 +39,16 @@ import time
 import traceback
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import polars as pl
+
+if TYPE_CHECKING:
+    # pandas is imported lazily inside the functions that need it; this
+    # TYPE_CHECKING-only import makes the `pd.DataFrame` string annotations
+    # resolvable for type-checkers and linters without a runtime dependency.
+    import pandas as pd
 
 logger = logging.getLogger(__name__)
 

@@ -33,13 +33,12 @@ from __future__ import annotations
 
 import gc
 import hashlib
-import json
 import logging
 import tempfile
 import time
 import warnings
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Literal, Optional, Tuple, Union, overload
 
 import numpy as np
 import polars as pl
@@ -62,7 +61,7 @@ _EMPTY_SCHEMA = {
     "mean_beta_control":      pl.Float32,
     "pvalue":                 pl.Float64,
     "log2_odds_ratio_pooled": pl.Float64,
-    "log2_odds_ratio":        pl.Float64,   # transitional NaN-filled; removed in 0.8
+    "log2_odds_ratio":        pl.Float64,   # transitional NaN-filled; deprecated, slated for removal in 1.1
     "meth_diff":              pl.Float32,
     "meth_diff_ci_lo":        pl.Float32,
     "meth_diff_ci_hi":        pl.Float32,
@@ -1653,11 +1652,11 @@ def _process_one_chromosome(
         df_resid_safe = np.maximum(df_resid_per_site, 1.0)
 
         # F-reference uses df_phi (see comment in glm path above).
-        stat, pvals, k_rank = _glm.wald_test(
+        stat, pvals, k_rank_np = _glm.wald_test(
             beta_full, cov_beta, contrast_matrix,
             phi_eff=phi_eff, df_resid=df_phi, reference=reference,
         )
-        k_rank = int(k_rank)
+        k_rank = int(k_rank_np)
 
         degenerate = (
             np.isnan(stat) | np.isnan(pvals) | (n_eff < p_full + 1)
@@ -1775,8 +1774,8 @@ def _process_one_chromosome(
     #   glm / glm_contrast: the value is the logit coefficient in log2 units
     #                        (not log2 of an odds ratio) => coef_treatment_log2.
     #   all other backends: genuine pooled log2 odds ratio => log2_odds_ratio_pooled.
-    # A transitional log2_odds_ratio column is NaN-filled for one release so
-    # existing code doesn't silently break; it is removed in 0.8.
+    # A transitional log2_odds_ratio column is NaN-filled so existing code
+    # doesn't silently break; it is slated for removal in 1.1.
     _log2_col = (
         "coef_treatment_log2"
         if test in _GLM_BACKENDS
@@ -1881,6 +1880,70 @@ def _validate_sample_size_and_warn(n_case: int, n_ctrl: int, test: str) -> None:
 
 
 # Public API
+
+@overload
+def process_chromosomes_dmc(
+    methylstore_path: str,
+    samples_treatment: Optional[list[str]] = ...,
+    samples_control: Optional[list[str]] = ...,
+    test: str = ...,
+    chromosomes: Optional[list[str]] = ...,
+    unite: bool = ...,
+    min_samples_treatment: Optional[int] = ...,
+    min_samples_control: int = ...,
+    dispersion: str = ...,
+    reference: str = ...,
+    design_full: Optional[np.ndarray] = ...,
+    design_reduced: Optional[np.ndarray] = ...,
+    coef_idx: Optional[int] = ...,
+    contrast_matrix: Optional[np.ndarray] = ...,
+    contrast_label: Optional[str] = ...,
+    samples_all_ordered: Optional[list[str]] = ...,
+    group_labels_per_sample: Optional[list[str]] = ...,
+    *,
+    backend: str = ...,
+    n_workers: Optional[int] = ...,
+    glm_backend: str = ...,
+    out_dir: Optional[Union[str, Path]] = ...,
+    return_store: Literal[True],
+    smoothing: bool = ...,
+    smoothing_span_bp: int = ...,
+    sep_fallback: bool = ...,
+    sep_threshold: float = ...,
+) -> DMCStore: ...
+
+
+@overload
+def process_chromosomes_dmc(
+    methylstore_path: str,
+    samples_treatment: Optional[list[str]] = ...,
+    samples_control: Optional[list[str]] = ...,
+    test: str = ...,
+    chromosomes: Optional[list[str]] = ...,
+    unite: bool = ...,
+    min_samples_treatment: Optional[int] = ...,
+    min_samples_control: int = ...,
+    dispersion: str = ...,
+    reference: str = ...,
+    design_full: Optional[np.ndarray] = ...,
+    design_reduced: Optional[np.ndarray] = ...,
+    coef_idx: Optional[int] = ...,
+    contrast_matrix: Optional[np.ndarray] = ...,
+    contrast_label: Optional[str] = ...,
+    samples_all_ordered: Optional[list[str]] = ...,
+    group_labels_per_sample: Optional[list[str]] = ...,
+    *,
+    backend: str = ...,
+    n_workers: Optional[int] = ...,
+    glm_backend: str = ...,
+    out_dir: Optional[Union[str, Path]] = ...,
+    return_store: Literal[False] = ...,
+    smoothing: bool = ...,
+    smoothing_span_bp: int = ...,
+    sep_fallback: bool = ...,
+    sep_threshold: float = ...,
+) -> pl.DataFrame: ...
+
 
 def process_chromosomes_dmc(
     methylstore_path: str,
@@ -2481,6 +2544,24 @@ def _apply_storey_qvalues(pvals: np.ndarray) -> tuple[np.ndarray, np.ndarray, fl
     qvals[order] = q_sorted
     reject = qvals < 0.05
     return reject, qvals, pi0
+
+
+@overload
+def apply_multiple_testing_correction(
+    dmc_results: DMCStore,
+    method: str = ...,
+    pvalue_col: str = ...,
+    qvalue_col: str = ...,
+) -> DMCStore: ...
+
+
+@overload
+def apply_multiple_testing_correction(
+    dmc_results: pl.DataFrame,
+    method: str = ...,
+    pvalue_col: str = ...,
+    qvalue_col: str = ...,
+) -> pl.DataFrame: ...
 
 
 def apply_multiple_testing_correction(

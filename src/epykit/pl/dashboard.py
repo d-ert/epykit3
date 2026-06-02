@@ -80,7 +80,6 @@ def qc_dashboard(
     ax3 = fig.add_subplot(gs[0, 2])
     if "global_methylation" in obs.columns:
         vals = obs.get_column("global_methylation").to_numpy()
-        unique_groups = sorted(set(groups))
         colors = [
             (PALETTE.get("treatment", "#c45") if g == "treatment"
              else PALETTE.get("control", "#456"))

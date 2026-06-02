@@ -20,7 +20,6 @@ cupy arrays) so downstream code stays GPU-agnostic.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import numpy as np
 
@@ -34,7 +33,7 @@ _PROP_CLIP = 1e-6
 def _require_cupy():
     """Import cupy lazily with a clear install hint on ImportError."""
     try:
-        import cupy as cp  # type: ignore
+        import cupy as cp
     except ImportError as exc:
         raise ImportError(
             "cupy is required for backend='gpu'. "
@@ -112,7 +111,11 @@ def irls_binomial_batch_gpu(
 
     n_sites, n_samples = meth.shape
     p = X.shape[1]
-    assert X.shape[0] == n_samples, "Design rows must match number of samples"
+    if X.shape[0] != n_samples:
+        raise ValueError(
+            f"Design matrix has {X.shape[0]} rows but there are "
+            f"{n_samples} samples; rows must match number of samples."
+        )
 
     # ---- Transfer inputs to device --------------------------------------
     cov_d = cp.asarray(cov, dtype=cp.float64)

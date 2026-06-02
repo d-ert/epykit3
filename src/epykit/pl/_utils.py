@@ -41,10 +41,7 @@ def _save_fig(
             f"format must be one of {_VALID_FORMATS}; got {format!r}"
         )
     out = Path(out_dir or "figures")
-    if format == "both":
-        formats = ("png", "pdf")
-    else:
-        formats = (format,)
+    formats: tuple[str, ...] = ("png", "pdf") if format == "both" else (format,)
 
     written: list[str] = []
     for fmt in formats:

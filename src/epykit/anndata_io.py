@@ -41,9 +41,17 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from typing import TYPE_CHECKING
+
 import polars as pl
 
 from .methyldata import MethylData
+
+if TYPE_CHECKING:
+    # numpy is imported lazily inside the functions that need it; this
+    # TYPE_CHECKING-only import makes ``"np.ndarray"`` string annotations
+    # resolvable for mypy under ``from __future__ import annotations``.
+    import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -230,7 +238,7 @@ def _fill_layer(
     samples: list[str],
     n_sites: int,
     layer: str,
-    chrom_index: dict[str, tuple[int, "object"]],
+    chrom_index: dict[str, tuple[int, "np.ndarray"]],
     dtype,
 ):
     """Stream sample x chromosome, filling a (n_samples x n_sites) array.
@@ -247,10 +255,11 @@ def _fill_layer(
     # Map numpy float dtype -> polars float dtype so the value column is
     # pinned end-to-end. Anything other than float32/float64 is rejected
     # by to_anndata() above, so this mapping is exhaustive.
+    pl_value_dtype: pl.DataType
     if np_dtype == np.float32:
-        pl_value_dtype = pl.Float32
+        pl_value_dtype = pl.Float32()
     elif np_dtype == np.float64:
-        pl_value_dtype = pl.Float64
+        pl_value_dtype = pl.Float64()
     else:
         raise ValueError(f"unsupported dtype {np_dtype!r}; use float32 or float64")
 
@@ -362,7 +371,6 @@ def to_anndata(
         )
 
     import numpy as np
-    import pandas as pd
 
     np_dtype = np.dtype(dtype)
     samples = md.obs.get_column("sample_id").to_list()
@@ -443,7 +451,7 @@ def to_mudata(
         Additional modalities to bundle into the MuData.
     """
     try:
-        import mudata as md_lib  # type: ignore
+        import mudata as md_lib
     except ImportError as exc:
         raise ImportError(
             "mudata is required for to_mudata. "

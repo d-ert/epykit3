@@ -6,10 +6,10 @@ This package provides a complete WGBS analysis pipeline:
   - filter:    QC / coverage filtering / site intersection
   - dmc:       Differential methylation calling per CpG. Default test is
                ``lr`` (quasi-binomial likelihood-ratio with McCullagh-
-               Nelder dispersion). Other backends: score, glm, logit_t,
-               welch_t, fisher.
-  - dmr:       DMR calling (tile-based default, sliding-window legacy) and
-               Gaussian-kernel methylation smoothing
+               Nelder dispersion). Other backends: welch_t, fisher, glm.
+  - dmr:       DMR calling (chain-merge default, with tile, sliding-window
+               and HMM-segmentation alternatives) and Gaussian-kernel
+               methylation smoothing
   - annotate:  Gene-feature and CpG-island context annotation
   - qc:        Bisulfite conversion rate, global methylation, coverage
                uniformity, plus opt-in clinical / cohort checks

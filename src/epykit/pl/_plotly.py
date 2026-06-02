@@ -14,7 +14,6 @@ from __future__ import annotations
 from typing import Optional
 
 import numpy as np
-import polars as pl
 
 from .._style import PALETTE
 from ._compute import (

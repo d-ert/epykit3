@@ -9,13 +9,13 @@ labels) of multi-panel methylation figures.
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from typing import Optional
 
 import numpy as np
 import polars as pl
 
 from .._style import PALETTE
-from ._utils import _get_ax, _save_fig
+from ._utils import _save_fig
 from ..methyldata import MethylData
 
 
@@ -120,8 +120,8 @@ def dmr_violin(
     n = len(categories)
     if figsize is None:
         figsize = (3.4 * n, 4.2)
-    fig, axes = plt.subplots(1, n, figsize=figsize, sharey=True, squeeze=False)
-    axes = axes.flat
+    fig, axes_arr = plt.subplots(1, n, figsize=figsize, sharey=True, squeeze=False)
+    axes = axes_arr.flat
 
     color_ctrl = PALETTE.get("control", "#4a90d9")
     color_case = PALETTE.get("treatment", "#e05263")
@@ -417,10 +417,10 @@ def dmr_heatmap(
                 if display_y[i + 1] - display_y[i] < min_spacing:
                     display_y[i] = display_y[i + 1] - min_spacing
             # Final clip into axes bounds.
-            top = -0.4
-            bot = n_rows - 0.6
+            top_y = -0.4
+            bot_y = n_rows - 0.6
             for i, y in enumerate(display_y):
-                display_y[i] = float(np.clip(y, top, bot))
+                display_y[i] = float(np.clip(y, top_y, bot_y))
 
             for row_idx, dy in zip(keep_idx_sorted, display_y):
                 g = rows_meta_ord[row_idx].get(gene_col)

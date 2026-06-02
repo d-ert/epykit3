@@ -104,7 +104,6 @@ def build_smoothed_pseudo_count_store(
                 # Left-join: every raw site keeps its strand / context /
                 # coverage; beta_smooth comes from the sidecar.
                 joined = raw_df.join(smooth_df, on="pos", how="left")
-                pos = joined["pos"].to_numpy()
                 cov = joined["coverage"].to_numpy().astype(np.int64)
                 raw_n_meth = joined["N_meth"].to_numpy().astype(np.int64)
                 beta = joined["beta_smooth"].to_numpy().astype(np.float64)

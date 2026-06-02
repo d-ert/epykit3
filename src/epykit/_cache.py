@@ -29,6 +29,23 @@ from pathlib import Path
 from typing import Any, Optional
 
 
+def count_store_rows(store_dir: str) -> Optional[int]:
+    """Total row count across all ``part-*.parquet`` files under a store.
+
+    Returns ``None`` if the count cannot be determined (e.g. pyarrow is
+    unavailable or the directory cannot be read).
+    """
+    try:
+        import pyarrow.parquet as pq
+
+        total = 0
+        for path in Path(store_dir).rglob("part-*.parquet"):
+            total += pq.read_metadata(str(path)).num_rows
+        return total
+    except Exception:
+        return None
+
+
 def file_signature(path: Path) -> dict[str, Any]:
     """Path + size + mtime fingerprint of a single file."""
     stat = path.stat()

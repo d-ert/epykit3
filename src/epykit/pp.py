@@ -7,6 +7,7 @@ from pathlib import Path
 import polars as pl
 
 from . import filter as filter_mod
+from ._cache import count_store_rows as _count_parquet_rows
 from .methyldata import MethylData
 
 logger = logging.getLogger(__name__)
@@ -23,18 +24,6 @@ def _append_store_history(md: MethylData, step: str, path: str, n_sites: int | N
         history = []
     history.append({"step": step, "path": path, "n_sites": n_sites})
     md.uns["_store_history"] = history
-
-
-def _count_parquet_rows(store_dir: str) -> int | None:
-    try:
-        import pyarrow.parquet as pq
-
-        total = 0
-        for path in Path(store_dir).rglob("part-*.parquet"):
-            total += pq.read_metadata(str(path)).num_rows
-        return total
-    except Exception:
-        return None
 
 
 def filter_coverage(

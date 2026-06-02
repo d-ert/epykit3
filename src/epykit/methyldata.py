@@ -6,7 +6,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 import warnings
 
 import polars as pl
@@ -423,12 +423,16 @@ class MethylData:
         from .report import generate_report
         return generate_report(self, output, **kwargs)
 
-    def to_bedgraph(self, sample: str, output: str, *, value: str = "beta") -> str:
+    def to_bedgraph(
+        self, sample: str, output: str,
+        *, value: Literal["beta", "coverage", "N_meth"] = "beta",
+    ) -> str:
         from .export import to_bedgraph
         return to_bedgraph(self, sample, output, value=value)
 
     def to_bigwig(
-        self, sample: str, output: str, *, value: str = "beta",
+        self, sample: str, output: str,
+        *, value: Literal["beta", "coverage", "N_meth"] = "beta",
         chrom_sizes: Optional[dict] = None,
     ) -> str:
         from .export import to_bigwig

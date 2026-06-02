@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import gc
 import logging
-from typing import Literal
+from typing import Any, Literal
 import polars as pl
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ from .dmc import (
     process_chromosomes_dmc,
 )
 from .dmr import (
-    DMR_PRESETS,
+    DMR_PRESETS,  # noqa: F401 -- public re-export: `from epykit.tl import DMR_PRESETS`
     call_dmr_chain_merge,
     call_dmr_sliding_window,
     call_dmr_tile_based,
@@ -193,7 +193,12 @@ def qc(
         for sample in samples:
             try:
                 rate = bisulfite_conversion_rate(md.store, sample, chh_context_store)
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "Bisulfite conversion rate unavailable for sample %s "
+                    "(CHH store %s): %s",
+                    sample, chh_context_store, exc,
+                )
                 rate = None
             conv.append({"sample_id": sample, "bisulfite_conversion_rate": rate})
         obs = obs.join(pl.DataFrame(conv), on="sample_id", how="left")
@@ -457,10 +462,10 @@ def dmc(
         # P1-11 deprecation notice for GLM / contrast path.
         import warnings as _warnings
         _warnings.warn(
-            "The 'log2_odds_ratio' column is deprecated and will be removed in "
-            "0.8. Use 'log2_odds_ratio_pooled' for pooled-count tests (lr, "
-            "fisher) or 'coef_treatment_log2' for the glm backend. The "
-            "transitional column is NaN-filled in 0.7.5.",
+            "The 'log2_odds_ratio' column is deprecated and is slated for "
+            "removal in 1.1. Use 'log2_odds_ratio_pooled' for pooled-count "
+            "tests (lr, fisher) or 'coef_treatment_log2' for the glm backend. "
+            "The transitional column is NaN-filled.",
             FutureWarning, stacklevel=2,
         )
         return
@@ -773,13 +778,13 @@ def dmc(
 
     # P1-11 deprecation notice – emitted once per tl.dmc call (not per-row,
     # not per-chromosome).  The transitional 'log2_odds_ratio' column is
-    # NaN-filled in 0.7.5; it will be removed in 0.8.
+    # NaN-filled and slated for removal in 1.1.
     import warnings as _warnings
     _warnings.warn(
-        "The 'log2_odds_ratio' column is deprecated and will be removed in "
-        "0.8. Use 'log2_odds_ratio_pooled' for pooled-count tests (lr, "
-        "fisher) or 'coef_treatment_log2' for the glm backend. The "
-        "transitional column is NaN-filled in 0.7.5.",
+        "The 'log2_odds_ratio' column is deprecated and is slated for "
+        "removal in 1.1. Use 'log2_odds_ratio_pooled' for pooled-count "
+        "tests (lr, fisher) or 'coef_treatment_log2' for the glm backend. "
+        "The transitional column is NaN-filled.",
         FutureWarning, stacklevel=2,
     )
 
@@ -805,7 +810,6 @@ def _run_dmc_contrast(
     md.obs order (not the binary case/control split), so the design
     matrix matches md.obs row-for-row.
     """
-    import numpy as np
     from .dmc import process_chromosomes_dmc
     from ._glm import build_design, resolve_contrast
 
@@ -866,8 +870,12 @@ def _run_dmc_contrast(
             ).to_list()
             samples_case_local = [s for s, m in zip(samples_all, mask_treat) if m]
             samples_control_local = [s for s, m in zip(samples_all, mask_treat) if not m]
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Could not derive case/control split from treatment column "
+                "%r; mean_beta_case/control will be NaN: %s",
+                treatment_col, exc,
+            )
 
     unite_info = md.uns.get("unite")
     unite = (unite_info is not None) and (unite_info.get("type") == "intersect")
@@ -972,13 +980,16 @@ def dmr(
     ``method="sliding_window"`` path operates on the in-memory DMC table
     and is unaffected by this setting.
 
-    Two methods are supported:
+    Four methods are supported (see ``method`` below for the full list):
 
-    * ``method="tile"`` (default, recommended) -- aggregates read counts
-      within fixed tiles and runs a single test per tile. Requires direct
-      access to ``md.store`` and the per-sample methylstore; does not
-      need a prior DMC table. The right path for whole-genome WGBS
-      analyses.
+    * ``method="chain_merge"`` (default, recommended) -- DSS-style
+      chaining of significant CpGs into regions; tune via ``preset``.
+      The recommended caller for most WGBS analyses.
+    * ``method="tile"`` -- aggregates read counts within fixed tiles and
+      runs a single test per tile. Requires direct access to ``md.store``
+      and the per-sample methylstore; does not need a prior DMC table.
+    * ``method="segment"`` -- rule-based 3-state segmentation over the
+      ``meth_diff`` signal with Stouffer-combined per-segment p-values.
     * ``method="sliding_window"`` -- the legacy in-tree method: takes the
       DMC result on ``md`` and combines per-CpG p-values within overlapping
       windows with signed Stouffer's Z. Faster (no extra I/O) but
@@ -1247,7 +1258,6 @@ def dmr(
         # Reuses the same DMC store as sliding_window when available so a
         # 22M-CpG run stays streaming-friendly.
         dmc_store_path = md.uns.get("dmc", {}).get("store_path")
-        dmc_input: object
         if dmc_store_path:
             from ._dmc_store import DMCStore
             from pathlib import Path as _Path
@@ -1765,7 +1775,7 @@ def annotate(
             # source. We forward whichever the caller set.
             annotation_path = gtf if gtf is not None else refgene
             forwarded_source = "gtf" if gtf is not None else "refgene"
-            af_kwargs = dict(
+            af_kwargs: dict[str, Any] = dict(
                 source=forwarded_source,
                 promoter_upstream_bp=promoter_upstream_bp,
                 promoter_downstream_bp=promoter_downstream_bp,

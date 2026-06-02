@@ -27,7 +27,7 @@ time (a tiny up-front cost).
 from __future__ import annotations
 
 import logging
-from typing import Optional, Sequence
+from typing import Any, Literal, Optional, Sequence, Union, overload
 
 import numpy as np
 import polars as pl
@@ -40,6 +40,33 @@ _PROP_CLIP = 1e-6
 
 # Design matrix construction
 
+@overload
+def build_design(
+    obs: pl.DataFrame,
+    samples_ordered: Sequence[str],
+    formula: Optional[str] = ...,
+    covariates: Optional[Sequence[str]] = ...,
+    treatment_col: str = ...,
+    require_treatment_col: bool = ...,
+    return_design_info: Literal[False] = ...,
+    reference_level: Optional[str] = ...,
+) -> tuple[np.ndarray, Optional[np.ndarray], int, list[str], str]: ...
+
+
+@overload
+def build_design(
+    obs: pl.DataFrame,
+    samples_ordered: Sequence[str],
+    formula: Optional[str] = ...,
+    covariates: Optional[Sequence[str]] = ...,
+    treatment_col: str = ...,
+    require_treatment_col: bool = ...,
+    *,
+    return_design_info: Literal[True],
+    reference_level: Optional[str] = ...,
+) -> tuple[np.ndarray, Optional[np.ndarray], int, list[str], str, Any]: ...
+
+
 def build_design(
     obs: pl.DataFrame,
     samples_ordered: Sequence[str],
@@ -49,7 +76,10 @@ def build_design(
     require_treatment_col: bool = True,
     return_design_info: bool = False,
     reference_level: Optional[str] = None,
-) -> tuple[np.ndarray, np.ndarray, int, list[str], str]:
+) -> Union[
+    tuple[np.ndarray, Optional[np.ndarray], int, list[str], str],
+    tuple[np.ndarray, Optional[np.ndarray], int, list[str], str, Any],
+]:
     """Build full + reduced model matrices from ``md.obs``.
 
     Parameters
@@ -229,7 +259,7 @@ def build_design(
         X_reduced = np.delete(X_full, coef_idx, axis=1)
     else:
         coef_idx = -1
-        X_reduced = None  # type: ignore[assignment]
+        X_reduced = None
 
     if return_design_info:
         return X_full, X_reduced, coef_idx, term_names, formula_used, design_info
@@ -314,7 +344,11 @@ def irls_binomial_batch(
     """
     n_sites, n_samples = meth.shape
     p = X.shape[1]
-    assert X.shape[0] == n_samples, "Design rows must match number of samples"
+    if X.shape[0] != n_samples:
+        raise ValueError(
+            f"Design matrix has {X.shape[0]} rows but there are "
+            f"{n_samples} samples; rows must match number of samples."
+        )
 
     cov_f  = cov.astype(np.float64, copy=False)
     meth_f = meth.astype(np.float64, copy=False)
@@ -805,7 +839,7 @@ def wald_test(
     phi_eff: Optional[np.ndarray] = None,
     df_resid: Optional[np.ndarray] = None,
     reference: str = "adaptive",
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.signedinteger]:
     """Per-site Wald / joint-F test of H0: C*beta_i = 0.
 
     Parameters

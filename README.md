@@ -4,7 +4,7 @@ A Python-native WGBS methylation analysis pipeline built on Parquet partitioning
 
 epykit ingests Bismark / MethylDackel coverage output into a partitioned Parquet **methylstore** and runs the whole downstream analysis (QC → filtering → DMC → DMR → annotation → plotting → report) over that store with [polars](https://pola.rs) and lazy I/O. The Python API is organised in a scanpy-style `pp` / `tl` / `pl` namespace; a CLI mirrors the same operations for scripting.
 
-> **Status:** version 0.7.2, pre-1.0. API may change. MIT licensed.
+> **Status:** version 1.0.0 — stable API. MIT licensed.
 
 [Documentation](https://d-ert.github.io/epykit/) | [Changelog](CHANGELOG.md)
 
@@ -17,7 +17,7 @@ epykit ingests Bismark / MethylDackel coverage output into a partitioned Parquet
 - **Statistical engines.** Four per-CpG DMC backends: `lr` (quasi-binomial likelihood-ratio, the default at n ≥ 2; closed-form with McCullagh-Nelder dispersion), `welch_t` (Welch t on raw β), `fisher` (pooled Fisher exact, n = 1 fallback), and `glm` (full IRLS binomial GLM with covariates). `auto` resolves to `fisher` at n < 2 and `lr` at n ≥ 2. Engines removed in 0.7.5: `logit_t`, `bb_lr`, `score`, `cmh` — all raise `ValueError` with a migration hint. Every test surfaces 95 % Wald CIs on `meth_diff`. Permutation empirical FDR is available end-to-end: `tl.dmc(..., empirical_fdr=True)` and `tl.dmr(..., empirical_fdr=True)` shuffle labels, re-run the engine, and add `empirical_pvalue` / `empirical_qvalue` columns.
 - **`lr+` power stack (opt-in, since 0.7.1).** Four enhancements to the `lr` engine — empirical-Bayes dispersion shrinkage (`dispersion="eb"`), Stouffer combiner over neighbouring CpGs (`neighbour_combine=True`), separation-aware Fisher fallback (`sep_fallback=True`), and two-stage BH q-values (`fdr_method="fdr_tsbh"`) — engaged via `power_stack="lr+"`. Out of the box (`power_stack="off"`, the 1.0 default), bare `lr` runs without any of these. All four together push TPR ≥ 0.999 on the Piao et al. 2021 simulated benchmark at every coverage ≥ 10× and every replicate count ≥ 4 while keeping FPR strictly tighter than every R baseline. See [`benchmark/REPORT.md`](benchmark/REPORT.md) for the head-to-head.
 - **Multi-group & covariate contrasts.** `tl.dmc(formula="~ group + age", contrast="group")` runs a joint F-test across factor levels; `contrast="age"` runs a Wald test on a continuous covariate as the primary effect.
-- **Four DMR engines plus permutation FDR.** Tile-based (read-pooled, default), per-CpG sliding-window with signed Stouffer's combining, HMM segmentation over `meth_diff`, and a DSS-compatible **chain-merge** caller (`tl.dmr(method="chain_merge", preset="strict" | "default" | "permissive")`) that mirrors DSS `callDMR` semantics. `tl.dmr(..., empirical_fdr=True, n_perm=100)` re-runs the engine on shuffled labels and reports empirical p- and q-values. `tl.diagnose_dmr_calling(md, reference_dmrs)` buckets unrecovered reference DMRs into actionable categories (coverage loss vs. weak test vs. structural filter) for triage.
+- **Four DMR engines plus permutation FDR.** A DSS-compatible **chain-merge** caller (`tl.dmr(method="chain_merge", preset="strict" | "default" | "permissive")`, the default) that mirrors DSS `callDMR` semantics, plus tile-based (read-pooled) aggregation, per-CpG sliding-window with signed Stouffer's combining, and HMM segmentation over `meth_diff`. `tl.dmr(..., empirical_fdr=True, n_perm=100)` re-runs the engine on shuffled labels and reports empirical p- and q-values. `tl.diagnose_dmr_calling(md, reference_dmrs)` buckets unrecovered reference DMRs into actionable categories (coverage loss vs. weak test vs. structural filter) for triage.
 - **Differential variability.** `tl.dvc(md)` finds CpGs whose between-replicate variance differs between groups even when the means don't — the iEVORA signal that mean-based DMC misses.
 - **Clinical / cohort QC.** Opt-in `qc.sex_check` (chrX mean β), `qc.contamination_estimate` (β-distribution bimodality), `qc.sample_correlation` (sample-swap detection), and `qc.power` (sample-size calculator). Bisulfite conversion rate is reported (CHH context, dashboard + MultiQC) but **not applied** to per-CpG counts — matching `bsseq` / `methylKit` defaults. A poorly converted library should be re-prepped, not papered over with a multiplicative count adjustment.
 - **Replicate-aware throughout.** Per-site `min_samples_treatment` / `min_samples_control` guards, per-site or chromosome-level McCullagh-Nelder dispersion, optional covariate design matrices via Wilkinson formulas.
@@ -119,8 +119,6 @@ ep.pl.umap(md,                 save="umap")
 ep.pl.qc_dashboard(md,         save="qc_dashboard")
 ep.pl.dmr_boxplot(md, top_n=6, save="dmr_boxplot")
 ```
-
-`scratch_plan2.py` at the repo root exercises every Plan 2 feature on real Bismark data and is the canonical real-data smoke test.
 
 ### 3. Covariate-adjusted analysis
 

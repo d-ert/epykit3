@@ -41,7 +41,7 @@ def umap(
     ax, figsize, save : matplotlib plumbing -- see :mod:`epykit.pl`.
     """
     try:
-        import umap as umap_lib  # type: ignore
+        import umap as umap_lib
     except ImportError as exc:
         raise ImportError(
             "umap-learn is required for pl.umap. "

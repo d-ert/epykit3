@@ -24,7 +24,7 @@ labels (and optionally the posterior matrix).
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Literal, Optional, Union, overload
 
 import numpy as np
 
@@ -120,6 +120,34 @@ def _build_transition(
     return A
 
 
+@overload
+def segment(
+    observations: np.ndarray,
+    n_states: int = ...,
+    *,
+    state_means: Optional[np.ndarray] = ...,
+    transition_priors: Optional[np.ndarray] = ...,
+    self_loop: float = ...,
+    return_posteriors: Literal[False] = ...,
+    emission: str = ...,
+    emission_sd: float = ...,
+) -> np.ndarray: ...
+
+
+@overload
+def segment(
+    observations: np.ndarray,
+    n_states: int = ...,
+    *,
+    state_means: Optional[np.ndarray] = ...,
+    transition_priors: Optional[np.ndarray] = ...,
+    self_loop: float = ...,
+    return_posteriors: Literal[True],
+    emission: str = ...,
+    emission_sd: float = ...,
+) -> tuple[np.ndarray, np.ndarray]: ...
+
+
 def segment(
     observations: np.ndarray,
     n_states: int = 2,
@@ -130,7 +158,7 @@ def segment(
     return_posteriors: bool = False,
     emission: str = "bernoulli",
     emission_sd: float = 0.1,
-) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+) -> Union[np.ndarray, tuple[np.ndarray, np.ndarray]]:
     """Forward-backward + Viterbi segmentation of a per-site beta signal.
 
     Parameters

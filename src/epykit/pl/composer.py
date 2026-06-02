@@ -27,7 +27,7 @@ Example
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Sequence
+from typing import Optional, Sequence
 
 import numpy as np
 
@@ -137,7 +137,8 @@ def figure_grid(
         gridspec_kw["height_ratios"] = list(height_ratios)
 
     fig, axd = plt.subplot_mosaic(
-        mosaic, figsize=figsize, gridspec_kw=gridspec_kw,
+        mosaic,  # type: ignore[arg-type]  # matplotlib stubs want HashableList; list[list[str]] works at runtime
+        figsize=figsize, gridspec_kw=gridspec_kw,
     )
 
     for letter, ax in axd.items():
@@ -223,12 +224,15 @@ def _adopt_axes_content(src_ax, dst_ax) -> None:
         )
     for col in src_ax.collections:
         if isinstance(col, PathCollection):
-            offs = col.get_offsets()
+            # matplotlib stubs widen these returns more than reality; in
+            # practice get_offsets() is always a (N, 2) ndarray on PathCollection.
+            offs = np.asarray(col.get_offsets())
             if len(offs):
+                facecolors = col.get_facecolors()  # type: ignore[attr-defined]
                 dst_ax.scatter(
                     offs[:, 0], offs[:, 1],
                     s=col.get_sizes() if col.get_sizes().size else 12,
-                    c=col.get_facecolors() if col.get_facecolors().size else None,
+                    c=facecolors if facecolors.size else None,
                     alpha=col.get_alpha(),
                 )
     for patch in src_ax.patches:

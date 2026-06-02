@@ -30,7 +30,7 @@ import polars as pl
 
 from ._compute import run_chrom_pipeline
 from ._hmm import runs_of_state, segment
-from .dmc import _detect_chromosomes, _load_sample_chrom
+from .dmc import _detect_chromosomes
 
 logger = logging.getLogger(__name__)
 

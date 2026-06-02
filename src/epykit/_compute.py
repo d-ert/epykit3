@@ -116,7 +116,7 @@ def _run_dask(
     label: str,
 ) -> Iterator[tuple[str, pl.DataFrame]]:
     try:
-        from dask.distributed import Client, LocalCluster, get_client  # type: ignore
+        from dask.distributed import Client, LocalCluster, get_client
     except ImportError as exc:
         raise ImportError(
             "Dask is required for backend='dask'. "
@@ -174,7 +174,7 @@ def _run_ray(
     label: str,
 ) -> Iterator[tuple[str, pl.DataFrame]]:
     try:
-        import ray  # type: ignore
+        import ray
     except ImportError as exc:
         raise ImportError(
             "Ray is required for backend='ray'. "

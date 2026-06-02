@@ -238,18 +238,18 @@ def filter_sites(
     None
         Writes filtered Parquet store to output_dir
     """
-    methylstore_path = Path(methylstore_path)
+    methylstore_root = Path(methylstore_path)
     output_dir_path = Path(output_dir)
     output_dir_path.mkdir(parents=True, exist_ok=True)
 
-    sample_dirs = list(methylstore_path.glob("sample=*"))
+    sample_dirs = list(methylstore_root.glob("sample=*"))
     if not sample_dirs:
-        raise ValueError(f"No sample=* directories found in {methylstore_path}")
+        raise ValueError(f"No sample=* directories found in {methylstore_root}")
 
     if sample:
-        sample_path = methylstore_path / f"sample={sample}"
+        sample_path = methylstore_root / f"sample={sample}"
         if not sample_path.exists():
-            raise ValueError(f"Sample '{sample}' not found in {methylstore_path}")
+            raise ValueError(f"Sample '{sample}' not found in {methylstore_root}")
         samples_to_filter = [sample]
     else:
         samples_to_filter = [d.name.removeprefix("sample=") for d in sorted(sample_dirs)]
@@ -257,7 +257,7 @@ def filter_sites(
     params = _filter_params_payload(min_coverage, max_coverage_quantile, blacklist_bed)
 
     for samp in samples_to_filter:
-        sample_dir = methylstore_path / f"sample={samp}"
+        sample_dir = methylstore_root / f"sample={samp}"
         out_sample_dir = output_dir_path / f"sample={samp}"
 
         if _can_reuse_filtered(sample_dir, out_sample_dir, params):
@@ -428,9 +428,9 @@ def normalize_coverage_store(
         ])
         if len(coverage_series) == 0:
             raise ValueError(f"Sample {samp!r} has zero rows after read")
+        coverage_np = coverage_series.to_numpy()
         summaries[samp] = float(
-            coverage_series.median() if method == "median"
-            else coverage_series.mean()
+            np.median(coverage_np) if method == "median" else coverage_np.mean()
         )
 
     summary_values = np.array(list(summaries.values()), dtype=np.float64)
@@ -438,7 +438,7 @@ def normalize_coverage_store(
         np.median(summary_values) if method == "median" else summary_values.mean()
     )
 
-    factors: dict[str, float] = {
+    factors = {
         samp: (target / s if s > 0 else 1.0) for samp, s in summaries.items()
     }
 

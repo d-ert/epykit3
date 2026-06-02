@@ -54,7 +54,7 @@ _BAM_READ_SCHEMA = {
 def _require_pysam():
     """Lazy import of pysam with a clear install message."""
     try:
-        import pysam  # type: ignore
+        import pysam
     except ImportError as exc:
         raise ImportError(
             "pysam is required for BAM ingestion. "
