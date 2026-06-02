@@ -457,3 +457,77 @@ def test_cli_qc_report_auto_emits_sibling_tsvs(tmp_path, synth_bundle, monkeypat
     assert (out_dir / "global_methylation.tsv").exists()
     assert (out_dir / "coverage_uniformity.parquet").exists()
     assert (out_dir / "coverage_uniformity.tsv").exists()
+
+
+def test_env_var_suppresses_cli_auto_emit(tmp_path, synth_bundle, monkeypatch):
+    """EPYKIT_NO_AUTO_CSV=1 suppresses the sibling write across the CLI."""
+    import sys
+    import epykit as ep
+    from epykit.cli import main
+
+    md_setup = ep.read_bismark(
+        synth_bundle.samplesheet,
+        treatment_group="treatment",
+        control_group="control",
+        assembly="synth",
+        store_dir=str(tmp_path / "store"),
+    )
+    populated_store = md_setup.store
+
+    out_parquet = tmp_path / "dmc.parquet"
+    sibling = tmp_path / "dmc.significant.tsv"
+
+    monkeypatch.setenv("EPYKIT_NO_AUTO_CSV", "1")
+    monkeypatch.setattr(sys, "argv", [
+        "epykit", "dmc",
+        "--methylstore", populated_store,
+        "--samplesheet", synth_bundle.samplesheet,
+        "--treatment-group", "treatment",
+        "--control-group", "control",
+        "--output", str(out_parquet),
+        "--test", "lr",
+    ])
+    main()
+
+    assert out_parquet.exists()
+    assert not sibling.exists(), (
+        "EPYKIT_NO_AUTO_CSV=1 must suppress the sibling write"
+    )
+
+
+def test_explicit_csv_path_wins_over_auto_emit_name(tmp_path, synth_bundle, monkeypatch):
+    """`--csv` flag overrides the derived `<stem>.significant.tsv` name and
+    picks the delimiter from the explicit path suffix."""
+    import sys
+    import epykit as ep
+    from epykit.cli import main
+
+    md_setup = ep.read_bismark(
+        synth_bundle.samplesheet,
+        treatment_group="treatment",
+        control_group="control",
+        assembly="synth",
+        store_dir=str(tmp_path / "store"),
+    )
+    populated_store = md_setup.store
+
+    out_parquet = tmp_path / "dmc.parquet"
+    explicit = tmp_path / "my_hits.csv"          # .csv suffix -> comma delim
+    default_sibling = tmp_path / "dmc.significant.tsv"
+
+    monkeypatch.setattr(sys, "argv", [
+        "epykit", "dmc",
+        "--methylstore", populated_store,
+        "--samplesheet", synth_bundle.samplesheet,
+        "--treatment-group", "treatment",
+        "--control-group", "control",
+        "--output", str(out_parquet),
+        "--test", "lr",
+        "--csv", str(explicit),
+    ])
+    main()
+
+    assert explicit.exists()
+    assert not default_sibling.exists()
+    header = explicit.read_text(encoding="utf-8").splitlines()[0]
+    assert "," in header and "\t" not in header
