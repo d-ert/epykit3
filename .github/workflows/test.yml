@@ -60,3 +60,31 @@ jobs:
 
       - name: Mypy
         run: uv run --python 3.12 mypy src/epykit
+
+  benchmark-regen:
+    # Engine-regression slice: runs regen_small.py and diffs the
+    # output hashes against benchmark/scripts/regen_small_hashes.json.
+    # Catches changes to dmc.py / _glm.py / dmr.py that move per-CpG
+    # output BEFORE they land in the headline benchmark numbers.
+    # See benchmark/scripts/regen_small.py for the slice definition.
+    name: benchmark-regen (lr / lr+ hash diff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Install epykit + benchmark deps
+        run: uv sync --python 3.12 --extra dev --extra all
+
+      - name: Run the engine-regression slice (~30s)
+        env:
+          PYTHONIOENCODING: utf-8
+        run: uv run --python 3.12 python benchmark/scripts/regen_small.py
