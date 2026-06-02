@@ -428,10 +428,20 @@ def normalize_coverage_store(
         ])
         if len(coverage_series) == 0:
             raise ValueError(f"Sample {samp!r} has zero rows after read")
-        coverage_np = coverage_series.to_numpy()
-        summaries[samp] = float(
-            np.median(coverage_np) if method == "median" else coverage_np.mean()
+        # Polars-native reduction (Rust, parallel). The type: ignore is
+        # because Series.median()/mean() are stubbed as the wide PythonLiteral
+        # union for arbitrary dtypes; for the int coverage column the runtime
+        # return is always float | None, which float() handles.
+        # Polars-native reduction (Rust, parallel). The cast is a type
+        # narrowing only: Series.median()/mean() are stubbed as the wide
+        # PythonLiteral union over every dtype, but the int coverage column
+        # always reduces to float | None at runtime.
+        from typing import cast
+        scalar = (
+            coverage_series.median() if method == "median"
+            else coverage_series.mean()
         )
+        summaries[samp] = float(cast(float, scalar))
 
     summary_values = np.array(list(summaries.values()), dtype=np.float64)
     target = float(
