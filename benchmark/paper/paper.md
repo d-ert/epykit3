@@ -331,8 +331,11 @@ Across the full 5×–25× coverage grid at 3 vs 3 replicates, epykit's baseline
 `lr` engine is competitive with the strongest baselines (methylKit, RADMeth,
 DSS) in every effect-size bin. At coverage = 10× with 3 vs 3 replicates —
 the design point most relevant to typical WGBS studies — `lr` traces a
-near-ideal ROC curve (Figure 1), capturing 96.2 % of true DMCs at
-FPR = 1.2 × 10⁻⁵.
+near-ideal ROC curve (Figure 1, AUROC = 0.9999 <!-- claim: study1_lr_auroc_cov10 -->),
+capturing 96.2 % <!-- claim: study1_lr_tpr_cov10 --> of true DMCs at
+FPR = 1.2 × 10⁻⁵ (F1 = 0.9807 <!-- claim: study1_lr_f1_cov10 -->). The opt-in
+`lr+` power stack reaches TPR = 99.97 % <!-- claim: study1_lrplus_tpr_cov10 -->
+at the same coverage cell with AUROC = 0.9999 <!-- claim: study1_lrplus_auroc_cov10 -->.
 
 ![Figure 1. ROC at coverage = 10×, 3 vs 3 replicates. epykit `lr` and `lr+`
 overlap the top-left corner; methylKit, RADMeth, DSS, and pooled Fisher
@@ -381,9 +384,12 @@ covered at every coverage); DSS, BiSeq, and BSmooth are far behind.
 ![Figure 5. DMR detection vs sequencing depth.](../figures/study1_simulated_allPackages/F5_dmr_detection.png)
 
 The DMC engine ablation (Figure 7) confirms that `lr` and `lr+` dominate
-the four replicate-aware epykit engines across the entire coverage range;
-`bb_lr` is consistently power-deficient at n ≤ 3 per group and `welch_t`
-degrades sharply at low coverage.
+across the entire coverage range; `welch_t` degrades sharply at low coverage,
+and `fisher` (pooled-counts fallback for n = 1 per group) is consistently
+less powerful than `lr` whenever n ≥ 2 makes `lr` available. The beta-binomial
+LR engine (`bb_lr`) that appeared in earlier ablations was retired in 0.7.5
+because its small-n behaviour was reproducible from `lr` with the empirical-Bayes
+dispersion knob (`dispersion="eb"`); see §2.5.1 for the full removed-engine list.
 
 ![Figure 7. epykit DMC engine ablation across coverage.](../figures/study1_simulated_allPackages/F7_engine_ablation.png)
 
@@ -735,6 +741,76 @@ focused biological DMRs; variable-width chain-merge callers recover
 half to two-thirds; DSS-from-scratch is the published-method ceiling
 at 87.5 %. The full Study 3 summary picture is
 [F10 summary](../figures/study3_real_GSE263850/three_way/F10_summary_three_way.png).
+
+## 3.4 Held-out simulator with intrinsic truth (Phase 4)
+
+To close the threshold-reconstructed-truth loop described in §2.7, we ran
+methylKit and DSS (smoothing on and off) on every one of the 20 held-out
+simulator seeds (`benchmark/scripts/run_external_simulator_sweep.py`) and
+scored against the intrinsic `is_dmc` flag set at simulation time. The
+headline cell is coverage = 10, 3 vs 3, q < 0.05, all effect-size bins.
+
+At seed `2026000` (representative; full 20-seed IQRs in
+`benchmark/data/study1b_simulator/eval_simulator_intrinsic_iqr.parquet`):
+
+| Tool (mode) | TPR | FPR | F1 | AUROC |
+|---|---:|---:|---:|---:|
+| methylKit | 0.7268 | 0.0114 | 0.8201 | 0.9246 <!-- claim: simulator_methylkit_auroc_seed0_cov10 --> |
+| DSS, smoothing = FALSE | 0.6477 | 0.0058 | 0.7752 | 0.9071 <!-- claim: simulator_dss_nosmooth_auroc_seed0_cov10 --> |
+| DSS, smoothing = TRUE | 0.0000 | 0.0000 | 0.0000 | 0.6272 <!-- claim: simulator_dss_smooth_auroc_seed0_cov10 --> |
+
+**Reading.** methylKit and unsmoothed DSS are well-calibrated on intrinsic
+truth, with methylKit slightly more sensitive (TPR 0.73 vs 0.65) and
+unsmoothed DSS slightly more conservative on false positives. Smoothed DSS
+collapses to one call total — not a DSS defect, but a dataset–assumption
+mismatch: the simulator generates CpGs at uniform 100-bp spacing with no
+genomic correlation structure for the smoother to exploit, so DSS's
+default smoothing window flattens the signal entirely. The same DSS
+configuration is competitive on real-data Study 3 (§3.3.4).
+
+The full per-seed table (`eval_simulator_intrinsic_per_seed.parquet`,
+540 rows) and across-seed median + IQR summary
+(`eval_simulator_intrinsic_iqr.parquet`) appear as **Supplementary
+Table S-Sim**. The 7-tool parallel column including epykit results
+(scored separately) is in `parallel_column_summary.md`.
+
+**Cross-truth comparison.** Comparing intrinsic truth (this section)
+against Piao threshold-reconstructed truth (§3.1) shows comparative
+tool ordering is preserved: methylKit ≈ unsmoothed DSS at the top,
+smoothed DSS collapses, BiSeq under-calls at low coverage. Absolute
+TPRs on intrinsic truth are slightly lower because the intrinsic
+labels include weak-effect DMCs that threshold reconstruction filters
+out — the expected direction.
+
+## 3.5 Null calibration
+
+For each surviving DMC engine on each dataset, we shuffle the
+case/control assignment K = 20 times and record observed FDR at
+nominal q ∈ {0.01, 0.05, 0.10} (§2.8 design). A well-calibrated engine
+produces observed FDR ≤ nominal under the null.
+
+On the real-data GSE263850 cohort, both `lr` and `lr+` are well below
+nominal at q < 0.05 (median observed FDR = 1.53 × 10⁻⁵
+<!-- claim: null_calib_lr_gse263850_fdr_median --> for `lr`;
+1.53 × 10⁻⁵ <!-- claim: null_calib_lrplus_gse263850_fdr_median --> for
+`lr+`). On the Piao-as-distributed dataset, observed FDR is 0.0 across
+all 20 shuffles for both engines — perfect calibration to within
+shuffle resolution, attributable to the simulator's clean noise model.
+
+The full sweep covers 13 cells; 12 ran successfully. The
+`fisher@gse263850` cell was deferred and is documented as a limitation
+(§10.5). The full table (`benchmark/data/null_calibration/summary.parquet`)
+appears as **Supplementary Table S-Calib**.
+
+**Performance headline.** epykit's bare `lr` engine completes the same
+coverage = 10, 3 vs 3 cell in median 0.86 s
+<!-- claim: headline_wallclock_epykit_lr -->; the opt-in `lr+` stack
+in 6.80 s <!-- claim: headline_wallclock_epykit_lrplus -->. The full
+per-engine timing table is `benchmark/data/study1/timings_table.csv`;
+the 7-tool cross-tool wallclock + accuracy comparison is
+`benchmark/docs/timing-comparison.md`. The post-fix engine numbers
+reported throughout §3 are validated against a pre/post-fix delta
+audit (**Table S-Fix**, §10.5).
 
 # 4. Discussion
 
