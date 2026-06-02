@@ -77,7 +77,7 @@ import epykit as ep
 md = ep.read_bismark("samplesheet.csv", treatment_group="tumor", control_group="normal", assembly="hg38")
 ep.pp.filter_coverage(md, lo_count=10, hi_perc=99.9)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 
 # Smooth for plotting
 ep.pp.smooth(md, method="gaussian", bandwidth=1000)
@@ -122,7 +122,7 @@ Smoothing is optional and should be applied after the core preprocessing steps:
 ```python
 ep.pp.filter_coverage(md)       # Required
 ep.pp.normalize_coverage(md)    # Required
-ep.pp.unite(md)                 # Required
+ep.pp.set_unite_type(md)                 # Required
 ep.pp.smooth(md)                # Optional
 ```
 

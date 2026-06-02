@@ -19,8 +19,8 @@ ep.pp.filter_coverage(md, lo_count=10, hi_perc=99.9)
 # 2. Normalize coverage across samples
 ep.pp.normalize_coverage(md, method="median")
 
-# 3. Define the site universe (intersect or union)
-ep.pp.unite(md, type="intersect")
+# 3. Mark the site universe (intersect or union)
+ep.pp.set_unite_type(md, type="union")
 
 # Optional steps (order-independent after unite)
 ep.pp.smooth(md, method="gaussian", bandwidth=1000)
@@ -33,7 +33,7 @@ ep.pp.aggregate_regions(md, regions_bed="promoters.bed")
 |----------|---------|-------------|
 | [`ep.pp.filter_coverage()`](filter-coverage.md) | Remove sites with too few or too many reads | Always -- first step after reading |
 | [`ep.pp.normalize_coverage()`](normalize-coverage.md) | Equalize coverage depth across samples | Always -- prevents sequencing-depth bias |
-| [`ep.pp.unite()`](unite.md) | Define which sites are included in analysis | Always -- required before DMC/DMR |
+| [`ep.pp.set_unite_type()`](unite.md) | Mark which site-alignment strategy DMC/DMR uses | Always -- required before DMC/DMR |
 | [`ep.pp.smooth()`](smooth.md) | Apply spatial smoothing to methylation values | Optional -- for visualization or exploratory analysis |
 | [`ep.pp.aggregate_regions()`](aggregate-regions.md) | Collapse per-CpG data into region-level summaries | Optional -- for promoter/enhancer-level analysis |
 
@@ -73,7 +73,7 @@ md = ep.read_bismark(
 # Preprocess
 ep.pp.filter_coverage(md, lo_count=10, hi_perc=99.9)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 
 # Ready for differential analysis
 ep.tl.dmc(md)
@@ -86,6 +86,6 @@ examples:
 
 - [Filter Coverage](filter-coverage.md)
 - [Normalize Coverage](normalize-coverage.md)
-- [Unite Sites](unite.md)
+- [Unite Sites (`set_unite_type`)](unite.md)
 - [Smoothing](smooth.md)
 - [Aggregate Regions](aggregate-regions.md)

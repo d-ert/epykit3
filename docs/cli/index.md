@@ -40,6 +40,21 @@ These flags are shared across most subcommands:
 | `--control GROUP` | Control group name |
 | `--assembly NAME` | Genome assembly (e.g., `hg38`, `mm10`) |
 
+## Sibling TSV auto-emit
+
+The `dmc`, `dmr`, `annotate`, and `qc-report` subcommands write a sibling
+TSV next to their primary output by default. For example,
+`epykit dmc ... --output dmc.parquet` also writes
+`dmc.significant.tsv` (and, with `--csv-full`, `dmc.tsv`).
+
+| Flag / env var | Effect |
+|----------------|--------|
+| `--csv PATH` | Override the auto-derived path. A `.csv` suffix selects comma delimiter; anything else uses tab. Implies the file is written. |
+| `--no-csv` | Suppress the sibling TSV auto-emit entirely. |
+| `--csv-alpha FLOAT` *(`dmc`, `dvc`)* | q-value threshold for the significant-only TSV. Default `0.05`. |
+| `--csv-full` *(`dmc`, `dvc`)* | Also write the full (unfiltered) table alongside the significant one. |
+| `EPYKIT_NO_AUTO_CSV=1` *(env var)* | Suppress the auto-emit globally for the current shell session -- handy for batch scripts that only want parquet output. |
+
 ---
 
 ## convert
@@ -105,29 +120,56 @@ epykit dmc \
 
 | Option | Description |
 |--------|-------------|
-| `--test {lr,score,glm,logit_t,welch_t,bb_lr,cmh,fisher}` | Statistical test to use |
+| `--test {lr,glm,welch_t,fisher}` | Statistical test to use. Default `lr` (quasi-binomial LR). `glm` is auto-selected when `--formula` is set. `fisher` is the n=1 fallback. The pre-1.0 engines `logit_t`, `bb_lr`, `score`, `cmh` were removed in 0.7.5. |
 | `--formula TEXT` | Model formula (e.g., `"~ treatment"`, `"~ treatment + age"`) |
 | `--contrast COL TREAT CTRL` | Contrast specification: column name, treatment level, control level |
+| `--allow-n1` | Permit n=1 per group (falls back to Fisher exact on pooled reads). Off by default -- p-values become anti-conservative. |
+| `--no-csv` / `--csv PATH` / `--csv-alpha 0.05` / `--csv-full` | TSV auto-emit controls (see [Sibling TSV auto-emit](#sibling-tsv-auto-emit)). |
 
 ---
 
 ## dmr
 
-Call differentially methylated regions from DMC results.
+Call differentially methylated regions. `chain_merge` (the default since 1.0)
+chains contiguous significant CpGs from a precomputed DMC parquet into
+DSS-style regions. `tile` pools reads across CpGs within each fixed-size
+tile and tests directly from the methylstore (no DMC parquet required).
+`sliding_window` and `segment` both read a precomputed DMC parquet.
 
 ```bash
+# Default: DSS-style chain_merge from a precomputed DMC parquet.
+epykit dmr \
+    --method chain_merge \
+    --dmc-results md_out/varm/dmc_lr.parquet \
+    --preset strict \
+    --output dmrs.parquet
+
+# Tile-based DMR (reads the methylstore directly).
 epykit dmr \
     --methylstore methylstore/ \
+    --samplesheet samplesheet.csv \
+    --treatment-group tumor --control-group normal \
     --method tile \
-    --empirical-fdr \
-    --n-perm 1000
+    --empirical-fdr --n-perm 1000 \
+    --output dmrs.parquet
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--method {tile,sliding_window}` | DMR detection method |
-| `--empirical-fdr` | Use permutation-based empirical FDR |
-| `--n-perm INT` | Number of permutations for empirical FDR (default: 1000) |
+| `--method {chain_merge,tile,sliding_window,segment}` | DMR detection method. Default `chain_merge`. `hmm` was renamed `segment` in 1.0 (same engine). |
+| `--output PATH` | Required. DMR parquet output path. |
+| `--dmc-results PATH` | (`chain_merge`, `sliding_window`, `segment`) Parquet from `epykit dmc`. |
+| `--preset {strict,default,permissive}` | (`chain_merge`) Parameter bundle. Explicit knob flags override the bundled value. |
+| `--dis-merge-bp INT` | (`chain_merge`) Max bp gap between consecutive significant CpGs. Default 500. |
+| `--pct-sig FLOAT` | (`chain_merge`) Min fraction of CpGs in a span that must be significant. Default 0.5. |
+| `--minlen-bp INT` | (`chain_merge`) Min DMR span in bp. Default 50. |
+| `--use-q-for-sig` | (`chain_merge`) Gate significance on q-value rather than p-value. |
+| `--tile-size-bp INT` | (`tile`) Tile width. Default 1000. |
+| `--min-cpgs-per-tile INT` | (`tile`) Minimum CpGs per tile per sample. Default 5. |
+| `--test {lr,glm,welch_t,fisher}` | (`tile`) Statistical test applied to tile-level counts. Default `lr`. |
+| `--empirical-fdr` | (`tile`) Permutation-based empirical FDR. |
+| `--n-perm INT` | (`tile`) Number of permutations. Default 100. |
+| `--no-csv` / `--csv PATH` | TSV auto-emit controls. |
 
 ---
 
@@ -146,6 +188,7 @@ epykit annotate \
 |--------|-------------|
 | `--gtf PATH` | GTF file for gene-feature annotation (promoter, exon, intron, intergenic) |
 | `--cpg-islands PATH` | BED file for CpG island/shore/shelf annotation |
+| `--no-csv` / `--csv PATH` | TSV auto-emit controls. |
 
 ---
 
@@ -159,6 +202,10 @@ epykit qc-report \
     --samplesheet samplesheet.csv \
     -o qc_report.html
 ```
+
+| Option | Description |
+|--------|-------------|
+| `--no-csv` / `--csv PATH` | Suppress or override the sibling TSV auto-emit. |
 
 ---
 
@@ -240,17 +287,21 @@ epykit filter \
     --min-coverage 10
 
 # 3. Differential methylation calling
+#    Auto-emits dmc.significant.tsv next to dmc.parquet.
 epykit dmc \
     --methylstore methylstore/ \
     --samplesheet samplesheet.csv \
     --test lr \
     --formula "~ treatment" \
-    --contrast treatment tumor normal
+    --contrast treatment tumor normal \
+    --output dmc.parquet
 
-# 4. DMR detection
+# 4. DMR detection (DSS-style chain_merge over the DMC parquet)
 epykit dmr \
-    --methylstore methylstore/ \
-    --method tile
+    --method chain_merge \
+    --dmc-results dmc.parquet \
+    --preset default \
+    --output dmrs.parquet
 
 # 5. Annotate with gene features and CpG islands
 epykit annotate \
@@ -269,12 +320,14 @@ epykit report \
 
 ## Python-API-Only Features
 
-The following features are currently available only through the Python API and do not
-have CLI equivalents:
+The following features are currently available only through the Python API
+and do not have CLI equivalents:
 
-- `lr` test with `power_stack` options
-- `chain_merge` DMR method
+- `tl.dmc(power_stack=...)` and the individual lr+ knobs (`neighbour_combine`, `fdr_method`, `sep_fallback`, `dispersion`). The CLI runs bare `lr` only -- 1.1 is expected to surface the lr+ knobs as flags.
 - AnnData / MuData export with custom modalities
 - `ep.query` random-access queries
+
+`chain_merge` DMRs (previously API-only) ship in the CLI since 1.0 via
+`epykit dmr --method chain_merge --dmc-results <dmc.parquet>`.
 
 See the [Python API documentation](../export/index.md) for these features.

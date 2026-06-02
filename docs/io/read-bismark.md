@@ -95,7 +95,7 @@ After reading, proceed to preprocessing:
 ```python
 ep.pp.filter_coverage(md, lo_count=10, hi_perc=99.9)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 ```
 
 See the [Preprocessing overview](../preprocessing/index.md) for the recommended workflow.

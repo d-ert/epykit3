@@ -26,7 +26,7 @@ md = ep.read_bismark("samples.csv", treatment_group="tumor",
                      control_group="normal", assembly="hg38")
 ep.pp.filter_coverage(md)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 
 ep.tl.dmc(md, backend="dask", n_workers=4)
 ```

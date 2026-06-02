@@ -13,6 +13,7 @@ takes a `MethylData` object and modifies it in place.
 | `store` | `str` | Filesystem path to the partitioned Parquet methylstore. Updated by preprocessing steps as the active cache stage changes. |
 | `varm` | `dict[str, pl.DataFrame]` | Per-variable (per-CpG) result tables, keyed by name. DMC results are stored here (e.g., `"dmc_lr"`, `"dmc_glm"`, `"dmc_lr_annotated"`). |
 | `uns` | `dict[str, Any]` | Unstructured storage for analysis results that are not per-sample or per-CpG. DMR results, DVC results, annotation metadata, and other outputs are stored here. |
+| `analysis_root` | `str` / `Path` / None | Optional root directory used by `tl.dmc(resumable=True)` and related sinks to anchor cache + CSV output. Public attribute since 1.0; the underscore-prefixed `_analysis_root` is a deprecated alias and will be removed in 2.0. |
 
 ## Properties
 
@@ -91,7 +92,7 @@ md.to_anndata(layer: str = "beta") -> anndata.AnnData
 ```
 
 Convert to an AnnData object with a samples-by-sites matrix. Requires a united
-site set (`ep.pp.unite()` must have been called). See
+site set (`ep.pp.set_unite_type()` must have been called). See
 [AnnData / MuData](../export/anndata.md) for details.
 
 ```python
@@ -122,7 +123,8 @@ Each analysis step stores its output in a specific slot:
 | DMC results | `md.varm["dmc_<test>"]` | `md.varm["dmc_lr"]` or `md.dmc` |
 | Annotated DMC | `md.varm["dmc_<test>_annotated"]` | `md.varm["dmc_lr_annotated"]` |
 | DMR results | `md.uns["dmr"]` | `md.uns["dmr"]` |
-| DVC results | `md.uns["dvc"]` | `md.uns["dvc"]` |
+| DVC results | `md.varm["dvc"]` | `md.varm["dvc"]` |
+| DVR results | `md.uns["dvr"]` | `md.uns["dvr"]` |
 | Annotation metadata | `md.uns["annotation_*"]` | `md.uns["annotation_gtf"]` |
 
 Annotation (`ep.tl.annotate()`) adds `gene_feature` and `cpg_context` columns

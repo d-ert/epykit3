@@ -45,10 +45,10 @@ object. Sections that lack data are omitted silently.
 | **Sample Overview** | Always present | Sample table, group counts |
 | **Coverage QC** | Coverage data | Per-sample coverage distributions, CpG detection rates |
 | **Global Methylation** | Beta values | Beta-value density plots, per-sample summaries |
-| **PCA** | `pp.unite()` | PCA scatter colored by sample groups |
-| **DMC Results** | `ep.dmc()` | Volcano plot, Manhattan plot, top DMC table |
-| **DMR Results** | `ep.dmr()` | DMR summary table, region-level statistics |
-| **Annotation** | `ep.annotate()` | Feature distribution (promoter, exon, intron, etc.), CpG island context |
+| **PCA** | `pp.set_unite_type()` | PCA scatter colored by sample groups |
+| **DMC Results** | `ep.tl.dmc()` | Volcano plot, Manhattan plot, top DMC table |
+| **DMR Results** | `ep.tl.dmr()` | DMR summary table, region-level statistics |
+| **Annotation** | `ep.tl.annotate()` | Feature distribution (promoter, exon, intron, etc.), CpG island context |
 
 ---
 
@@ -59,16 +59,22 @@ A typical workflow that produces a full report:
 ```python
 import epykit as ep
 
-md = ep.read_methyl("samplesheet.csv", store="methylstore/")
+md = ep.read_bismark(
+    "samplesheet.csv",
+    treatment_group="tumor",
+    control_group="normal",
+    assembly="hg38",
+    store_dir="methylstore/",
+)
 
 # Preprocessing
-ep.pp.filter_coverage(md, min_cov=10)
-ep.pp.unite(md)
+ep.pp.filter_coverage(md, lo_count=10)
+ep.pp.set_unite_type(md)
 
 # Analysis
-ep.dmc(md, formula="~ treatment", contrast=("treatment", "tumor", "normal"))
-ep.dmr(md, method="chain_merge")
-ep.annotate(md, gtf="gencode.v44.gtf.gz", cpg_islands="cpg_islands.bed")
+ep.tl.dmc(md, formula="~ treatment", contrast="treatment")
+ep.tl.dmr(md, method="chain_merge")
+ep.tl.annotate(md, gtf="gencode.v44.gtf.gz", cpg_islands="cpg_islands.bed")
 
 # Generate report -- all sections will be populated
 md.report("methylation_report.html")

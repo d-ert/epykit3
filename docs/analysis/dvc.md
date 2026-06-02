@@ -19,7 +19,7 @@ md = ep.read_bismark("samples.csv", treatment_group="tumor",
                      control_group="normal", assembly="hg38")
 ep.pp.filter_coverage(md)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 
 ep.tl.dvc(md)
 
@@ -73,6 +73,9 @@ Results are stored at `md.varm["dvc"]`:
 | `mean_filter_alpha` | float | 0.05 | p-value threshold for mean filter (sites must **exceed** this) |
 | `backend` | str | `"sequential"` | Execution backend |
 | `n_workers` | int | None | Worker pool size |
+| `csv` | str | None | Write the significant DVCs (q < `csv_alpha`) to this TSV path. Pass `csv=False` to disable. |
+| `csv_full` | bool | False | Also emit the full DVC table alongside the significant TSV. |
+| `csv_alpha` | float | 0.05 | q-value threshold used to filter the significant TSV. |
 
 Summary metadata is stored at `md.uns["dvc"]`:
 
@@ -124,7 +127,7 @@ md = ep.read_bismark("samples.csv", treatment_group="tumor",
                      control_group="normal", assembly="hg38")
 ep.pp.filter_coverage(md)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 
 # Run both DMC and DVC
 ep.tl.dmc(md)

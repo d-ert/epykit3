@@ -17,7 +17,7 @@ import epykit as ep
 md = ep.read_bismark("samples.csv", treatment_group="tumor",
                      control_group="normal", assembly="hg38")
 ep.pp.filter_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 
 # Run the Horvath multi-tissue clock
 ep.tl.age_clock(

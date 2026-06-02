@@ -55,7 +55,7 @@ from the per-chromosome parquets -- no re-encoding, constant memory.
 
 ```python
 md.report("report.html")              # interactive HTML report
-md.to_anndata()                       # -> AnnData (requires ep.pp.unite first)
+md.to_anndata()                       # -> AnnData (requires ep.pp.set_unite_type first)
 md.to_mudata()                        # -> MuData
 md.to_methylkit_tabix("output_dir/")  # per-sample methylKit tabix tables
 md.to_bedgraph("sample_1", "out.bedgraph")
@@ -116,7 +116,7 @@ They modify `md` in place (updating `md.store`, `md.uns`, etc.).
 |----------|-------------|
 | `ep.pp.filter_coverage(md)` | Remove sites below a minimum coverage or above a percentile ceiling. Optionally exclude blacklisted regions. |
 | `ep.pp.normalize_coverage(md)` | Per-sample median (or mean) coverage normalisation. |
-| `ep.pp.unite(md)` | Record the site-alignment strategy (`"intersect"` or `"union"`) for downstream DMC processing. Does not materialise the full join. |
+| `ep.pp.set_unite_type(md)` | Record the site-alignment strategy (`"intersect"` or `"union"`) for downstream DMC processing. Does not materialise the full join. (Was named `pp.unite()` pre-1.0; the old name still works as a deprecated alias.) |
 | `ep.pp.smooth(md)` | Smooth per-sample beta values along the genome (Gaussian kernel or BSmooth). |
 | `ep.pp.aggregate_regions(md, bed)` | Aggregate per-CpG counts within user-supplied BED regions, producing a region-level store compatible with `ep.tl.dmc()`. |
 

@@ -38,15 +38,21 @@ An `anndata.AnnData` object where:
 
 **Prerequisites**
 
-You must run `pp.unite()` before calling `to_anndata` so that all samples share
-a common set of CpG sites:
+You must run `pp.set_unite_type()` before calling `to_anndata` so that all
+samples share a common set of CpG sites:
 
 ```python
 import epykit as ep
 
-md = ep.read_methyl("samplesheet.csv", store="methylstore/")
-ep.pp.filter_coverage(md, min_cov=10)
-ep.pp.unite(md)
+md = ep.read_bismark(
+    "samplesheet.csv",
+    treatment_group="tumor",
+    control_group="normal",
+    assembly="hg38",
+    store_dir="methylstore/",
+)
+ep.pp.filter_coverage(md, lo_count=10)
+ep.pp.set_unite_type(md, type="intersect")
 
 adata = ep.to_anndata(md, layer="beta")
 print(adata)
@@ -92,8 +98,14 @@ A `mudata.MuData` object with:
 ```python
 import epykit as ep
 
-md = ep.read_methyl("samplesheet.csv", store="methylstore/")
-ep.pp.unite(md)
+md = ep.read_bismark(
+    "samplesheet.csv",
+    treatment_group="tumor",
+    control_group="normal",
+    assembly="hg38",
+    store_dir="methylstore/",
+)
+ep.pp.set_unite_type(md, type="intersect")
 
 # Methylation only
 mdata = ep.to_mudata(md)

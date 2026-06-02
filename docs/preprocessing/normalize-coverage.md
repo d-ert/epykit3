@@ -77,12 +77,12 @@ small when coverage distributions are well-behaved (i.e., after proper filtering
 
 ## Call Order
 
-Normalization should be called **after** `filter_coverage` and **before** `unite`:
+Normalization should be called **after** `filter_coverage` and **before** `set_unite_type`:
 
 ```python
 ep.pp.filter_coverage(md)       # Remove unreliable sites first
 ep.pp.normalize_coverage(md)    # Then normalize remaining sites
-ep.pp.unite(md)                 # Then define the site universe
+ep.pp.set_unite_type(md)                 # Then define the site universe
 ```
 
 Filtering before normalization ensures that extreme-coverage outliers (which are removed by
@@ -93,5 +93,5 @@ Filtering before normalization ensures that extreme-coverage outliers (which are
 After normalization, proceed to [Unite Sites](unite.md):
 
 ```python
-ep.pp.unite(md, type="intersect")
+ep.pp.set_unite_type(md, type="union")  # or type="intersect"
 ```

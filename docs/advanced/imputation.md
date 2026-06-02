@@ -69,7 +69,7 @@ the raw data is sparse:
 - **Single-cell bisulfite sequencing** (scBS-seq): coverage per cell is
   typically 1-5%, leaving the vast majority of CpG sites unmeasured.
 - **Low-coverage WGBS** (< 5x): many sites have no reads in some samples.
-- **Post-unite matrices**: `ep.pp.unite(md)` retains only sites with
+- **Post-unite matrices**: `ep.pp.set_unite_type(md, "intersect")` retains only sites with
   coverage in at least one sample, but individual samples may still have
   gaps.
 
@@ -90,7 +90,7 @@ Avoid imputation in these scenarios:
   missing values would inflate sample sizes and produce anti-conservative
   p-values.
 - **Well-covered bulk WGBS** (> 10x): Most sites will have coverage in all
-  samples after `ep.pp.unite()`. Imputation adds no benefit and only
+  samples after `ep.pp.set_unite_type()`. Imputation adds no benefit and only
   introduces bias.
 - **Quantitative effect-size estimation**: Imputed values regress toward
   local averages, attenuating true methylation differences.
@@ -120,7 +120,7 @@ import epykit as ep
 md = ep.read_bismark("sc_samples.csv", treatment_group="celltype_A",
                      control_group="celltype_B", assembly="hg38")
 ep.pp.filter_coverage(md, min_coverage=1)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 
 # Impute the methylstore for sparse single-cell data
 ep.impute_knn_beta(md.store, k=5, max_distance_bp=500)

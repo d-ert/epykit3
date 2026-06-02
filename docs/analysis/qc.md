@@ -12,7 +12,7 @@ import epykit as ep
 md = ep.read_bismark("samples.csv", treatment_group="tumor",
                      control_group="normal", assembly="hg38")
 ep.pp.filter_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 
 # Default QC: global methylation + coverage uniformity
 ep.tl.qc(md)
@@ -169,3 +169,4 @@ required sample size), but not both.
 | `run_sample_correlation` | bool | False | Enable all-vs-all correlation |
 | `correlation_method` | str | `"spearman"` | Correlation method (`"spearman"` or `"pearson"`) |
 | `expected_sex_col` | str | None | Column in `md.obs` with reported sex for mismatch detection |
+| `csv` | str | None | Write the QC metrics table to this TSV path. Pass `csv=False` to disable. |

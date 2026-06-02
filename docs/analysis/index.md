@@ -14,12 +14,12 @@ depending on the output type.
 | [`tl.dvc()`](dvc.md) | Differentially variable CpG calling |
 | [`tl.dvr()`](dvc.md#dvr) | Differentially variable region calling |
 | [`tl.annotate()`](annotate.md) | Gene-feature and CpG-island annotation |
-| `tl.age_clock()` | Epigenetic age clocks (experimental) |
-| `tl.deconvolve()` | Cell-type deconvolution (experimental) |
-| `tl.asm()` | Allele-specific methylation (experimental) |
-| `tl.entropy()` | Methylation entropy (experimental) |
-| `tl.pmd()` | Partially methylated domains (experimental) |
-| `tl.hmr()` | Hypo-/low-methylated regions (experimental) |
+| [`tl.age_clock()`](age-clock.md) | Epigenetic age clocks |
+| [`tl.deconvolve()`](deconvolve.md) | Cell-type deconvolution |
+| [`tl.asm()`](asm.md) | Allele-specific methylation |
+| [`tl.entropy()`](entropy.md) | Methylation entropy |
+| [`tl.pmd()`](pmd.md) | Partially methylated domains |
+| [`tl.hmr()`](hmr.md) | Hypo-/low-methylated regions |
 
 ## Typical Pipeline
 
@@ -45,7 +45,7 @@ md = ep.read_bismark("samples.csv", treatment_group="tumor",
                      control_group="normal", assembly="hg38")
 ep.pp.filter_coverage(md)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 
 ep.tl.qc(md)
 ep.tl.dmc(md)

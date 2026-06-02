@@ -99,7 +99,7 @@ print(md.obs.select(["sample_id", "group", "batch"]))
 
 ep.pp.filter_coverage(md)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 
 # Adjust for batch while testing group
 ep.tl.dmc(md, formula="~ group + batch", contrast="group")
@@ -121,7 +121,7 @@ md = ep.read_bismark("samples.csv", treatment_group="KO",
 # md.obs has a 'genotype' column with levels: WT, KO, HET
 ep.pp.filter_coverage(md)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 
 ep.tl.dmc(md, formula="~ genotype", contrast="genotype")
 

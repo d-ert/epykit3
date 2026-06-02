@@ -13,11 +13,11 @@ epykit ingests Bismark / MethylDackel coverage output into a partitioned Parquet
 
 ## Highlights
 
-- **Partitioned Parquet methylstore.** Per-chromosome, per-sample columnar storage — never load a whole genome into RAM. DMC results follow the same convention: `process_chromosomes_dmc(..., return_store=True)` returns a `DMCStore` handle backed by per-chromosome parquet files under `<methylstore>/.cache/dmc/<test>/`, and `apply_multiple_testing_correction` / `call_dmr_sliding_window` stream from it so peak memory stays at O(largest chromosome) on whole-genome inputs (~22 M CpGs).
+- **Partitioned Parquet methylstore.** Per-chromosome, per-sample columnar storage — never load a whole genome into RAM. DMC results follow the same convention: `tl.dmc(md, resumable=True)` writes per-chromosome parquet files under `<methylstore>/.cache/dmc/<test>/` and exposes a streaming `DMCStore` handle, so peak memory stays at O(largest chromosome) on whole-genome inputs (~22 M CpGs). Advanced users can drive the streaming engines directly via `from epykit.dmc import process_chromosomes_dmc, apply_multiple_testing_correction`.
 - **Statistical engines.** Four per-CpG DMC backends: `lr` (quasi-binomial likelihood-ratio, the default at n ≥ 2; closed-form with McCullagh-Nelder dispersion), `welch_t` (Welch t on raw β), `fisher` (pooled Fisher exact, n = 1 fallback), and `glm` (full IRLS binomial GLM with covariates). `auto` resolves to `fisher` at n < 2 and `lr` at n ≥ 2. Engines removed in 0.7.5: `logit_t`, `bb_lr`, `score`, `cmh` — all raise `ValueError` with a migration hint. Every test surfaces 95 % Wald CIs on `meth_diff`. Permutation empirical FDR is available end-to-end: `tl.dmc(..., empirical_fdr=True)` and `tl.dmr(..., empirical_fdr=True)` shuffle labels, re-run the engine, and add `empirical_pvalue` / `empirical_qvalue` columns.
 - **`lr+` power stack (opt-in, since 0.7.1).** Four enhancements to the `lr` engine — empirical-Bayes dispersion shrinkage (`dispersion="eb"`), Stouffer combiner over neighbouring CpGs (`neighbour_combine=True`), separation-aware Fisher fallback (`sep_fallback=True`), and two-stage BH q-values (`fdr_method="fdr_tsbh"`) — engaged via `power_stack="lr+"`. Out of the box (`power_stack="off"`, the 1.0 default), bare `lr` runs without any of these. All four together push TPR ≥ 0.999 on the Piao et al. 2021 simulated benchmark at every coverage ≥ 10× and every replicate count ≥ 4 while keeping FPR strictly tighter than every R baseline. See [`benchmark/REPORT.md`](benchmark/REPORT.md) for the head-to-head.
 - **Multi-group & covariate contrasts.** `tl.dmc(formula="~ group + age", contrast="group")` runs a joint F-test across factor levels; `contrast="age"` runs a Wald test on a continuous covariate as the primary effect.
-- **Four DMR engines plus permutation FDR.** A DSS-compatible **chain-merge** caller (`tl.dmr(method="chain_merge", preset="strict" | "default" | "permissive")`, the default) that mirrors DSS `callDMR` semantics, plus tile-based (read-pooled) aggregation, per-CpG sliding-window with signed Stouffer's combining, and HMM segmentation over `meth_diff`. `tl.dmr(..., empirical_fdr=True, n_perm=100)` re-runs the engine on shuffled labels and reports empirical p- and q-values. `tl.diagnose_dmr_calling(md, reference_dmrs)` buckets unrecovered reference DMRs into actionable categories (coverage loss vs. weak test vs. structural filter) for triage.
+- **Four DMR engines plus permutation FDR.** A DSS-compatible **chain-merge** caller (`tl.dmr(method="chain_merge", preset="strict" | "default" | "permissive")`, the default) that mirrors DSS `callDMR` semantics, plus tile-based (read-pooled) aggregation, per-CpG sliding-window with signed Stouffer's combining, and rule-based 3-state segmentation over `meth_diff` (`method="segment"`; renamed from `"hmm"` in 1.0, same engine). `tl.dmr(..., empirical_fdr=True, n_perm=100)` re-runs the engine on shuffled labels and reports empirical p- and q-values. `tl.diagnose_dmr_calling(md, reference_dmrs)` buckets unrecovered reference DMRs into actionable categories (coverage loss vs. weak test vs. structural filter) for triage.
 - **Differential variability.** `tl.dvc(md)` finds CpGs whose between-replicate variance differs between groups even when the means don't — the iEVORA signal that mean-based DMC misses.
 - **Clinical / cohort QC.** Opt-in `qc.sex_check` (chrX mean β), `qc.contamination_estimate` (β-distribution bimodality), `qc.sample_correlation` (sample-swap detection), and `qc.power` (sample-size calculator). Bisulfite conversion rate is reported (CHH context, dashboard + MultiQC) but **not applied** to per-CpG counts — matching `bsseq` / `methylKit` defaults. A poorly converted library should be re-prepped, not papered over with a multiplicative count adjustment.
 - **Replicate-aware throughout.** Per-site `min_samples_treatment` / `min_samples_control` guards, per-site or chromosome-level McCullagh-Nelder dispersion, optional covariate design matrices via Wilkinson formulas.
@@ -84,12 +84,12 @@ print(md)
 # Preprocessing (pp.*) — each step repoints md.store at a cached store.
 ep.pp.filter_coverage(md, lo_count=10, hi_perc=99.9)
 ep.pp.normalize_coverage(md, method="median")
-ep.pp.unite(md, type="intersect")        # or "union" + min_samples_* guards
+ep.pp.set_unite_type(md, type="intersect")  # or "union" + min_samples_* guards
 
 # Tools (tl.*) — populate md.obs / md.varm / md.uns.
-ep.tl.qc(md)                              # populates md.obs with QC metrics
-ep.tl.dmc(md, test="auto")                # md.varm["dmc_lr"] (n≥2) or "dmc_fisher" (n=1)
-ep.tl.dmr(md, tile_size_bp=500, min_cpgs_per_tile=5)   # tile-based, default
+ep.tl.qc(md)                                # populates md.obs with QC metrics
+ep.tl.dmc(md, test="auto")                  # md.varm["dmc_lr"] (n≥2) or "dmc_fisher" (n=1, allow_n1=True)
+ep.tl.dmr(md)                               # chain_merge default (DSS callDMR semantics)
 
 # Inspect.
 total = len(md.dmc)

@@ -9,16 +9,40 @@ calls internally. Use them when you need direct control: custom pipelines,
 non-standard workflows, benchmarking, or building your own higher-level
 abstractions.
 
+!!! warning "1.0 import path"
+    Several DMC-level engines (`process_chromosomes_dmc`,
+    `apply_multiple_testing_correction`, `empirical_fdr_for_dmc`,
+    `fisher_exact_vectorized`, `shrink_meth_diff`) were removed from the
+    top-level `epykit.*` namespace in 1.0. They remain importable from
+    their owning submodule:
+
+    ```python
+    from epykit.dmc import (
+        process_chromosomes_dmc,
+        apply_multiple_testing_correction,
+        empirical_fdr_for_dmc,
+        fisher_exact_vectorized,
+        shrink_meth_diff,
+    )
+    ```
+
+    The bare `ep.<name>` access still resolves via a `__getattr__` shim
+    that emits `DeprecationWarning`; the shim is scheduled for removal in
+    1.2. The samples below use the new explicit import path; older `ep.X`
+    snippets will continue to run for the 1.x series.
+
 ## DMC Engines
 
-### ep.process_chromosomes_dmc
+### process_chromosomes_dmc
 
 Per-chromosome streaming DMC accumulator. This is the core function that
 iterates over chromosomes, runs the selected statistical test on each, and
 writes results to a `DMCStore`.
 
 ```python
-dmc_store = ep.process_chromosomes_dmc(
+from epykit.dmc import process_chromosomes_dmc
+
+dmc_store = process_chromosomes_dmc(
     store="methylstore/",
     samples={"treatment": ["t1", "t2"], "control": ["c1", "c2"]},
     test="lr",
@@ -30,47 +54,51 @@ dmc_store = ep.process_chromosomes_dmc(
 
 Returns a `DMCStore` with one parquet file per chromosome.
 
-### ep.apply_multiple_testing_correction
+### apply_multiple_testing_correction
 
 BH or Storey correction on a `DMCStore` or a Polars/pandas DataFrame. When
 given a `DMCStore`, it streams through chromosomes in two passes (count, then
 correct) to avoid loading the full genome into memory.
 
 ```python
-# On a DMCStore (streaming)
-ep.apply_multiple_testing_correction(dmc_store, method="fdr_bh")
+from epykit.dmc import apply_multiple_testing_correction
+
+# On a DMCStore (streaming, in-place: writes corrected per-chrom parquets)
+apply_multiple_testing_correction(dmc_store, method="fdr_bh")
 
 # On a DataFrame (in-memory)
-corrected_df = ep.apply_multiple_testing_correction(dmc_df, method="fdr_tsbh")
+corrected_df = apply_multiple_testing_correction(dmc_df, method="fdr_tsbh")
 ```
 
 Supported methods: `"fdr_bh"` (Benjamini-Hochberg), `"fdr_tsbh"` (two-stage BH).
 
-### ep.empirical_fdr_for_dmc
+### empirical_fdr_for_dmc
 
 Permutation-based empirical FDR. Shuffles treatment/control labels `n_perm`
 times, re-runs the test, and estimates an empirical null distribution.
 
 ```python
-ep.empirical_fdr_for_dmc(md, n_perm=100, test="lr")
+from epykit.dmc import empirical_fdr_for_dmc
+empirical_fdr_for_dmc(md, n_perm=100, test="lr")
 ```
 
 Adds `empirical_pvalue` and `empirical_qvalue` columns to the DMC result.
 
-### ep.fisher_exact_vectorized
+### fisher_exact_vectorized
 
 Vectorized Fisher exact test for 2x2 contingency tables. Operates on arrays
 of (a, b, c, d) values and returns p-values and odds ratios.
 
 ```python
 import numpy as np
+from epykit.dmc import fisher_exact_vectorized
 
 a = np.array([10, 20, 5])
 b = np.array([5, 10, 15])
 c = np.array([3, 8, 12])
 d = np.array([12, 2, 8])
 
-pvalues, odds_ratios = ep.fisher_exact_vectorized(a, b, c, d)
+pvalues, odds_ratios = fisher_exact_vectorized(a, b, c, d)
 ```
 
 Used internally by the `fisher` test backend and the separation fallback in
@@ -213,7 +241,7 @@ Use the low-level engines when:
 - You are building a **custom pipeline** that does not follow the standard
   preprocess-test-annotate workflow.
 - You need to **benchmark** individual components (e.g., compare the runtime of
-  `lr` vs `score` on a single chromosome).
+  `lr` vs `welch_t` on a single chromosome).
 - You want to run a test on **data not managed by MethylData** (e.g., a
   DataFrame you constructed manually).
 - You are implementing a **new DMR method** that consumes DMCStore output.

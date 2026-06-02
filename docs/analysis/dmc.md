@@ -13,9 +13,9 @@ md = ep.read_bismark("samples.csv", treatment_group="tumor",
                      control_group="normal", assembly="hg38")
 ep.pp.filter_coverage(md)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 
-# Default: auto-selects lr at n>=2, fisher at n=1
+# Default: auto-selects lr at n>=2, fisher at n=1 (with allow_n1=True)
 ep.tl.dmc(md)
 
 # Access results
@@ -169,7 +169,10 @@ the cache.
 | `resumable` | bool | False | Enable checkpoint/resume |
 | `use_smoothed` | bool | False | Use smoothed pseudo-counts |
 | `fdr_method` | str | `"fdr_bh"` | FDR correction method |
-| `power_stack` | bool | False | Enable all lr+ enhancements at once |
+| `power_stack` | str | `"off"` | lr+ engagement mode -- one of `"off"`, `"lr+"` (alias `"auto"`/`True`), `"conservative"`, or `False`. See [lr+ Power Stack](lr-plus.md). |
+| `csv` | str | None | Write the significant DMCs (q < `csv_alpha`) to this TSV path; auto-derived next to the DMC parquet when unset. Pass `csv=False` to disable. |
+| `csv_full` | bool | False | Also emit the full DMC table alongside the significant TSV. |
+| `csv_alpha` | float | 0.05 | q-value threshold used to filter the significant TSV. |
 
 ## Distributed Execution
 
@@ -198,4 +201,7 @@ See the dedicated [Covariate & Multi-group](covariates.md) page for
 ## lr+ Power Stack
 
 See the dedicated [lr+ Power Stack](lr-plus.md) page for the four opt-in
-enhancements (`fdr_method`, `neighbour_combine`, `sep_fallback`, `dispersion="eb"`).
+enhancements (`fdr_method`, `neighbour_combine`, `sep_fallback`, `dispersion="eb"`),
+their `power_stack` shorthand, and the column conventions when
+`neighbour_combine=True` (raw `pvalue`/`qvalue` stay, combined columns are
+**added** as `pvalue_combined`/`qvalue_combined`).

@@ -51,9 +51,10 @@ ep.pp.filter_coverage(md, lo_count=10, hi_perc=99.9)
 # Equalise per-sample coverage depth (median normalisation)
 ep.pp.normalize_coverage(md)
 
-# Record site-alignment strategy (union keeps all sites; intersect
-# restricts to sites covered in every sample)
-ep.pp.unite(md, type="union")
+# Mark site-alignment strategy (union keeps all sites; intersect
+# restricts to sites covered in every sample). Lazy state-marker: no
+# materialisation, downstream tl.* functions read this.
+ep.pp.set_unite_type(md, type="union")
 ```
 
 The recommended order is **filter -> normalize -> unite**. Each step updates
@@ -87,11 +88,16 @@ ep.tl.dmc(md, test="auto")
 ```
 
 `test="auto"` selects the quasi-binomial likelihood-ratio test (`lr`) when
-you have 2+ replicates per group, or Fisher exact when n=1 (with a warning).
-The result is stored in `md.varm["dmc_lr"]` and accessible via `md.dmc`.
+you have 2+ replicates per group, or Fisher exact when n=1 (requires
+`allow_n1=True`). The result is stored in `md.varm["dmc_lr"]` and accessible
+via `md.dmc`.
 
-Available tests: `lr`, `score`, `glm`, `logit_t`, `welch_t`, `bb_lr`, `cmh`,
-`fisher`.
+Available tests (epykit 1.0): `lr` (default at n >= 2), `glm` (full IRLS
+binomial GLM), `welch_t` (Welch t on raw beta), `fisher` (pooled Fisher
+exact, n = 1 fallback). The pre-1.0 engines `logit_t`, `bb_lr`, `score`,
+and `cmh` were removed in 0.7.5 and now raise `ValueError` with a migration
+hint; the `lr+` power stack (`tl.dmc(md, power_stack="lr+")`) covers the
+sensitivity gap of the removed methods on top of bare `lr`.
 
 For covariate-adjusted analysis:
 

@@ -10,8 +10,9 @@ Parquet storage and never loads the whole genome into RAM.
 ## Highlights
 
 - **Partitioned Parquet store** -- hive-partitioned by `sample=*/chrom=*`, enabling random-access queries and chromosome-streaming analysis on whole-genome data without loading everything into memory.
-- **8 DMC backends** -- `lr` (quasi-binomial likelihood-ratio, default), `score`, `glm`, `logit_t`, `welch_t`, `bb_lr`, `cmh`, and `fisher`. Multi-group and continuous-covariate contrasts via patsy formulas.
-- **4 DMR methods** -- `chain_merge` (DSS-style, default), `tile`, `sliding_window`, and `hmm`. Preset bundles (`strict`, `default`, `permissive`) for chain-merge.
+- **4 DMC backends** -- `lr` (quasi-binomial likelihood-ratio, default at n >= 2), `glm` (IRLS binomial with covariates), `welch_t` (Welch t on raw beta), and `fisher` (pooled Fisher exact, n = 1 fallback). `auto` resolves to `lr` at n >= 2 and `fisher` at n = 1. Multi-group and continuous-covariate contrasts via patsy formulas.
+- **4 DMR methods** -- `chain_merge` (DSS-style, default), `tile`, `sliding_window`, and `segment`. Preset bundles (`strict`, `default`, `permissive`) for chain-merge.
+- **`lr+` power stack (opt-in)** -- four enhancements on top of `lr` (empirical-Bayes dispersion, neighbour combining, separation-aware fallback, two-stage BH q-values) engaged via `tl.dmc(..., power_stack="lr+")`. Off by default; bare `lr` is what you get out of the box.
 - **25+ plots** -- volcano, MA, Manhattan, PCA, UMAP, QC dashboard, karyogram, TSS/gene-body metaplots, DMR boxplots/violins/heatmaps, annotation stacked bars, and more.
 - **Clinical QC** -- bisulfite conversion rate, coverage uniformity, sex check, contamination estimation, sample correlation, and power analysis.
 - **Interop** -- export to AnnData, MuData, methylKit tabix, BedGraph, BigWig, BED, and self-contained interactive HTML reports.
@@ -35,9 +36,9 @@ md = ep.read_bismark("samples.csv", treatment_group="tumor", control_group="norm
                      assembly="hg38", store_dir="my_store")
 ep.pp.filter_coverage(md)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
-ep.tl.dmc(md)
-ep.tl.dmr(md)
+ep.pp.set_unite_type(md, type="union")
+ep.tl.dmc(md)                  # default test="auto" -> "lr" at n >= 2
+ep.tl.dmr(md)                  # default method="chain_merge"
 ep.tl.annotate(md, gtf="gencode.v44.gtf.gz")
 md.save("results/my_analysis")
 ```

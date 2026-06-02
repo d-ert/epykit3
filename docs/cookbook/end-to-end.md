@@ -54,7 +54,7 @@ ep.pp.filter_coverage(md, lo_count=10, hi_perc=99.9)
 ep.pp.normalize_coverage(md)
 
 # Align site sets across samples
-ep.pp.unite(md, type="union")
+ep.pp.set_unite_type(md, type="union")
 ```
 
 Each step updates the methylstore in place. The recommended order ensures that

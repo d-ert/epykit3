@@ -13,7 +13,7 @@ md = ep.read_bismark("samples.csv", treatment_group="tumor",
                      control_group="normal", assembly="hg38")
 ep.pp.filter_coverage(md)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 ep.tl.dmc(md)
 
 # Default: chain_merge (DSS-style)
@@ -40,6 +40,17 @@ ep.tl.dmr(md, method="chain_merge")
 
 # With a preset
 ep.tl.dmr(md, method="chain_merge", preset="strict")
+```
+
+`chain_merge` is also available from the CLI (added in 1.0), so you don't
+need to drop into Python just to run the DSS-style caller:
+
+```bash
+epykit dmr \
+    --methylstore methylstore/ \
+    --method chain_merge \
+    --dmc-results md/varm/dmc_lr.parquet \
+    --preset strict
 ```
 
 #### Presets
@@ -94,18 +105,26 @@ Requires a prior `ep.tl.dmc(md)` call.
 ep.tl.dmr(md, method="sliding_window", window_bp=500, step_bp=250)
 ```
 
-### hmm
+### segment
 
-HMM segmentation over `meth_diff`. Fits a two-state (hyper/hypo) hidden Markov
-model to the per-CpG methylation differences and segments the genome into
-contiguous DMRs. Useful when the spatial structure of methylation changes is
-complex.
+Rule-based 3-state segmentation over `meth_diff`. Walks the per-CpG result
+and segments the genome into contiguous hyper / hypo / null runs, then
+filters by minimum CpG count and minimum span. Useful when the spatial
+structure of methylation changes is more complex than chain-merge's
+"contiguous significant CpGs" assumption.
 
 Requires a prior `ep.tl.dmc(md)` call.
 
 ```python
-ep.tl.dmr(md, method="hmm")
+ep.tl.dmr(md, method="segment")
 ```
+
+!!! note "Renamed from `hmm` in 1.0"
+    Previous releases shipped this engine as `method="hmm"`; the name was
+    misleading because the implementation is rule-based, not an HMM. The
+    underlying segmenter is unchanged. `method="hmm"` was deprecated in
+    0.7.5 with `FutureWarning` and now raises `ValueError` -- use
+    `method="segment"`.
 
 ## Empirical FDR
 
@@ -195,7 +214,8 @@ The five diagnostic buckets:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `md` | MethylData | required | Analysis object |
-| `method` | str | `"chain_merge"` | DMR method: `"chain_merge"`, `"tile"`, `"sliding_window"`, `"hmm"` |
+| `method` | str | `"chain_merge"` | DMR method: `"chain_merge"`, `"tile"`, `"sliding_window"`, `"segment"` |
+| `csv` | str | None | Write the DMR table to this TSV path; auto-derived next to the DMR output when unset. Pass `csv=False` to disable. |
 | `chromosomes` | list | None | Restrict to specific chromosomes |
 | `backend` | str | `"sequential"` | Execution backend (tile method only) |
 | `empirical_fdr` | bool | False | Permutation FDR (tile method only) |

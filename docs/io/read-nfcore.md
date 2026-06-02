@@ -141,7 +141,7 @@ print(qc[["sample_name", "alignment_rate", "bisulfite_conversion_rate"]])
 # Continue with preprocessing
 ep.pp.filter_coverage(md, lo_count=10, hi_perc=99.9)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 ```
 
 ## Next Steps

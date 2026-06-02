@@ -75,7 +75,7 @@ From this point, the workflow is the same as any other epykit analysis:
 # Preprocessing
 ep.pp.filter_coverage(md, lo_count=10, hi_perc=99.9)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 
 # QC (epykit's own QC, complementing nf-core's upstream QC)
 ep.tl.qc(md)
@@ -151,7 +151,7 @@ md = ep.read_nfcore_methylseq(
 # 3. Analyse
 ep.pp.filter_coverage(md)
 ep.pp.normalize_coverage(md)
-ep.pp.unite(md)
+ep.pp.set_unite_type(md)
 ep.tl.qc(md)
 ep.tl.dmc(md)
 ep.tl.dmr(md)
