@@ -367,15 +367,21 @@ def dmc_to_tsv(
     Delimiter is derived from the path suffix (.csv -> comma, else tab).
     """
     df = _resolve_dmc_table(md, test)
-    q_col = "qvalue_combined" if "qvalue_combined" in df.columns else "qvalue"
-    p_col = "pvalue_combined" if "pvalue_combined" in df.columns else "pvalue"
 
     if full:
         out_df = df.sort(["chrom", "pos"])
     else:
-        # Significance gate: prefer qvalue (combined or raw); fall back to
-        # pvalue when no qvalue column is present at all.
-        gate_col = q_col if q_col in df.columns else p_col
+        # Significance gate: prefer qvalue_combined (lr+ neighbour-combine),
+        # then raw qvalue, then pvalue_combined, then raw pvalue.
+        if "qvalue_combined" in df.columns:
+            gate_col = "qvalue_combined"
+        elif "qvalue" in df.columns:
+            gate_col = "qvalue"
+        elif "pvalue_combined" in df.columns:
+            gate_col = "pvalue_combined"
+        else:
+            gate_col = "pvalue"
+
         out_df = (
             df.filter(
                 pl.col(gate_col).is_not_null()

@@ -95,7 +95,7 @@ def test_dmc_to_tsv_significant_only_qvalue_asc(tmp_path):
     rows = list(csv.DictReader(
         out.read_text(encoding="utf-8").splitlines(), delimiter="\t",
     ))
-    # 4 rows are q<0.05 (qvalue 1e-5, 1e-4, 1e-2, plus row with q=0.5 / 0.6 dropped)
+    # 3 rows have qvalue < 0.05 (1e-5, 1e-4, 1e-2); the other 2 (q=0.5, 0.6) are dropped.
     assert len(rows) == 3
     # qvalue ascending
     qvalues = [float(r["qvalue"]) for r in rows]
