@@ -6,7 +6,7 @@ mkdocs.yml
 # Everything under benchmark/data/ (raw inputs, intermediate parquets,
 # baseline tables, methylkit per-scenario TSVs, eval_summary.parquet,
 # ground truth) is regenerable from scripts/ and NOT bundled in git.
-# Same for shinygo_lists/, idk_if_needed/, and binary artefacts
+# Same for shinygo_lists/ and binary artefacts
 # (.docx, .pptx) -- the markdown copies are the canonical reports.
 benchmark/raw_sim_data/
 benchmark/_converted/
@@ -16,7 +16,6 @@ benchmark/_runs_post_phase3/
 benchmark/results/
 benchmark/data/**
 benchmark/shinygo_lists/
-benchmark/idk_if_needed/
 benchmark/**/*.docx
 benchmark/**/*.pptx
 # Override the global 'figures/' rule for benchmark/figures/ -- those
