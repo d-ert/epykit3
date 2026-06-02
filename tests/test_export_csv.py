@@ -425,3 +425,35 @@ def test_cli_annotate_auto_emits_sibling_tsv(tmp_path, synth_bundle, monkeypatch
     assert sibling.exists()
     header = sibling.read_text(encoding="utf-8").splitlines()[0].split("\t")
     assert "chrom" in header and "pos" in header
+
+
+def test_cli_qc_report_auto_emits_sibling_tsvs(tmp_path, synth_bundle, monkeypatch):
+    """`epykit qc-report --output-dir DIR` writes sibling .tsv files in DIR."""
+    import sys
+    import epykit as ep
+    from epykit.cli import main
+
+    md_setup = ep.read_bismark(
+        synth_bundle.samplesheet,
+        treatment_group="treatment",
+        control_group="control",
+        assembly="synth",
+        store_dir=str(tmp_path / "store"),
+    )
+    populated_store = md_setup.store
+
+    out_dir = tmp_path / "qc_out"
+    samples = ",".join(synth_bundle.treatment_ids + synth_bundle.control_ids)
+
+    monkeypatch.setattr(sys, "argv", [
+        "epykit", "qc-report",
+        "--methylstore", populated_store,
+        "--samples", samples,
+        "--output-dir", str(out_dir),
+    ])
+    main()
+
+    assert (out_dir / "global_methylation.parquet").exists()
+    assert (out_dir / "global_methylation.tsv").exists()
+    assert (out_dir / "coverage_uniformity.parquet").exists()
+    assert (out_dir / "coverage_uniformity.tsv").exists()

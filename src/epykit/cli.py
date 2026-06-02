@@ -425,6 +425,8 @@ def _cmd_qc_report(args: argparse.Namespace):
         out = Path(args.output_dir)
         out.mkdir(parents=True, exist_ok=True)
         meth_report.write_parquet(str(out / "global_methylation.parquet"))
+        if not _csv_suppressed(args):
+            _write_table_local(meth_report, str(out / "global_methylation.tsv"))
 
     print("\n=== Coverage uniformity report ===")
     cov_frames: list[pl.DataFrame] = []
@@ -440,6 +442,11 @@ def _cmd_qc_report(args: argparse.Namespace):
     if cov_frames and args.output_dir:
         combined = pl.concat(cov_frames)
         combined.write_parquet(str(Path(args.output_dir) / "coverage_uniformity.parquet"))
+        if not _csv_suppressed(args):
+            _write_table_local(
+                combined,
+                str(Path(args.output_dir) / "coverage_uniformity.tsv"),
+            )
         print(f"\nQC reports written to {args.output_dir}")
 
 
@@ -838,6 +845,10 @@ def main():
     p_qc.add_argument(
         "--output-dir",
         help="Directory for Parquet QC output files (optional)",
+    )
+    p_qc.add_argument(
+        "--no-csv", action="store_true", dest="no_csv", default=False,
+        help="Suppress the sibling .tsv auto-emit alongside the parquets.",
     )
     p_qc.set_defaults(func=_cmd_qc_report)
 
