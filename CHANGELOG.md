@@ -65,6 +65,18 @@ deprecation shim so 0.7.6 code continues to run with warnings.
 - **Project status:** classifier `Development Status :: 4 - Beta` →
   `Development Status :: 5 - Production/Stable`.
 
+### Fixed
+
+- **`MethylData.save()` preserves `pvalue_combined` / `qvalue_combined`
+  columns** added by `neighbour_combine=True`. The DMCStore-backed
+  save path hardlinks per-chromosome Parquet files, but the combined
+  columns are added in-memory *after* those files were written, so the
+  hardlink path was silently dropping them. `save()` now detects the
+  `pvalue_combined` column on the in-memory frame and falls back to
+  the single-file Parquet write so the four combined / audit columns
+  survive a save/load round-trip. Regression test
+  `test_save_load_preserves_neighbour_combine_columns`.
+
 ### Internal
 
 - Public-surface audit committed at
@@ -73,16 +85,6 @@ deprecation shim so 0.7.6 code continues to run with warnings.
   1.1 backlog.
 - Phase 4 plan checkboxes synced to reflect what actually shipped
   (Tasks 1-8 marked).
-
-### Known limitations (1.0.1 candidates)
-
-- **DMCStore save/load drops `pvalue_combined` columns** when
-  `neighbour_combine=True`. The combined columns are added in-memory
-  after per-chromosome Parquet files are written, so `md.save()` /
-  `md.load()` round-trips lose them. With the default `power_stack="off"`,
-  this only affects users who explicitly opt in to the power stack and
-  then save. To preserve combined p-values across save/load, re-run
-  the DMC step after loading or keep the in-memory result alive.
 
 ## Unreleased
 
