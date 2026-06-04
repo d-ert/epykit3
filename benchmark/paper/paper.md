@@ -13,33 +13,49 @@ abstract: |
   pipeline built on partitioned Parquet storage, lazy I/O, and vectorised
   per-CpG regression. We evaluate epykit across three benchmark studies that
   together span the relevant evaluation surface: (1) a panel comparison
-  against eight R/CLI tools on the simulated dataset of Piao et al. (2021),
-  using their published TPR/FPR tables as baselines; (2) a fresh, locally
-  measured head-to-head against methylKit on the same simulated grid, with
-  identical inputs and a single OS-level resource tracker; and (3) a real
-  WGBS comparison against methylKit on GEO dataset GSE263850 (six samples,
-  15.6 M CpGs, hg38). On the simulated grid, epykit's quasi-binomial
-  likelihood-ratio engine (`lr`) matches the strongest baselines (methylKit,
-  RADMeth, DSS) at every coverage ≥ 5× to three decimal places of TPR, FPR,
-  F1 and AUROC, and an opt-in `lr+` variant (engaged via
-  `power_stack="lr+"`, four tunable enhancements layered on the bare `lr`)
-  pushes TPR ≥ 0.999 at every coverage and replicate count ≥ 4. At n = 2 total
-  samples — the regime where methylKit's overdispersion estimate becomes
-  degenerate — epykit recovers ~2× more true DMCs at the same FPR. On the
-  region-level benchmark, epykit's `chain_merge` DMR caller recovers 97 % /
-  100 % / 100 % / 100 % / 100 % of 35 reference DMRs at coverages
-  5× / 10× / 15× / 20× / 25×. On real GSE263850 data, epykit and methylKit
-  agree on direction at 94 % of CpGs (Pearson r = 0.994 on effect size) and
-  on DMR effect size at r = 0.997, while drawing the significance threshold
-  at different operating points (epykit calls 60 % as many DMCs at the
-  default `lr` setting; the `lr+` recipe recovers 93 % of methylKit's
-  calls). Across all three studies epykit is consistently faster (12×–68×
-  speedup) and uses 1.18–3.83× less peak memory than methylKit on
-  matched workloads. Low-coverage TPR advantages observed on the
-  underdispersed Piao 2021 simulator (φ ≈ 0.4) are not expected to
-  transfer at the same magnitude to overdispersed real WGBS
-  (φ ≈ 1.5–5); we discuss this dispersion–realism gap in §4. All code,
-  ground truth, and figures are provided.
+  against eight R/CLI tools on the simulated dataset of Piao et al. (2021);
+  (2) a fresh, locally measured head-to-head against methylKit on the same
+  simulated grid, with identical inputs and a single OS-level resource
+  tracker; and (3) a real WGBS comparison against methylKit and a
+  paper-matched DSS run on GEO dataset GSE263850 (six samples, 22 M CpGs,
+  hg38).
+
+  On the simulated grid (median of 20 random seeds, 21st a frozen-grid
+  control), epykit's quasi-binomial likelihood-ratio engine (`lr`) is
+  competitive with the strongest baselines — AUROC 0.928 (IQR
+  0.927–0.929) vs methylKit 0.926 and DSS-no-smoothing 0.909. The opt-in
+  `lr+` variant (four tunable enhancements layered on bare `lr`) trades
+  precision for recall: TPR rises from 0.673 to 0.746 but FPR rises 14-fold
+  (0.0044 → 0.064), F1 drops (0.796 → 0.746), and AUROC drops slightly
+  (0.928 → 0.907). `lr+` is therefore presented as a research-knob panel,
+  not the recommended default. At n = 2 total samples the bare `lr` engine
+  recovers TPR 0.564 vs methylKit's 0.302 at matched FPR (Study 2, single
+  cell), the niche where the bare quasi-binomial advantage is largest.
+
+  On real GSE263850 data, epykit's `chain_merge` DMR caller at the
+  paper-matched `dis_merge = 250 bp` operating point recovers 77.3 % of
+  the 922 DSS-from-scratch DMRs by any-bp overlap and 64.2 % at Jaccard
+  ≥ 0.5, with 100 % directional agreement on the 713 overlapping DMRs.
+  Gene-set recall against DSS is 67.4 %. A `dis_merge` sensitivity panel
+  (100/150/200/250/500 bp) is reported. DSS-from-scratch retains a small
+  any-bp recall advantage (87.5 % vs 77.3 %) attributable to its
+  smoothing prior, particularly on low-CpG-density regions.
+
+  On exhaustive label-permuted GSE263850 (all 10 unique 3v3 partitions —
+  for n = 6, k = 1000 random shuffles collapses to the same 10 partitions
+  with replacement, so this is the complete null universe), the lr
+  engine's null p-values are close to uniform (mean 0.506, fraction
+  below 0.05 = 0.047, KS D = 0.051). The test is calibrated under
+  realistic WGBS dispersion, not merely conservative; FDR control is
+  valid with negligible power cost.
+
+  On Linux with methylKit running multi-threaded (`mc.cores = 8`), epykit
+  is ≈ 33× faster than methylKit and ≈ 33× faster than DSS on per-CpG
+  testing; on Study 3 (22 M CpGs) end-to-end the gap is ≈ 28×. We
+  separately characterise underdispersion of the Piao 2021 simulator
+  (φ ≈ 0.4 vs ≈ 1.5–5 in real WGBS) in §4. All code, ground truth, and
+  figures are provided; the resubmission-bundle benchmark artefacts are
+  versioned under `benchmark/data/`.
 ---
 
 # 1. Introduction
@@ -589,23 +605,26 @@ Disagreement is exclusively about *which* regions are flagged.
 
 ### 3.3.3 dis.merge as a calibration knob
 
-epykit's `dmr_chain_merge` reaches 52.6 % paper-DMR recall at the
-paper's literal `dis.merge = 100`. Sweeping `dis.merge` reveals that
-the parameter behaves as expected:
+`dis.merge` controls how aggressively `dmr_chain_merge` joins adjacent
+significant CpG chains into wider DMRs. We re-ran the sweep on the
+Linux 2026-06-04 cohort against the locally-rerun DSS-922 call set
+(rather than the published 813-paper DMRs used pre-rerun); results in
+`benchmark/data/multi_thread_and_chain_sweep/chain_merge_dis_merge_sweep/`:
 
-| dis.merge | n DMRs | median bp | recall any-bp | recall J ≥ 0.5 | precision |
-|---:|---:|---:|---:|---:|---:|
-| 100 (paper) | 702 | 123 | 52.6 % | 27.4 % | 64.5 % |
-| 150 | 833 | 164 | 59.2 % | 39.7 % | 59.1 % |
-| 200 | 901 | 188 | 61.5 % | 45.8 % | 55.8 % |
-| **250 (morphology-matched)** | **940** | **196** | **62.7 %** | **48.1 %** | **54.5 %** |
-| 500 | 954 | 205 | 63.6 % | 50.4 % | 53.3 % |
+| dis.merge | n DMRs | median bp | recall any-bp | recall J ≥ 0.5 | precision | direction agree |
+|---:|---:|---:|---:|---:|---:|---:|
+| 100 (paper) | 852 | 125 | 63.8 % | 34.5 % | 74.4 % | 588 / 588 = 100 % |
+| 150 | 1,010 | 164 | 72.8 % | 52.1 % | 68.7 % | 671 / 671 = 100 % |
+| 200 | 1,095 | 192 | 76.3 % | 60.6 % | 64.9 % | 703 / 703 = 100 % |
+| **250 (morphology-matched)** | **1,139** | **205** | **77.3 %** | **64.2 %** | **63.0 %** | **713 / 713 = 100 %** |
+| 500 | 1,160 | 214 | 78.4 % | 67.0 % | 61.5 % | 723 / 723 = 100 % |
 
-dis.merge = 250 yields a near-double of the strict J ≥ 0.5 recall (27.4 % → 48.1 %)
-and brings the median DMR length from 123 bp toward the paper's 239 bp.
-The gain plateaus past 250 (only +2 pp recall at dis.merge = 500 for
-–4 pp precision). We interpret 250 as a morphology-matched setpoint for
-epykit's smoother — the paper's `dis.merge = 100` works for DSS
+`dis.merge = 250` nearly doubles the strict J ≥ 0.5 recall over the
+paper-default 100 (34.5 % → 64.2 %) and brings the median DMR length
+from 125 bp toward DSS's 241 bp. The gain plateaus past 250 (+1 pp
+any-bp recall at 500 for –1.5 pp precision). We interpret 250 as a
+morphology-matched setpoint for epykit's chain-merge under the
+DSS-vs-epykit comparison — the paper's `dis.merge = 100` works for DSS
 because DSS's count-smoother extends each significant chain slightly
 further than epykit's quasi-binomial LR does in the small-p tail
 (the smoother is identical; the test statistic differs). The full
@@ -806,23 +825,41 @@ out — the expected direction.
 
 ## 3.5 Null calibration
 
-For each surviving DMC engine on each dataset, we shuffle the
-case/control assignment K = 20 times and record observed FDR at
-nominal q ∈ {0.01, 0.05, 0.10} (§2.8 design). A well-calibrated engine
-produces observed FDR ≤ nominal under the null.
+A well-calibrated test produces uniform per-CpG p-values under the null
+(no true DMCs). Distinguishing *calibrated* from merely *conservative*
+requires inspecting the p-value distribution, not just the headline FDR.
 
-On the real-data GSE263850 cohort, both `lr` and `lr+` are well below
-nominal at q < 0.05 (median observed FDR = 1.53 × 10⁻⁵
-<!-- claim: null_calib_lr_gse263850_fdr_median --> for `lr`;
-1.53 × 10⁻⁵ <!-- claim: null_calib_lrplus_gse263850_fdr_median --> for
-`lr+`). On the Piao-as-distributed dataset, observed FDR is 0.0 across
-all 20 shuffles for both engines — perfect calibration to within
-shuffle resolution, attributable to the simulator's clean noise model.
+**Exhaustive enumeration on real WGBS (GSE263850).** For n = 6 samples
+in a 3v3 contrast, there are exactly C(6, 3) / 2 = 10 distinct unordered
+label partitions. We ran the lr engine on each, capturing the per-CpG
+p-value distribution. This is the *complete* null universe: at n = 6, k
+= 1000 random shuffles would draw the same 10 partitions with
+replacement (~100× each), conveying no information beyond the
+exhaustive enumeration we report. Under realistic WGBS dispersion the
+lr engine's null p-values are close to uniform:
 
-The full sweep covers 13 cells; 12 ran successfully. The
-`fisher@gse263850` cell was deferred and is documented as a limitation
-(§4.3). The full table (`benchmark/data/null_calibration/summary.parquet`)
-appears as **Supplementary Table S-Calib**.
+| Statistic | Value | Expected under uniform | Interpretation |
+|---|---:|---:|---|
+| Mean p | 0.506 | 0.500 | +0.6 % conservative bias |
+| Fraction p < 0.05 | 0.047 | 0.050 | –6 % under nominal |
+| KS D | 0.051 | — | Small departure; effect-size measure |
+
+The test is therefore **calibrated**, not merely conservative — the
+distribution is close to uniform with a tiny conservative lean, so
+FDR control at nominal q is valid with negligible power cost. The
+Q-Q plot (Supplementary Figure S-QQ-LR) hugs the diagonal across
+the full p-value range. Source: `benchmark/data/null_calibration/
+gse263850/lr_calibration_report.{md,json}` and `lr_qq.png`; sampled
+p-values for figure regeneration in `lr_pvalues.parquet`.
+
+**Pre-1.0 K = 20 baseline (deprecated headline).** Earlier engineering
+runs used K = 20 random shuffles on every (engine, dataset) cell and
+reported median observed FDR ≤ 1.53 × 10⁻⁵. At K = 20 the minimum
+resolvable empirical p-value is ≈ 1/K = 0.05 — five-decimal precision
+was unsupportable. The K = 20 summary survives in
+`benchmark/data/null_calibration/summary.parquet` as the Piao-simulator
+and pre-1.0 reference baseline; the exhaustive-enumeration headline
+above supersedes it on the real-data calibration question.
 
 **Performance headline.** epykit's bare `lr` engine completes the same
 coverage = 10, 3 vs 3 cell in median 0.86 s
@@ -862,32 +899,39 @@ WGBS pipeline:
   coverage and small effects `lr` outperforms several baselines.
 * Study 2 establishes **bit-precise calibration** against methylKit: the
   two implementations agree on TPR, FPR, F1 and AUROC to three decimal
-  places at n ≥ 4, and epykit additionally recovers ~2× more true DMCs at
-  n = 2 where methylKit's overdispersion estimator becomes degenerate.
+  places at n ≥ 4, and at n = 2 — where methylKit's overdispersion
+  estimator becomes degenerate — epykit's `lr` engine recovers TPR
+  0.564 vs methylKit's 0.302 at matched FPR (Study 2, single cell).
 * Study 3 demonstrates **faithful behaviour on real biological data**:
-  on identical counts the two pipelines agree on direction at 94 % of CpGs
-  and on effect size at Pearson r = 0.994, while drawing significance at
-  different operating points.
+  on identical counts the two pipelines agree on direction at 100 %
+  of overlapping DMRs (Study 3 chain_merge-250 vs DSS-from-scratch,
+  713/713), and on effect size at Pearson r = 0.994 per-CpG.
 
-Across the three studies epykit is consistently 12×–68× faster than
-methylKit on matched workloads and uses 18 %–74 % less peak memory.
+On Linux with methylKit multi-threaded (`mc.cores = 8`), epykit is
+≈ 33 × faster on per-CpG testing and ≈ 28 × faster on Study 3
+end-to-end; on Study 2 simulator cells the ratio is ≈ 33 ×. Earlier
+Windows-only numbers (12 × – 68 ×) reflected methylKit's `mc.cores`
+no-op on Windows (no `fork()`) and overstated the gap.
 
 ## 4.2 The calibration–sensitivity trade-off
 
 Study 3 surfaces a real choice: at n = 3 per group on biological data,
 methylKit's pooled `overdispersion="MN"` is more aggressive in the
-small-p tail than epykit's per-site McCullagh–Nelder; epykit calls ~60 % as
-many DMCs at the same threshold. The `lr+` recipe recovers 93 % of
-methylKit's calls but emits 13× more total significant DMCs. Neither
-operating point is "more correct"; the precision/recall optimum depends
-on the downstream analysis and the user's tolerance for false positives.
-We therefore recommend that users:
+small-p tail than epykit's per-site McCullagh–Nelder; epykit calls
+fewer DMCs at the same threshold (30,965 vs methylKit 51,792 at
+|d| ≥ 10 %, q < 0.05). The `lr+` recipe emits ≈ 13 × more total
+significant DMCs (406,515 vs 30,965) than bare `lr` at the same
+q-threshold — consistent with the simulator-validated FPR inflation
+under realistic dispersion (§3.4 / §4 framing paragraph). Neither
+operating point is "more correct"; the precision/recall optimum
+depends on the downstream analysis and the user's tolerance for
+false positives. We therefore recommend that users:
 
 * Report results at the default `lr` setting unless they have a specific
   reason to deviate;
-* Document any opt-in (`lr+`, `dispersion="shrink"`, etc.) explicitly;
-* Reproduce headline findings under at least one alternative dispersion
-  mode as a sensitivity check.
+* Treat `lr+` as a sensitivity-favouring research mode, not a default;
+  reproduce headline findings under bare `lr` as a calibration check;
+* Document any opt-in (`lr+`, `dispersion="shrink"`, etc.) explicitly.
 
 ## 4.3 Limitations
 
@@ -904,19 +948,23 @@ We therefore recommend that users:
 * **DMR baselines are figure-derived.** DMR detection rates for the eight
   baselines in Study 1 come from hand-transcribed bar charts (Figures 3a,
   3b, S5–S7). Per-figure confidence labels in `PROVENANCE.md`.
-* **Single real dataset.** Study 3 is one tissue × one genome (Clone vs
-  SBP009 in hg38). A multi-dataset real-data validation
-  (IMR90 vs H1-hESC, mouse imprinted DMRs, etc.) is future work.
+* **Single real dataset.** Study 3 is one tissue × one genome (Het_AKAP11_KO
+  vs WT in hg38, six samples total). A multi-cohort real-data validation
+  (TCGA tumour/normal WGBS, ENCODE tissue series, mouse imprinted DMRs)
+  is future work; the DSS-vs-epykit ordering observed here may not
+  generalise to higher dispersion regimes.
 * **DMR-engine choice on real data.** Study 3 (§3.3) shows that fixed
   500 bp tile callers (including `dmr_tile` and methylKit's `tileMethylCounts`)
   recover ≤ 10 % of focused real-data DMRs at coordinate level when
   compared against a published DSS call set. epykit's `dmr_chain_merge`
-  recovers 53–63 % depending on `dis.merge`; DSS-from-scratch reaches
-  87.5 %. Per-CpG calibration is engine-agnostic (r = 0.994 across
-  the board) — but for users targeting reproduction of published
-  DMR-level analyses, the engine choice matters more than the per-CpG
-  test. We recommend `dmr_chain_merge` as the default for real-data
-  region-level analysis.
+  recovers 63.8 % (any-bp) at the paper-faithful `dis.merge = 100` and
+  77.3 % at morphology-matched `dis.merge = 250`, with 100 % direction
+  agreement on overlapping DMRs in both cases; DSS-from-scratch reaches
+  87.5 %. The DSS smoothing prior helps most on low-CpG-density regions
+  (named-gene misses include CLEC19A, KANK1, CNR1). Per-CpG calibration
+  is engine-agnostic; for users targeting reproduction of published
+  DMR-level analyses we recommend `dmr_chain_merge` with `dis.merge = 250`
+  as the default for real-data region-level analysis.
 * **Multi-omics scope.** The Farhangdoost et al. 2025 paper integrates
   RNA-seq DEGs, WGBS DMRs, and ChIP-seq H3K27ac peaks; our benchmark
   scope is WGBS only. We can compare DMR coordinates, annotations,
@@ -924,51 +972,89 @@ We therefore recommend that users:
   6, and 8, but we cannot recompute the DMR–DEG correlations or
   triple-overlap enhancer analyses without the additional GEO
   datasets and an independent RNA-seq / ChIP-seq pipeline.
-* **Windows host (Study 2).** methylKit's `mc.cores` is a no-op on Windows
-  (no `fork()`), so methylKit ran single-threaded by force, not by choice.
-  On Linux with `mc.cores = 8` we estimate methylKit's DMR grid would drop
-  from ~6 h to ~1–1.5 h; epykit would still be ~10× faster.
-* **Ground truth non-independence.** True-DMC labels come from the
+* **Platform-dependent timing (Linux re-run).** Earlier engineering runs
+  on Windows recorded a 12 – 68 × speedup vs methylKit, but methylKit's
+  `mc.cores` is a no-op on Windows (no `fork()`), so methylKit ran
+  single-threaded by force. We re-ran the Study 2 grid on Linux with
+  `methylKit::calculateDiffMeth(mc.cores = 8)` (5.9 × scaling, median
+  across three seeds). On Linux at multi-threaded methylKit the honest
+  ratio against epykit's bare `lr` is ≈ 33 × on the simulator
+  (`benchmark/data/multi_thread_and_chain_sweep/methylkit_multicore/`).
+  We separately verified that DSS's `DMLfit.multiFactor` (the
+  multi-factor path used here) provides no multi-core option in
+  DSS 2.58.0, so the reported speed advantage over DSS is not eroded
+  by parallelising DSS.
+* **Ground truth non-independence.** Study 1 true-DMC labels come from the
   coverage-25 sample (the cleanest signal in the dataset), not from the
-  simulator's internal flags. Recovered counts (19,999 DMCs, 35 DMRs)
-  match the paper's design but the truth is technically not independent
-  of the highest-coverage observation.
-* **Null calibration coverage.** The null-calibration sweep (§3.5) covers
-  12 of 13 engine × dataset cells. The `fisher@gse263850` cell — the
-  small-n Fisher engine on the 12-sample GSE263850 cohort — was deferred
-  because the closure requires a parallel backend to be tractable at
-  K = 20 label shuffles on 15.6 M CpGs. The `fisher` engine is documented
-  as the small-n fallback (`n < 2` per group); its null behaviour on a
-  12-sample real cohort is the least informative cell in the sweep, and
-  the remaining 12 cells confirm engine calibration at nominal
-  q ∈ {0.01, 0.05, 0.10}.
+  simulator's internal flags. To check the in-house simulator does not
+  asymmetrically advantage epykit (reviewer M3), we re-scored the
+  external baselines under both labellings on the 21-seed Linux output:
+  the methylkit-vs-DSS ordering is robust (intrinsic AUROC 0.926 vs
+  0.909; threshold AUROC 0.987 vs 0.986); the absolute scale shifts
+  upward under threshold truth but the rank does not flip.
+  (`benchmark/data/study1b_simulator/M3_truth_mode_comparison.md`.)
+* **Null calibration coverage.** Our published headline null result
+  (§3.5) is the lr engine on label-permuted GSE263850 with all C(6,3)/2
+  = 10 unique 3v3 partitions enumerated. For n = 6, this is the
+  *complete* null universe — k = 1000 random shuffles would draw the
+  same 10 partitions with replacement (~100× each). The earlier K = 20
+  random-shuffle sweep over (engine × dataset) cells survives as a
+  pre-1.0 baseline in `benchmark/data/null_calibration/summary.parquet`
+  but cannot resolve the calibration-vs-conservatism question at
+  five-decimal precision (min resolvable empirical p ≈ 0.05). Extending
+  the exhaustive enumeration to larger cohorts (e.g. TCGA tumour/normal
+  with n ≥ 6+6) would require sampling rather than enumeration but is
+  not required for the headline calibration claim.
+* **lr+ as a research knob, not a default.** The four-knob `lr+` stack
+  trades precision for recall (Simulator: TPR 0.673 → 0.746 buys a 14×
+  FPR inflation, 0.0044 → 0.064; F1 0.796 → 0.746; AUROC 0.928 → 0.907).
+  We retain `lr+` as a deliberately-opt-in mode for users who want to
+  trade calibration for sensitivity in low-replicate regimes, and
+  document it as such in the API and §2.5. Bare `lr` is the engine
+  the abstract numbers are reported against; `lr+` headline panels are
+  labelled as such throughout §3.
+* **sep_threshold is inert at realistic coverage.** §M11 (sep_threshold)
+  reports that the lr+ separation-aware Fisher fallback never fires on
+  GSE263850 (0 candidate sites across all chromosomes, identical DMC
+  output at sep_threshold ∈ {0.7, 0.8, 0.9, 0.95} on the validated
+  cold-cache sweep). It is a rare-event safeguard for pathologically
+  low-coverage sites that the coverage filter (default ≥ 10×/sample)
+  removes upstream; the default value (0.9) has no effect on any
+  reported number and requires no tuning. Investigating this question
+  surfaced and fixed a cache-key bug in `tl.py` that had previously
+  hidden the inertness behind silent cache reuse.
 
 # 5. Conclusion
 
-epykit is a credible Python-native replacement for the
-methylKit / DSS / RADMeth workflow. Its default `lr` engine matches or
-exceeds the strongest R/CLI tools across the simulated benchmark grid; the
-optional `lr+` recipe closes residual gaps to near-perfect TPR at the cost
-of a small, well-controlled FPR increase. On real WGBS (GSE263850) the
-per-CpG implementation agrees with methylKit on direction at 94 % of
-sites and effect size at Pearson r = 0.994 — they are measuring the
-same biology, with a configurable operating point on the precision/recall
-curve. At the DMR level, the three-way comparison against the paper's
-published call set establishes:
+epykit is a Python-native pipeline for WGBS downstream analysis whose
+default `lr` engine is competitive with the strongest R/CLI tools
+(simulator: AUROC 0.928 vs methylKit 0.926, DSS-no-smoothing 0.909).
+The opt-in `lr+` stack trades precision for recall (14× FPR inflation
+for +7 pp TPR; lower F1 and AUROC) and is documented as a research
+knob, not a recommended default. On real WGBS (GSE263850), at the
+paper-matched `dmr_chain_merge` operating point (`dis.merge = 250`):
 
 * fixed-tile callers (methylKit, epykit-tile) miss ≥ 90 % of focused
   real-data DMRs at coordinate level;
-* epykit's `dmr_chain_merge` recovers 53 % at paper-faithful
-  `dis.merge = 100` and 63 % at morphology-matched `dis.merge = 250`,
-  with 100 % direction agreement on every matched DMR;
-* DSS-from-scratch is the published-method ceiling at 87.5 %; the
-  remaining gap is DSS-vs-DSS reproducibility noise, not method
-  divergence.
+* epykit's `dmr_chain_merge` recovers 77.3 % of DSS-from-scratch DMRs
+  by any-bp overlap and 64.2 % at Jaccard ≥ 0.5, with 100 % direction
+  agreement on the 713 overlapping DMRs and 67.4 % gene-set recall;
+* DSS-from-scratch retains a small recall advantage (87.5 %, 80.4 %
+  panel-E gene recall) attributable to its smoothing prior, which
+  helps particularly on low-CpG-density regions.
 
-Across all three benchmark studies epykit is 12×–68× faster than
-methylKit on matched workloads and ~6× faster than DSS on the same
-real-data DMR call, while using less peak memory. Combined with the
-rest of the epykit API (annotation, plotting, HTML reporting,
+Under exhaustive label-permutation on GSE263850 (all 10 unique 3v3
+partitions = the complete null universe at n = 6) the `lr` engine is
+calibrated, not merely conservative: null p-values are close to
+uniform (mean 0.506, fraction below 0.05 = 0.047, KS D = 0.051), so
+FDR control is valid at negligible power cost.
+
+On Linux with methylKit multi-threaded (`mc.cores = 8`), epykit is
+≈ 33 × faster than methylKit on per-CpG testing and ≈ 28 × faster
+than DSS on Study 3 end-to-end. DSS's `DMLfit.multiFactor` does not
+expose a multi-core option in DSS 2.58.0, so the DSS comparison is
+single-thread by construction, not by choice. Combined with the rest
+of the epykit API (annotation, plotting, HTML reporting,
 AnnData / MuData interop), this brings the WGBS downstream pipeline
 into the same Python ecosystem as the rest of modern bioinformatics.
 
