@@ -1,0 +1,32 @@
+[
+  {
+    "dis_merge_bp": 100,
+    "n_dmr": 852,
+    "median_width_bp": 125.0,
+    "mean_width_bp": 152.3
+  },
+  {
+    "dis_merge_bp": 150,
+    "n_dmr": 1010,
+    "median_width_bp": 164.0,
+    "mean_width_bp": 193.5
+  },
+  {
+    "dis_merge_bp": 200,
+    "n_dmr": 1095,
+    "median_width_bp": 192.0,
+    "mean_width_bp": 220.2
+  },
+  {
+    "dis_merge_bp": 250,
+    "n_dmr": 1139,
+    "median_width_bp": 205.0,
+    "mean_width_bp": 235.0
+  },
+  {
+    "dis_merge_bp": 500,
+    "n_dmr": 1160,
+    "median_width_bp": 214.0,
+    "mean_width_bp": 258.8
+  }
+]

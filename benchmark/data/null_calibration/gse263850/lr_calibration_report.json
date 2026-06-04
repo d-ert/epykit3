@@ -1,0 +1,28 @@
+{
+  "engine": "lr",
+  "dataset": "GSE263850 (label-permuted, exhaustive k=10, 3v3 n=6)",
+  "dmc_config": "ep.tl.dmc(test='lr')  [default dispersion='eb']",
+  "k_shuffles": 10,
+  "n_pvalues_sampled": 1000000,
+  "ks_D": 0.0506,
+  "ks_pvalue_note": "p~0 at n=1e6 is uninformative; use D + tails",
+  "mean_pvalue": 0.5055,
+  "mean_obs_minus_exp": 0.0055,
+  "tail_fractions": {
+    "p<0.01": 0.0096,
+    "p<0.05": 0.0472,
+    "p<0.1": 0.0987
+  },
+  "tail_nominal": {
+    "p<0.01": 0.01,
+    "p<0.05": 0.05,
+    "p<0.1": 0.1
+  },
+  "median_observed_fdr": 1.764167458230721e-05,
+  "iqr_observed_fdr": [
+    1.6038919352857905e-05,
+    2.027883212296138e-05
+  ],
+  "verdict": "calibrated (slightly conservative)",
+  "qq_png": "benchmark/data/null_calibration/gse263850/lr_qq.png"
+}

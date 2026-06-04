@@ -1,0 +1,6 @@
+step	wall_seconds	total_cpu_seconds	r_mem_peak_mb
+load_dmltest_cache	14.175	21.684	235594808
+callDMR	2.36	2.351	366487453
+per_sample_dmr_means	57.63	119.238	521508802
+annotate_refgene_homer	249.529	265.9	296317685
+build_100kb_gene_links	0.215	0.425	249868672

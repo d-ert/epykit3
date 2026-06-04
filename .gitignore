@@ -59,7 +59,9 @@ benchmark/data/study1/epykit_post_phase3/*.parquet
 !benchmark/data/study1b_simulator/eval_external_timings_iqr.parquet
 benchmark/data/study1b_simulator/seed=*/
 benchmark/data/study1b_simulator/frozen_grid/
-benchmark/data/study1b_simulator/timings_simulator.parquet
+# Linux-rerun 2026-06-03: include the per-engine simulator timings table
+# (4 KB headline) but keep per-seed methylkit/dss/dss_nosmooth TSVs ignored.
+!benchmark/data/study1b_simulator/timings_simulator.parquet
 benchmark/_converted_simulator/
 benchmark/_runs_simulator/
 
@@ -92,12 +94,54 @@ benchmark/data/study3/epykit_post_phase3/dmr/
 !benchmark/data/null_calibration/summary.parquet
 benchmark/data/null_calibration/piao_distributed/
 benchmark/data/null_calibration/simulator/
-benchmark/data/null_calibration/gse263850/
 benchmark/_runs_null_calibration/
+
+# Linux-rerun 2026-06-03 (M5): exhaustive 3v3 null calibration on
+# label-permuted GSE263850. Track headline report, Q-Q figure, sampled
+# p-values (7 MB) for figure regen, and KS JSON. Exclude the per-shuffle
+# methylstore cache (~2 GB) and the obs/methyldata snapshot.
+!benchmark/data/null_calibration/gse263850/
+!benchmark/data/null_calibration/gse263850/lr_calibration_report.json
+!benchmark/data/null_calibration/gse263850/lr_calibration_report.md
+!benchmark/data/null_calibration/gse263850/lr_ks.json
+!benchmark/data/null_calibration/gse263850/lr_qq.png
+!benchmark/data/null_calibration/gse263850/lr_summary.parquet
+!benchmark/data/null_calibration/gse263850/lr.parquet
+!benchmark/data/null_calibration/gse263850/lr_pvalues.parquet
+benchmark/data/null_calibration/gse263850/_ingest_store/
+benchmark/data/null_calibration/gse263850/snapshot/
+
+# Linux-rerun 2026-06-03 (M11b): sep_threshold prevalence/inertness
+# evidence on simulator + real WGBS (GSE263850). All artefacts tiny.
+!benchmark/data/sep_threshold_roc/
+!benchmark/data/sep_threshold_roc/**
+
+# Linux-rerun 2026-06-03 (Study 3): paper-matched chain_merge + DSS DMR
+# call sets, plus the two-way comparison. dmltest_per_cpg.tsv.gz (460 MB)
+# stays ignored as a regenerable per-CpG dump.
+!benchmark/data/study3/chain_merge/
+!benchmark/data/study3/chain_merge/**
+!benchmark/data/study3/dss/
+!benchmark/data/study3/dss/**
+benchmark/data/study3/dss/dmltest_per_cpg.tsv.gz
+!benchmark/data/study3/comparisons/
+!benchmark/data/study3/comparisons/**
+!benchmark/data/study3/samplesheet.csv
+
+# Linux-rerun 2026-06-04 (m13 + M4): chain_merge dis_merge sensitivity
+# sweep (100/150/200/250/500 vs DSS-922) and methylKit cores=8 timing.
+!benchmark/data/multi_thread_and_chain_sweep/
+!benchmark/data/multi_thread_and_chain_sweep/**
 
 # Phase 2: filesystem-only archive of the pre-2026-05-27 benchmark dir
 # (~15 GB of regenerables; kept on disk only, not in git history)
 _legacy_benchmark/
+
+# 2026-06-03/04 Linux-rerun staging area. Headline tables already
+# integrated into benchmark/data/ (see commits referencing M4/M5/M9/m13);
+# this dir is the raw filesystem drop from the Linux box and stays
+# unbundled (includes ~3 GB of bulk artefacts).
+benchmark/rerun_outputs_2026-06-03/
 
 
 
