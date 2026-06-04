@@ -244,6 +244,30 @@ reproduces the pre-1.0 carve-out that auto-engaged two of the knobs at
 `min_n ≤ 2`. See the technical report
 ([report/REPORT.md](../report/REPORT.md)) for full knob specification.
 
+**Degrees-of-freedom floor under EB shrinkage.** When EB shrinkage is
+active, the effective dispersion uncertainty is summarised by a
+pseudo-df parameter `df_phi` used as the denominator of the
+F(1, df_phi) reference distribution. The shrunk df can be small —
+typically `df_phi ≈ 4` at the n = 3-vs-3 effective sample sizes seen
+on the Piao simulator — and at such small df the F tail is materially
+heavier than the asymptotic chi²(1). At the conventional p = 0.05
+critical value (chi² 95-th percentile ≈ 3.841), F(1, 4) gives
+P(stat ≥ 3.841) ≈ 0.121, an inflation factor of ≈ 2.4× relative to
+chi²(1); F(1, 50) drops the same number to ≈ 0.056, an inflation
+factor of ≈ 1.1×. epykit therefore enforces a floor of `df_phi ≥ 50`
+during the F-vs-chi² adaptive switch, which keeps the per-CpG p-value
+calibration within ≈ 11 % relative of the asymptotic reference — below
+the per-CpG calibration noise floor observed on real GSE263850 data
+(§3.5). The floor value is empirical, not first-principles, and is
+pinned by `tests/test_principled_df.py` so a future change cannot
+silently move the calibration. Independent end-to-end validation
+comes from the exhaustive 10-partition null calibration on
+GSE263850 (§3.5): under realistic WGBS dispersion the lr engine's
+null p-values are close to uniform (mean 0.506, fraction below 0.05
+= 0.047, KS statistic D = 0.051), so the floor is not merely
+conservative — the test is calibrated, with FDR control valid at
+negligible power cost.
+
 ### 2.5.1 Engines removed in 0.7.5
 
 Four DMC engines available in epykit ≤ 0.7.4 were removed at the 0.7.5
