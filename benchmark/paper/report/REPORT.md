@@ -453,66 +453,70 @@ Paper parameters (paper Methods §"WGBS data processing and analysis"):
 > Annotation via HOMER (hg38). 100 kb gene-DMR linkage (TSS to DMR
 > midpoint).
 
-### 3.10 DMR coordinate concordance vs paper Supp Table 5 (4-way)
+### 3.10 DMR coordinate concordance vs DSS-from-scratch (post-rerun)
 
-| Caller | n DMRs | median bp | %hyper | recall any-bp | precision any-bp | recall J≥0.25 | recall J≥0.5 | recall J≥0.75 | direction agreement on matched |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| methylKit-tile (500 bp) | 2,661 | 500 | ~50 % | 8.9 % | 2.8 % | n/a | n/a | n/a | (≤ 1 matched at J≥0.5) |
-| epykit-tile (500 bp) | 3,433 | 500 | ~50 % | 7.7 % | 1.8 % | n/a | n/a | n/a | (≤ 1 matched at J≥0.5) |
-| **ek-chain_merge-100** | **702** | **123** | **82.5 %** | **52.6 %** | **64.5 %** | **43.3 %** | **27.4 %** | **18.1 %** | **428 / 428 = 100 %** |
-| **ek-chain_merge-250** | **940** | **196** | **79.7 %** | **62.7 %** | **54.5 %** | **57.3 %** | **48.1 %** | **37.4 %** | **587 / 587 = 100 %** |
-| **DSS-from-scratch** | **922** | **241** | **74.6 %** | **87.5 %** | **76.8 %** | ~ 82 % | ~ 55 % | ~ 40 % | **710 / 710 = 100 %** |
-| paper (Supp Table 5) | 813 | 239 | 78.5 % | 100 % | 100 % | 100 % | 100 % | 100 % | — |
+After the 2026-06 Linux re-run the chain_merge call sets at
+`dis.merge = 100 / 250` shifted from pre-rerun 702 / 940 to **852 / 1,139**
+DMRs respectively, and the comparison baseline shifts from the paper's
+813 DMRs to the locally-rerun DSS-from-scratch 922 DMRs (§3.3.4 of
+[paper.md](../paper/paper.md) for rationale: DSS-vs-paper recall is
+only 87.5 %, so paper-813 is not the appropriate denominator).
+
+| Caller | n DMRs | median bp | %hyper | recall any-bp (vs DSS) | precision any-bp | recall J ≥ 0.5 | direction agreement on matched |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| methylKit-tile (500 bp) | 2,661 | 500 | ~50 % | ≈ 8.7 % | ≈ 3.0 % | ~ 0 % | (≤ 1 matched at J ≥ 0.5) |
+| **ek-chain_merge-100** | **852** | **125** | **79.0 %** | **63.8 %** | **74.4 %** | **34.5 %** | **588 / 588 = 100 %** |
+| **ek-chain_merge-250** | **1,139** | **205** | **~ 80 %** | **77.3 %** | **63.0 %** | **64.2 %** | **713 / 713 = 100 %** |
+| **DSS-from-scratch** (2.58.0) | **922** | **241** | **74.6 %** | 100 % (self) | 100 % (self) | 100 % (self) | — |
+| paper (Supp Table 5, contextual reference) | 813 | 239 | 78.5 % | DSS-vs-paper: 87.5 % | — | — | — |
 
 Direction agreement on every matched DMR is **100 % across every
-caller**. Source: [headline.json](../data/study3/comparisons/chain_merge_vs_paper/headline.json)
-+ [F1 UpSet plot](../figures/study3_real_GSE263850/three_way/F1a_upset_any_bp.png)
-([J ≥ 0.5 variant](../figures/study3_real_GSE263850/three_way/F1b_upset_J05.png)).
+caller**. Source: [`headline.json`](../data/study3/comparisons/epykit_vs_dss/headline.json),
+[`dis_merge_vs_dss_sensitivity.csv`](../data/multi_thread_and_chain_sweep/chain_merge_dis_merge_sweep/dis_merge_vs_dss_sensitivity.csv).
 
-### 3.11 dis.merge sweep
+### 3.11 dis.merge sweep (post-rerun, vs DSS-922)
 
-| dis.merge | n DMRs | median bp | %hyper | recall any-bp | recall J≥0.25 | recall J≥0.5 | recall J≥0.75 | precision | Table-5 gene (nearest) | Table-8 (46) (nearest) | DMR time (s) |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 100 (paper) | 702 | 123 | 82.5 % | 52.6 % | 43.3 % | 27.4 % | 18.1 % | 64.5 % | 48.9 % | 60.9 % | 0.1 |
-| 150 | 833 | 164 | 80.7 % | 59.2 % | 51.9 % | 39.7 % | 29.1 % | 59.1 % | 54.8 % | 65.2 % | 22.3 |
-| 200 | 901 | 188 | 79.8 % | 61.5 % | 56.1 % | 45.8 % | 34.7 % | 55.8 % | 57.0 % | 67.4 % | 21.7 |
-| **250 (sweet spot)** | **940** | **196** | **79.7 %** | **62.7 %** | **57.3 %** | **48.1 %** | **37.4 %** | **54.5 %** | **57.6 %** | **67.4 %** | **23.0** |
-| 500 | 954 | 205 | 78.8 % | 63.6 % | 58.8 % | 50.4 % | 39.1 % | 53.3 % | 58.6 % | 69.6 % | 25.9 |
+| dis.merge | n DMRs | median bp | recall any-bp | recall J ≥ 0.25 | recall J ≥ 0.5 | recall J ≥ 0.75 | precision | direction agree |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 100 (paper) | 852 | 125 | 63.8 % | 54.2 % | 34.5 % | 22.8 % | 74.4 % | 588 / 588 = 100 % |
+| 150 | 1,010 | 164 | 72.8 % | 65.8 % | 52.1 % | 40.6 % | 68.7 % | 671 / 671 = 100 % |
+| 200 | 1,095 | 192 | 76.3 % | 70.9 % | 60.6 % | 49.5 % | 64.9 % | 703 / 703 = 100 % |
+| **250 (morphology-matched)** | **1,139** | **205** | **77.3 %** | **73.1 %** | **64.2 %** | **53.0 %** | **63.0 %** | **713 / 713 = 100 %** |
+| 500 | 1,160 | 214 | 78.4 % | 74.4 % | 67.0 % | 54.9 % | 61.5 % | 723 / 723 = 100 % |
 
 Direction agreement remains 100 % across the entire sweep. Source:
-[sweep_summary.csv](../data/study3/chain_merge_dis_merge_sweep/sweep_summary.csv) +
+[`dis_merge_vs_dss_sensitivity.csv`](../data/multi_thread_and_chain_sweep/chain_merge_dis_merge_sweep/dis_merge_vs_dss_sensitivity.csv) +
 [F2 curves](../figures/study3_real_GSE263850/three_way/F2_dis_merge_sweep.png).
 
-### 3.12 Panel-E gene capture (Supp Table 8 = 46 critical genes)
+### 3.12 Panel-E gene capture (Supp Table 8 = 46 critical genes), post-rerun
 
 | Caller | Captured by nearest-TSS | Captured by 100 kb rule |
 |---|---:|---:|
-| methylKit-tile | 23 / 46 = 50.0 % | n/a (no 100 kb table; tile DMRs are short) |
-| epykit-tile-top813 | 22 / 46 = 47.8 % | n/a |
-| epykit-chain_merge-100 | 28 / 46 = **60.9 %** | 27 / 46 = 58.7 % |
-| epykit-chain_merge-250 | 31 / 46 = **67.4 %** | 32 / 46 = 69.6 % |
-| **DSS-from-scratch** | **37 / 46 = 80.4 %** | 33 / 46 = 71.7 % |
+| methylKit-tile | 25 / 46 = 54.3 % | n/a (tile DMRs too short for 100 kb gene-link table) |
+| epykit-chain_merge-100 | **30 / 46 = 65.2 %** | 29 / 46 = 63.0 % |
+| epykit-chain_merge-250 | **32 / 46 = 69.6 %** | (sweep variant; 100 kb gene-link table not regenerated) |
+| **DSS-from-scratch** | **37 / 46 = 80.4 %** | 38 / 46 = 82.6 % |
 
-Misses for ek-chain_merge-100 include CLEC19A, KANK1, CNR1, EDNRB,
-ANXA1, CXCR4, SHOX2, SIX3, TFAP2B (genes the paper depended on for
-Fig 3E enrichment). Most of these have very short / low-CpG-density
-DMRs that pass DSS's smoothed test but fall below epykit's LR.
-Source: [panel_e_capture_table8.csv](../data/study3/comparisons/chain_merge_vs_paper/panel_e_capture_table8.csv) +
-[panel_e_capture_dss.csv](../data/study3/comparisons/epykit_vs_dss/panel_e_capture_dss.csv).
+Source: [`panel_e_capture_dss.csv`](../data/study3/comparisons/epykit_vs_dss/panel_e_capture_dss.csv) +
+[`polish_recompute_2026_06_05.json`](../data/study3/comparisons/epykit_vs_dss/polish_recompute_2026_06_05.json).
+chain_merge-100 misses include CLEC19A, KANK1, CNR1, EDNRB, ANXA1,
+CXCR4, SHOX2, SIX3, TFAP2B — genes the paper depended on for the
+Fig 3E enrichment. Most have very short / low-CpG-density DMRs that
+pass DSS's smoothed test but fall below epykit's LR.
 
 ### 3.13 Annotation distribution (paper Fig 3C reproduction)
 
 | Feature | paper-DSS | mk-tile | ek-tile | ek-cm-100 | ek-cm-250 | DSS-local |
 |---|---:|---:|---:|---:|---:|---:|
-| promoter-TSS | 0.9 % | 2.1 % | 2.0 % | 2.7 % | 3.0 % | 0.8 % |
+| promoter-TSS | 0.9 % | 2.1 % | 2.0 % | 2.6 % | 2.8 % | 0.8 % |
 | 5' UTR       | 0.1 % | 0.0 % | 0.1 % | 0.0 % | 0.0 % | 0.1 % |
-| exon         | 2.9 % | 1.6 % | 1.6 % | 8.6 % | 6.8 % | 3.7 % |
-| intron       | 44.3 % | 35.8 % | 37.7 % | 42.0 % | 42.2 % | 38.8 % |
+| exon         | 2.9 % | 1.6 % | 1.6 % | 8.1 % | 6.9 % | 3.7 % |
+| intron       | 44.3 % | 35.8 % | 37.7 % | 42.0 % | 42.1 % | 38.8 % |
 | 3' UTR       | 1.6 % | 1.2 % | 1.3 % | 0.0 % | 0.0 % | 1.7 % |
-| TTS          | 1.4 % | 1.6 % | 1.4 % | 1.0 % | 1.4 % | 1.6 % |
-| non-coding   | 0.5 % | 5.9 % | 5.7 % | 0.0 % | 0.0 % | 5.9 % |
-| intergenic   | 48.3 % | 51.7 % | 50.2 % | 45.7 % | 46.6 % | 47.4 % |
-| n            | 813 | 2,661 | 3,433 | 702 | 940 | 922 |
+| TTS          | 1.4 % | 1.6 % | 1.4 % | 1.1 % | 1.3 % | 1.6 % |
+| non-coding   | 0.5 % | 5.9 % | 5.7 % | 0.0 % | 0.1 % | 5.9 % |
+| intergenic   | 48.3 % | 51.7 % | 50.2 % | 46.2 % | 46.8 % | 47.4 % |
+| n            | 813 | 2,661 | 3,433 | **852** | **1,139** | 922 |
 | chi² vs paper (lower = closer) | 0 | 65.4 | 58.0 | **45.7** | **44.2** | **41.4** |
 
 After switching to epykit3 (which has the proper full-HOMER feature
@@ -551,38 +555,51 @@ DMR-associated genes. Direct coordinate-overlap hits per caller:
 | epykit-chain_merge-250 | 11 / 20 | 7 / 20 |
 | **DSS-from-scratch** | **18 / 20** | **17 / 20** |
 
-Specific genes hit by chain_merge-100: NR2E1, OTX1, IRX2, OTX2,
-ENPP2, GREB1L, CCDC177 (+ 2 hypo). Misses: PAX7, NAALADL2 (both very
-short, low-CpG-density). Source:
+Specific hyper-side genes hit by chain_merge-100: NR2E1, OTX1, IRX2,
+ENPP2, GREB1L, CCDC177, EBF1; hypo-side: RPLP0P2, FAM87A (= 9 / 20).
+Notable hyper misses include OTX2, GNG11, PPP2R3B — short,
+low-CpG-density DMRs that pass DSS's smoothed test but fall below
+epykit's LR; hypo misses include LOC100506858, KC6, TMEM242,
+NAALADL2, LOC100131655, PAX7, PDK3, OSBPL8. Source:
 [F4 named-gene heatmap](../figures/study3_real_GSE263850/three_way/F4_top_named_gene_hits.png) +
 [F4 data](../figures/study3_real_GSE263850/three_way/F4_top_named_gene_hits_data.csv).
 
 ### 3.15 Per-DMR effect-size concordance (epykit vs DSS)
 
 For matched (J ≥ 0.5) DMR pairs between epykit-chain_merge and
-DSS-from-scratch:
+DSS-from-scratch, post-rerun:
 
-| Pair | n matched | Pearson r on Δβ | Spearman ρ on sig | Direction agreement |
+| Pair | n matched | Pearson r on Δβ | Spearman ρ on Δβ | Direction agreement |
 |---|---:|---:|---:|---:|
-| ek-100 vs DSS, J ≥ 0.25 | 484 | — | — | 100 % |
-| ek-100 vs DSS, J ≥ 0.5  | 256 | **0.9941** | 0.8988 | 100 % |
-| ek-250 vs DSS, J ≥ 0.5  | 453 | **0.9955** | 0.8996 | 100 % |
+| ek-100 vs DSS, any-bp | 634 | **0.9936** | 0.9257 | 100 % |
+| ek-100 vs DSS, J ≥ 0.25 | 506 | **0.9950** | 0.9357 | 100 % |
+| ek-100 vs DSS, J ≥ 0.5  | **318** | **0.9954** | 0.9382 | 100 % |
+| ek-250 vs DSS, any-bp | 718 | **0.9950** | 0.9412 | 100 % |
+| ek-250 vs DSS, J ≥ 0.5  | **592** | **0.9965** | 0.9543 | 100 % |
 
 When the two engines overlap a region, they agree to four decimal
-places on effect size and to about 0.90 on significance ranks.
-Source: [per_dmr_stat_concordance_summary.json](../data/study3/comparisons/per_dmr_stat_concordance_summary.json) +
+places on effect size and ≥ 0.93 on signed-rank correlation.
+Source: [`polish_recompute_2026_06_05.json`](../data/study3/comparisons/epykit_vs_dss/polish_recompute_2026_06_05.json) +
 [F9](../figures/study3_real_GSE263850/three_way/F9_per_dmr_concordance.png).
 
-### 3.16 Pipeline cost (4-way)
+### 3.16 Pipeline cost (4-way, Windows host)
+
+Windows-host numbers; methylKit `mc.cores` is a no-op on Windows so
+methylKit is forced single-threaded. Linux honest ratios for the
+DMC step are reported in [paper.md](../paper/paper.md) §4.3 abstract +
+§3.5 (≈ 33 × at the simulator headline cell, ≈ 5 × at the Study 3
+15.6 M-CpG cell). DSS is single-thread by construction (no
+multi-core path in DSS 2.58.0); the DSS ratio is
+platform-agnostic.
 
 | Caller | Wall (s) | CPU (s) | Peak RSS (GB) | Threads peak | Engine notes |
 |---|---:|---:|---:|---:|---|
-| methylKit-tile (R 4.5.0) | 12,372 | 12,419 | **48.0** | 1 (Windows: mc.cores = no-op) | `calculateDiffMeth` on 15.6 M CpGs dominates |
+| methylKit-tile (R 4.5.0, Windows) | 12,372 | 12,419 | **48.0** | 1 (Windows: mc.cores = no-op) | `calculateDiffMeth` on 15.6 M CpGs dominates |
 | epykit-tile (Python 3.13) | 675 | 993 | 12.6 | — | matches methylKit at DMC; ~3× faster overall |
 | epykit-chain_merge-100 | **~ 443** | **~ 260** | ~ 12.6 (est.) | — | DMC cached + DMR re-callable per dis.merge |
-| **DSS-from-scratch** (R 4.5.0) | **2,820** | **2,756** | **9.3** | 12 logical (effective 1) | DMLfit smoothing dominates (~ 34 min) |
+| **DSS-from-scratch** (R 4.5.0, DSS 2.58.0) | **2,820** | **2,756** | **9.3** | 12 logical (effective 1) | DMLfit smoothing dominates (~ 34 min) |
 
-epykit chain_merge is ~6× faster than DSS on the same input and uses
+epykit chain_merge is ~ 6 × faster than DSS on the same input and uses
 about the same memory; the DSS smoothing step is single-threaded and
 the most expensive single operation in any of the four pipelines.
 Source: [F7 resource bars](../figures/study3_real_GSE263850/three_way/F7_resources.png) +

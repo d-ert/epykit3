@@ -18,7 +18,8 @@ studies.
 | psutil | ≥ 5.9 | Study 2 perf sampling |
 | R | 4.5.0 | Studies 2 and 3 |
 | methylKit | 1.34.0 (Study 2); 1.36.0 (Study 3); 0.99.2 (Study 1 baseline tables, transcribed) | All studies |
-| Other Study 1 baselines | methylSig 0.4.4, DSS 2.12.0, RADMeth, BiSeq, Fisher (pooled), BSmooth, metilene — versions from Piao et al. 2021 | Study 1 (transcribed) |
+| **DSS** | **2.58.0 (Study 3 local re-run; per `data/study3/dss/dss_session_info.txt`)**; 2.12.0 (Study 1 baseline, transcribed from Piao 2021) | Studies 1 (transcribed), 3 (local) |
+| Other Study 1 baselines | methylSig 0.4.4, RADMeth, BiSeq, Fisher (pooled), BSmooth, metilene — versions from Piao et al. 2021 | Study 1 (transcribed) |
 
 All three studies were executed at commit `60a71e0` (engine tag
 `v0.7.5-phase3-engines-frozen`, 2026-05-28); the package version string was
@@ -382,8 +383,8 @@ Versions used (Windows host):
 | Component | Version |
 |---|---|
 | R | 4.5.0 (2025-04-11) |
-| DSS | (current Bioconductor; installation date 2025) |
-| bsseq | (Bioconductor) |
+| DSS | **2.58.0** (Bioconductor; per `data/study3/dss/dss_session_info.txt`) |
+| bsseq | **1.46.0** (Bioconductor) |
 | data.table | 1.x |
 | optparse | 1.x |
 
