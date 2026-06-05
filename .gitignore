@@ -65,6 +65,9 @@ benchmark/data/study1/epykit_post_phase3/*.parquet
 # M1: dispersion (phi) sweep eval outputs (median+IQR and per-cell)
 !benchmark/data/study1b_simulator/eval_phi_sweep_iqr.parquet
 !benchmark/data/study1b_simulator/eval_phi_sweep_per_cell.parquet
+# tabix/memory comparison: epykit OOC vs methylKit RAM/tabix backend (summaries)
+!benchmark/data/tabix_memory/
+!benchmark/data/tabix_memory/**
 !benchmark/data/study1b_simulator/MANIFEST.txt
 # Phase 4 Task 5: 1-seed methylKit + DSS parallel column (intrinsic-truth).
 !benchmark/data/study1b_simulator/eval_simulator_intrinsic.parquet

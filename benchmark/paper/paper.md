@@ -1041,7 +1041,8 @@ sweep only for the resource axis. On wall-clock at this cell epykit `lr`
 faster than DSS (15.1 s); methylKit at `mc.cores = 8` (5.9× scaling) narrows
 to ≈ 2×. Peak RSS at this cell is epykit `lr` 0.44 GB vs DSS 1.3 GB,
 methylKit 8.8 GB, BSmooth 9.5 GB and dmrseq 30 GB — roughly 20× less memory
-than methylKit (Figure 11, right; source `memory_timing_by_tool.csv`).
+than methylKit (Figure 11, right; source `memory_timing_by_tool.csv`; §3.7
+shows methylKit's own low-memory tabix backend does not close this gap).
 
 ![Figure 11. Dispersion (φ) sweep on the intrinsic-truth simulator (coverage
 10, 3 vs 3, median of 10 seeds; dual ρ / Pearson-φ axis). Left: sensitivity
@@ -1049,6 +1050,43 @@ than methylKit (Figure 11, right; source `memory_timing_by_tool.csv`).
 realised FDR at q < 0.05 — only epykit `lr` tracks the nominal 0.05 line across
 the realistic-WGBS band (φ ≈ 1.5–5, shaded); methylKit and DSS inflate 3–10×.
 Right: peak RSS.](../figures/study1_simulated_allPackages/F9_phi_sweep.png)
+
+## 3.7 Peak memory and methylKit's tabix backend
+
+A natural objection to the memory gap in §3.6 — epykit `lr` 0.44 GB vs methylKit
+8.8 GB at eight cores — is that methylKit offers an on-disk **tabix/database
+backend** (`methRead(..., dbtype="tabix")`) intended to lower memory, which the
+default in-RAM runs do not use. We therefore re-ran methylKit on identical
+inputs under both backends (`benchmark/scripts/run_methylkit_backend.R`; the
+same `methRead → unite → calculateDiffMeth`, so the per-CpG p/q are unchanged —
+only storage and I/O differ). Because forked multi-core workers share
+copy-on-write pages, we report **unique set size (USS)** as the fair multi-core
+memory metric beside RSS.
+
+**Table S-Mem.** Simulator cell (coverage 10, 3 vs 3; median of 3 seeds).
+
+| tool | backend | cores | wall (s) | RSS (MB) | USS (MB) |
+|---|---|---:|---:|---:|---:|
+| **epykit `lr`** | parquet (out-of-core) | 1 | **1.9** | **436** | **417** |
+| methylKit | in-RAM | 1 | 78 | 1,298 | 1,279 |
+| methylKit | tabix (on-disk) | 1 | 79 | 1,296 | 1,277 |
+| methylKit | in-RAM | 8 | 21 | 8,785 | 3,165 |
+| methylKit | tabix (on-disk) | 8 | 25 | 10,064 | 9,076 |
+
+Source: [`tabix_vs_epykit_summary.csv`](../data/tabix_memory/tabix_vs_epykit_summary.csv).
+
+The tabix backend **does not lower methylKit's peak memory**: at one core it is
+within 0.2 % of the in-RAM run (1,296 vs 1,298 MB RSS), and at eight cores it is
+*worse* (10.1 vs 8.8 GB RSS, and 1.19× slower) — the on-disk index adds overhead
+without shrinking the working set. The cost lives in `calculateDiffMeth`'s
+in-memory model fit, not in where the source counts are stored; tabix changes
+storage and I/O, not the statistical step. epykit's parquet path instead streams
+per chromosome and holds only the working chromosome, so its peak stays at
+0.44 GB. The advantage over methylKit — ≈ 3× at one core (RSS), rising to ≈ 7.6×
+on the fair USS metric at eight cores (≈ 20× on raw RSS) — is therefore
+**architectural, not a consequence of running methylKit in a non-default mode**:
+the "use methylKit's low-memory backend" objection is empirically refuted, with
+per-CpG statistics identical across backends.
 
 # 4. Discussion
 
