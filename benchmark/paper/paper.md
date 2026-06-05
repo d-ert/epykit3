@@ -52,11 +52,12 @@ abstract: |
   realistic WGBS dispersion, not merely conservative; FDR control is
   valid with negligible power cost.
 
-  On Linux with methylKit running multi-threaded (`mc.cores = 8`), epykit
-  is ≈ 33× faster than methylKit and ≈ 33× faster than DSS on per-CpG
-  testing; on Study 3 (22 M CpGs), the full epykit DMR pipeline is
-  ≈ 18× faster than single-core methylKit and ≈ 3.5× faster than
-  DSS-from-scratch end-to-end (Table 5b). A dispersion sweep to realistic
+  Measured under one harness on the simulator (per-CpG testing), epykit `lr`
+  is ≈ 13× faster than single-core methylKit and ≈ 9× faster than DSS — and
+  ≈ 2× faster than methylKit at `mc.cores = 8` — at ≈ 20× lower peak memory;
+  on Study 3 (22 M CpGs), the full epykit DMR pipeline is ≈ 18× faster than
+  single-core methylKit and ≈ 3.5× faster than DSS-from-scratch end-to-end
+  (Table 5b). A dispersion sweep to realistic
   WGBS overdispersion (Pearson φ ≈ 1.5–5; §3.6) shows detection power is tied
   across tools (AUROC), but epykit `lr` is the only per-CpG test that holds
   nominal FDR (≈ 0.02–0.03) as dispersion rises, while methylKit and DSS
@@ -577,12 +578,11 @@ than the DMC speedup because the per-CpG fixed cost of methylKit's
 R-level `glm()` loop dominates at 4 M sites. epykit fits the same
 regressions in a vectorised NumPy / statsmodels path under a Polars
 groupby; the dominant axis is vectorisation (~ 15–20 ×), not
-parallelism (~ 2–3 × from Polars / NumPy implicit threading). On
-Linux with `methylKit::calculateDiffMeth(mc.cores = 8)` (5.9 ×
-scaling, §4.3), methylKit's `diffmeth` step alone drops to ≈ 12 s on
-the same simulator cell, so the honest epykit-vs-methylKit `diffmeth`
-ratio is ≈ 33 × (epykit's bare `lr` finishes the same cell in median
-0.86 s; §3.5).
+parallelism (~ 2–3 × from Polars / NumPy implicit threading). Measured
+under one harness on Linux (§3.6), epykit's bare `lr` (median 1.7 s) is
+≈ 13 × faster than single-core methylKit (21.5 s) and ≈ 9 × faster than
+DSS (15.1 s) on the same per-CpG cell; methylKit at `mc.cores = 8`
+(5.9 × scaling, §4.3) narrows its gap to ≈ 2 ×.
 
 See Figure F6 ([study2_simulated_headToHead/F6_runtime.png](../figures/study2_simulated_headToHead/F6_runtime.png))
 for the per-scenario runtime distribution.
@@ -826,7 +826,8 @@ places on the effect size. See
 **Linux host** (pivoine, 24 logical cores; methylKit `mc.cores = 1`
 explicit for a fair single-core comparison; DSS single-thread by
 construction). See §4.3 for the methylKit `mc.cores = 8` multi-core
-ratio and §3.5 for the simulator Linux 33 × headline.
+ratio and §3.6 for the same-harness simulator per-CpG ratios
+(≈ 13 × vs single-core methylKit, ≈ 2 × vs multi-core).
 
 | Caller | Wall (s) | CPU (s) | Peak RSS (GB) | Notes |
 |---|---:|---:|---:|---|
@@ -1033,9 +1034,12 @@ sensitivity, is epykit's substantive per-CpG contribution.
 dmrseq and BSmooth are region callers; scored at single-CpG resolution here
 they are uncalibrated (FDR ≈ 0.6–0.7) and not meaningfully comparable per-CpG —
 they enter at the DMR level (§3.1, Study 3) instead. We retain them in this
-sweep only for the resource axis: peak RSS at this cell is epykit `lr` 0.44 GB
-vs DSS 1.3 GB, methylKit 8.8 GB, BSmooth 9.5 GB and dmrseq 30 GB — roughly 20×
-less memory than methylKit (Figure 11, right).
+sweep only for the resource axis. On wall-clock at this cell epykit `lr`
+(median 1.7 s) is ≈ 13× faster than single-core methylKit (21.5 s) and ≈ 9×
+faster than DSS (15.1 s); methylKit at `mc.cores = 8` (5.9× scaling) narrows
+to ≈ 2×. Peak RSS at this cell is epykit `lr` 0.44 GB vs DSS 1.3 GB,
+methylKit 8.8 GB, BSmooth 9.5 GB and dmrseq 30 GB — roughly 20× less memory
+than methylKit (Figure 11, right; source `memory_timing_by_tool.csv`).
 
 ![Figure 11. Dispersion (φ) sweep on the intrinsic-truth simulator (coverage
 10, 3 vs 3, median of 10 seeds; dual ρ / Pearson-φ axis). Left: sensitivity
@@ -1087,13 +1091,13 @@ WGBS pipeline:
   of overlapping DMRs (Study 3 chain_merge-250 vs DSS-from-scratch,
   713/713), and on effect size at Pearson r = 0.994 per-CpG.
 
-On Linux with methylKit multi-threaded (`mc.cores = 8`), epykit is
-≈ 33 × faster on per-CpG testing; on Study 3 the full epykit DMR
-pipeline is ≈ 18 × faster than single-core methylKit and ≈ 3.5 ×
-faster than DSS-from-scratch end-to-end (Table 5b); on Study 2
-simulator cells the ratio is ≈ 33 ×. Earlier Windows-only numbers
-(12 × – 68 ×) reflected methylKit's `mc.cores` no-op on Windows (no
-`fork()`) and overstated the gap.
+On the simulator (per-CpG, same harness; §3.6), epykit `lr` is ≈ 13 ×
+faster than single-core methylKit and ≈ 9 × faster than DSS, narrowing
+to ≈ 2 × against methylKit at `mc.cores = 8`; on Study 3 the full epykit
+DMR pipeline is ≈ 18 × faster than single-core methylKit and ≈ 3.5 ×
+faster than DSS-from-scratch end-to-end (Table 5b). Earlier Windows-only
+numbers (12 × – 68 ×) reflected methylKit's `mc.cores` no-op on Windows
+(no `fork()`) and overstated the gap.
 
 ## 4.2 The calibration–sensitivity trade-off
 
@@ -1174,8 +1178,9 @@ false positives. We therefore recommend that users:
   `mc.cores` is a no-op on Windows (no `fork()`), so methylKit ran
   single-threaded by force. We re-ran the Study 2 grid on Linux with
   `methylKit::calculateDiffMeth(mc.cores = 8)` (5.9 × scaling, median
-  across three seeds). On Linux at multi-threaded methylKit the honest
-  ratio against epykit's bare `lr` is ≈ 33 × on the simulator
+  across three seeds). Under one harness (§3.6) epykit's bare `lr` is
+  ≈ 13 × faster than single-core methylKit on the simulator, narrowing to
+  ≈ 2 × against methylKit at `mc.cores = 8`
   (`benchmark/data/multi_thread_and_chain_sweep/methylkit_multicore/`).
   We separately verified that DSS's `DMLfit.multiFactor` (the
   multi-factor path used here) provides no multi-core option in
@@ -1247,10 +1252,11 @@ calibrated, not merely conservative: null p-values are close to
 uniform (mean 0.506, fraction below 0.05 = 0.047, KS D = 0.051), so
 FDR control is valid at negligible power cost.
 
-On Linux with methylKit multi-threaded (`mc.cores = 8`), epykit is
-≈ 33 × faster than methylKit on per-CpG testing; on Study 3 the full
-epykit DMR pipeline is ≈ 18 × faster than single-core methylKit and
-≈ 3.5 × faster than DSS-from-scratch end-to-end (Table 5b). DSS's
+On the simulator (per-CpG, same harness; §3.6), epykit `lr` is ≈ 13 ×
+faster than single-core methylKit and ≈ 9 × faster than DSS (≈ 2 × vs
+methylKit at `mc.cores = 8`); on Study 3 the full epykit DMR pipeline is
+≈ 18 × faster than single-core methylKit and ≈ 3.5 × faster than
+DSS-from-scratch end-to-end (Table 5b). DSS's
 `DMLfit.multiFactor` does not expose a multi-core option in the DSS
 version we used (2.58.0), so the DSS comparison is single-thread by
 construction, not by choice. Combined with the rest
