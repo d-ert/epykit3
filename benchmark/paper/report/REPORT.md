@@ -583,25 +583,25 @@ places on effect size and ≥ 0.93 on signed-rank correlation.
 Source: [`polish_recompute_2026_06_05.json`](../data/study3/comparisons/epykit_vs_dss/polish_recompute_2026_06_05.json) +
 [F9](../figures/study3_real_GSE263850/three_way/F9_per_dmr_concordance.png).
 
-### 3.16 Pipeline cost (4-way, Windows host)
+### 3.16 Pipeline cost (4-way, Linux host pivoine)
 
-Windows-host numbers; methylKit `mc.cores` is a no-op on Windows so
-methylKit is forced single-threaded. Linux honest ratios for the
-DMC step are reported in [paper.md](../paper/paper.md) §4.3 abstract +
-§3.5 (≈ 33 × at the simulator headline cell, ≈ 5 × at the Study 3
-15.6 M-CpG cell). DSS is single-thread by construction (no
-multi-core path in DSS 2.58.0); the DSS ratio is
-platform-agnostic.
+Linux-host numbers (pivoine, 24 logical cores). methylKit `mc.cores = 1`
+explicit for a fair single-core comparison; DSS single-thread by
+construction (no multi-core path in DSS 2.58.0); epykit single-process.
+The methylKit `mc.cores = 8` multi-core ratio is in
+[paper.md](../paper/paper.md) §4.3 (≈ 33 × at the simulator headline cell).
 
 | Caller | Wall (s) | CPU (s) | Peak RSS (GB) | Threads peak | Engine notes |
 |---|---:|---:|---:|---:|---|
-| methylKit-tile (R 4.5.0, Windows) | 12,372 | 12,419 | **48.0** | 1 (Windows: mc.cores = no-op) | `calculateDiffMeth` on 15.6 M CpGs dominates |
-| epykit-tile (Python 3.13) | 675 | 993 | 12.6 | — | matches methylKit at DMC; ~3× faster overall |
-| epykit-chain_merge-100 | **~ 443** | **~ 260** | ~ 12.6 (est.) | — | DMC cached + DMR re-callable per dis.merge |
-| **DSS-from-scratch** (R 4.5.0, DSS 2.58.0) | **2,820** | **2,756** | **9.3** | 12 logical (effective 1) | DMLfit smoothing dominates (~ 34 min) |
+| methylKit-tile (R 4.5.0, `mc.cores = 1`) | 12,372 | 12,419 | **48.0** | 1 (explicit single-core) | `calculateDiffMeth` on 15.6 M CpGs dominates |
+| epykit-tile (Python 3.12) | 675 | 993 | 12.6 | — | full pipeline from raw BEDs; ~ 18× faster than methylKit at DMC |
+| epykit-chain_merge-100 | **~ 92** | **~ 262** | ~ 12.6 (est.) | — | cached-store DMC+DMR re-call (re-callable per dis.merge) |
+| **DSS-from-scratch** (R 4.5.0, DSS 2.58.0) | **2,368** | **2,454** | **14.3** | 13 (effective ~1) | DMLfit smoothing dominates (~ 34 min) |
 
-epykit chain_merge is ~ 6 × faster than DSS on the same input and uses
-about the same memory; the DSS smoothing step is single-threaded and
+A full epykit pipeline (epykit-tile) is ~ 3.5 × faster than
+DSS-from-scratch on the same input (675 s vs 2,368 s) and uses **less**
+peak memory (12.6 vs 14.3 GB); the cached-store chain_merge re-call
+(92 s) is faster still. The DSS smoothing step is single-threaded and
 the most expensive single operation in any of the four pipelines.
 Source: [F7 resource bars](../figures/study3_real_GSE263850/three_way/F7_resources.png) +
 [F7_resources_data.csv](../figures/study3_real_GSE263850/three_way/F7_resources_data.csv).

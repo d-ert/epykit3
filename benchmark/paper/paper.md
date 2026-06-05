@@ -51,7 +51,9 @@ abstract: |
 
   On Linux with methylKit running multi-threaded (`mc.cores = 8`), epykit
   is ≈ 33× faster than methylKit and ≈ 33× faster than DSS on per-CpG
-  testing; on Study 3 (22 M CpGs) end-to-end the gap is ≈ 28×. We
+  testing; on Study 3 (22 M CpGs), the full epykit DMR pipeline is
+  ≈ 18× faster than single-core methylKit and ≈ 3.5× faster than
+  DSS-from-scratch end-to-end (Table 5b). We
   separately characterise underdispersion of the Piao 2021 simulator
   (φ ≈ 0.4 vs ≈ 1.5–5 in real WGBS) in §4. All code, ground truth, and
   figures are provided; the resubmission-bundle benchmark artefacts are
@@ -794,27 +796,30 @@ places on the effect size. See
 ### 3.3.10 Performance (4-way)
 
 **Table 5b.** Pipeline cost on the GSE263850 6-sample 22 M-CpG input,
-**Windows host** (methylKit `mc.cores` no-op; methylKit forced
-single-threaded). See §4.3 for the Linux multi-core methylKit ratio,
-and §3.5 for the simulator Linux 33 × headline.
+**Linux host** (pivoine, 24 logical cores; methylKit `mc.cores = 1`
+explicit for a fair single-core comparison; DSS single-thread by
+construction). See §4.3 for the methylKit `mc.cores = 8` multi-core
+ratio and §3.5 for the simulator Linux 33 × headline.
 
 | Caller | Wall (s) | CPU (s) | Peak RSS (GB) | Notes |
 |---|---:|---:|---:|---|
-| methylKit-tile (Windows, `mc.cores = 1` forced) | 12,372 | 12,419 | **48.0** | dominated by `calculateDiffMeth` on 15.6 M CpGs |
-| epykit-tile | 675 | 993 | 12.6 | platform-agnostic |
-| **epykit-chain_merge (100)** | **~ 443** | **~ 260** | **~ 12.6** | DMC + DMR steps cached & re-callable across dis.merge |
-| **DSS-from-scratch** (DSS 2.58.0) | **2,820** | **2,756** | **9.3** | single-threaded by construction (verified in DSS 2.58.0); DMLfit smoothing dominates (~ 34 min) |
+| methylKit-tile (`mc.cores = 1`) | 12,372 | 12,419 | **48.0** | dominated by `calculateDiffMeth` on 15.6 M CpGs |
+| epykit-tile | 675 | 993 | 12.6 | full pipeline from raw BEDs |
+| **epykit-chain_merge (100)** | **~ 92** | **~ 262** | **~ 12.6** | cached-store DMC + DMR re-call (re-callable across dis.merge) |
+| **DSS-from-scratch** (DSS 2.58.0) | **2,368** | **2,454** | **14.3** | single-threaded by construction (verified in DSS 2.58.0); DMLfit smoothing dominates (~ 34 min) |
 
-epykit-chain_merge is ~6 × faster than DSS on the same input and uses
-about the same memory (12.6 vs 9.3 GB; chain_merge holds the per-CpG
-DMC store, DSS holds the BSseq matrix). The Windows 12 × speedup vs
-methylKit holds for both tile and chain_merge engines because the DMC
-step is shared. On Linux with `methylKit::calculateDiffMeth(mc.cores = 8)`
-(5.9 × scaling factor measured on the simulator), the comparable
-methylKit wall would be ≈ 2.1 kS, shrinking the ratio to ≈ 5 × at
-real-data scale (still favourable). The DSS comparison is unaffected
-by the platform switch (no multi-core path). Per-pipeline resource
-breakdown in
+A full epykit pipeline (epykit-tile, comparable scope) is ~ 3.5 × faster
+than DSS-from-scratch on the same input (675 s vs 2,368 s) and uses
+**less** peak memory (12.6 vs 14.3 GB; epykit holds the per-CpG DMC
+store, DSS holds the BSseq matrix plus the smoother's working set). The
+cached-store chain_merge re-call (92 s) is faster still because it reuses
+the already-computed DMC store. Against single-core methylKit, epykit is
+≈ 18 × faster on the full DMC pipeline (the DMC step is shared by tile and
+chain_merge). On Linux with `methylKit::calculateDiffMeth(mc.cores = 8)`
+(5.9 × scaling measured on the simulator), the comparable methylKit wall
+would be ≈ 2.1 kS, shrinking the ratio to ≈ 3 × at real-data scale (still
+favourable). The DSS comparison is unaffected by core count (no
+multi-core path). Per-pipeline resource breakdown in
 [F7 resources](../figures/study3_real_GSE263850/three_way/F7_resources.png).
 
 ### 3.3.11 Cross-study consistency
@@ -964,10 +969,12 @@ WGBS pipeline:
   713/713), and on effect size at Pearson r = 0.994 per-CpG.
 
 On Linux with methylKit multi-threaded (`mc.cores = 8`), epykit is
-≈ 33 × faster on per-CpG testing and ≈ 28 × faster on Study 3
-end-to-end; on Study 2 simulator cells the ratio is ≈ 33 ×. Earlier
-Windows-only numbers (12 × – 68 ×) reflected methylKit's `mc.cores`
-no-op on Windows (no `fork()`) and overstated the gap.
+≈ 33 × faster on per-CpG testing; on Study 3 the full epykit DMR
+pipeline is ≈ 18 × faster than single-core methylKit and ≈ 3.5 ×
+faster than DSS-from-scratch end-to-end (Table 5b); on Study 2
+simulator cells the ratio is ≈ 33 ×. Earlier Windows-only numbers
+(12 × – 68 ×) reflected methylKit's `mc.cores` no-op on Windows (no
+`fork()`) and overstated the gap.
 
 ## 4.2 The calibration–sensitivity trade-off
 
@@ -1107,10 +1114,12 @@ uniform (mean 0.506, fraction below 0.05 = 0.047, KS D = 0.051), so
 FDR control is valid at negligible power cost.
 
 On Linux with methylKit multi-threaded (`mc.cores = 8`), epykit is
-≈ 33 × faster than methylKit on per-CpG testing and ≈ 28 × faster
-than DSS on Study 3 end-to-end. DSS's `DMLfit.multiFactor` does not
-expose a multi-core option in the DSS version we used (2.58.0), so the
-DSS comparison is single-thread by construction, not by choice. Combined with the rest
+≈ 33 × faster than methylKit on per-CpG testing; on Study 3 the full
+epykit DMR pipeline is ≈ 18 × faster than single-core methylKit and
+≈ 3.5 × faster than DSS-from-scratch end-to-end (Table 5b). DSS's
+`DMLfit.multiFactor` does not expose a multi-core option in the DSS
+version we used (2.58.0), so the DSS comparison is single-thread by
+construction, not by choice. Combined with the rest
 of the epykit API (annotation, plotting, HTML reporting,
 AnnData / MuData interop), this brings the WGBS downstream pipeline
 into the same Python ecosystem as the rest of modern bioinformatics.

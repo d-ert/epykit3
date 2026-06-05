@@ -1,0 +1,15 @@
+intersection	count	criterion
+DSS+epykit+paper	1557	any_bp
+DSS+paper	406	any_bp
+epykit	214	any_bp
+DSS+epykit	173	any_bp
+DSS	131	any_bp
+paper	98	any_bp
+epykit+paper	8	any_bp
+DSS+paper	807	J0.5
+DSS+epykit+paper	759	J0.5
+epykit	513	J0.5
+DSS	202	J0.5
+paper	137	J0.5
+DSS+epykit	130	J0.5
+epykit+paper	39	J0.5

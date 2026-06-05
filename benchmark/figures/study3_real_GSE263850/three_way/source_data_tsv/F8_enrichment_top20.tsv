@@ -1,0 +1,301 @@
+caller	library	rank	term	p_value	p_adj	n_overlap	paper_term_match
+paper_Table5	Reactome_2022	1	Ligand-receptor Interactions R-HSA-5632681	0.002138658779930332	0.9999948763663931	3	
+paper_Table5	Reactome_2022	2	Collagen Chain Trimerization R-HSA-8948216	0.004234155354130675	0.9999948763663931	6	
+paper_Table5	Reactome_2022	3	GABA Receptor Activation R-HSA-977443	0.004561160826254483	0.9999948763663931	7	
+paper_Table5	Reactome_2022	4	Regulation Of Insulin Secretion R-HSA-422356	0.0056696583737593596	0.9999948763663931	8	
+paper_Table5	Reactome_2022	5	G-protein Activation R-HSA-202040	0.009273000494646097	0.9999948763663931	4	
+paper_Table5	Reactome_2022	6	Activated NTRK2 Signals Thru CDK5 R-HSA-9032845	0.011558842393856135	0.9999948763663931	2	
+paper_Table5	Reactome_2022	7	IRS Activation R-HSA-74713	0.011558842393856135	0.9999948763663931	2	
+paper_Table5	Reactome_2022	8	Opioid Signaling R-HSA-111885	0.012392353999823112	0.9999948763663931	8	
+paper_Table5	Reactome_2022	9	Binding And Uptake Of Ligands By Scavenger Receptors R-HSA-2173782	0.014088338234405941	0.9999948763663931	5	
+paper_Table5	Reactome_2022	10	Activation Of GABAB Receptors R-HSA-991365	0.01554097272619671	0.9999948763663931	5	
+paper_Table5	Reactome_2022	11	Activation Of G Protein Gated Potassium Channels R-HSA-1296041	0.018049941801606562	0.9999948763663931	4	g protein
+paper_Table5	Reactome_2022	12	Adherens Junctions Interactions R-HSA-418990	0.018049941801606562	0.9999948763663931	4	
+paper_Table5	Reactome_2022	13	Peptide Ligand-Binding Receptors R-HSA-375276	0.021892272448451603	0.9999948763663931	13	peptide ligand
+paper_Table5	Reactome_2022	14	Inactivation Of CDC42 And RAC1 R-HSA-428543	0.02316081835883735	0.9999948763663931	2	
+paper_Table5	Reactome_2022	15	Scavenging By Class A Receptors R-HSA-3000480	0.027743747845071626	0.9999948763663931	3	
+paper_Table5	Reactome_2022	16	Transmission Across Chemical Synapses R-HSA-112315	0.028424320297530177	0.9999948763663931	15	
+paper_Table5	Reactome_2022	17	Netrin-1 Signaling R-HSA-373752	0.02853752755176257	0.9999948763663931	5	
+paper_Table5	Reactome_2022	18	Role Of ABL In ROBO-SLIT Signaling R-HSA-428890	0.030168221839213794	0.9999948763663931	2	
+paper_Table5	Reactome_2022	19	Transport Of RCbl Within Body R-HSA-9758890	0.030168221839213794	0.9999948763663931	2	
+paper_Table5	Reactome_2022	20	Collagen Biosynthesis And Modifying Enzymes R-HSA-1650814	0.030467639455520015	0.9999948763663931	6	
+paper_Table5	KEGG_2021_Human	1	Morphine addiction	8.263704437168093e-05	0.017932238628654763	12	morphine addiction
+paper_Table5	KEGG_2021_Human	2	Protein digestion and absorption	0.010561337002518358	0.7415531933775051	9	
+paper_Table5	KEGG_2021_Human	3	GABAergic synapse	0.013209593427132058	0.7415531933775051	8	
+paper_Table5	KEGG_2021_Human	4	Hedgehog signaling pathway	0.013669183288064612	0.7415531933775051	6	
+paper_Table5	KEGG_2021_Human	5	Dopaminergic synapse	0.018507319039702562	0.8032176463230911	10	
+paper_Table5	KEGG_2021_Human	6	Retrograde endocannabinoid signaling	0.03694694815824428	0.9999102018800622	10	
+paper_Table5	KEGG_2021_Human	7	Cholinergic synapse	0.046490440823029285	0.9999102018800622	8	
+paper_Table5	KEGG_2021_Human	8	Vitamin digestion and absorption	0.05094202102597766	0.9999102018800622	3	
+paper_Table5	KEGG_2021_Human	9	Nicotine addiction	0.05141302015409156	0.9999102018800622	4	
+paper_Table5	KEGG_2021_Human	10	Axon guidance	0.05796989606713956	0.9999102018800622	11	
+paper_Table5	KEGG_2021_Human	11	Maturity onset diabetes of the young	0.06217425601412588	0.9999102018800622	3	
+paper_Table5	KEGG_2021_Human	12	Type II diabetes mellitus	0.07807615800374221	0.9999102018800622	4	
+paper_Table5	KEGG_2021_Human	13	Pentose phosphate pathway	0.08769796490126452	0.9999102018800622	3	
+paper_Table5	KEGG_2021_Human	14	Cocaine addiction	0.09354104423129625	0.9999102018800622	4	
+paper_Table5	KEGG_2021_Human	15	Neuroactive ligand-receptor interaction	0.15125126929151403	0.9999102018800622	16	neuroactive ligand
+paper_Table5	KEGG_2021_Human	16	Purine metabolism	0.17099027889198354	0.9999102018800622	7	
+paper_Table5	KEGG_2021_Human	17	Relaxin signaling pathway	0.17099027889198354	0.9999102018800622	7	
+paper_Table5	KEGG_2021_Human	18	Taste transduction	0.18669092976162957	0.9999102018800622	5	
+paper_Table5	KEGG_2021_Human	19	Caffeine metabolism	0.1937364286447065	0.9999102018800622	1	
+paper_Table5	KEGG_2021_Human	20	Mannose type O-glycan biosynthesis	0.19374629346863176	0.9999102018800622	2	
+paper_Table5	GO_Molecular_Function_2023	1	Sequence-Specific DNA Binding (GO:0043565)	0.005047001045702321	0.834578862028668	39	sequence-specific dna binding
+paper_Table5	GO_Molecular_Function_2023	2	GTPase Inhibitor Activity (GO:0005095)	0.007560939113446124	0.834578862028668	3	
+paper_Table5	GO_Molecular_Function_2023	3	G Protein-Coupled Opioid Receptor Activity (GO:0004985)	0.011558842393856135	0.834578862028668	2	g protein
+paper_Table5	GO_Molecular_Function_2023	4	alpha-N-acetylgalactosaminide Alpha-2,6-Sialyltransferase Activity (GO:0001665)	0.011558842393856135	0.834578862028668	2	
+paper_Table5	GO_Molecular_Function_2023	5	Malate Dehydrogenase Activity (GO:0016615)	0.011558842393856135	0.834578862028668	2	
+paper_Table5	GO_Molecular_Function_2023	6	3',5'-Cyclic-Nucleotide Phosphodiesterase Activity (GO:0004114)	0.017333533919361207	0.834578862028668	3	
+paper_Table5	GO_Molecular_Function_2023	7	3',5'-cyclic-GMP Phosphodiesterase Activity (GO:0047555)	0.02316081835883735	0.834578862028668	2	
+paper_Table5	GO_Molecular_Function_2023	8	Sodium Channel Inhibitor Activity (GO:0019871)	0.02316081835883735	0.834578862028668	2	
+paper_Table5	GO_Molecular_Function_2023	9	GABA-A Receptor Activity (GO:0004890)	0.023977008063215583	0.834578862028668	3	
+paper_Table5	GO_Molecular_Function_2023	10	Phosphatidylinositol Phospholipase C Activity (GO:0004435)	0.03180572734638127	0.834578862028668	3	
+paper_Table5	GO_Molecular_Function_2023	11	Sialyltransferase Activity (GO:0008373)	0.03180572734638127	0.834578862028668	3	
+paper_Table5	GO_Molecular_Function_2023	12	GABA Receptor Activity (GO:0016917)	0.03616046343814286	0.834578862028668	3	
+paper_Table5	GO_Molecular_Function_2023	13	Neuropeptide Receptor Activity (GO:0008188)	0.0369470181953746	0.834578862028668	4	
+paper_Table5	GO_Molecular_Function_2023	14	Benzodiazepine Receptor Activity (GO:0008503)	0.0378950769622329	0.834578862028668	2	
+paper_Table5	GO_Molecular_Function_2023	15	Mitogen-Activated Protein Kinase Kinase Kinase Binding (GO:0031435)	0.0378950769622329	0.834578862028668	2	
+paper_Table5	GO_Molecular_Function_2023	16	Calcium Ion Binding (GO:0005509)	0.038432723564240386	0.834578862028668	19	
+paper_Table5	GO_Molecular_Function_2023	17	Phospholipase C Activity (GO:0004629)	0.0457333874794926	0.834578862028668	3	
+paper_Table5	GO_Molecular_Function_2023	18	Extracellular Ligand-Gated Monoatomic Ion Channel Activity (GO:0005230)	0.04628210607197015	0.834578862028668	2	
+paper_Table5	GO_Molecular_Function_2023	19	Platelet-Derived Growth Factor Binding (GO:0048407)	0.04628210607197015	0.834578862028668	2	
+paper_Table5	GO_Molecular_Function_2023	20	Sequence-Specific Double-Stranded DNA Binding (GO:1990837)	0.04799247503233595	0.834578862028668	34	
+methylKit_tile	Reactome_2022	1	NR1H2 And NR1H3 Regulate Gene Expression To Control Bile Acid Homeostasis R-HSA-9623433	0.010078897479455562	0.9999954906318989	4	
+methylKit_tile	Reactome_2022	2	Defective B3GALTL Causes PpS R-HSA-5083635	0.012896086539509436	0.9999954906318989	9	
+methylKit_tile	Reactome_2022	3	O-glycosylation Of TSR Domain-Containing Proteins R-HSA-5173214	0.01535600588888084	0.9999954906318989	9	g protein
+methylKit_tile	Reactome_2022	4	GRB2 Events In ERBB2 Signaling R-HSA-1963640	0.015826603284738835	0.9999954906318989	5	
+methylKit_tile	Reactome_2022	5	RUNX1 Regulates Estrogen Receptor Mediated Transcription R-HSA-8931987	0.018372967501356707	0.9999954906318989	3	
+methylKit_tile	Reactome_2022	6	SHC1 Events In ERBB2 Signaling R-HSA-1250196	0.018463023920080143	0.9999954906318989	6	
+methylKit_tile	Reactome_2022	7	PI3K Events In ERBB2 Signaling R-HSA-1963642	0.02105959295633113	0.9999954906318989	5	
+methylKit_tile	Reactome_2022	8	RUNX3 Regulates CDKN1A Transcription R-HSA-8941855	0.029654835932984052	0.9999954906318989	3	
+methylKit_tile	Reactome_2022	9	ERBB2 Activates PTK6 Signaling R-HSA-8847993	0.04060043486646452	0.9999954906318989	4	
+methylKit_tile	Reactome_2022	10	SHC1 Events In ERBB4 Signaling R-HSA-1250347	0.04060043486646452	0.9999954906318989	4	
+methylKit_tile	Reactome_2022	11	FCGR3A-mediated IL10 Synthesis R-HSA-9664323	0.04181823692707662	0.9999954906318989	8	
+methylKit_tile	Reactome_2022	12	GABA Synthesis, Release, Reuptake And Degradation R-HSA-888590	0.04300327703846619	0.9999954906318989	5	
+methylKit_tile	Reactome_2022	13	EGFR Transactivation By Gastrin R-HSA-2179392	0.04378412989696503	0.9999954906318989	3	
+methylKit_tile	Reactome_2022	14	Signaling By BMP R-HSA-201451	0.05852327486383232	0.9999954906318989	6	
+methylKit_tile	Reactome_2022	15	Activation Of Ca-permeable Kainate Receptor R-HSA-451308	0.06063676864287562	0.9999954906318989	3	
+methylKit_tile	Reactome_2022	16	Signaling By ERBB2 TMD/JMD Mutants R-HSA-9665686	0.06316411727016122	0.9999954906318989	5	
+methylKit_tile	Reactome_2022	17	ERBB2 Regulates Cell Motility R-HSA-6785631	0.06546188823126733	0.9999954906318989	4	
+methylKit_tile	Reactome_2022	18	RUNX1 Interacts With Co-Factors Whose Precise Effect On RUNX1 Targets Is Not Known R-HSA-8939243	0.06979011601291607	0.9999954906318989	7	
+methylKit_tile	Reactome_2022	19	Ion Homeostasis R-HSA-5578775	0.07587702900300822	0.9999954906318989	9	
+methylKit_tile	Reactome_2022	20	Voltage Gated Potassium Channels R-HSA-1296072	0.07797284649153047	0.9999954906318989	8	
+methylKit_tile	KEGG_2021_Human	1	Gastric acid secretion	0.026661177602329344	0.9999940393086377	14	
+methylKit_tile	KEGG_2021_Human	2	Axon guidance	0.04348235361540367	0.9999940393086377	27	
+methylKit_tile	KEGG_2021_Human	3	Salivary secretion	0.06268071603222365	0.9999940393086377	15	
+methylKit_tile	KEGG_2021_Human	4	Morphine addiction	0.09580066882001993	0.9999940393086377	14	morphine addiction
+methylKit_tile	KEGG_2021_Human	5	Apelin signaling pathway	0.13126028732753278	0.9999940393086377	19	
+methylKit_tile	KEGG_2021_Human	6	Hippo signaling pathway	0.13677478029373627	0.9999940393086377	22	
+methylKit_tile	KEGG_2021_Human	7	Inflammatory bowel disease	0.1434425351768782	0.9999940393086377	10	
+methylKit_tile	KEGG_2021_Human	8	Cell adhesion molecules	0.14902110628869372	0.9999940393086377	20	
+methylKit_tile	KEGG_2021_Human	9	Vascular smooth muscle contraction	0.16268769817895373	0.9999940393086377	18	
+methylKit_tile	KEGG_2021_Human	10	cGMP-PKG signaling pathway	0.1629769747506773	0.9999940393086377	22	
+methylKit_tile	KEGG_2021_Human	11	Mucin type O-glycan biosynthesis	0.17394859667907683	0.9999940393086377	6	
+methylKit_tile	KEGG_2021_Human	12	Oxytocin signaling pathway	0.19368036958960788	0.9999940393086377	20	
+methylKit_tile	KEGG_2021_Human	13	Synaptic vesicle cycle	0.1968364380449429	0.9999940393086377	11	
+methylKit_tile	KEGG_2021_Human	14	Toxoplasmosis	0.20054554061295	0.9999940393086377	15	
+methylKit_tile	KEGG_2021_Human	15	Adherens junction	0.21262688880519098	0.9999940393086377	10	
+methylKit_tile	KEGG_2021_Human	16	Circadian entrainment	0.22103214181880831	0.9999940393086377	13	
+methylKit_tile	KEGG_2021_Human	17	Other types of O-glycan biosynthesis	0.22312131239629357	0.9999940393086377	7	
+methylKit_tile	KEGG_2021_Human	18	Parathyroid hormone synthesis, secretion and action	0.2259480124611232	0.9999940393086377	14	
+methylKit_tile	KEGG_2021_Human	19	Adrenergic signaling in cardiomyocytes	0.23306099331327318	0.9999940393086377	19	
+methylKit_tile	KEGG_2021_Human	20	Th17 cell differentiation	0.23655167133274224	0.9999940393086377	14	
+methylKit_tile	GO_Molecular_Function_2023	1	Intracellular Ligand-Gated Monoatomic Ion Channel Activity (GO:0005217)	0.005461894564543074	0.9999947436471125	5	
+methylKit_tile	GO_Molecular_Function_2023	2	alpha-N-acetylneuraminate Alpha-2,8-Sialyltransferase Activity (GO:0003828)	0.009965298161215623	0.9999947436471125	3	
+methylKit_tile	GO_Molecular_Function_2023	3	Amino Acid:Proton Symporter Activity (GO:0005280)	0.009965298161215623	0.9999947436471125	3	
+methylKit_tile	GO_Molecular_Function_2023	4	Melanocortin Receptor Activity (GO:0004977)	0.009965298161215623	0.9999947436471125	3	
+methylKit_tile	GO_Molecular_Function_2023	5	Glycine Transmembrane Transporter Activity (GO:0015187)	0.010078897479455562	0.9999947436471125	4	
+methylKit_tile	GO_Molecular_Function_2023	6	Interleukin-1 Receptor Binding (GO:0005149)	0.010078897479455562	0.9999947436471125	4	
+methylKit_tile	GO_Molecular_Function_2023	7	Transmembrane-Ephrin Receptor Activity (GO:0005005)	0.011537052220368833	0.9999947436471125	5	
+methylKit_tile	GO_Molecular_Function_2023	8	Ephrin Receptor Activity (GO:0005003)	0.015826603284738835	0.9999947436471125	5	
+methylKit_tile	GO_Molecular_Function_2023	9	Cell Adhesion Mediator Activity (GO:0098631)	0.02338339496308941	0.9999947436471125	7	
+methylKit_tile	GO_Molecular_Function_2023	10	Calcium-Release Channel Activity (GO:0015278)	0.027301617208597296	0.9999947436471125	5	
+methylKit_tile	GO_Molecular_Function_2023	11	Transmembrane Receptor Protein Tyrosine Kinase Activator Activity (GO:0030297)	0.030604044936646344	0.9999947436471125	4	
+methylKit_tile	GO_Molecular_Function_2023	12	Cell-Cell Adhesion Mediator Activity (GO:0098632)	0.033003080154999025	0.9999947436471125	9	
+methylKit_tile	GO_Molecular_Function_2023	13	Ligand-Gated Calcium Channel Activity (GO:0099604)	0.03460401095787082	0.9999947436471125	5	
+methylKit_tile	GO_Molecular_Function_2023	14	Chemorepellent Activity (GO:0045499)	0.03486651715179991	0.9999947436471125	6	
+methylKit_tile	GO_Molecular_Function_2023	15	3',5'-cyclic-AMP Phosphodiesterase Activity (GO:0004115)	0.04060043486646452	0.9999947436471125	4	
+methylKit_tile	GO_Molecular_Function_2023	16	R-SMAD Binding (GO:0070412)	0.04300327703846619	0.9999947436471125	5	
+methylKit_tile	GO_Molecular_Function_2023	17	Transaminase Activity (GO:0008483)	0.05222580229288252	0.9999947436471125	4	
+methylKit_tile	GO_Molecular_Function_2023	18	G Protein-Coupled Peptide Receptor Activity (GO:0008528)	0.05885947871443424	0.9999947436471125	13	g protein
+methylKit_tile	GO_Molecular_Function_2023	19	MAP Kinase Tyrosine Phosphatase Activity (GO:0033550)	0.06063676864287562	0.9999947436471125	3	
+methylKit_tile	GO_Molecular_Function_2023	20	MAP Kinase Tyrosine/Serine/Threonine Phosphatase Activity (GO:0017017)	0.06063676864287562	0.9999947436471125	3	
+ek_chain_merge_100	Reactome_2022	1	Ligand-receptor Interactions R-HSA-5632681	0.011728175796805282	0.9999954178078987	3	
+ek_chain_merge_100	Reactome_2022	2	GABA Receptor Activation R-HSA-977443	0.01276434033085697	0.9999954178078987	9	
+ek_chain_merge_100	Reactome_2022	3	G-protein Activation R-HSA-202040	0.01682468013110989	0.9999954178078987	5	
+ek_chain_merge_100	Reactome_2022	4	Activation Of G Protein Gated Potassium Channels R-HSA-1296041	0.03607509862087876	0.9999954178078987	5	g protein
+ek_chain_merge_100	Reactome_2022	5	Beta Oxidation Of hexanoyl-CoA To butanoyl-CoA R-HSA-77350	0.036471101073784845	0.9999954178078987	2	
+ek_chain_merge_100	Reactome_2022	6	Beta Oxidation Of lauroyl-CoA To decanoyl-CoA-CoA R-HSA-77310	0.036471101073784845	0.9999954178078987	2	
+ek_chain_merge_100	Reactome_2022	7	Beta Oxidation Of octanoyl-CoA To hexanoyl-CoA R-HSA-77348	0.036471101073784845	0.9999954178078987	2	
+ek_chain_merge_100	Reactome_2022	8	Defective F9 Activation R-HSA-9673221	0.036471101073784845	0.9999954178078987	2	
+ek_chain_merge_100	Reactome_2022	9	IRS Activation R-HSA-74713	0.036471101073784845	0.9999954178078987	2	
+ek_chain_merge_100	Reactome_2022	10	Synthesis Of PI R-HSA-1483226	0.036471101073784845	0.9999954178078987	2	
+ek_chain_merge_100	Reactome_2022	11	Transmission Across Chemical Synapses R-HSA-112315	0.04725713090650131	0.9999954178078987	23	
+ek_chain_merge_100	Reactome_2022	12	Acyl Chain Remodeling Of CL R-HSA-1482798	0.05239732815291656	0.9999954178078987	2	
+ek_chain_merge_100	Reactome_2022	13	Beta Oxidation Of decanoyl-CoA To octanoyl-CoA-CoA R-HSA-77346	0.05239732815291656	0.9999954178078987	2	
+ek_chain_merge_100	Reactome_2022	14	Synthesis Of Lipoxins (LX) R-HSA-2142700	0.05239732815291656	0.9999954178078987	2	
+ek_chain_merge_100	Reactome_2022	15	Mitochondrial Fatty Acid Beta-Oxidation Of Unsaturated Fatty Acids R-HSA-77288	0.05239732815291656	0.9999954178078987	2	
+ek_chain_merge_100	Reactome_2022	16	APC Truncation Mutants Have Impaired AXIN Binding R-HSA-5467337	0.05710415249225821	0.9999954178078987	3	
+ek_chain_merge_100	Reactome_2022	17	Synthesis Of IP2, IP, And Ins In Cytosol R-HSA-1855183	0.05710415249225821	0.9999954178078987	3	
+ek_chain_merge_100	Reactome_2022	18	CTNNB1 S33 Mutants Not Phosphorylated R-HSA-5358747	0.06806848847545555	0.9999954178078987	3	
+ek_chain_merge_100	Reactome_2022	19	Insulin-like Growth Factor-2 mRNA Binding Proteins (IGF2BPs/IMPs/VICKZs) Bind RNA R-HSA-428359	0.07027766202922593	0.9999954178078987	2	g protein
+ek_chain_merge_100	Reactome_2022	20	Inwardly Rectifying K+ Channels R-HSA-1296065	0.07205202222993733	0.9999954178078987	5	
+ek_chain_merge_100	KEGG_2021_Human	1	beta-Alanine metabolism	0.011091439974909996	0.9999953058449279	6	
+ek_chain_merge_100	KEGG_2021_Human	2	Morphine addiction	0.06809284737901815	0.9999953058449279	10	morphine addiction
+ek_chain_merge_100	KEGG_2021_Human	3	Alanine, aspartate and glutamate metabolism	0.08722163811613559	0.9999953058449279	5	
+ek_chain_merge_100	KEGG_2021_Human	4	Phenylalanine metabolism	0.09256112357769203	0.9999953058449279	3	
+ek_chain_merge_100	KEGG_2021_Human	5	Various types of N-glycan biosynthesis	0.1039158548255522	0.9999953058449279	5	
+ek_chain_merge_100	KEGG_2021_Human	6	ECM-receptor interaction	0.11353573019239105	0.9999953058449279	9	
+ek_chain_merge_100	KEGG_2021_Human	7	GABAergic synapse	0.11952197678254452	0.9999953058449279	9	
+ek_chain_merge_100	KEGG_2021_Human	8	Pentose phosphate pathway	0.12484162778458388	0.9999953058449279	4	
+ek_chain_merge_100	KEGG_2021_Human	9	Taurine and hypotaurine metabolism	0.15545682928277135	0.9999953058449279	2	
+ek_chain_merge_100	KEGG_2021_Human	10	Viral protein interaction with cytokine and cytokine receptor	0.19584547207127728	0.9999953058449279	9	
+ek_chain_merge_100	KEGG_2021_Human	11	Tyrosine metabolism	0.20020676747752253	0.9999953058449279	4	
+ek_chain_merge_100	KEGG_2021_Human	12	Arginine and proline metabolism	0.218879140169945	0.9999953058449279	5	
+ek_chain_merge_100	KEGG_2021_Human	13	N-Glycan biosynthesis	0.218879140169945	0.9999953058449279	5	
+ek_chain_merge_100	KEGG_2021_Human	14	Fatty acid elongation	0.25126674607965144	0.9999953058449279	3	
+ek_chain_merge_100	KEGG_2021_Human	15	Nicotine addiction	0.2563639456576168	0.9999953058449279	4	
+ek_chain_merge_100	KEGG_2021_Human	16	B cell receptor signaling pathway	0.26700054558191916	0.9999953058449279	7	
+ek_chain_merge_100	KEGG_2021_Human	17	Butanoate metabolism	0.269062445841762	0.9999953058449279	3	
+ek_chain_merge_100	KEGG_2021_Human	18	Mitophagy	0.27395359333487873	0.9999953058449279	6	
+ek_chain_merge_100	KEGG_2021_Human	19	Renin secretion	0.2852182122478562	0.9999953058449279	6	
+ek_chain_merge_100	KEGG_2021_Human	20	Hedgehog signaling pathway	0.29313469578897744	0.9999953058449279	5	
+ek_chain_merge_100	GO_Molecular_Function_2023	1	N,N-dimethylaniline Monooxygenase Activity (GO:0004499)	0.0024256438819354673	0.999995536439378	3	
+ek_chain_merge_100	GO_Molecular_Function_2023	2	Lipoprotein Lipase Activity (GO:0004465)	0.004618706357047963	0.999995536439378	3	
+ek_chain_merge_100	GO_Molecular_Function_2023	3	Oxidoreductase Activity, Acting On The CH-NH2 Group Of Donors, Oxygen As Acceptor (GO:0016641)	0.0076965579453926874	0.999995536439378	3	
+ek_chain_merge_100	GO_Molecular_Function_2023	4	Transaminase Activity (GO:0008483)	0.01022829234302586	0.999995536439378	4	
+ek_chain_merge_100	GO_Molecular_Function_2023	5	CCR Chemokine Receptor Binding (GO:0048020)	0.021514582599779366	0.999995536439378	7	
+ek_chain_merge_100	GO_Molecular_Function_2023	6	NAD Binding (GO:0051287)	0.023414279096738485	0.999995536439378	5	
+ek_chain_merge_100	GO_Molecular_Function_2023	7	GABA-A Receptor Activity (GO:0004890)	0.025461764417275757	0.999995536439378	4	
+ek_chain_merge_100	GO_Molecular_Function_2023	8	Chemokine Activity (GO:0008009)	0.026902497972498145	0.999995536439378	7	
+ek_chain_merge_100	GO_Molecular_Function_2023	9	Metalloendopeptidase Activity (GO:0004222)	0.029174054216777247	0.999995536439378	12	
+ek_chain_merge_100	GO_Molecular_Function_2023	10	enoyl-CoA Hydratase Activity (GO:0004300)	0.029883524196614327	0.999995536439378	3	
+ek_chain_merge_100	GO_Molecular_Function_2023	11	Mechanosensitive Monoatomic Ion Channel Activity (GO:0008381)	0.029883524196614327	0.999995536439378	3	
+ek_chain_merge_100	GO_Molecular_Function_2023	12	Phospholipid Scramblase Activity (GO:0017128)	0.029883524196614327	0.999995536439378	3	
+ek_chain_merge_100	GO_Molecular_Function_2023	13	3-hydroxyacyl-CoA Dehydrogenase Activity (GO:0003857)	0.036471101073784845	0.999995536439378	2	
+ek_chain_merge_100	GO_Molecular_Function_2023	14	Malate Dehydrogenase Activity (GO:0016615)	0.036471101073784845	0.999995536439378	2	
+ek_chain_merge_100	GO_Molecular_Function_2023	15	Protein Phosphatase 2B Binding (GO:0030346)	0.036471101073784845	0.999995536439378	2	
+ek_chain_merge_100	GO_Molecular_Function_2023	16	Chemokine Receptor Binding (GO:0042379)	0.040274545278179884	0.999995536439378	7	
+ek_chain_merge_100	GO_Molecular_Function_2023	17	Triglyceride Lipase Activity (GO:0004806)	0.042752542528046965	0.999995536439378	4	
+ek_chain_merge_100	GO_Molecular_Function_2023	18	GABA Receptor Activity (GO:0016917)	0.042752542528046965	0.999995536439378	4	
+ek_chain_merge_100	GO_Molecular_Function_2023	19	Inhibitory Extracellular Ligand-Gated Monoatomic Ion Channel Activity (GO:0005237)	0.04705931519253772	0.999995536439378	3	
+ek_chain_merge_100	GO_Molecular_Function_2023	20	acetyl-CoA C-acyltransferase Activity (GO:0003988)	0.05239732815291656	0.999995536439378	2	
+ek_chain_merge_250	Reactome_2022	1	GABA Receptor Activation R-HSA-977443	0.002717669080523145	0.9999942489390535	12	
+ek_chain_merge_250	Reactome_2022	2	G-protein Activation R-HSA-202040	0.011349582412736474	0.9999942489390535	6	
+ek_chain_merge_250	Reactome_2022	3	Ligand-receptor Interactions R-HSA-5632681	0.022703571502308985	0.9999942489390535	3	
+ek_chain_merge_250	Reactome_2022	4	Activation Of G Protein Gated Potassium Channels R-HSA-1296041	0.028198312159033668	0.9999942489390535	6	g protein
+ek_chain_merge_250	Reactome_2022	5	ADP Signaling Thru P2Y Purinoceptor 12 R-HSA-392170	0.030244160433475085	0.9999942489390535	5	
+ek_chain_merge_250	Reactome_2022	6	GP1b-IX-V Activation Signaling R-HSA-430116	0.03200488988311105	0.9999942489390535	3	
+ek_chain_merge_250	Reactome_2022	7	Signal Attenuation R-HSA-74749	0.042981472847694394	0.9999942489390535	3	
+ek_chain_merge_250	Reactome_2022	8	Transmission Across Chemical Synapses R-HSA-112315	0.04977448242711373	0.9999942489390535	28	
+ek_chain_merge_250	Reactome_2022	9	Activation Of GABAB Receptors R-HSA-991365	0.053541523238345594	0.9999942489390535	7	
+ek_chain_merge_250	Reactome_2022	10	G Alpha (12/13) Signaling Events R-HSA-416482	0.05379213325629688	0.9999942489390535	11	
+ek_chain_merge_250	Reactome_2022	11	G Beta:Gamma Signaling Thru BTK R-HSA-8964315	0.05500758508233598	0.9999942489390535	4	
+ek_chain_merge_250	Reactome_2022	12	Acetylcholine Inhibits Contraction Of Outer Hair Cells R-HSA-9667769	0.05717190657421772	0.9999942489390535	2	
+ek_chain_merge_250	Reactome_2022	13	Beta Oxidation Of hexanoyl-CoA To butanoyl-CoA R-HSA-77350	0.05717190657421772	0.9999942489390535	2	
+ek_chain_merge_250	Reactome_2022	14	Beta Oxidation Of lauroyl-CoA To decanoyl-CoA-CoA R-HSA-77310	0.05717190657421772	0.9999942489390535	2	
+ek_chain_merge_250	Reactome_2022	15	Beta Oxidation Of octanoyl-CoA To hexanoyl-CoA R-HSA-77348	0.05717190657421772	0.9999942489390535	2	
+ek_chain_merge_250	Reactome_2022	16	Defective F9 Activation R-HSA-9673221	0.05717190657421772	0.9999942489390535	2	
+ek_chain_merge_250	Reactome_2022	17	IRS Activation R-HSA-74713	0.05717190657421772	0.9999942489390535	2	
+ek_chain_merge_250	Reactome_2022	18	MET Interacts With TNS Proteins R-HSA-8875513	0.05717190657421772	0.9999942489390535	2	
+ek_chain_merge_250	Reactome_2022	19	Synthesis Of PI R-HSA-1483226	0.05717190657421772	0.9999942489390535	2	
+ek_chain_merge_250	Reactome_2022	20	Inwardly Rectifying K+ Channels R-HSA-1296065	0.06356330953458679	0.9999942489390535	6	
+ek_chain_merge_250	KEGG_2021_Human	1	Morphine addiction	0.016366774259886984	0.9999937047180504	14	morphine addiction
+ek_chain_merge_250	KEGG_2021_Human	2	beta-Alanine metabolism	0.03287354371679561	0.9999937047180504	6	
+ek_chain_merge_250	KEGG_2021_Human	3	Toll-like receptor signaling pathway	0.04554474671349851	0.9999937047180504	14	
+ek_chain_merge_250	KEGG_2021_Human	4	GABAergic synapse	0.06035606394246752	0.9999937047180504	12	
+ek_chain_merge_250	KEGG_2021_Human	5	Alanine, aspartate and glutamate metabolism	0.0793569687411701	0.9999937047180504	6	
+ek_chain_merge_250	KEGG_2021_Human	6	Pentose phosphate pathway	0.09558221084429788	0.9999937047180504	5	
+ek_chain_merge_250	KEGG_2021_Human	7	ECM-receptor interaction	0.10645413468823266	0.9999937047180504	11	
+ek_chain_merge_250	KEGG_2021_Human	8	Renin secretion	0.1114886278168111	0.9999937047180504	9	
+ek_chain_merge_250	KEGG_2021_Human	9	Viral protein interaction with cytokine and cytokine receptor	0.11888754327330016	0.9999937047180504	12	
+ek_chain_merge_250	KEGG_2021_Human	10	Phenylalanine metabolism	0.15943811192230845	0.9999937047180504	3	
+ek_chain_merge_250	KEGG_2021_Human	11	Chemokine signaling pathway	0.1630595668268506	0.9999937047180504	20	
+ek_chain_merge_250	KEGG_2021_Human	12	Butanoate metabolism	0.1947811713483764	0.9999937047180504	4	
+ek_chain_merge_250	KEGG_2021_Human	13	Various types of N-glycan biosynthesis	0.21429190818566551	0.9999937047180504	5	
+ek_chain_merge_250	KEGG_2021_Human	14	B cell receptor signaling pathway	0.22041401390643914	0.9999937047180504	9	
+ek_chain_merge_250	KEGG_2021_Human	15	Taurine and hypotaurine metabolism	0.22745777031470515	0.9999937047180504	2	
+ek_chain_merge_250	KEGG_2021_Human	16	Nicotine addiction	0.22965196134593027	0.9999937047180504	5	
+ek_chain_merge_250	KEGG_2021_Human	17	Non-homologous end-joining	0.29059868630734714	0.9999937047180504	2	
+ek_chain_merge_250	KEGG_2021_Human	18	Retrograde endocannabinoid signaling	0.33252853112234604	0.9999937047180504	14	
+ek_chain_merge_250	KEGG_2021_Human	19	Mucin type O-glycan biosynthesis	0.34348219044750705	0.9999937047180504	4	
+ek_chain_merge_250	KEGG_2021_Human	20	Tyrosine metabolism	0.34348219044750705	0.9999937047180504	4	
+ek_chain_merge_250	GO_Molecular_Function_2023	1	Chemokine Activity (GO:0008009)	0.003618203425895681	0.9999955662110636	10	
+ek_chain_merge_250	GO_Molecular_Function_2023	2	N,N-dimethylaniline Monooxygenase Activity (GO:0004499)	0.004893146584241365	0.9999955662110636	3	
+ek_chain_merge_250	GO_Molecular_Function_2023	3	Chemokine Receptor Binding (GO:0042379)	0.00675730387936274	0.9999955662110636	10	
+ek_chain_merge_250	GO_Molecular_Function_2023	4	Lipoprotein Lipase Activity (GO:0004465)	0.009188900990397167	0.9999955662110636	3	
+ek_chain_merge_250	GO_Molecular_Function_2023	5	GABA-A Receptor Activity (GO:0004890)	0.012935991740525102	0.9999955662110636	5	
+ek_chain_merge_250	GO_Molecular_Function_2023	6	3',5'-cyclic-GMP Phosphodiesterase Activity (GO:0047555)	0.015103362295575552	0.9999955662110636	3	
+ek_chain_merge_250	GO_Molecular_Function_2023	7	Oxidoreductase Activity, Acting On The CH-NH2 Group Of Donors, Oxygen As Acceptor (GO:0016641)	0.015103362295575552	0.9999955662110636	3	
+ek_chain_merge_250	GO_Molecular_Function_2023	8	Transaminase Activity (GO:0008483)	0.02337347032056377	0.9999955662110636	4	
+ek_chain_merge_250	GO_Molecular_Function_2023	9	GABA Receptor Activity (GO:0016917)	0.025017641960494445	0.9999955662110636	5	
+ek_chain_merge_250	GO_Molecular_Function_2023	10	3',5'-Cyclic-Nucleotide Phosphodiesterase Activity (GO:0004114)	0.03727011462471222	0.9999955662110636	4	
+ek_chain_merge_250	GO_Molecular_Function_2023	11	CXCR Chemokine Receptor Binding (GO:0045236)	0.03727011462471222	0.9999955662110636	4	
+ek_chain_merge_250	GO_Molecular_Function_2023	12	UDP-galactose:beta-N-acetylglucosamine Beta-1,3-Galactosyltransferase Activity (GO:0008499)	0.05557517299638319	0.9999955662110636	3	
+ek_chain_merge_250	GO_Molecular_Function_2023	13	enoyl-CoA Hydratase Activity (GO:0004300)	0.05557517299638319	0.9999955662110636	3	
+ek_chain_merge_250	GO_Molecular_Function_2023	14	Mechanosensitive Monoatomic Ion Channel Activity (GO:0008381)	0.05557517299638319	0.9999955662110636	3	
+ek_chain_merge_250	GO_Molecular_Function_2023	15	Monoamine Transmembrane Transporter Activity (GO:0008504)	0.05557517299638319	0.9999955662110636	3	
+ek_chain_merge_250	GO_Molecular_Function_2023	16	Phospholipid Scramblase Activity (GO:0017128)	0.05557517299638319	0.9999955662110636	3	
+ek_chain_merge_250	GO_Molecular_Function_2023	17	3-hydroxyacyl-CoA Dehydrogenase Activity (GO:0003857)	0.05717190657421772	0.9999955662110636	2	
+ek_chain_merge_250	GO_Molecular_Function_2023	18	alpha-N-acetylgalactosaminide Alpha-2,6-Sialyltransferase Activity (GO:0001665)	0.05717190657421772	0.9999955662110636	2	
+ek_chain_merge_250	GO_Molecular_Function_2023	19	Malate Dehydrogenase Activity (GO:0016615)	0.05717190657421772	0.9999955662110636	2	
+ek_chain_merge_250	GO_Molecular_Function_2023	20	Protein Phosphatase 2B Binding (GO:0030346)	0.05717190657421772	0.9999955662110636	2	
+DSS_from_scratch	Reactome_2022	1	Scavenging By Class A Receptors R-HSA-3000480	0.010289851700168471	0.9999949514300523	5	
+DSS_from_scratch	Reactome_2022	2	Insulin-like Growth Factor-2 mRNA Binding Proteins (IGF2BPs/IMPs/VICKZs) Bind RNA R-HSA-428359	0.011013394133616485	0.9999949514300523	3	g protein
+DSS_from_scratch	Reactome_2022	3	Ligand-receptor Interactions R-HSA-5632681	0.016669018311681542	0.9999949514300523	3	
+DSS_from_scratch	Reactome_2022	4	GABA Receptor Activation R-HSA-977443	0.02713852549120768	0.9999949514300523	9	
+DSS_from_scratch	Reactome_2022	5	G-protein Activation R-HSA-202040	0.027754250237411574	0.9999949514300523	5	
+DSS_from_scratch	Reactome_2022	6	Acetylcholine Inhibits Contraction Of Outer Hair Cells R-HSA-9667769	0.046314262150848336	0.9999949514300523	2	
+DSS_from_scratch	Reactome_2022	7	Beta Oxidation Of hexanoyl-CoA To butanoyl-CoA R-HSA-77350	0.046314262150848336	0.9999949514300523	2	
+DSS_from_scratch	Reactome_2022	8	Beta Oxidation Of lauroyl-CoA To decanoyl-CoA-CoA R-HSA-77310	0.046314262150848336	0.9999949514300523	2	
+DSS_from_scratch	Reactome_2022	9	Beta Oxidation Of octanoyl-CoA To hexanoyl-CoA R-HSA-77348	0.046314262150848336	0.9999949514300523	2	
+DSS_from_scratch	Reactome_2022	10	Defective F9 Activation R-HSA-9673221	0.046314262150848336	0.9999949514300523	2	
+DSS_from_scratch	Reactome_2022	11	IRS Activation R-HSA-74713	0.046314262150848336	0.9999949514300523	2	
+DSS_from_scratch	Reactome_2022	12	Activation Of G Protein Gated Potassium Channels R-HSA-1296041	0.05743134973964004	0.9999949514300523	5	g protein
+DSS_from_scratch	Reactome_2022	13	G Alpha (12/13) Signaling Events R-HSA-416482	0.05836377049226767	0.9999949514300523	10	
+DSS_from_scratch	Reactome_2022	14	Nitric Oxide Stimulates Guanylate Cyclase R-HSA-392154	0.06334415986804647	0.9999949514300523	4	
+DSS_from_scratch	Reactome_2022	15	Acyl Chain Remodeling Of CL R-HSA-1482798	0.0661441822486494	0.9999949514300523	2	
+DSS_from_scratch	Reactome_2022	16	Beta Oxidation Of decanoyl-CoA To octanoyl-CoA-CoA R-HSA-77346	0.0661441822486494	0.9999949514300523	2	
+DSS_from_scratch	Reactome_2022	17	Mitochondrial Fatty Acid Beta-Oxidation Of Unsaturated Fatty Acids R-HSA-77288	0.0661441822486494	0.9999949514300523	2	
+DSS_from_scratch	Reactome_2022	18	Binding And Uptake Of Ligands By Scavenger Receptors R-HSA-2173782	0.07670491492752092	0.9999949514300523	6	
+DSS_from_scratch	Reactome_2022	19	Pentose Phosphate Pathway R-HSA-71336	0.07802066755023493	0.9999949514300523	3	
+DSS_from_scratch	Reactome_2022	20	Post-transcriptional Silencing By Small RNAs R-HSA-426496	0.08819652350521871	0.9999949514300523	2	
+DSS_from_scratch	KEGG_2021_Human	1	beta-Alanine metabolism	0.06493077507128775	0.9999950215298073	5	
+DSS_from_scratch	KEGG_2021_Human	2	Nicotine addiction	0.16671248164508937	0.9999950215298073	5	
+DSS_from_scratch	KEGG_2021_Human	3	Pentose phosphate pathway	0.1743999192230554	0.9999950215298073	4	
+DSS_from_scratch	KEGG_2021_Human	4	ECM-receptor interaction	0.19557527351321385	0.9999950215298073	9	
+DSS_from_scratch	KEGG_2021_Human	5	GABAergic synapse	0.20449269880369944	0.9999950215298073	9	
+DSS_from_scratch	KEGG_2021_Human	6	Morphine addiction	0.22281013087675133	0.9999950215298073	9	morphine addiction
+DSS_from_scratch	KEGG_2021_Human	7	Toll-like receptor signaling pathway	0.23172893097408817	0.9999950215298073	10	
+DSS_from_scratch	KEGG_2021_Human	8	Renin-angiotensin system	0.23594935973734088	0.9999950215298073	3	
+DSS_from_scratch	KEGG_2021_Human	9	Type II diabetes mellitus	0.24626667208786585	0.9999950215298073	5	
+DSS_from_scratch	KEGG_2021_Human	10	Valine, leucine and isoleucine degradation	0.27473142356966623	0.9999950215298073	5	
+DSS_from_scratch	KEGG_2021_Human	11	Ether lipid metabolism	0.2892124147864458	0.9999950215298073	5	
+DSS_from_scratch	KEGG_2021_Human	12	Retrograde endocannabinoid signaling	0.2902845000828	0.9999950215298073	13	
+DSS_from_scratch	KEGG_2021_Human	13	Cholesterol metabolism	0.303825119988088	0.9999950215298073	5	
+DSS_from_scratch	KEGG_2021_Human	14	Viral protein interaction with cytokine and cytokine receptor	0.3116821739257163	0.9999950215298073	9	
+DSS_from_scratch	KEGG_2021_Human	15	Lysine degradation	0.315113317414872	0.9999950215298073	6	
+DSS_from_scratch	KEGG_2021_Human	16	Fatty acid elongation	0.31767597370825273	0.9999950215298073	3	
+DSS_from_scratch	KEGG_2021_Human	17	Various types of N-glycan biosynthesis	0.32021153068317576	0.9999950215298073	4	
+DSS_from_scratch	KEGG_2021_Human	18	Butanoate metabolism	0.3383150484576592	0.9999950215298073	3	
+DSS_from_scratch	KEGG_2021_Human	19	Phenylalanine metabolism	0.35758875026506326	0.9999950215298073	2	
+DSS_from_scratch	KEGG_2021_Human	20	Phosphonate and phosphinate metabolism	0.36690490237712997	0.9999950215298073	1	
+DSS_from_scratch	GO_Molecular_Function_2023	1	Sulfur Amino Acid Transmembrane Transporter Activity (GO:0000099)	0.003518961072074808	0.8355717539704	3	
+DSS_from_scratch	GO_Molecular_Function_2023	2	N,N-dimethylaniline Monooxygenase Activity (GO:0004499)	0.003518961072074808	0.8355717539704	3	
+DSS_from_scratch	GO_Molecular_Function_2023	3	Platelet-Derived Growth Factor Binding (GO:0048407)	0.004227175821098145	0.8355717539704	4	
+DSS_from_scratch	GO_Molecular_Function_2023	4	Lipoprotein Lipase Activity (GO:0004465)	0.006654484351609861	0.9865273051261618	3	
+DSS_from_scratch	GO_Molecular_Function_2023	5	Oxidoreductase Activity, Acting On The CH-NH2 Group Of Donors, Oxygen As Acceptor (GO:0016641)	0.011013394133616485	0.9999954458216508	3	
+DSS_from_scratch	GO_Molecular_Function_2023	6	CCR Chemokine Receptor Binding (GO:0048020)	0.013593436634240143	0.9999954458216508	8	
+DSS_from_scratch	GO_Molecular_Function_2023	7	Phosphatidylinositol-3,5-Bisphosphate Binding (GO:0080025)	0.027754250237411574	0.9999954458216508	5	
+DSS_from_scratch	GO_Molecular_Function_2023	8	NAD Binding (GO:0051287)	0.038074557050299385	0.9999954458216508	5	
+DSS_from_scratch	GO_Molecular_Function_2023	9	GABA-A Receptor Activity (GO:0004890)	0.03850815914698439	0.9999954458216508	4	
+DSS_from_scratch	GO_Molecular_Function_2023	10	enoyl-CoA Hydratase Activity (GO:0004300)	0.04163188308043627	0.9999954458216508	3	
+DSS_from_scratch	GO_Molecular_Function_2023	11	Mechanosensitive Monoatomic Ion Channel Activity (GO:0008381)	0.04163188308043627	0.9999954458216508	3	
+DSS_from_scratch	GO_Molecular_Function_2023	12	Monoamine Transmembrane Transporter Activity (GO:0008504)	0.04163188308043627	0.9999954458216508	3	
+DSS_from_scratch	GO_Molecular_Function_2023	13	Phospholipid Scramblase Activity (GO:0017128)	0.04163188308043627	0.9999954458216508	3	
+DSS_from_scratch	GO_Molecular_Function_2023	14	3-hydroxyacyl-CoA Dehydrogenase Activity (GO:0003857)	0.046314262150848336	0.9999954458216508	2	
+DSS_from_scratch	GO_Molecular_Function_2023	15	Acetylcholine Receptor Inhibitor Activity (GO:0030550)	0.046314262150848336	0.9999954458216508	2	
+DSS_from_scratch	GO_Molecular_Function_2023	16	alpha-N-acetylgalactosaminide Alpha-2,6-Sialyltransferase Activity (GO:0001665)	0.046314262150848336	0.9999954458216508	2	
+DSS_from_scratch	GO_Molecular_Function_2023	17	Malate Dehydrogenase Activity (GO:0016615)	0.046314262150848336	0.9999954458216508	2	
+DSS_from_scratch	GO_Molecular_Function_2023	18	Chemokine Activity (GO:0008009)	0.04884892007516694	0.9999954458216508	7	
+DSS_from_scratch	GO_Molecular_Function_2023	19	Triglyceride Lipase Activity (GO:0004806)	0.06334415986804647	0.9999954458216508	4	
+DSS_from_scratch	GO_Molecular_Function_2023	20	GABA Receptor Activity (GO:0016917)	0.06334415986804647	0.9999954458216508	4	

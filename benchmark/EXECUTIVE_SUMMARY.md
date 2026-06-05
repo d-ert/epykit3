@@ -38,7 +38,7 @@ side-by-side, and (iii) whether it behaves correctly on real biological data.
 | Why does epykit call fewer significant DMCs on real data (30K vs methylKit's 52K)? | Different operating points on the precision/recall curve, not different biology. epykit's default is more conservative; the opt-in `lr+` recipe recovers 93 % of methylKit's calls. |
 | What about the named genes from the source paper's Fig 3B? | epykit-chain_merge-100 hits 12 / 20 of paper's labeled hyper+hypo genes at any-bp overlap (NR2E1, OTX1, IRX2, ENPP2, GREB1L, CCDC177, GNG11, EBF1 + 4 hypo); chain_merge-250 hits 14 / 20. DSS-from-scratch hits 18 / 20. methylKit-tile hits 2 / 20. |
 | Speed (Linux, methylKit `mc.cores = 8`)? | **≈ 33 × faster on per-CpG testing vs methylKit, ≈ 33 × faster than DSS** at the simulator headline cell; **≈ 28 × end-to-end** on the Study 3 22 M-CpG real-data input. DSS's `DMLfit.multiFactor` is single-thread by construction (no multi-core path in DSS 2.58.0). Earlier Windows-only numbers (12 × – 68 ×) reflected methylKit's `mc.cores` no-op on Windows and overstated the gap. |
-| Memory? | **1.18× less peak RAM on simulated data, 3.83× less than methylKit on real data** (12.6 GB vs 48.0 GB on the 15.6 M-CpG genome). DSS uses 9.3 GB on the same input. |
+| Memory? | **1.18× less peak RAM on simulated data, 3.83× less than methylKit on real data** (12.6 GB vs 48.0 GB on the 15.6 M-CpG genome). On Linux, DSS-from-scratch peaks at 14.3 GB on the same input — epykit uses ~1.13× less than DSS too. |
 
 ---
 
@@ -48,7 +48,7 @@ side-by-side, and (iii) whether it behaves correctly on real biological data.
 |---|---|---|---|---|
 | **1. Simulated, panel** | 8 baseline tools | (timings transcribed, not re-run) | n/a (not re-run) | TPR ≥ best baseline across grid; FPR 100×–600× lower at 5× |
 | **2. Simulated, head-to-head** | methylKit (local) | **≈ 33× per-CpG `diffmeth` on Linux** (`mc.cores = 8`); 43× Windows no-op total grid | 1.18× less | Identical to 3 decimal places at n ≥ 4; 2× recall at n = 2 |
-| **3. Real GSE263850** | methylKit + DSS (paper, local) | **≈ 28× end-to-end on Linux**; 12× wall on Windows; **6× vs DSS** (DSS is single-thread, platform-agnostic) | **3.83× less than mk; 1.3× more than DSS** | per-CpG r = 0.994 with methylKit; **63.8 % (paper-faithful) / 77.3 % (morphology-matched) DSS-DMR any-bp recall** with chain_merge (vs ≈ 9 % for methylKit-tile, 87.5 % for DSS-from-scratch vs paper-813); **100 % direction agreement on every matched DMR across every engine** |
+| **3. Real GSE263850** | methylKit + DSS (local, Linux pivoine) | **≈ 18× vs single-core methylKit** (full DMC pipeline); **~ 3.5× vs DSS** full-pipeline (675 s vs 2,368 s); cached chain_merge re-call 92 s | **3.83× less than mk; ~1.13× less than DSS** (12.6 vs 48.0 / 14.3 GB) | per-CpG r = 0.994 with methylKit; **63.8 % (paper-faithful) / 77.3 % (morphology-matched) DSS-DMR any-bp recall** with chain_merge (vs ≈ 9 % for methylKit-tile, 87.5 % for DSS-from-scratch vs paper-813); **100 % direction agreement on every matched DMR across every engine** |
 
 ---
 

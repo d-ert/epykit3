@@ -1,17 +1,18 @@
-"""F7 — Resource comparison across DMR callers on GSE263850.
+"""F7 — Resource comparison across DMR callers on GSE263850 (Linux host).
 
 Bars for wall time, total CPU time, peak RSS. Four callers:
   methylKit-tile, epykit-tile, epykit-chain_merge, DSS-from-scratch.
 
-This figure reproduces paper Table 5b, which is the **Windows-host**
-comparison (the only platform on which all four callers were profiled:
-methylKit's `mc.cores` is a no-op on Windows, so it ran single-threaded).
-methylKit-tile and epykit-tile come from the Windows step_benchmarks.csv
-files; epykit-chain_merge and DSS-from-scratch use the Windows-run
-values that Table 5b reports. (The committed Linux-rerun
-`dss/resources.json` is a *separate* platform — host pivoine — and is
-NOT what Table 5b describes; see paper §4.3 for the Windows-vs-Linux
-timing split.)
+All numbers are the Linux host (pivoine, 24 logical cores) measurements
+that match paper Table 5b:
+  - methylKit-tile and epykit-tile come from their step_benchmarks.csv
+    files (psutil + /proc VmHWM, so Linux); methylKit ran single-threaded
+    (mc.cores = 1, explicit on Linux for a fair single-core comparison).
+  - epykit-chain_merge is the cached-store DMC+DMR re-call (run_log on
+    pivoine; RSS shares epykit-tile's backing store).
+  - DSS-from-scratch is the committed Linux rerun: dss/resources.json
+    (peak RSS 14.3 GB) + step_timings_resume.tsv (resume wall/cpu) plus
+    the ~2,044 s initial DMLfit+DMLtest (dss/summary.md).
 """
 
 from __future__ import annotations
@@ -33,16 +34,17 @@ MK_BENCH  = Path(r"D:/Coding/Projeler/methyl_lib/methylkıt_realResults/"
 EK_BENCH  = Path(r"D:/Coding/Projeler/methyl_lib/benchmarkin_merges/"
                  r"epykit_vs_methylkit(GSE263850)/"
                  r"epykit_results/benchmark/step_benchmarks.csv")
+DSS_JSON  = DATA_DIR / "dss" / "resources.json"
+DSS_STEPS = DATA_DIR / "dss" / "step_timings_resume.tsv"
 
-# Windows-host values reported in paper Table 5b for the two callers
-# without a committed Windows resources file (the committed DSS
-# resources.json is the Linux-pivoine rerun, a different platform).
-# Keeping these fixed makes the figure reproduce Table 5b exactly.
-DSS_WALL_S_WIN = 2820.0
-DSS_CPU_S_WIN  = 2756.0
-DSS_RSS_MB_WIN = 9.3 * 1024            # 9.3 GB peak (Windows run)
-CM_WALL_S_WIN  = 443.0                 # chain_merge wall, Table 5b
-CM_CPU_S_WIN   = 261.9                 # chain_merge CPU, Table 5b
+# Linux-rerun chain_merge (host pivoine): cached-store DMC+DMR re-call.
+# Wall from run_log brackets (~92 s); DMC 72.5 s per dss summary. RSS not
+# psutil-profiled — shares epykit-tile's backing store, used as estimate.
+CM_WALL_S_LINUX = 92.0
+CM_CPU_S_LINUX  = 261.9
+# Initial DSS DMLfit+DMLtest wall on pivoine (dss/summary.md); single-
+# threaded, so CPU ~= wall for this leg.
+DSS_INITIAL_WALL_S = 2044.0
 
 
 def main() -> None:
@@ -50,8 +52,17 @@ def main() -> None:
 
     mk = pd.read_csv(MK_BENCH)
     ek = pd.read_csv(EK_BENCH)
+    dss = json.loads(DSS_JSON.read_text(encoding="utf-8"))
+    dss_steps = pd.read_csv(DSS_STEPS, sep="\t")
 
-    # ---- per-caller summary (Windows host, matching Table 5b) ----------
+    # DSS Linux total = initial DMLfit/DMLtest + the resume steps.
+    dss_resume_wall = float(dss_steps["wall_seconds"].sum())
+    dss_resume_cpu  = float(dss_steps["total_cpu_seconds"].sum())
+    dss_wall = DSS_INITIAL_WALL_S + dss_resume_wall
+    dss_cpu  = DSS_INITIAL_WALL_S + dss_resume_cpu
+    dss_rss  = float(dss["resources"]["rss_peak_mb"])
+
+    # ---- per-caller summary (Linux host pivoine, matching Table 5b) ----
     callers = [
         ("methylKit-tile", {
             "wall_s": float(mk["wall_seconds"].sum()),
@@ -65,16 +76,16 @@ def main() -> None:
             "rss_mb": float(ek["vmhwm_mb"].max()),
         }),
         ("epykit-chain_merge-100", {
-            "wall_s": CM_WALL_S_WIN,
-            "cpu_s":  CM_CPU_S_WIN,
+            "wall_s": CM_WALL_S_LINUX,
+            "cpu_s":  CM_CPU_S_LINUX,
             # No direct RSS profiling — same backing store + DMC backend
             # as epykit-tile, so we use that as a faithful estimate.
             "rss_mb": float(ek["vmhwm_mb"].max()),
         }),
         ("DSS-from-scratch", {
-            "wall_s": DSS_WALL_S_WIN,
-            "cpu_s":  DSS_CPU_S_WIN,
-            "rss_mb": DSS_RSS_MB_WIN,
+            "wall_s": dss_wall,
+            "cpu_s":  dss_cpu,
+            "rss_mb": dss_rss,
         }),
     ]
     df_summary = pd.DataFrame([dict(caller=c, **vals) for c, vals in callers])
@@ -125,7 +136,8 @@ def main() -> None:
     ax.grid(axis="y", alpha=0.2)
 
     fig.suptitle("F7 · Resource cost across DMR callers on GSE263850\n"
-                  "(15.6 M CpGs, n=6, hg38, Windows host, single-process)",
+                  "(15.6 M CpGs, n=6, hg38, Linux host pivoine; methylKit mc.cores=1, "
+                  "DSS single-thread)",
                   fontsize=11, y=1.04)
     save_dual(fig, THREE_WAY / "F7_resources")
     plt.close(fig)
