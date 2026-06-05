@@ -80,7 +80,7 @@ def _read_claim_value(claim: dict) -> float:
     if df.height != 1:
         raise ValueError(
             f"claim '{claim['claim_id']}': filter selected {df.height} rows "
-            f"(expected 1) from {parquet_path}"
+            f"(expected 1) from {src_path}"
         )
     return float(df[claim["column"]][0])
 
