@@ -125,6 +125,32 @@
   expected: 0.627174
   precision: 0.001
 
+- claim_id: simulator_epykit_lr_auroc_seed0_cov10
+  parquet: benchmark/data/study1b_simulator/eval_per_seed.parquet
+  column: auroc
+  filter:
+    tool: epykit_lr
+    seed: 2026000
+    coverage: 10
+    threshold_kind: qvalue
+    threshold: 0.05
+    meth_diff_bin: "all"
+  expected: 0.926721
+  precision: 0.001
+
+- claim_id: simulator_epykit_lrplus_auroc_seed0_cov10
+  parquet: benchmark/data/study1b_simulator/eval_per_seed.parquet
+  column: auroc
+  filter:
+    tool: epykit_lrplus
+    seed: 2026000
+    coverage: 10
+    threshold_kind: qvalue
+    threshold: 0.05
+    meth_diff_bin: "all"
+  expected: 0.905198
+  precision: 0.001
+
 # ── Null calibration: empirical FDR (gse263850 real dataset, 10 shuffles) ──────
 
 - claim_id: null_calib_lr_gse263850_fdr_median
