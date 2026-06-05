@@ -8,8 +8,10 @@ abstract: |
   base-resolution DNA methylation profiling, but its analytical ecosystem is
   fragmented across R/Bioconductor (methylKit, DSS, BSmooth, methylSig, BiSeq)
   and command-line tools (RADMeth, metilene). Modern single-cell and
-  multi-omics workflows live in Python, where no comparably mature option
-  exists. We introduce **epykit**, a Python-native methylation analysis
+  multi-omics workflows live in Python, where the main established option,
+  methylpy, provides a single permutation-based DMR test inside a
+  read-processing pipeline rather than a maintained panel of DMC/DMR engines.
+  We introduce **epykit**, a Python-native methylation analysis
   pipeline built on partitioned Parquet storage, lazy I/O, and vectorised
   per-CpG regression. We evaluate epykit across three benchmark studies that
   together span the relevant evaluation surface: (1) a panel comparison
@@ -29,8 +31,9 @@ abstract: |
   (0.0044 → 0.064), F1 drops (0.796 → 0.746), and AUROC drops slightly
   (0.928 → 0.907). `lr+` is therefore presented as a research-knob panel,
   not the recommended default. At n = 2 total samples the bare `lr` engine
-  recovers TPR 0.564 vs methylKit's 0.302 at matched FPR (Study 2, single
-  cell), the niche where the bare quasi-binomial advantage is largest.
+  recovers TPR 0.564 vs methylKit's 0.302 at comparably negligible FPR
+  (1.2 × 10⁻⁵ vs 0; Study 2, single cell), the niche where the bare
+  quasi-binomial advantage is largest.
 
   On real GSE263850 data, epykit's `chain_merge` DMR caller at the
   paper-matched `dis_merge = 250 bp` operating point recovers 77.3 % of
@@ -78,6 +81,18 @@ scanpy / anndata / mudata, leaving WGBS downstream analysis stranded in a
 different language. Second, modern WGBS experiments routinely involve dozens
 of samples and tens of millions of CpG sites, where naive in-memory R data
 frames are no longer the right abstraction.
+
+A Python-native option is not entirely absent, but the gap is real. methylpy
+[@Schultz2015] performs WGBS DMR calling through an RMS permutation test
+(`DMRfind`) embedded in a read-processing pipeline; it exposes a single
+statistical procedure, has not had a substantive release since 2018, and
+predates the scanpy/anndata data model. More recent Python entrants target
+*adjacent* modalities rather than bulk WGBS: scbs/MethSCAn [@Kremer2024] for
+single-cell bisulfite data and pycoMeth [@Snajder2023] for Nanopore long-read
+calls. What remains missing — and what epykit provides — is a maintained,
+bulk-WGBS toolkit that pairs a *panel* of GLM/quasi-binomial DMC engines and
+four DMR callers with lazy, partitioned-Parquet I/O at the 22 M-CpG scale and
+a scanpy-style API.
 
 **epykit** is a Python-native pipeline that addresses both: per-CpG counts
 are stored as per-chromosome, per-sample Parquet partitions and queried
@@ -378,6 +393,11 @@ capturing 96.2 % <!-- claim: study1_lr_tpr_cov10 --> of true DMCs at
 FPR = 1.2 × 10⁻⁵ (F1 = 0.9807 <!-- claim: study1_lr_f1_cov10 -->). The opt-in
 `lr+` power stack reaches TPR = 99.97 % <!-- claim: study1_lrplus_tpr_cov10 -->
 at the same coverage cell with AUROC = 0.9999 <!-- claim: study1_lrplus_auroc_cov10 -->.
+This near-perfect AUROC is measured under *threshold-reconstructed* truth (|Δβ| ≥
+0.2; §2.7); under intrinsic held-out truth — which counts every simulated DMC,
+including the weak-effect tail — the same `lr` engine scores AUROC = 0.928, the
+honest operating number the abstract reports. Both figures are real and trace to
+committed data; §3.4 places them side by side and explains the reconciliation.
 
 ![Figure 1. ROC at coverage = 10×, 3 vs 3 replicates. epykit `lr` and `lr+`
 overlap the top-left corner; methylKit, RADMeth, DSS, and pooled Fisher
@@ -503,9 +523,9 @@ GLM, which is identifiable at n = 1.
 | 10 | epykit / `lr` | 0.984 | 1.2 × 10⁻⁵ | 0.992 | 1.0000 | 19,678 |
 | 10 | methylKit / default | 0.984 | 1.2 × 10⁻⁵ | 0.992 | 1.0000 | 19,678 |
 
-At n = 2, epykit recovers **~2× more true DMCs at the same FPR** as
-methylKit (0.564 vs 0.302). From n = 4 upward the two engines are
-interchangeable on this simulator.
+At n = 2, epykit recovers **~2× more true DMCs than methylKit** (0.564 vs
+0.302) at comparably negligible FPR (1.2 × 10⁻⁵ vs 0). From n = 4 upward the
+two engines are interchangeable on this simulator.
 
 ### 3.2.3 DMR detection
 
@@ -852,19 +872,38 @@ PROTOCOL.md R2).
 | DSS, smoothing = TRUE | 5.0 × 10⁻⁵ (0 – 1.5 × 10⁻⁴) | 1.2 × 10⁻⁵ (0 – 1.3 × 10⁻⁵) | 1.0 × 10⁻⁴ | 0.6297 (0.6285 – 0.6314) <!-- claim: simulator_dss_smooth_auroc_median_cov10 --> |
 
 Source: [`eval_simulator_intrinsic_iqr.parquet`](../data/study1b_simulator/eval_simulator_intrinsic_iqr.parquet)
-(21 seeds; 20 sampled + 1 frozen-grid control).
+(external tools; 21 seeds = 20 sampled + 1 frozen-grid control). Across all 20
+held-out seeds the median epykit `lr` AUROC on intrinsic truth is **0.928**
+(IQR 0.927–0.929; `eval_seed_iqr.parquet`), essentially tied with methylKit
+(0.926); median epykit `lr+` AUROC is 0.907.
 
-**Reading.** methylKit and unsmoothed DSS are well-calibrated on intrinsic
-truth, with methylKit slightly more sensitive (TPR median 0.73 vs 0.65)
-and unsmoothed DSS slightly more conservative on false positives. Smoothed
-DSS collapses to a near-zero call rate (median 5 × 10⁻⁵ TPR) — not a
-DSS defect, but a dataset–assumption mismatch: the simulator generates
-CpGs at uniform 100-bp spacing with no genomic correlation structure
-for the smoother to exploit, so DSS's default smoothing window flattens
-the signal entirely. The same DSS configuration is competitive on
-real-data Study 3 (§3.3.4). The seed-to-seed IQR widths are tight
-(< 0.003 absolute on TPR and AUROC for both non-degenerate tools),
-confirming the median is not masking large between-seed variance.
+**Reading.** epykit `lr`, methylKit and unsmoothed DSS are all well-calibrated
+on intrinsic truth and rank near-identically (median AUROC 0.928 / 0.926 /
+0.909): methylKit is slightly more sensitive (TPR median 0.73) at a slightly
+higher FPR, epykit `lr` is the most conservative on false positives, and `lr+`
+trades calibration for recall (median TPR 0.746 at FPR 0.064, AUROC 0.907). At
+the representative single seed 2026000, epykit `lr` AUROC is 0.9267
+<!-- claim: simulator_epykit_lr_auroc_seed0_cov10 --> and `lr+` 0.9052
+<!-- claim: simulator_epykit_lrplus_auroc_seed0_cov10 -->. Smoothed DSS
+collapses to a near-zero call rate (median 5 × 10⁻⁵ TPR) — not a DSS defect,
+but a dataset–assumption mismatch: the simulator generates CpGs at uniform
+100-bp spacing with no genomic correlation structure for the smoother to
+exploit, so DSS's default smoothing window flattens the signal entirely. The
+same DSS configuration is competitive on real-data Study 3 (§3.3.4). The
+seed-to-seed IQR widths are tight (< 0.003 absolute on TPR and AUROC for the
+non-degenerate tools), confirming the median is not masking large between-seed
+variance.
+
+**Truth-definition duality (and §3.1's AUROC = 0.9999).** epykit `lr`'s AUROC
+is **0.9999 under threshold-reconstructed truth** (§3.1, weak-effect DMCs
+excluded by the |Δβ| ≥ 0.2 reconstruction) but **0.928 under intrinsic
+held-out truth** (this section, every simulated DMC including the weak-effect
+tail counts as a positive). The gap is a property of the *truth definition*,
+not of the estimator: intrinsic truth includes near-threshold DMCs that no
+calibrated test can separate from the null, so every tool's AUROC drops the
+same way (methylKit 0.999 → 0.925). The 0.928 intrinsic figure is the honest
+operating number and is what the abstract reports; 0.9999 is the
+threshold-reconstructed ceiling.
 
 The full per-seed table (`eval_simulator_intrinsic_per_seed.parquet`,
 540 rows) and across-seed median + IQR summary appear as
@@ -1004,6 +1043,18 @@ false positives. We therefore recommend that users:
   part of why it dominates the low-coverage small-effect bin in §3.1.
   `dispersion="eb"` is designed for heterogeneous regimes but is a no-op
   on this simulator.
+* **The empirical-Bayes dispersion prior is not validated against an external
+  estimator.** The EB shrinkage behind `dispersion="eb"` (and hence the opt-in
+  `lr+` stack) treats per-site Pearson dispersions as draws from an
+  inverse-Gamma prior whose hyperparameters are fit by method-of-moments per
+  chromosome (§2.5). We make no goodness-of-fit claim for that prior: its
+  per-site posterior dispersions have not been Q-Q compared against an
+  independent estimator such as DSS's, and that comparison remains future work.
+  This is acceptable here precisely because `eb`/`lr+` are opt-in research
+  knobs rather than the recommended default — **every headline result in this
+  paper is reported under bare `lr`**, whose dispersion is the binomial-floored
+  quasi-binomial Pearson estimate, not the EB prior. A reader should not read
+  any headline number as depending on, or as evidence for, the EB prior.
 * **Baseline software versions.** Study 1 baseline numbers are from 2021
   software releases. Relative ordering at low coverage / small n is robust
   across recent versions of those tools, but absolute numbers may have
