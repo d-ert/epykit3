@@ -133,14 +133,24 @@ cat(sprintf("dmrseq: %d DMRs called\n", length(dmrs)))
 # raw beta-difference per region as ``rawMeanDiff`` for downstream
 # consistency with DSS / methylKit output).
 mcols_df <- as.data.frame(GenomicRanges::mcols(dmrs))
+cat(sprintf("dmrseq mcols columns: %s\n",
+            paste(colnames(mcols_df), collapse = ", ")))
+# dmrseq's column names vary by version: >=1.30 emits `pval`/`qval`, while
+# earlier releases used `pvalue`/`qvalue`. Resolve defensively so the writer
+# does not silently produce a NULL (length-0) column -> data.frame() row
+# mismatch (the bug this guards against).
+pick <- function(df, ...) {
+  for (nm in c(...)) if (!is.null(df[[nm]])) return(df[[nm]])
+  stop(sprintf("none of (%s) present in dmrseq mcols", paste(c(...), collapse = ", ")))
+}
 out_df <- data.frame(
   chr       = as.character(GenomicRanges::seqnames(dmrs)),
   start     = GenomicRanges::start(dmrs),
   end       = GenomicRanges::end(dmrs),
-  stat      = mcols_df$stat,
-  pvalue    = mcols_df$pvalue,
-  qvalue    = mcols_df$qvalue,
-  meth_diff = mcols_df$beta
+  stat      = pick(mcols_df, "stat"),
+  pvalue    = pick(mcols_df, "pvalue", "pval"),
+  qvalue    = pick(mcols_df, "qvalue", "qval"),
+  meth_diff = pick(mcols_df, "beta")
 )
 write.table(out_df, file = out_path, sep = "\t",
             quote = FALSE, row.names = FALSE)
