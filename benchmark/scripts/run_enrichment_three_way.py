@@ -36,22 +36,22 @@ import pandas as pd
 import polars as pl
 import requests
 
-REPO_ROOT = Path(r"D:/Coding/Projeler/methyl_lib/benchmarkin_merges").resolve()
+# Repointed 2026-06-05 from the external benchmarkin_merges tree to the
+# current committed epykit3/benchmark tree (post-rerun gene-link tables).
+BENCH     = Path(__file__).resolve().parents[1]
 RAW_DIR   = Path(r"D:/Coding/Projeler/methyl_lib/epykit2/GSE263850_RAW")
 
-CM_LINKS_100   = REPO_ROOT / "FINAL_REPORT" / "data" / "study3" / "chain_merge" \
-                 / "dmr_gene_links_100kb.csv"
-CM_LINKS_250   = (REPO_ROOT / "FINAL_REPORT" / "data" / "study3"
+CM_LINKS_100   = BENCH / "data" / "study3" / "chain_merge" / "dmr_gene_links_100kb.csv"
+CM_LINKS_250   = (BENCH / "data" / "multi_thread_and_chain_sweep"
                   / "chain_merge_dis_merge_sweep" / "dis_merge_250"
                   / "dmr_gene_links_100kb.csv")
-DSS_LINKS      = REPO_ROOT / "FINAL_REPORT" / "data" / "study3" / "dss" \
-                 / "dmr_gene_links_100kb.csv"
+DSS_LINKS      = BENCH / "data" / "study3" / "dss" / "dmr_gene_links_100kb.csv"
 MK_TILE        = Path(r"D:/Coding/Projeler/methyl_lib/methylkıt_realResults/"
                       r"scripts_and_results/methylkit_results/"
                       r"dmr_significant_lenient.csv")
 PAPER_T5       = RAW_DIR / "Paper resources" / "DMR_total_list.xlsx"
 
-OUT_DIR        = REPO_ROOT / "FINAL_REPORT" / "data" / "study3" / "comparisons"
+OUT_DIR        = BENCH / "data" / "study3" / "comparisons"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 ENRICHR = "https://maayanlab.cloud/Enrichr"
@@ -233,8 +233,9 @@ def main() -> None:
     g_mk = genes_methylkit_tile()
     print(f"  methylKit-tile (nearest-TSS): {len(g_mk)} genes", flush=True)
 
-    # Save them to shinygo_lists/ for posterity
-    out_list_dir = REPO_ROOT / "FINAL_REPORT" / "shinygo_lists"
+    # Save the gene lists alongside the JSON for posterity / reproducibility.
+    out_list_dir = OUT_DIR / "enrichment_gene_lists"
+    out_list_dir.mkdir(parents=True, exist_ok=True)
     (out_list_dir / "dss_100kb_genes.txt").write_text(
         "\n".join(g_dss), encoding="utf-8")
     (out_list_dir / "methylkit_tile_nearestTSS_genes.txt").write_text(

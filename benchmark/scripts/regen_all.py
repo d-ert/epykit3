@@ -64,12 +64,17 @@ def _parse_paper_claims(paper_path: Path) -> set[str]:
 
 
 def _read_claim_value(claim: dict) -> float:
-    parquet_path = Path(str(claim["parquet"]))
-    if not parquet_path.is_absolute():
+    # A claim cites its source as either ``parquet:`` or ``csv:``.
+    src_key = "parquet" if "parquet" in claim else "csv"
+    src_path = Path(str(claim[src_key]))
+    if not src_path.is_absolute():
         # Resolve relative to repo root (two levels above benchmark/scripts/).
         repo = Path(__file__).resolve().parents[2]
-        parquet_path = repo / parquet_path
-    df = pl.read_parquet(str(parquet_path))
+        src_path = repo / src_path
+    if src_key == "csv":
+        df = pl.read_csv(str(src_path))
+    else:
+        df = pl.read_parquet(str(src_path))
     for col, val in (claim.get("filter") or {}).items():
         df = df.filter(pl.col(col) == val)
     if df.height != 1:

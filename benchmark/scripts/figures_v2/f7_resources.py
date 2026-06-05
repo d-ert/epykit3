@@ -3,9 +3,15 @@
 Bars for wall time, total CPU time, peak RSS. Four callers:
   methylKit-tile, epykit-tile, epykit-chain_merge, DSS-from-scratch.
 
-Numbers from each pipeline's benchmark CSV / resources.json. The
-epykit-chain_merge run wasn't profiled with psutil 1-Hz sampling — RSS
-estimated from epykit-tile (same store + DMC backend).
+This figure reproduces paper Table 5b, which is the **Windows-host**
+comparison (the only platform on which all four callers were profiled:
+methylKit's `mc.cores` is a no-op on Windows, so it ran single-threaded).
+methylKit-tile and epykit-tile come from the Windows step_benchmarks.csv
+files; epykit-chain_merge and DSS-from-scratch use the Windows-run
+values that Table 5b reports. (The committed Linux-rerun
+`dss/resources.json` is a *separate* platform — host pivoine — and is
+NOT what Table 5b describes; see paper §4.3 for the Windows-vs-Linux
+timing split.)
 """
 
 from __future__ import annotations
@@ -27,28 +33,16 @@ MK_BENCH  = Path(r"D:/Coding/Projeler/methyl_lib/methylkıt_realResults/"
 EK_BENCH  = Path(r"D:/Coding/Projeler/methyl_lib/benchmarkin_merges/"
                  r"epykit_vs_methylkit(GSE263850)/"
                  r"epykit_results/benchmark/step_benchmarks.csv")
-DSS_JSON  = DATA_DIR / "dss" / "resources.json"
-CM_LOG    = DATA_DIR / "chain_merge" / "run_log.txt"
 
-
-def parse_cm_wall_cpu() -> tuple[float, float]:
-    """Total wall + summed CPU from the chain_merge log."""
-    text = CM_LOG.read_text(encoding="utf-8").splitlines()
-    # Use ISO timestamps to bracket the run
-    first = last = None
-    for line in text:
-        if line[:4].isdigit() and " " in line:
-            ts = line.split(",", 1)[0]
-            if first is None:
-                first = ts
-            last = ts
-    from datetime import datetime
-    fmt = "%Y-%m-%d %H:%M:%S"
-    dt = (datetime.strptime(last, fmt) -
-          datetime.strptime(first, fmt)).total_seconds()
-    # CPU we don't have directly; use the DMC + DMR + annotation snippets
-    cpu_s = 219.8 + 20.6 + 21.5   # DMC + DMR + (annotate ~21s from log)
-    return dt, cpu_s
+# Windows-host values reported in paper Table 5b for the two callers
+# without a committed Windows resources file (the committed DSS
+# resources.json is the Linux-pivoine rerun, a different platform).
+# Keeping these fixed makes the figure reproduce Table 5b exactly.
+DSS_WALL_S_WIN = 2820.0
+DSS_CPU_S_WIN  = 2756.0
+DSS_RSS_MB_WIN = 9.3 * 1024            # 9.3 GB peak (Windows run)
+CM_WALL_S_WIN  = 443.0                 # chain_merge wall, Table 5b
+CM_CPU_S_WIN   = 261.9                 # chain_merge CPU, Table 5b
 
 
 def main() -> None:
@@ -56,10 +50,8 @@ def main() -> None:
 
     mk = pd.read_csv(MK_BENCH)
     ek = pd.read_csv(EK_BENCH)
-    dss = json.loads(DSS_JSON.read_text(encoding="utf-8"))
-    cm_wall, cm_cpu = parse_cm_wall_cpu()
 
-    # ---- per-caller summary --------------------------------------------
+    # ---- per-caller summary (Windows host, matching Table 5b) ----------
     callers = [
         ("methylKit-tile", {
             "wall_s": float(mk["wall_seconds"].sum()),
@@ -73,20 +65,16 @@ def main() -> None:
             "rss_mb": float(ek["vmhwm_mb"].max()),
         }),
         ("epykit-chain_merge-100", {
-            "wall_s": cm_wall,
-            "cpu_s":  cm_cpu,
+            "wall_s": CM_WALL_S_WIN,
+            "cpu_s":  CM_CPU_S_WIN,
             # No direct RSS profiling — same backing store + DMC backend
             # as epykit-tile, so we use that as a faithful estimate.
             "rss_mb": float(ek["vmhwm_mb"].max()),
         }),
         ("DSS-from-scratch", {
-            # Full run = initial DMLfit+DMLtest (2044+145+75+51+5 ≈ 2320s wall)
-            # + resume (499s). Use the sum.
-            "wall_s": 75.4 + 50.6 + 2044.5 + 145.4 + 4.7
-                       + dss["resources"]["wall_seconds_resume_only"],
-            "cpu_s":  67.5 + 49.4 + 2029.0 + 144.3 + 4.5
-                       + 14.0 + 4.8 + 86.8 + 361.1,  # from step_timings parts
-            "rss_mb": float(dss["resources"]["rss_peak_mb"]),
+            "wall_s": DSS_WALL_S_WIN,
+            "cpu_s":  DSS_CPU_S_WIN,
+            "rss_mb": DSS_RSS_MB_WIN,
         }),
     ]
     df_summary = pd.DataFrame([dict(caller=c, **vals) for c, vals in callers])

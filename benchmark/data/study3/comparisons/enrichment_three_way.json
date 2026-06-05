@@ -1,0 +1,4914 @@
+{
+  "paper_Table5": {
+    "n_genes": 705,
+    "userListId": 130272196,
+    "libraries": {
+      "Reactome_2022": {
+        "n_total": 800,
+        "top20": [
+          {
+            "term": "Ligand-receptor Interactions R-HSA-5632681",
+            "p_value": 0.002138658779930332,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 101.35619526703476,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "SHH",
+              "HHIP",
+              "GAS1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Collagen Chain Trimerization R-HSA-8948216",
+            "p_value": 0.004234155354130675,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 23.770330186724163,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "COL27A1",
+              "COL1A2",
+              "COL25A1",
+              "COL4A1",
+              "COL12A1",
+              "COL6A5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABA Receptor Activation R-HSA-977443",
+            "p_value": 0.004561160826254483,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 20.003922829933458,
+            "n_overlap": 7,
+            "overlap_genes": [
+              "GABRR1",
+              "KCNJ6",
+              "GABRA5",
+              "GNB4",
+              "KCNJ16",
+              "GNG11",
+              "GNAI1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Regulation Of Insulin Secretion R-HSA-422356",
+            "p_value": 0.0056696583737593596,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 16.542767628899814,
+            "n_overlap": 8,
+            "overlap_genes": [
+              "CHRM3",
+              "KCNC2",
+              "PRKAR1A",
+              "GNB4",
+              "CACNA1A",
+              "CACNA1E",
+              "GNG11",
+              "GNAI1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "G-protein Activation R-HSA-202040",
+            "p_value": 0.009273000494646097,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 25.740226955180624,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "GNB4",
+              "OPRM1",
+              "PDYN",
+              "GNG11"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Activated NTRK2 Signals Thru CDK5 R-HSA-9032845",
+            "p_value": 0.011558842393856135,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 81.60094411149987,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "NTRK2",
+              "TIAM1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "IRS Activation R-HSA-74713",
+            "p_value": 0.011558842393856135,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 81.60094411149987,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "IRS1",
+              "INSR"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Opioid Signaling R-HSA-111885",
+            "p_value": 0.012392353999823112,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 12.104280033861599,
+            "n_overlap": 8,
+            "overlap_genes": [
+              "PDE1C",
+              "PRKAR1A",
+              "PDE4B",
+              "GNB4",
+              "OPRM1",
+              "PDYN",
+              "GNG11",
+              "GNAI1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Binding And Uptake Of Ligands By Scavenger Receptors R-HSA-2173782",
+            "p_value": 0.014088338234405941,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 16.287641613950207,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "COLEC12",
+              "COL1A2",
+              "AMBP",
+              "COL4A1",
+              "DLC1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Activation Of GABAB Receptors R-HSA-991365",
+            "p_value": 0.01554097272619671,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 15.481778864312203,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "KCNJ6",
+              "GNB4",
+              "KCNJ16",
+              "GNG11",
+              "GNAI1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Activation Of G Protein Gated Potassium Channels R-HSA-1296041",
+            "p_value": 0.018049941801606562,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 17.65742402565962,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "KCNJ6",
+              "GNB4",
+              "KCNJ16",
+              "GNG11"
+            ],
+            "paper_term_match": "g protein"
+          },
+          {
+            "term": "Adherens Junctions Interactions R-HSA-418990",
+            "p_value": 0.018049941801606562,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 17.65742402565962,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "CDH4",
+              "CDH2",
+              "NECTIN3",
+              "CDH18"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Peptide Ligand-Binding Receptors R-HSA-375276",
+            "p_value": 0.021892272448451603,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 7.497905859914483,
+            "n_overlap": 13,
+            "overlap_genes": [
+              "ANXA1",
+              "NPY2R",
+              "CXCR4",
+              "OPRK1",
+              "OPRM1",
+              "PDYN",
+              "CXCL13",
+              "RXFP1",
+              "NPS",
+              "EDNRA",
+              "PROKR2",
+              "EDNRB",
+              "NMUR2"
+            ],
+            "paper_term_match": "peptide ligand"
+          },
+          {
+            "term": "Inactivation Of CDC42 And RAC1 R-HSA-428543",
+            "p_value": 0.02316081835883735,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 41.327173599194516,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "SLIT2",
+              "ROBO1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Scavenging By Class A Receptors R-HSA-3000480",
+            "p_value": 0.027743747845071626,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 18.458946144242454,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "COLEC12",
+              "COL1A2",
+              "COL4A1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Transmission Across Chemical Synapses R-HSA-112315",
+            "p_value": 0.028424320297530177,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 6.387875544259092,
+            "n_overlap": 15,
+            "overlap_genes": [
+              "KCNJ6",
+              "GABRA5",
+              "CACNA1A",
+              "SLC1A3",
+              "KCNJ16",
+              "GNG11",
+              "KIF17",
+              "CACNA1E",
+              "SLC6A3",
+              "GNAI1",
+              "NCALD",
+              "GABRR1",
+              "PRKAR1A",
+              "GNB4",
+              "PPFIA2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Netrin-1 Signaling R-HSA-373752",
+            "p_value": 0.02853752755176257,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 11.114750177341012,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "TRIO",
+              "ABLIM2",
+              "UNC5D",
+              "SLIT2",
+              "ROBO1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Role Of ABL In ROBO-SLIT Signaling R-HSA-428890",
+            "p_value": 0.030168221839213794,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 32.01997931157176,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "SLIT2",
+              "ROBO1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Transport Of RCbl Within Body R-HSA-9758890",
+            "p_value": 0.030168221839213794,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 32.01997931157176,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "LMBRD1",
+              "LDLRAP1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Collagen Biosynthesis And Modifying Enzymes R-HSA-1650814",
+            "p_value": 0.030467639455520015,
+            "p_adj": 0.9999948763663931,
+            "combined_score": 9.448762138763868,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "COL27A1",
+              "COL1A2",
+              "COL25A1",
+              "COL4A1",
+              "COL12A1",
+              "COL6A5"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 2
+      },
+      "KEGG_2021_Human": {
+        "n_total": 217,
+        "top20": [
+          {
+            "term": "Morphine addiction",
+            "p_value": 8.263704437168093e-05,
+            "p_adj": 0.017932238628654763,
+            "combined_score": 39.59682718369744,
+            "n_overlap": 12,
+            "overlap_genes": [
+              "GABRR1",
+              "KCNJ6",
+              "PDE1C",
+              "GABRA5",
+              "PDE4B",
+              "GNB4",
+              "CACNA1A",
+              "OPRM1",
+              "DRD1",
+              "GNG11",
+              "GNAI1",
+              "GABRG1"
+            ],
+            "paper_term_match": "morphine addiction"
+          },
+          {
+            "term": "Protein digestion and absorption",
+            "p_value": 0.010561337002518358,
+            "p_adj": 0.7415531933775051,
+            "combined_score": 12.019701147623195,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "COL27A1",
+              "COL1A2",
+              "COL4A1",
+              "COL25A1",
+              "SLC7A9",
+              "KCNQ1",
+              "COL12A1",
+              "COL6A5",
+              "SLC36A4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABAergic synapse",
+            "p_value": 0.013209593427132058,
+            "p_adj": 0.7415531933775051,
+            "combined_score": 11.780344628708681,
+            "n_overlap": 8,
+            "overlap_genes": [
+              "GABRR1",
+              "KCNJ6",
+              "GABRA5",
+              "GNB4",
+              "CACNA1A",
+              "GNG11",
+              "GNAI1",
+              "GABRG1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Hedgehog signaling pathway",
+            "p_value": 0.013669183288064612,
+            "p_adj": 0.7415531933775051,
+            "combined_score": 14.182198439374284,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "CSNK1G3",
+              "SHH",
+              "HHIP",
+              "BCL2",
+              "GAS1",
+              "DISP1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Dopaminergic synapse",
+            "p_value": 0.018507319039702562,
+            "p_adj": 0.8032176463230911,
+            "combined_score": 9.021392843877836,
+            "n_overlap": 10,
+            "overlap_genes": [
+              "KCNJ6",
+              "KIF5C",
+              "GNB4",
+              "CACNA1A",
+              "PPP2R2A",
+              "PPP2R3B",
+              "DRD1",
+              "GNG11",
+              "SLC6A3",
+              "GNAI1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Retrograde endocannabinoid signaling",
+            "p_value": 0.03694694815824428,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 6.5879471470691895,
+            "n_overlap": 10,
+            "overlap_genes": [
+              "GABRR1",
+              "KCNJ6",
+              "CNR1",
+              "GABRA5",
+              "NDUFB4",
+              "GNB4",
+              "CACNA1A",
+              "GNG11",
+              "GNAI1",
+              "GABRG1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Cholinergic synapse",
+            "p_value": 0.046490440823029285,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 6.436803092417012,
+            "n_overlap": 8,
+            "overlap_genes": [
+              "CHRM3",
+              "KCNJ6",
+              "KCNQ1",
+              "BCL2",
+              "GNB4",
+              "CACNA1A",
+              "GNG11",
+              "GNAI1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Vitamin digestion and absorption",
+            "p_value": 0.05094202102597766,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 11.676840042978624,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "LMBRD1",
+              "FOLH1",
+              "PLB1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Nicotine addiction",
+            "p_value": 0.05141302015409156,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 9.059770085188436,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "GABRR1",
+              "GABRA5",
+              "CACNA1A",
+              "GABRG1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Axon guidance",
+            "p_value": 0.05796989606713956,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 5.048125219584789,
+            "n_overlap": 11,
+            "overlap_genes": [
+              "EFNB2",
+              "SHH",
+              "RGS3",
+              "ABLIM2",
+              "CXCR4",
+              "UNC5D",
+              "SLIT2",
+              "EFNA5",
+              "GNAI1",
+              "SSH1",
+              "ROBO1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Maturity onset diabetes of the young",
+            "p_value": 0.06217425601412588,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 9.94686665353503,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "NEUROD1",
+              "PAX6",
+              "NKX6-1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Type II diabetes mellitus",
+            "p_value": 0.07807615800374221,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 6.670268077344999,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "IRS1",
+              "INSR",
+              "CACNA1A",
+              "CACNA1E"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Pentose phosphate pathway",
+            "p_value": 0.08769796490126452,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 7.422530655552943,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "PRPS2",
+              "RPE",
+              "PFKP"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Cocaine addiction",
+            "p_value": 0.09354104423129625,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 5.78349444197335,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "DRD1",
+              "PDYN",
+              "SLC6A3",
+              "GNAI1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Neuroactive ligand-receptor interaction",
+            "p_value": 0.15125126929151403,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 2.5601985399131673,
+            "n_overlap": 16,
+            "overlap_genes": [
+              "CHRM3",
+              "GABRA5",
+              "NPY2R",
+              "OPRK1",
+              "OPRM1",
+              "PDYN",
+              "RXFP1",
+              "GABRG1",
+              "EDNRA",
+              "GABRR1",
+              "HRH1",
+              "EDNRB",
+              "CNR1",
+              "NMUR2",
+              "S1PR3",
+              "DRD1"
+            ],
+            "paper_term_match": "neuroactive ligand"
+          },
+          {
+            "term": "Purine metabolism",
+            "p_value": 0.17099027889198354,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 2.7835568378974727,
+            "n_overlap": 7,
+            "overlap_genes": [
+              "PRPS2",
+              "GUCY1A2",
+              "PDE1C",
+              "PDE4B",
+              "NTPCR",
+              "FHIT",
+              "PDE9A"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Relaxin signaling pathway",
+            "p_value": 0.17099027889198354,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 2.7835568378974727,
+            "n_overlap": 7,
+            "overlap_genes": [
+              "EDNRB",
+              "COL1A2",
+              "COL4A1",
+              "GNB4",
+              "RXFP1",
+              "GNG11",
+              "GNAI1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Taste transduction",
+            "p_value": 0.18669092976162957,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 2.8436394878482063,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "CHRM3",
+              "PDE1C",
+              "GABRA5",
+              "CACNA1A",
+              "ASIC2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Caffeine metabolism",
+            "p_value": 0.1937364286447065,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 8.994272997247428,
+            "n_overlap": 1,
+            "overlap_genes": [
+              "NAT2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Mannose type O-glycan biosynthesis",
+            "p_value": 0.19374629346863176,
+            "p_adj": 0.9999102018800622,
+            "combined_score": 4.28538907539862,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "FUT9",
+              "LARGE1"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 1,
+        "n_paper_term_matches_top20": 2
+      },
+      "GO_Molecular_Function_2023": {
+        "n_total": 453,
+        "top20": [
+          {
+            "term": "Sequence-Specific DNA Binding (GO:0043565)",
+            "p_value": 0.005047001045702321,
+            "p_adj": 0.834578862028668,
+            "combined_score": 8.50434269961133,
+            "n_overlap": 39,
+            "overlap_genes": [
+              "FOXC1",
+              "KMT2A",
+              "SHOX2",
+              "CREM",
+              "PRDM2",
+              "NR2E1",
+              "NEUROD1",
+              "GBX2",
+              "SIX3",
+              "SHOX",
+              "ZBED1",
+              "OTX2",
+              "OTX1",
+              "ZBTB18",
+              "IRX2",
+              "TFAP2B",
+              "ZSCAN5A",
+              "OLIG3",
+              "EN2",
+              "ZBTB10",
+              "SOX14",
+              "PAX6",
+              "DMRT3",
+              "NR2F2",
+              "VAX1",
+              "GRHL1",
+              "POU4F1",
+              "ETV4",
+              "PAX2",
+              "TBX3",
+              "FOXP1",
+              "DMRTA2",
+              "MAF",
+              "PAX7",
+              "HNRNPD",
+              "BCL2",
+              "RARB",
+              "TERF2IP",
+              "ERG"
+            ],
+            "paper_term_match": "sequence-specific dna binding"
+          },
+          {
+            "term": "GTPase Inhibitor Activity (GO:0005095)",
+            "p_value": 0.007560939113446124,
+            "p_adj": 0.834578862028668,
+            "combined_score": 44.732895988673874,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "SLIT2",
+              "CPEB2",
+              "IPO5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "G Protein-Coupled Opioid Receptor Activity (GO:0004985)",
+            "p_value": 0.011558842393856135,
+            "p_adj": 0.834578862028668,
+            "combined_score": 81.60094411149987,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "OPRK1",
+              "OPRM1"
+            ],
+            "paper_term_match": "g protein"
+          },
+          {
+            "term": "alpha-N-acetylgalactosaminide Alpha-2,6-Sialyltransferase Activity (GO:0001665)",
+            "p_value": 0.011558842393856135,
+            "p_adj": 0.834578862028668,
+            "combined_score": 81.60094411149987,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "ST6GALNAC3",
+              "ST6GALNAC5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Malate Dehydrogenase Activity (GO:0016615)",
+            "p_value": 0.011558842393856135,
+            "p_adj": 0.834578862028668,
+            "combined_score": 81.60094411149987,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "ME1",
+              "ME3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "3',5'-Cyclic-Nucleotide Phosphodiesterase Activity (GO:0004114)",
+            "p_value": 0.017333533919361207,
+            "p_adj": 0.834578862028668,
+            "combined_score": 25.70370641765606,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "PDE1C",
+              "PDE4B",
+              "PDE9A"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "3',5'-cyclic-GMP Phosphodiesterase Activity (GO:0047555)",
+            "p_value": 0.02316081835883735,
+            "p_adj": 0.834578862028668,
+            "combined_score": 41.327173599194516,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "PDE1C",
+              "PDE9A"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Sodium Channel Inhibitor Activity (GO:0019871)",
+            "p_value": 0.02316081835883735,
+            "p_adj": 0.834578862028668,
+            "combined_score": 41.327173599194516,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "NEDD4",
+              "PCSK9"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABA-A Receptor Activity (GO:0004890)",
+            "p_value": 0.023977008063215583,
+            "p_adj": 0.834578862028668,
+            "combined_score": 20.492057826705068,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "GABRR1",
+              "GABRA5",
+              "GABRG1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Phosphatidylinositol Phospholipase C Activity (GO:0004435)",
+            "p_value": 0.03180572734638127,
+            "p_adj": 0.834578862028668,
+            "combined_score": 16.710066208568932,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "CHRM3",
+              "EDNRA",
+              "PLCH1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Sialyltransferase Activity (GO:0008373)",
+            "p_value": 0.03180572734638127,
+            "p_adj": 0.834578862028668,
+            "combined_score": 16.710066208568932,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "ST8SIA4",
+              "ST6GALNAC3",
+              "ST6GALNAC5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABA Receptor Activity (GO:0016917)",
+            "p_value": 0.03616046343814286,
+            "p_adj": 0.834578862028668,
+            "combined_score": 15.193630377497461,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "GABRR1",
+              "GABRA5",
+              "GABRG1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Neuropeptide Receptor Activity (GO:0008188)",
+            "p_value": 0.0369470181953746,
+            "p_adj": 0.834578862028668,
+            "combined_score": 11.329276288985245,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "GPR151",
+              "NPY2R",
+              "NMUR2",
+              "OPRM1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Benzodiazepine Receptor Activity (GO:0008503)",
+            "p_value": 0.0378950769622329,
+            "p_adj": 0.834578862028668,
+            "combined_score": 25.65671707268034,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "GABRA5",
+              "GABRG1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Mitogen-Activated Protein Kinase Kinase Kinase Binding (GO:0031435)",
+            "p_value": 0.0378950769622329,
+            "p_adj": 0.834578862028668,
+            "combined_score": 25.65671707268034,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "ROR2",
+              "SASH1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Calcium Ion Binding (GO:0005509)",
+            "p_value": 0.038432723564240386,
+            "p_adj": 0.834578862028668,
+            "combined_score": 5.235607875473803,
+            "n_overlap": 19,
+            "overlap_genes": [
+              "ANXA1",
+              "GALNT3",
+              "NRXN1",
+              "CACNA1A",
+              "ANXA10",
+              "NCALD",
+              "OTOL1",
+              "RPH3A",
+              "SHH",
+              "CDH4",
+              "PCP4",
+              "CDH2",
+              "S100Z",
+              "PITPNM3",
+              "DNER",
+              "ENPP2",
+              "SLIT2",
+              "PAM",
+              "CDH18"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Phospholipase C Activity (GO:0004629)",
+            "p_value": 0.0457333874794926,
+            "p_adj": 0.834578862028668,
+            "combined_score": 12.705547336220311,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "CHRM3",
+              "EDNRA",
+              "PLCH1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Extracellular Ligand-Gated Monoatomic Ion Channel Activity (GO:0005230)",
+            "p_value": 0.04628210607197015,
+            "p_adj": 0.834578862028668,
+            "combined_score": 21.077150961130858,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "GABRA5",
+              "GABRG1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Platelet-Derived Growth Factor Binding (GO:0048407)",
+            "p_value": 0.04628210607197015,
+            "p_adj": 0.834578862028668,
+            "combined_score": 21.077150961130858,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "COL1A2",
+              "COL4A1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Sequence-Specific Double-Stranded DNA Binding (GO:1990837)",
+            "p_value": 0.04799247503233595,
+            "p_adj": 0.834578862028668,
+            "combined_score": 4.205837262225488,
+            "n_overlap": 34,
+            "overlap_genes": [
+              "FOXC1",
+              "SHOX2",
+              "CREM",
+              "NR2E1",
+              "NEUROD1",
+              "GBX2",
+              "SIX3",
+              "SHOX",
+              "ZBED1",
+              "OTX2",
+              "OTX1",
+              "ASIC2",
+              "SOX5",
+              "ZBTB18",
+              "TFAP2B",
+              "ZSCAN5A",
+              "OLIG3",
+              "EN2",
+              "SOX14",
+              "PAX6",
+              "DMRT3",
+              "VAX1",
+              "GRHL1",
+              "POU4F1",
+              "ETV4",
+              "PAX2",
+              "TBX3",
+              "FOXP1",
+              "DMRTA2",
+              "MAF",
+              "PAX7",
+              "TBL1XR1",
+              "RARB",
+              "ERG"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 2
+      }
+    }
+  },
+  "methylKit_tile": {
+    "n_genes": 2111,
+    "userListId": 130272208,
+    "libraries": {
+      "Reactome_2022": {
+        "n_total": 1400,
+        "top20": [
+          {
+            "term": "NR1H2 And NR1H3 Regulate Gene Expression To Control Bile Acid Homeostasis R-HSA-9623433",
+            "p_value": 0.010078897479455562,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 31.217206289943682,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "NCOR2",
+              "NCOR1",
+              "RXRA",
+              "FABP6"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Defective B3GALTL Causes PpS R-HSA-5083635",
+            "p_value": 0.012896086539509436,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 11.883101025093396,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "SEMA5B",
+              "ADAMTS14",
+              "ADAMTS2",
+              "ADAMTS13",
+              "THSD7B",
+              "ADAMTS18",
+              "THBS1",
+              "ADAMTS9",
+              "THSD4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "O-glycosylation Of TSR Domain-Containing Proteins R-HSA-5173214",
+            "p_value": 0.01535600588888084,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 11.012339691493803,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "SEMA5B",
+              "ADAMTS14",
+              "ADAMTS2",
+              "ADAMTS13",
+              "THSD7B",
+              "ADAMTS18",
+              "THBS1",
+              "ADAMTS9",
+              "THSD4"
+            ],
+            "paper_term_match": "g protein"
+          },
+          {
+            "term": "GRB2 Events In ERBB2 Signaling R-HSA-1963640",
+            "p_value": 0.015826603284738835,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 17.59911216162753,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "NRG3",
+              "NRG1",
+              "GRB2",
+              "EGFR",
+              "HBEGF"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "RUNX1 Regulates Estrogen Receptor Mediated Transcription R-HSA-8931987",
+            "p_value": 0.018372967501356707,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 33.91276262142,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "ESR1",
+              "KCTD6",
+              "RUNX1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "SHC1 Events In ERBB2 Signaling R-HSA-1250196",
+            "p_value": 0.018463023920080143,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 13.558716281237547,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "NRG3",
+              "PRKCE",
+              "NRG1",
+              "GRB2",
+              "EGFR",
+              "HBEGF"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "PI3K Events In ERBB2 Signaling R-HSA-1963642",
+            "p_value": 0.02105959295633113,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 14.896014658265146,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "NRG3",
+              "NRG1",
+              "GRB2",
+              "EGFR",
+              "HBEGF"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "RUNX3 Regulates CDKN1A Transcription R-HSA-8941855",
+            "p_value": 0.029654835932984052,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 22.386772853847397,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "SMAD4",
+              "ZFHX3",
+              "SMAD3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "ERBB2 Activates PTK6 Signaling R-HSA-8847993",
+            "p_value": 0.04060043486646452,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 12.083974022182243,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "NRG3",
+              "NRG1",
+              "EGFR",
+              "HBEGF"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "SHC1 Events In ERBB4 Signaling R-HSA-1250347",
+            "p_value": 0.04060043486646452,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 12.083974022182243,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "NRG3",
+              "NRG1",
+              "GRB2",
+              "HBEGF"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "FCGR3A-mediated IL10 Synthesis R-HSA-9664323",
+            "p_value": 0.04181823692707662,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 7.188716537468612,
+            "n_overlap": 8,
+            "overlap_genes": [
+              "IL10",
+              "HCK",
+              "PRKAR1A",
+              "ITPR1",
+              "CD247",
+              "ADCY8",
+              "CALM1",
+              "ADCY5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABA Synthesis, Release, Reuptake And Degradation R-HSA-888590",
+            "p_value": 0.04300327703846619,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 9.537937752411512,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "RIMS1",
+              "SLC32A1",
+              "GAD2",
+              "ABAT",
+              "CPLX1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "EGFR Transactivation By Gastrin R-HSA-2179392",
+            "p_value": 0.04378412989696503,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 15.92499202748053,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "GRB2",
+              "EGFR",
+              "HBEGF"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Signaling By BMP R-HSA-201451",
+            "p_value": 0.05852327486383232,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 6.883650317614761,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "SKI",
+              "GREM2",
+              "SMAD4",
+              "BMPR2",
+              "SMAD6",
+              "BMPR1A"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Activation Of Ca-permeable Kainate Receptor R-HSA-451308",
+            "p_value": 0.06063676864287562,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 11.88886028971402,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "GRIK3",
+              "CALM1",
+              "NCALD"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Signaling By ERBB2 TMD/JMD Mutants R-HSA-9665686",
+            "p_value": 0.06316411727016122,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 7.3251370885690665,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "NRG3",
+              "NRG1",
+              "GRB2",
+              "EGFR",
+              "HBEGF"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "ERBB2 Regulates Cell Motility R-HSA-6785631",
+            "p_value": 0.06546188823126733,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 8.41188452887302,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "NRG3",
+              "NRG1",
+              "EGFR",
+              "HBEGF"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "RUNX1 Interacts With Co-Factors Whose Precise Effect On RUNX1 Targets Is Not Known R-HSA-8939243",
+            "p_value": 0.06979011601291607,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 5.6500329568318195,
+            "n_overlap": 7,
+            "overlap_genes": [
+              "PHC2",
+              "PHC1",
+              "RYBP",
+              "CSNK2A2",
+              "ARID1B",
+              "HIPK2",
+              "RUNX1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Ion Homeostasis R-HSA-5578775",
+            "p_value": 0.07587702900300822,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 4.806250811834148,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "RYR1",
+              "ASPH",
+              "ATP1A4",
+              "ITPR1",
+              "ATP2A2",
+              "ATP1A3",
+              "ATP1B3",
+              "CALM1",
+              "RYR3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Voltage Gated Potassium Channels R-HSA-1296072",
+            "p_value": 0.07797284649153047,
+            "p_adj": 0.9999954906318989,
+            "combined_score": 4.951033197179484,
+            "n_overlap": 8,
+            "overlap_genes": [
+              "KCNG1",
+              "KCNH3",
+              "KCNG4",
+              "KCNS2",
+              "KCNC3",
+              "KCNH8",
+              "KCNQ1",
+              "KCNQ3"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 1
+      },
+      "KEGG_2021_Human": {
+        "n_total": 300,
+        "top20": [
+          {
+            "term": "Gastric acid secretion",
+            "p_value": 0.026661177602329344,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 6.957767161783645,
+            "n_overlap": 14,
+            "overlap_genes": [
+              "CHRM3",
+              "ATP1A4",
+              "ITPR1",
+              "ATP1A3",
+              "KCNJ16",
+              "ATP1B3",
+              "ADCY8",
+              "MYLK4",
+              "ADCY5",
+              "HRH2",
+              "KCNQ1",
+              "CALM1",
+              "CALM2",
+              "KCNJ2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Axon guidance",
+            "p_value": 0.04348235361540367,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 4.647656488624165,
+            "n_overlap": 27,
+            "overlap_genes": [
+              "EPHB6",
+              "ITGB1",
+              "ROBO2",
+              "SEMA5B",
+              "BMPR2",
+              "ROCK2",
+              "CXCR4",
+              "EFNA5",
+              "EFNB2",
+              "ABLIM1",
+              "RGS3",
+              "ABL1",
+              "PLXNA2",
+              "PLXNC1",
+              "SLIT2",
+              "LRRC4C",
+              "EPHB1",
+              "WNT4",
+              "PAK4",
+              "NTNG2",
+              "EPHA7",
+              "EPHA6",
+              "TRPC4",
+              "SEMA6D",
+              "SEMA4B",
+              "WNT5A",
+              "EPHA3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Salivary secretion",
+            "p_value": 0.06268071603222365,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 4.526125982752918,
+            "n_overlap": 15,
+            "overlap_genes": [
+              "CHRM3",
+              "GUCY1B1",
+              "ATP1A4",
+              "ITPR1",
+              "ATP1A3",
+              "ATP1B3",
+              "LYZL1",
+              "ADCY8",
+              "RYR3",
+              "ADCY5",
+              "CST4",
+              "DMBT1",
+              "NOS1",
+              "CALM1",
+              "CALM2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Morphine addiction",
+            "p_value": 0.09580066882001993,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 3.6222993654837494,
+            "n_overlap": 14,
+            "overlap_genes": [
+              "GABRB3",
+              "KCNJ6",
+              "SLC32A1",
+              "PDE1C",
+              "CACNA1B",
+              "ADCY8",
+              "GABRG3",
+              "ADCY5",
+              "GNGT2",
+              "PDE10A",
+              "GNB4",
+              "PDE4A",
+              "PDE8B",
+              "PDE8A"
+            ],
+            "paper_term_match": "morphine addiction"
+          },
+          {
+            "term": "Apelin signaling pathway",
+            "p_value": 0.13126028732753278,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 2.7774125125401024,
+            "n_overlap": 19,
+            "overlap_genes": [
+              "RYR1",
+              "EGR1",
+              "SMAD4",
+              "SMAD3",
+              "NOS2",
+              "PRKCE",
+              "ITPR1",
+              "ADCY8",
+              "RYR3",
+              "MYLK4",
+              "PIK3R5",
+              "ADCY5",
+              "ACTA2",
+              "GNGT2",
+              "APLNR",
+              "GNB4",
+              "NOS1",
+              "CALM1",
+              "CALM2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Hippo signaling pathway",
+            "p_value": 0.13677478029373627,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 2.637187147304625,
+            "n_overlap": 22,
+            "overlap_genes": [
+              "CRB2",
+              "CRB1",
+              "SMAD4",
+              "SMAD3",
+              "BMPR2",
+              "FBXW11",
+              "WWC1",
+              "WNT7B",
+              "WNT5A",
+              "WNT7A",
+              "LIMD1",
+              "FRMD1",
+              "BMP5",
+              "GLI2",
+              "PPP2R2C",
+              "DLG5",
+              "PPP2R2D",
+              "NF2",
+              "TEAD1",
+              "WNT4",
+              "BMPR1A",
+              "TP73"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Inflammatory bowel disease",
+            "p_value": 0.1434425351768782,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 2.9968786910197585,
+            "n_overlap": 10,
+            "overlap_genes": [
+              "IL10",
+              "MAF",
+              "SMAD3",
+              "IFNGR1",
+              "IFNGR2",
+              "RORA",
+              "NFATC1",
+              "GATA3",
+              "TLR5",
+              "TLR4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Cell adhesion molecules",
+            "p_value": 0.14902110628869372,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 2.5265300282712295,
+            "n_overlap": 20,
+            "overlap_genes": [
+              "ITGB1",
+              "NTNG2",
+              "CNTNAP2",
+              "ITGAM",
+              "SDC2",
+              "NRXN1",
+              "CD8B2",
+              "F11R",
+              "HLA-E",
+              "CLDN10",
+              "VCAN",
+              "CD8A",
+              "CLDN14",
+              "NRCAM",
+              "ITGA6",
+              "NCAM1",
+              "LRRC4C",
+              "CD34",
+              "CD99",
+              "NECTIN1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Vascular smooth muscle contraction",
+            "p_value": 0.16268769817895373,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 2.4137262436983287,
+            "n_overlap": 18,
+            "overlap_genes": [
+              "PPP1R14A",
+              "PLA2G12A",
+              "GUCY1B1",
+              "EDN3",
+              "ROCK2",
+              "PRKCE",
+              "ITPR1",
+              "ADCY8",
+              "ACTG2",
+              "MYLK4",
+              "ADCY5",
+              "ACTA2",
+              "ADORA2B",
+              "GNA12",
+              "MYH14",
+              "MYH11",
+              "CALM1",
+              "CALM2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "cGMP-PKG signaling pathway",
+            "p_value": 0.1629769747506773,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 2.3379762015251844,
+            "n_overlap": 22,
+            "overlap_genes": [
+              "GUCY1B1",
+              "ROCK2",
+              "PRKCE",
+              "INSR",
+              "ITPR1",
+              "ATP1A4",
+              "ATP2A2",
+              "ATP1A3",
+              "ATP1B3",
+              "NFATC1",
+              "ADRA2C",
+              "ADCY8",
+              "MYLK4",
+              "PIK3R5",
+              "ADCY5",
+              "CREB3L2",
+              "GNA12",
+              "PPIF",
+              "GTF2IRD1",
+              "CALM1",
+              "CALM2",
+              "CNGB1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Mucin type O-glycan biosynthesis",
+            "p_value": 0.17394859667907683,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 2.9677253822938177,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "GALNT11",
+              "GALNT15",
+              "GALNT2",
+              "GALNT17",
+              "GALNTL5",
+              "B4GALT5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Oxytocin signaling pathway",
+            "p_value": 0.19368036958960788,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 2.080390747957656,
+            "n_overlap": 20,
+            "overlap_genes": [
+              "RYR1",
+              "OXTR",
+              "KCNJ6",
+              "GUCY1B1",
+              "ROCK2",
+              "CACNA2D3",
+              "ITPR1",
+              "NFATC1",
+              "ADCY8",
+              "RYR3",
+              "EGFR",
+              "MYLK4",
+              "PIK3R5",
+              "ADCY5",
+              "TRPM2",
+              "CACNG1",
+              "CALM1",
+              "CALM2",
+              "CACNG4",
+              "KCNJ2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Synaptic vesicle cycle",
+            "p_value": 0.1968364380449429,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 2.264699141310422,
+            "n_overlap": 11,
+            "overlap_genes": [
+              "SLC6A5",
+              "RIMS1",
+              "SLC32A1",
+              "SLC6A9",
+              "CACNA1B",
+              "ATP6V0A4",
+              "CPLX2",
+              "ATP6V0E2",
+              "CPLX1",
+              "SLC18A2",
+              "CPLX4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Toxoplasmosis",
+            "p_value": 0.20054554061295,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 2.109072812804452,
+            "n_overlap": 15,
+            "overlap_genes": [
+              "ITGB1",
+              "IL10",
+              "NOS2",
+              "IFNGR1",
+              "IFNGR2",
+              "HSPA6",
+              "LAMA3",
+              "LAMC2",
+              "PIK3R5",
+              "MAPK10",
+              "SOCS1",
+              "PPIF",
+              "ITGA6",
+              "MAP3K7",
+              "TLR4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Adherens junction",
+            "p_value": 0.21262688880519098,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 2.1536661698412054,
+            "n_overlap": 10,
+            "overlap_genes": [
+              "TJP1",
+              "SMAD4",
+              "SMAD3",
+              "CSNK2A3",
+              "INSR",
+              "CSNK2A2",
+              "LMO7",
+              "MAP3K7",
+              "EGFR",
+              "NECTIN1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Circadian entrainment",
+            "p_value": 0.22103214181880831,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 1.9825240850815642,
+            "n_overlap": 13,
+            "overlap_genes": [
+              "RYR1",
+              "KCNJ6",
+              "GUCY1B1",
+              "ITPR1",
+              "ADCY8",
+              "RYR3",
+              "ADCY5",
+              "GNGT2",
+              "RASD1",
+              "GNB4",
+              "NOS1",
+              "CALM1",
+              "CALM2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Other types of O-glycan biosynthesis",
+            "p_value": 0.22312131239629357,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 2.2269421868734747,
+            "n_overlap": 7,
+            "overlap_genes": [
+              "GALNT11",
+              "ST6GAL2",
+              "GALNT15",
+              "GALNT2",
+              "GALNT17",
+              "GALNTL5",
+              "GXYLT2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Parathyroid hormone synthesis, secretion and action",
+            "p_value": 0.2259480124611232,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 1.9210163157330205,
+            "n_overlap": 14,
+            "overlap_genes": [
+              "EGR1",
+              "ITPR1",
+              "GATA3",
+              "ADCY8",
+              "EGFR",
+              "ADCY5",
+              "AKAP13",
+              "MAFB",
+              "RXRA",
+              "CREB3L2",
+              "GNA12",
+              "PDE4A",
+              "SOST",
+              "HBEGF"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Adrenergic signaling in cardiomyocytes",
+            "p_value": 0.23306099331327318,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 1.793129985761538,
+            "n_overlap": 19,
+            "overlap_genes": [
+              "CACNA2D3",
+              "ATP1A4",
+              "ATP2A2",
+              "ATP1A3",
+              "ATP1B3",
+              "PPP2R3B",
+              "PPP2R3A",
+              "ADCY8",
+              "PIK3R5",
+              "ADCY5",
+              "PPP2R2C",
+              "PPP2R5E",
+              "KCNQ1",
+              "CREB3L2",
+              "PPP2R2D",
+              "CACNG1",
+              "CALM1",
+              "CALM2",
+              "CACNG4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Th17 cell differentiation",
+            "p_value": 0.23655167133274224,
+            "p_adj": 0.9999940393086377,
+            "combined_score": 1.8416639901240608,
+            "n_overlap": 14,
+            "overlap_genes": [
+              "SMAD4",
+              "SMAD3",
+              "IFNGR1",
+              "IFNGR2",
+              "RORA",
+              "NFATC1",
+              "IL1RAP",
+              "GATA3",
+              "RUNX1",
+              "MAPK10",
+              "RXRA",
+              "IRF4",
+              "CD247",
+              "IL17D"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 1
+      },
+      "GO_Molecular_Function_2023": {
+        "n_total": 692,
+        "top20": [
+          {
+            "term": "Intracellular Ligand-Gated Monoatomic Ion Channel Activity (GO:0005217)",
+            "p_value": 0.005461894564543074,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 31.598323444654262,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "RYR1",
+              "RASA3",
+              "ITPR1",
+              "RYR3",
+              "TPCN1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "alpha-N-acetylneuraminate Alpha-2,8-Sialyltransferase Activity (GO:0003828)",
+            "p_value": 0.009965298161215623,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 58.65858034498053,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "ST8SIA2",
+              "ST8SIA3",
+              "ST8SIA4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Amino Acid:Proton Symporter Activity (GO:0005280)",
+            "p_value": 0.009965298161215623,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 58.65858034498053,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "SLC36A3",
+              "SLC36A2",
+              "SLC32A1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Melanocortin Receptor Activity (GO:0004977)",
+            "p_value": 0.009965298161215623,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 58.65858034498053,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "MC3R",
+              "MC2R",
+              "MC5R"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Glycine Transmembrane Transporter Activity (GO:0015187)",
+            "p_value": 0.010078897479455562,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 31.217206289943682,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "SLC36A3",
+              "SLC36A2",
+              "SLC32A1",
+              "SLC6A9"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Interleukin-1 Receptor Binding (GO:0005149)",
+            "p_value": 0.010078897479455562,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 31.217206289943682,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "IL1RN",
+              "IL36A",
+              "IL1RAP",
+              "TLR5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Transmembrane-Ephrin Receptor Activity (GO:0005005)",
+            "p_value": 0.011537052220368833,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 21.04674049115481,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "EPHB6",
+              "EPHA7",
+              "EPHA6",
+              "EPHB1",
+              "EPHA3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Ephrin Receptor Activity (GO:0005003)",
+            "p_value": 0.015826603284738835,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 17.59911216162753,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "EPHB6",
+              "EPHA7",
+              "EPHA6",
+              "EPHB1",
+              "EPHA3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Cell Adhesion Mediator Activity (GO:0098631)",
+            "p_value": 0.02338339496308941,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 10.6317122962669,
+            "n_overlap": 7,
+            "overlap_genes": [
+              "CNTN5",
+              "SIRPA",
+              "NRCAM",
+              "EMB",
+              "CNTN4",
+              "LRRC4C",
+              "DSCAML1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Calcium-Release Channel Activity (GO:0015278)",
+            "p_value": 0.027301617208597296,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 12.735768552865615,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "RYR1",
+              "RASA3",
+              "ITPR1",
+              "RYR3",
+              "TPCN1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Transmembrane Receptor Protein Tyrosine Kinase Activator Activity (GO:0030297)",
+            "p_value": 0.030604044936646344,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 14.794567511940018,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "NRG3",
+              "NRG1",
+              "EFNA5",
+              "HBEGF"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Cell-Cell Adhesion Mediator Activity (GO:0098632)",
+            "p_value": 0.033003080154999025,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 7.669942543674744,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "CNTN5",
+              "TRIM29",
+              "SIRPA",
+              "NRCAM",
+              "EMB",
+              "CNTN4",
+              "LRRC4C",
+              "DSCAML1",
+              "PAK4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Ligand-Gated Calcium Channel Activity (GO:0099604)",
+            "p_value": 0.03460401095787082,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 10.981633577263803,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "RYR1",
+              "RASA3",
+              "ITPR1",
+              "TRPM8",
+              "RYR3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Chemorepellent Activity (GO:0045499)",
+            "p_value": 0.03486651715179991,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 9.497886939774874,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "SEMA5B",
+              "EPHA7",
+              "NRG3",
+              "SEMA4B",
+              "SEMA6D",
+              "NRG1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "3',5'-cyclic-AMP Phosphodiesterase Activity (GO:0004115)",
+            "p_value": 0.04060043486646452,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 12.083974022182243,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "PDE1C",
+              "PDE4A",
+              "PDE8B",
+              "PDE8A"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "R-SMAD Binding (GO:0070412)",
+            "p_value": 0.04300327703846619,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 9.537937752411512,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "SMAD4",
+              "SMAD3",
+              "PMEPA1",
+              "LDLRAD4",
+              "SMAD6"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Transaminase Activity (GO:0008483)",
+            "p_value": 0.05222580229288252,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 10.020313499347,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "OAT",
+              "GOT1",
+              "ACCSL",
+              "ABAT"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "G Protein-Coupled Peptide Receptor Activity (GO:0008528)",
+            "p_value": 0.05885947871443424,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 4.888471084221067,
+            "n_overlap": 13,
+            "overlap_genes": [
+              "NPSR1",
+              "OXTR",
+              "VIPR1",
+              "VIPR2",
+              "GLP2R",
+              "CRHR1",
+              "MC3R",
+              "GPR151",
+              "MC2R",
+              "FBXW7-AS1",
+              "GALR1",
+              "MC5R",
+              "APLNR"
+            ],
+            "paper_term_match": "g protein"
+          },
+          {
+            "term": "MAP Kinase Tyrosine Phosphatase Activity (GO:0033550)",
+            "p_value": 0.06063676864287562,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 11.88886028971402,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "DUSP4",
+              "DUSP8",
+              "DUSP6"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "MAP Kinase Tyrosine/Serine/Threonine Phosphatase Activity (GO:0017017)",
+            "p_value": 0.06063676864287562,
+            "p_adj": 0.9999947436471125,
+            "combined_score": 11.88886028971402,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "DUSP4",
+              "DUSP8",
+              "DUSP6"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 1
+      }
+    }
+  },
+  "ek_chain_merge_100": {
+    "n_genes": 1290,
+    "userListId": 130272218,
+    "libraries": {
+      "Reactome_2022": {
+        "n_total": 1064,
+        "top20": [
+          {
+            "term": "Ligand-receptor Interactions R-HSA-5632681",
+            "p_value": 0.011728175796805282,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 38.7682807491942,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "SHH",
+              "HHIP",
+              "CDON"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABA Receptor Activation R-HSA-977443",
+            "p_value": 0.01276434033085697,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 11.434865237774373,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "GNGT1",
+              "GABRR2",
+              "GABRR1",
+              "GNG5",
+              "GABRA5",
+              "KCNJ16",
+              "GABRG3",
+              "GNG11",
+              "KCNJ2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "G-protein Activation R-HSA-202040",
+            "p_value": 0.01682468013110989,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 15.63608912301469,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "GNGT1",
+              "GNG5",
+              "OPRM1",
+              "PDYN",
+              "GNG11"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Activation Of G Protein Gated Potassium Channels R-HSA-1296041",
+            "p_value": 0.03607509862087876,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 10.064484517536155,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "GNGT1",
+              "GNG5",
+              "KCNJ16",
+              "GNG11",
+              "KCNJ2"
+            ],
+            "paper_term_match": "g protein"
+          },
+          {
+            "term": "Beta Oxidation Of hexanoyl-CoA To butanoyl-CoA R-HSA-77350",
+            "p_value": 0.036471101073784845,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 32.0617363898124,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Beta Oxidation Of lauroyl-CoA To decanoyl-CoA-CoA R-HSA-77310",
+            "p_value": 0.036471101073784845,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 32.0617363898124,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Beta Oxidation Of octanoyl-CoA To hexanoyl-CoA R-HSA-77348",
+            "p_value": 0.036471101073784845,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 32.0617363898124,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Defective F9 Activation R-HSA-9673221",
+            "p_value": 0.036471101073784845,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 32.0617363898124,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "GP9",
+              "GP5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "IRS Activation R-HSA-74713",
+            "p_value": 0.036471101073784845,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 32.0617363898124,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "IRS1",
+              "INSR"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Synthesis Of PI R-HSA-1483226",
+            "p_value": 0.036471101073784845,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 32.0617363898124,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "PITPNM3",
+              "PITPNM2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Transmission Across Chemical Synapses R-HSA-112315",
+            "p_value": 0.04725713090650131,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 4.593237663025703,
+            "n_overlap": 23,
+            "overlap_genes": [
+              "SYT1",
+              "GABRA5",
+              "PRKAG2",
+              "GAD2",
+              "KCNJ16",
+              "ABAT",
+              "LIN7C",
+              "GABRG3",
+              "GNG11",
+              "KIF17",
+              "CACNA1E",
+              "SLC6A3",
+              "NCALD",
+              "SLC6A4",
+              "GNGT1",
+              "GABRR2",
+              "GABRR1",
+              "GNG5",
+              "GLRB",
+              "PRKAR1A",
+              "RPS6KA2",
+              "PPFIA1",
+              "KCNJ2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Acyl Chain Remodeling Of CL R-HSA-1482798",
+            "p_value": 0.05239732815291656,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 21.413865444181752,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Beta Oxidation Of decanoyl-CoA To octanoyl-CoA-CoA R-HSA-77346",
+            "p_value": 0.05239732815291656,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 21.413865444181752,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Synthesis Of Lipoxins (LX) R-HSA-2142700",
+            "p_value": 0.05239732815291656,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 21.413865444181752,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "ALOX5AP",
+              "ALOX12"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Mitochondrial Fatty Acid Beta-Oxidation Of Unsaturated Fatty Acids R-HSA-77288",
+            "p_value": 0.05239732815291656,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 21.413865444181752,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "APC Truncation Mutants Have Impaired AXIN Binding R-HSA-5467337",
+            "p_value": 0.05710415249225821,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 11.344133075515618,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "AMER1",
+              "PROC",
+              "PPP2R1A"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Synthesis Of IP2, IP, And Ins In Cytosol R-HSA-1855183",
+            "p_value": 0.05710415249225821,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 11.344133075515618,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "ISYNA1",
+              "SYNJ1",
+              "MTMR9"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "CTNNB1 S33 Mutants Not Phosphorylated R-HSA-5358747",
+            "p_value": 0.06806848847545555,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 9.760301145314195,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "AMER1",
+              "PROC",
+              "PPP2R1A"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Insulin-like Growth Factor-2 mRNA Binding Proteins (IGF2BPs/IMPs/VICKZs) Bind RNA R-HSA-428359",
+            "p_value": 0.07027766202922593,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 15.424661643950573,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "POTEF",
+              "CD44"
+            ],
+            "paper_term_match": "g protein"
+          },
+          {
+            "term": "Inwardly Rectifying K+ Channels R-HSA-1296065",
+            "p_value": 0.07205202222993733,
+            "p_adj": 0.9999954178078987,
+            "combined_score": 6.372925227396955,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "GNGT1",
+              "GNG5",
+              "KCNJ16",
+              "GNG11",
+              "KCNJ2"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 2
+      },
+      "KEGG_2021_Human": {
+        "n_total": 267,
+        "top20": [
+          {
+            "term": "beta-Alanine metabolism",
+            "p_value": 0.011091439974909996,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 16.377833830799396,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "AOC3",
+              "HADHA",
+              "AOC2",
+              "ALDH1B1",
+              "GAD2",
+              "ABAT"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Morphine addiction",
+            "p_value": 0.06809284737901815,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 4.827733923249204,
+            "n_overlap": 10,
+            "overlap_genes": [
+              "GNGT1",
+              "GABRR2",
+              "GABRR1",
+              "GNG5",
+              "GABRA5",
+              "PDE3A",
+              "OPRM1",
+              "PDE7B",
+              "GABRG3",
+              "GNG11"
+            ],
+            "paper_term_match": "morphine addiction"
+          },
+          {
+            "term": "Alanine, aspartate and glutamate metabolism",
+            "p_value": 0.08722163811613559,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 5.540041142756959,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "FOLH1",
+              "GOT1",
+              "ASNS",
+              "GAD2",
+              "ABAT"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Phenylalanine metabolism",
+            "p_value": 0.09256112357769203,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 7.4083166377794605,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "AOC3",
+              "AOC2",
+              "GOT1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Various types of N-glycan biosynthesis",
+            "p_value": 0.1039158548255522,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 4.839289288807617,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "RPN1",
+              "MAN1C1",
+              "MGAT1",
+              "ALG1",
+              "DDOST"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "ECM-receptor interaction",
+            "p_value": 0.11353573019239105,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 3.6048651855279967,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "GP9",
+              "COL1A2",
+              "TNN",
+              "ITGB8",
+              "DMP1",
+              "ITGB6",
+              "GP5",
+              "CD44",
+              "DSPP"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABAergic synapse",
+            "p_value": 0.11952197678254452,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 3.4755448763984096,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "GNGT1",
+              "GABRR2",
+              "GABRR1",
+              "GNG5",
+              "GABRA5",
+              "GAD2",
+              "ABAT",
+              "GABRG3",
+              "GNG11"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Pentose phosphate pathway",
+            "p_value": 0.12484162778458388,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 4.650792317895651,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "RPE",
+              "ALDOB",
+              "PFKP",
+              "RBKS"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Taurine and hypotaurine metabolism",
+            "p_value": 0.15545682928277135,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 6.005831993575412,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "GAD2",
+              "BAAT"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Viral protein interaction with cytokine and cytokine receptor",
+            "p_value": 0.19584547207127728,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 2.3437447965887044,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "CCL14",
+              "CCL23",
+              "CCL4L1",
+              "CCL4L2",
+              "CCL4",
+              "CXCR4",
+              "CCL18",
+              "CCL16",
+              "CCL15"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Tyrosine metabolism",
+            "p_value": 0.20020676747752253,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 2.9200798297581234,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "AOC3",
+              "TPO",
+              "AOC2",
+              "GOT1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Arginine and proline metabolism",
+            "p_value": 0.218879140169945,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 2.4519266725180193,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "CKMT2",
+              "OAT",
+              "DAO",
+              "ALDH1B1",
+              "GOT1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "N-Glycan biosynthesis",
+            "p_value": 0.218879140169945,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 2.4519266725180193,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "RPN1",
+              "MAN1C1",
+              "MGAT1",
+              "ALG1",
+              "DDOST"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Fatty acid elongation",
+            "p_value": 0.25126674607965144,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 2.506784560115146,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA",
+              "ACOT7"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Nicotine addiction",
+            "p_value": 0.2563639456576168,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 2.196150786689976,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "GABRR2",
+              "GABRR1",
+              "GABRA5",
+              "GABRG3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "B cell receptor signaling pathway",
+            "p_value": 0.26700054558191916,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 1.8143968223302356,
+            "n_overlap": 7,
+            "overlap_genes": [
+              "LILRA6",
+              "PPP3CB",
+              "INPP5D",
+              "LILRB2",
+              "LILRB3",
+              "LILRB5",
+              "LILRA5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Butanoate metabolism",
+            "p_value": 0.269062445841762,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 2.2871690643149956,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "HADHA",
+              "GAD2",
+              "ABAT"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Mitophagy",
+            "p_value": 0.27395359333487873,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 1.8198195768113297,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "PRKN",
+              "MAPK10",
+              "PINK1",
+              "E2F1",
+              "USP30",
+              "OPTN"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Renin secretion",
+            "p_value": 0.2852182122478562,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 1.735104227813212,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "EDNRA",
+              "PPP3CB",
+              "GUCY1A1",
+              "GUCY1B1",
+              "PDE3A",
+              "KCNJ2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Hedgehog signaling pathway",
+            "p_value": 0.29313469578897744,
+            "p_adj": 0.9999953058449279,
+            "combined_score": 1.7469206708405145,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "SHH",
+              "HHIP",
+              "LRP2",
+              "CDON",
+              "DISP1"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 1
+      },
+      "GO_Molecular_Function_2023": {
+        "n_total": 549,
+        "top20": [
+          {
+            "term": "N,N-dimethylaniline Monooxygenase Activity (GO:0004499)",
+            "p_value": 0.0024256438819354673,
+            "p_adj": 0.999995536439378,
+            "combined_score": 131.29741601801464,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "FMO2",
+              "FMO3",
+              "FMO6P"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Lipoprotein Lipase Activity (GO:0004465)",
+            "p_value": 0.004618706357047963,
+            "p_adj": 0.999995536439378,
+            "combined_score": 78.16590763259562,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "LIPN",
+              "LIPM",
+              "LIPK"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Oxidoreductase Activity, Acting On The CH-NH2 Group Of Donors, Oxygen As Acceptor (GO:0016641)",
+            "p_value": 0.0076965579453926874,
+            "p_adj": 0.999995536439378,
+            "combined_score": 53.054642543196664,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "AOC3",
+              "AOC2",
+              "RNLS"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Transaminase Activity (GO:0008483)",
+            "p_value": 0.01022829234302586,
+            "p_adj": 0.999995536439378,
+            "combined_score": 26.654611463673493,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "OAT",
+              "GOT1",
+              "ABAT",
+              "ACCS"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "CCR Chemokine Receptor Binding (GO:0048020)",
+            "p_value": 0.021514582599779366,
+            "p_adj": 0.999995536439378,
+            "combined_score": 10.57072121962557,
+            "n_overlap": 7,
+            "overlap_genes": [
+              "CCL14",
+              "CCL23",
+              "CCL4L1",
+              "CCL4",
+              "CCL18",
+              "CCL16",
+              "CCL15"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "NAD Binding (GO:0051287)",
+            "p_value": 0.023414279096738485,
+            "p_adj": 0.999995536439378,
+            "combined_score": 13.00095497581271,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "HADHA",
+              "ALDH1B1",
+              "RNLS",
+              "UXS1",
+              "ME1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABA-A Receptor Activity (GO:0004890)",
+            "p_value": 0.025461764417275757,
+            "p_adj": 0.999995536439378,
+            "combined_score": 15.246637374351849,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "GABRR2",
+              "GABRR1",
+              "GABRA5",
+              "GABRG3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Chemokine Activity (GO:0008009)",
+            "p_value": 0.026902497972498145,
+            "p_adj": 0.999995536439378,
+            "combined_score": 9.443806108866694,
+            "n_overlap": 7,
+            "overlap_genes": [
+              "CCL14",
+              "CCL23",
+              "CCL4L1",
+              "CCL4",
+              "CCL18",
+              "CCL16",
+              "CCL15"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Metalloendopeptidase Activity (GO:0004222)",
+            "p_value": 0.029174054216777247,
+            "p_adj": 0.999995536439378,
+            "combined_score": 6.943658663071589,
+            "n_overlap": 12,
+            "overlap_genes": [
+              "ADAMTS16",
+              "MMP12",
+              "ADAMTS15",
+              "ADAMDEC1",
+              "ADAM28",
+              "MMP1",
+              "ADAMTS17",
+              "MMP3",
+              "ADAM7",
+              "ADAMTS8",
+              "MMP10",
+              "PAPPA2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "enoyl-CoA Hydratase Activity (GO:0004300)",
+            "p_value": 0.029883524196614327,
+            "p_adj": 0.999995536439378,
+            "combined_score": 19.12948663593469,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA",
+              "ECHDC3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Mechanosensitive Monoatomic Ion Channel Activity (GO:0008381)",
+            "p_value": 0.029883524196614327,
+            "p_adj": 0.999995536439378,
+            "combined_score": 19.12948663593469,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "TMC8",
+              "TMC6",
+              "TMC4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Phospholipid Scramblase Activity (GO:0017128)",
+            "p_value": 0.029883524196614327,
+            "p_adj": 0.999995536439378,
+            "combined_score": 19.12948663593469,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "PLSCR1",
+              "PLSCR5",
+              "CLPTM1L"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "3-hydroxyacyl-CoA Dehydrogenase Activity (GO:0003857)",
+            "p_value": 0.036471101073784845,
+            "p_adj": 0.999995536439378,
+            "combined_score": 32.0617363898124,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Malate Dehydrogenase Activity (GO:0016615)",
+            "p_value": 0.036471101073784845,
+            "p_adj": 0.999995536439378,
+            "combined_score": 32.0617363898124,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "ME1",
+              "ME3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Protein Phosphatase 2B Binding (GO:0030346)",
+            "p_value": 0.036471101073784845,
+            "p_adj": 0.999995536439378,
+            "combined_score": 32.0617363898124,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "PPP3CB",
+              "SOD1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Chemokine Receptor Binding (GO:0042379)",
+            "p_value": 0.040274545278179884,
+            "p_adj": 0.999995536439378,
+            "combined_score": 7.607777648612443,
+            "n_overlap": 7,
+            "overlap_genes": [
+              "CCL14",
+              "CCL23",
+              "CCL4L1",
+              "CCL4",
+              "CCL18",
+              "CCL16",
+              "CCL15"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Triglyceride Lipase Activity (GO:0004806)",
+            "p_value": 0.042752542528046965,
+            "p_adj": 0.999995536439378,
+            "combined_score": 10.781528010234972,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "DAGLA",
+              "LIPN",
+              "LIPM",
+              "LIPK"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABA Receptor Activity (GO:0016917)",
+            "p_value": 0.042752542528046965,
+            "p_adj": 0.999995536439378,
+            "combined_score": 10.781528010234972,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "GABRR2",
+              "GABRR1",
+              "GABRA5",
+              "GABRG3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Inhibitory Extracellular Ligand-Gated Monoatomic Ion Channel Activity (GO:0005237)",
+            "p_value": 0.04705931519253772,
+            "p_adj": 0.999995536439378,
+            "combined_score": 13.322535797159183,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "GLRB",
+              "GABRA5",
+              "GABRG3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "acetyl-CoA C-acyltransferase Activity (GO:0003988)",
+            "p_value": 0.05239732815291656,
+            "p_adj": 0.999995536439378,
+            "combined_score": 21.413865444181752,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 0
+      }
+    }
+  },
+  "ek_chain_merge_250": {
+    "n_genes": 1645,
+    "userListId": 130272232,
+    "libraries": {
+      "Reactome_2022": {
+        "n_total": 1233,
+        "top20": [
+          {
+            "term": "GABA Receptor Activation R-HSA-977443",
+            "p_value": 0.002717669080523145,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 16.911307118447137,
+            "n_overlap": 12,
+            "overlap_genes": [
+              "GABRR3",
+              "GNGT1",
+              "GABRR2",
+              "GABRR1",
+              "GNG5",
+              "GABRA5",
+              "GNB4",
+              "KCNJ16",
+              "GABRG3",
+              "GNG11",
+              "GNAI1",
+              "KCNJ2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "G-protein Activation R-HSA-202040",
+            "p_value": 0.011349582412736474,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 16.70197629540067,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "GNGT1",
+              "GNG5",
+              "GNB4",
+              "OPRM1",
+              "PDYN",
+              "GNG11"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Ligand-receptor Interactions R-HSA-5632681",
+            "p_value": 0.022703571502308985,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 25.380886529816195,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "SHH",
+              "HHIP",
+              "CDON"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Activation Of G Protein Gated Potassium Channels R-HSA-1296041",
+            "p_value": 0.028198312159033668,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 10.412120305138327,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "GNGT1",
+              "GNG5",
+              "GNB4",
+              "KCNJ16",
+              "GNG11",
+              "KCNJ2"
+            ],
+            "paper_term_match": "g protein"
+          },
+          {
+            "term": "ADP Signaling Thru P2Y Purinoceptor 12 R-HSA-392170",
+            "p_value": 0.030244160433475085,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 11.505490611346671,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "GNGT1",
+              "GNG5",
+              "GNB4",
+              "GNG11",
+              "GNAI1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GP1b-IX-V Activation Signaling R-HSA-430116",
+            "p_value": 0.03200488988311105,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 19.231062685213505,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "GP9",
+              "GP5",
+              "YWHAZ"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Signal Attenuation R-HSA-74749",
+            "p_value": 0.042981472847694394,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 15.070706803307816,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "IRS1",
+              "INSR",
+              "SOS1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Transmission Across Chemical Synapses R-HSA-112315",
+            "p_value": 0.04977448242711373,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 4.322299180220756,
+            "n_overlap": 28,
+            "overlap_genes": [
+              "PRKAG2",
+              "ABAT",
+              "LIN7C",
+              "KIF17",
+              "CACNA1E",
+              "SLC6A3",
+              "GNAI1",
+              "NCALD",
+              "SLC6A4",
+              "GABRR3",
+              "GNGT1",
+              "GABRR2",
+              "GABRR1",
+              "GNG5",
+              "RPS6KA2",
+              "PPFIA1",
+              "KCNJ2",
+              "SYT1",
+              "GABRA5",
+              "GAD2",
+              "KCNJ16",
+              "GABRG3",
+              "GNG11",
+              "ALDH5A1",
+              "GLRB",
+              "PRKAR1A",
+              "GNB4",
+              "APBA1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Activation Of GABAB Receptors R-HSA-991365",
+            "p_value": 0.053541523238345594,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 6.547997011946905,
+            "n_overlap": 7,
+            "overlap_genes": [
+              "GNGT1",
+              "GNG5",
+              "GNB4",
+              "KCNJ16",
+              "GNG11",
+              "GNAI1",
+              "KCNJ2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "G Alpha (12/13) Signaling Events R-HSA-416482",
+            "p_value": 0.05379213325629688,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 5.370387095649756,
+            "n_overlap": 11,
+            "overlap_genes": [
+              "GNGT1",
+              "TIAM1",
+              "TRIO",
+              "GNG5",
+              "PLEKHG5",
+              "GNB4",
+              "ARHGEF18",
+              "ADRA1B",
+              "SOS1",
+              "GNG11",
+              "NGEF"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "G Beta:Gamma Signaling Thru BTK R-HSA-8964315",
+            "p_value": 0.05500758508233598,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 9.261619635722154,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "GNGT1",
+              "GNG5",
+              "GNB4",
+              "GNG11"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Acetylcholine Inhibits Contraction Of Outer Hair Cells R-HSA-9667769",
+            "p_value": 0.05717190657421772,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 21.309711268832714,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "CHRNA10",
+              "KCNN2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Beta Oxidation Of hexanoyl-CoA To butanoyl-CoA R-HSA-77350",
+            "p_value": 0.05717190657421772,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 21.309711268832714,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Beta Oxidation Of lauroyl-CoA To decanoyl-CoA-CoA R-HSA-77310",
+            "p_value": 0.05717190657421772,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 21.309711268832714,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Beta Oxidation Of octanoyl-CoA To hexanoyl-CoA R-HSA-77348",
+            "p_value": 0.05717190657421772,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 21.309711268832714,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Defective F9 Activation R-HSA-9673221",
+            "p_value": 0.05717190657421772,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 21.309711268832714,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "GP9",
+              "GP5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "IRS Activation R-HSA-74713",
+            "p_value": 0.05717190657421772,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 21.309711268832714,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "IRS1",
+              "INSR"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "MET Interacts With TNS Proteins R-HSA-8875513",
+            "p_value": 0.05717190657421772,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 21.309711268832714,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "SOS1",
+              "TNS3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Synthesis Of PI R-HSA-1483226",
+            "p_value": 0.05717190657421772,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 21.309711268832714,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "PITPNM3",
+              "PITPNM2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Inwardly Rectifying K+ Channels R-HSA-1296065",
+            "p_value": 0.06356330953458679,
+            "p_adj": 0.9999942489390535,
+            "combined_score": 6.374951589136956,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "GNGT1",
+              "GNG5",
+              "GNB4",
+              "KCNJ16",
+              "GNG11",
+              "KCNJ2"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 1
+      },
+      "KEGG_2021_Human": {
+        "n_total": 285,
+        "top20": [
+          {
+            "term": "Morphine addiction",
+            "p_value": 0.016366774259886984,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 8.379500675061923,
+            "n_overlap": 14,
+            "overlap_genes": [
+              "PDE1B",
+              "GABRA5",
+              "OPRM1",
+              "GABRG3",
+              "GNG11",
+              "GNAI1",
+              "GABRR3",
+              "GNGT1",
+              "GABRR2",
+              "GABRR1",
+              "GNG5",
+              "GNB4",
+              "PDE3A",
+              "PDE7B"
+            ],
+            "paper_term_match": "morphine addiction"
+          },
+          {
+            "term": "beta-Alanine metabolism",
+            "p_value": 0.03287354371679561,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 9.548804361314035,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "AOC3",
+              "HADHA",
+              "AOC2",
+              "ALDH1B1",
+              "GAD2",
+              "ABAT"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Toll-like receptor signaling pathway",
+            "p_value": 0.04554474671349851,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 5.381180806347716,
+            "n_overlap": 14,
+            "overlap_genes": [
+              "CXCL9",
+              "CCL4L1",
+              "STAT1",
+              "CCL4L2",
+              "IRAK4",
+              "MAPK10",
+              "CXCL10",
+              "CXCL11",
+              "CCL4",
+              "TLR8",
+              "RIPK1",
+              "TLR7",
+              "TLR5",
+              "IKBKE"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABAergic synapse",
+            "p_value": 0.06035606394246752,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 4.897244912948689,
+            "n_overlap": 12,
+            "overlap_genes": [
+              "GABRR3",
+              "GNGT1",
+              "GABRR2",
+              "GABRR1",
+              "GNG5",
+              "GABRA5",
+              "GNB4",
+              "GAD2",
+              "ABAT",
+              "GABRG3",
+              "GNG11",
+              "GNAI1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Alanine, aspartate and glutamate metabolism",
+            "p_value": 0.0793569687411701,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 5.482808138120447,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "ALDH5A1",
+              "FOLH1",
+              "GOT1",
+              "ASNS",
+              "GAD2",
+              "ABAT"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Pentose phosphate pathway",
+            "p_value": 0.09558221084429788,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 5.248121660753124,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "PRPS2",
+              "RPE",
+              "ALDOB",
+              "PFKP",
+              "RBKS"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "ECM-receptor interaction",
+            "p_value": 0.10645413468823266,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 3.579600476776526,
+            "n_overlap": 11,
+            "overlap_genes": [
+              "GP9",
+              "COL1A2",
+              "TNN",
+              "COL9A1",
+              "ITGB8",
+              "DMP1",
+              "ITGB6",
+              "GP5",
+              "CD44",
+              "ITGA9",
+              "DSPP"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Renin secretion",
+            "p_value": 0.1114886278168111,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 3.679966594400975,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "EDNRA",
+              "PPP3CB",
+              "GUCY1A1",
+              "GUCY1B1",
+              "PDE1B",
+              "PDE3A",
+              "CALM2",
+              "GNAI1",
+              "KCNJ2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Viral protein interaction with cytokine and cytokine receptor",
+            "p_value": 0.11888754327330016,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 3.248426285229986,
+            "n_overlap": 12,
+            "overlap_genes": [
+              "CCL14",
+              "CXCL10",
+              "CXCL11",
+              "CXCL9",
+              "CCL23",
+              "CCL4L1",
+              "CCL4L2",
+              "CCL4",
+              "CXCR4",
+              "CCL18",
+              "CCL16",
+              "CCL15"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Phenylalanine metabolism",
+            "p_value": 0.15943811192230845,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 4.394801625484581,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "AOC3",
+              "AOC2",
+              "GOT1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Chemokine signaling pathway",
+            "p_value": 0.1630595668268506,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 2.3597431658582537,
+            "n_overlap": 20,
+            "overlap_genes": [
+              "CCL14",
+              "CXCL9",
+              "CCL23",
+              "CCL4L1",
+              "STAT1",
+              "CCL4L2",
+              "CXCR4",
+              "GNG11",
+              "GNAI1",
+              "GNGT1",
+              "TIAM1",
+              "CXCL10",
+              "CXCL11",
+              "GNG5",
+              "CCL4",
+              "GNB4",
+              "SOS1",
+              "CCL18",
+              "CCL16",
+              "CCL15"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Butanoate metabolism",
+            "p_value": 0.1947811713483764,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 3.0456316958624043,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "HADHA",
+              "ALDH5A1",
+              "GAD2",
+              "ABAT"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Various types of N-glycan biosynthesis",
+            "p_value": 0.21429190818566551,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 2.5306639200850123,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "RPN1",
+              "MAN1C1",
+              "MGAT1",
+              "ALG1",
+              "DDOST"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "B cell receptor signaling pathway",
+            "p_value": 0.22041401390643914,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 2.1125017750627806,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "LILRA6",
+              "PPP3CB",
+              "INPP5D",
+              "LILRB2",
+              "SOS1",
+              "LILRB3",
+              "PIK3AP1",
+              "LILRB5",
+              "LILRA5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Taurine and hypotaurine metabolism",
+            "p_value": 0.22745777031470515,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 3.6743877550371176,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "GAD2",
+              "BAAT"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Nicotine addiction",
+            "p_value": 0.22965196134593027,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 2.347753205811638,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "GABRR3",
+              "GABRR2",
+              "GABRR1",
+              "GABRA5",
+              "GABRG3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Non-homologous end-joining",
+            "p_value": 0.29059868630734714,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 2.508685466417005,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "MRE11",
+              "POLL"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Retrograde endocannabinoid signaling",
+            "p_value": 0.33252853112234604,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 1.2851105380243493,
+            "n_overlap": 14,
+            "overlap_genes": [
+              "DAGLA",
+              "GABRA5",
+              "NDUFB4",
+              "GABRG3",
+              "GNG11",
+              "GNAI1",
+              "GABRR3",
+              "GNGT1",
+              "MAPK10",
+              "GABRR2",
+              "GABRR1",
+              "GNG5",
+              "CNR1",
+              "GNB4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Mucin type O-glycan biosynthesis",
+            "p_value": 0.34348219044750705,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 1.4914933388763956,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "GALNT14",
+              "GALNT3",
+              "GALNT17",
+              "ST6GALNAC3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Tyrosine metabolism",
+            "p_value": 0.34348219044750705,
+            "p_adj": 0.9999937047180504,
+            "combined_score": 1.4914933388763956,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "AOC3",
+              "TPO",
+              "AOC2",
+              "GOT1"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 1
+      },
+      "GO_Molecular_Function_2023": {
+        "n_total": 643,
+        "top20": [
+          {
+            "term": "Chemokine Activity (GO:0008009)",
+            "p_value": 0.003618203425895681,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 17.49666073588552,
+            "n_overlap": 10,
+            "overlap_genes": [
+              "CCL14",
+              "CXCL10",
+              "CXCL9",
+              "CCL23",
+              "CXCL11",
+              "CCL4L1",
+              "CCL4",
+              "CCL18",
+              "CCL16",
+              "CCL15"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "N,N-dimethylaniline Monooxygenase Activity (GO:0004499)",
+            "p_value": 0.004893146584241365,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 89.19289259058908,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "FMO2",
+              "FMO3",
+              "FMO6P"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Chemokine Receptor Binding (GO:0042379)",
+            "p_value": 0.00675730387936274,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 13.994259910176192,
+            "n_overlap": 10,
+            "overlap_genes": [
+              "CCL14",
+              "CXCL10",
+              "CXCL9",
+              "CCL23",
+              "CXCL11",
+              "CCL4L1",
+              "CCL4",
+              "CCL18",
+              "CCL16",
+              "CCL15"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Lipoprotein Lipase Activity (GO:0004465)",
+            "p_value": 0.009188900990397167,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 52.41562485849841,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "LIPN",
+              "LIPM",
+              "LIPK"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABA-A Receptor Activity (GO:0004890)",
+            "p_value": 0.012935991740525102,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 18.70222326629179,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "GABRR3",
+              "GABRR2",
+              "GABRR1",
+              "GABRA5",
+              "GABRG3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "3',5'-cyclic-GMP Phosphodiesterase Activity (GO:0047555)",
+            "p_value": 0.015103362295575552,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 35.14438252640546,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "PDE1B",
+              "PDE3A",
+              "PDE9A"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Oxidoreductase Activity, Acting On The CH-NH2 Group Of Donors, Oxygen As Acceptor (GO:0016641)",
+            "p_value": 0.015103362295575552,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 35.14438252640546,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "AOC3",
+              "AOC2",
+              "RNLS"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Transaminase Activity (GO:0008483)",
+            "p_value": 0.02337347032056377,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 16.796255612476116,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "OAT",
+              "GOT1",
+              "ABAT",
+              "ACCS"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABA Receptor Activity (GO:0016917)",
+            "p_value": 0.025017641960494445,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 12.888228551172705,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "GABRR3",
+              "GABRR2",
+              "GABRR1",
+              "GABRA5",
+              "GABRG3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "3',5'-Cyclic-Nucleotide Phosphodiesterase Activity (GO:0004114)",
+            "p_value": 0.03727011462471222,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 12.256848079744868,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "PDE1B",
+              "PDE3A",
+              "PDE7B",
+              "PDE9A"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "CXCR Chemokine Receptor Binding (GO:0045236)",
+            "p_value": 0.03727011462471222,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 12.256848079744868,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "CXCL10",
+              "CXCL9",
+              "CXCL11",
+              "TFF2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "UDP-galactose:beta-N-acetylglucosamine Beta-1,3-Galactosyltransferase Activity (GO:0008499)",
+            "p_value": 0.05557517299638319,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 12.109433588077081,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "B3GNT7",
+              "B3GALT2",
+              "B3GNTL1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "enoyl-CoA Hydratase Activity (GO:0004300)",
+            "p_value": 0.05557517299638319,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 12.109433588077081,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA",
+              "ECHDC3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Mechanosensitive Monoatomic Ion Channel Activity (GO:0008381)",
+            "p_value": 0.05557517299638319,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 12.109433588077081,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "TMC8",
+              "TMC6",
+              "TMC4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Monoamine Transmembrane Transporter Activity (GO:0008504)",
+            "p_value": 0.05557517299638319,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 12.109433588077081,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "SLC29A4",
+              "SLC6A3",
+              "SLC6A4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Phospholipid Scramblase Activity (GO:0017128)",
+            "p_value": 0.05557517299638319,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 12.109433588077081,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "PLSCR1",
+              "PLSCR5",
+              "CLPTM1L"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "3-hydroxyacyl-CoA Dehydrogenase Activity (GO:0003857)",
+            "p_value": 0.05717190657421772,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 21.309711268832714,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "alpha-N-acetylgalactosaminide Alpha-2,6-Sialyltransferase Activity (GO:0001665)",
+            "p_value": 0.05717190657421772,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 21.309711268832714,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "ST6GALNAC3",
+              "ST6GALNAC5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Malate Dehydrogenase Activity (GO:0016615)",
+            "p_value": 0.05717190657421772,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 21.309711268832714,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "ME1",
+              "ME3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Protein Phosphatase 2B Binding (GO:0030346)",
+            "p_value": 0.05717190657421772,
+            "p_adj": 0.9999955662110636,
+            "combined_score": 21.309711268832714,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "PPP3CB",
+              "SOD1"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 0
+      }
+    }
+  },
+  "DSS_from_scratch": {
+    "n_genes": 1467,
+    "userListId": 130272243,
+    "libraries": {
+      "Reactome_2022": {
+        "n_total": 1109,
+        "top20": [
+          {
+            "term": "Scavenging By Class A Receptors R-HSA-3000480",
+            "p_value": 0.010289851700168471,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 20.70402639712156,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "COLEC12",
+              "COL3A1",
+              "COL1A2",
+              "COL4A2",
+              "COL4A1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Insulin-like Growth Factor-2 mRNA Binding Proteins (IGF2BPs/IMPs/VICKZs) Bind RNA R-HSA-428359",
+            "p_value": 0.011013394133616485,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 42.797463099571026,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "MYC",
+              "POTEF",
+              "CD44"
+            ],
+            "paper_term_match": "g protein"
+          },
+          {
+            "term": "Ligand-receptor Interactions R-HSA-5632681",
+            "p_value": 0.016669018311681542,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 31.089099162516032,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "SHH",
+              "HHIP",
+              "CDON"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABA Receptor Activation R-HSA-977443",
+            "p_value": 0.02713852549120768,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 8.230185440203934,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "GNGT1",
+              "GABRR2",
+              "GABRR1",
+              "GABRA5",
+              "GNB4",
+              "KCNJ16",
+              "GABRG3",
+              "GNG11",
+              "KCNJ2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "G-protein Activation R-HSA-202040",
+            "p_value": 0.027754250237411574,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 11.944876785768233,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "GNGT1",
+              "GNB4",
+              "OPRM1",
+              "PDYN",
+              "GNG11"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Acetylcholine Inhibits Contraction Of Outer Hair Cells R-HSA-9667769",
+            "p_value": 0.046314262150848336,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 25.906629223542005,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "CHRNA10",
+              "KCNN2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Beta Oxidation Of hexanoyl-CoA To butanoyl-CoA R-HSA-77350",
+            "p_value": 0.046314262150848336,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 25.906629223542005,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Beta Oxidation Of lauroyl-CoA To decanoyl-CoA-CoA R-HSA-77310",
+            "p_value": 0.046314262150848336,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 25.906629223542005,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Beta Oxidation Of octanoyl-CoA To hexanoyl-CoA R-HSA-77348",
+            "p_value": 0.046314262150848336,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 25.906629223542005,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Defective F9 Activation R-HSA-9673221",
+            "p_value": 0.046314262150848336,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 25.906629223542005,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "GP9",
+              "GP5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "IRS Activation R-HSA-74713",
+            "p_value": 0.046314262150848336,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 25.906629223542005,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "IRS1",
+              "INSR"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Activation Of G Protein Gated Potassium Channels R-HSA-1296041",
+            "p_value": 0.05743134973964004,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 7.535805158794397,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "GNGT1",
+              "GNB4",
+              "KCNJ16",
+              "GNG11",
+              "KCNJ2"
+            ],
+            "paper_term_match": "g protein"
+          },
+          {
+            "term": "G Alpha (12/13) Signaling Events R-HSA-416482",
+            "p_value": 0.05836377049226767,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 5.294942465947847,
+            "n_overlap": 10,
+            "overlap_genes": [
+              "GNGT1",
+              "TIAM1",
+              "TRIO",
+              "MCF2L",
+              "PLEKHG5",
+              "GNB4",
+              "ARHGEF18",
+              "ECT2",
+              "GNG11",
+              "NGEF"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Nitric Oxide Stimulates Guanylate Cyclase R-HSA-392154",
+            "p_value": 0.06334415986804647,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 8.216611991492345,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "GUCY1A1",
+              "GUCY1B1",
+              "PDE5A",
+              "PDE9A"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Acyl Chain Remodeling Of CL R-HSA-1482798",
+            "p_value": 0.0661441822486494,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 17.175170964072574,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Beta Oxidation Of decanoyl-CoA To octanoyl-CoA-CoA R-HSA-77346",
+            "p_value": 0.0661441822486494,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 17.175170964072574,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Mitochondrial Fatty Acid Beta-Oxidation Of Unsaturated Fatty Acids R-HSA-77288",
+            "p_value": 0.0661441822486494,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 17.175170964072574,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Binding And Uptake Of Ligands By Scavenger Receptors R-HSA-2173782",
+            "p_value": 0.07670491492752092,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 5.573361107340072,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "COLEC12",
+              "COL3A1",
+              "COL1A2",
+              "AMBP",
+              "COL4A2",
+              "COL4A1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Pentose Phosphate Pathway R-HSA-71336",
+            "p_value": 0.07802066755023493,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 8.801336678683356,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "PRPS2",
+              "RPE",
+              "RBKS"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Post-transcriptional Silencing By Small RNAs R-HSA-426496",
+            "p_value": 0.08819652350521871,
+            "p_adj": 0.9999949514300523,
+            "combined_score": 12.283812235651698,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "TNRC6C",
+              "AGO2"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 2
+      },
+      "KEGG_2021_Human": {
+        "n_total": 269,
+        "top20": [
+          {
+            "term": "beta-Alanine metabolism",
+            "p_value": 0.06493077507128775,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 6.923241671057358,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "AOC3",
+              "HADHA",
+              "AOC2",
+              "ALDH1B1",
+              "ABAT"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Nicotine addiction",
+            "p_value": 0.16671248164508937,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 3.2381163228183354,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "GABRR2",
+              "GABRR1",
+              "GABRA5",
+              "CACNA1A",
+              "GABRG3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Pentose phosphate pathway",
+            "p_value": 0.1743999192230554,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 3.398780492891976,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "PRPS2",
+              "RPE",
+              "PFKP",
+              "RBKS"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "ECM-receptor interaction",
+            "p_value": 0.19557527351321385,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 2.3529786440341276,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "GP9",
+              "COL1A2",
+              "COL4A2",
+              "TNN",
+              "COL4A1",
+              "LAMA4",
+              "ITGB8",
+              "GP5",
+              "CD44"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABAergic synapse",
+            "p_value": 0.20449269880369944,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 2.2599557210361594,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "GNGT1",
+              "GABRR2",
+              "GABRR1",
+              "GABRA5",
+              "GNB4",
+              "CACNA1A",
+              "ABAT",
+              "GABRG3",
+              "GNG11"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Morphine addiction",
+            "p_value": 0.22281013087675133,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 2.0854398331227477,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "GNGT1",
+              "GABRR2",
+              "GABRR1",
+              "GABRA5",
+              "GNB4",
+              "CACNA1A",
+              "OPRM1",
+              "GABRG3",
+              "GNG11"
+            ],
+            "paper_term_match": "morphine addiction"
+          },
+          {
+            "term": "Toll-like receptor signaling pathway",
+            "p_value": 0.23172893097408817,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 1.9685791216624309,
+            "n_overlap": 10,
+            "overlap_genes": [
+              "MAPK10",
+              "CCL4L1",
+              "STAT1",
+              "CCL4L2",
+              "CCL4",
+              "TLR8",
+              "RIPK1",
+              "TLR7",
+              "IRAK4",
+              "IKBKE"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Renin-angiotensin system",
+            "p_value": 0.23594935973734088,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 2.7392754273291122,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "KLK1",
+              "ATP6AP2",
+              "KLK2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Type II diabetes mellitus",
+            "p_value": 0.24626667208786585,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 2.1615549012284094,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "MAPK10",
+              "IRS1",
+              "INSR",
+              "CACNA1A",
+              "CACNA1E"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Valine, leucine and isoleucine degradation",
+            "p_value": 0.27473142356966623,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 1.8999430883904895,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA",
+              "ALDH1B1",
+              "ABAT",
+              "HMGCLL1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Ether lipid metabolism",
+            "p_value": 0.2892124147864458,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 1.7828426118413816,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "LPCAT1",
+              "ENPP2",
+              "GDPD1",
+              "SELENOI",
+              "PAFAH2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Retrograde endocannabinoid signaling",
+            "p_value": 0.2902845000828,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 1.5071212911073775,
+            "n_overlap": 13,
+            "overlap_genes": [
+              "DAGLA",
+              "GABRA5",
+              "NDUFB4",
+              "CACNA1A",
+              "GABRG3",
+              "GNG11",
+              "GNGT1",
+              "MAPK10",
+              "GABRR2",
+              "GABRR1",
+              "CNR1",
+              "NDUFAB1",
+              "GNB4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Cholesterol metabolism",
+            "p_value": 0.303825119988088,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 1.6738721675392083,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "NCEH1",
+              "PCSK9",
+              "LPL",
+              "LRP2",
+              "LDLRAP1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Viral protein interaction with cytokine and cytokine receptor",
+            "p_value": 0.3116821739257163,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 1.458360738961692,
+            "n_overlap": 9,
+            "overlap_genes": [
+              "CCL14",
+              "CCL23",
+              "CCL4L1",
+              "CCL4L2",
+              "CCL4",
+              "CXCR4",
+              "CCL18",
+              "CCL16",
+              "CCL15"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Lysine degradation",
+            "p_value": 0.315113317414872,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 1.5372678510531375,
+            "n_overlap": 6,
+            "overlap_genes": [
+              "HADHA",
+              "COLGALT2",
+              "KMT2A",
+              "ALDH1B1",
+              "PRDM2",
+              "CAMKMT"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Fatty acid elongation",
+            "p_value": 0.31767597370825273,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 1.8122184756339612,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA",
+              "ACOT7"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Various types of N-glycan biosynthesis",
+            "p_value": 0.32021153068317576,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 1.6455448971447655,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "RPN1",
+              "MAN1C1",
+              "ALG1",
+              "DDOST"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Butanoate metabolism",
+            "p_value": 0.3383150484576592,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 1.6441441042143694,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "HADHA",
+              "ABAT",
+              "HMGCLL1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Phenylalanine metabolism",
+            "p_value": 0.35758875026506326,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 1.733186534800443,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "AOC3",
+              "AOC2"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Phosphonate and phosphinate metabolism",
+            "p_value": 0.36690490237712997,
+            "p_adj": 0.9999950215298073,
+            "combined_score": 2.5343993335800308,
+            "n_overlap": 1,
+            "overlap_genes": [
+              "SELENOI"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 1
+      },
+      "GO_Molecular_Function_2023": {
+        "n_total": 593,
+        "top20": [
+          {
+            "term": "Sulfur Amino Acid Transmembrane Transporter Activity (GO:0000099)",
+            "p_value": 0.003518961072074808,
+            "p_adj": 0.8355717539704,
+            "combined_score": 107.2669494958199,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "SLC7A9",
+              "SLC3A1",
+              "SLC1A4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "N,N-dimethylaniline Monooxygenase Activity (GO:0004499)",
+            "p_value": 0.003518961072074808,
+            "p_adj": 0.8355717539704,
+            "combined_score": 107.2669494958199,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "FMO2",
+              "FMO3",
+              "FMO6P"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Platelet-Derived Growth Factor Binding (GO:0048407)",
+            "p_value": 0.004227175821098145,
+            "p_adj": 0.8355717539704,
+            "combined_score": 46.14840715242766,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "COL3A1",
+              "COL1A2",
+              "COL4A1",
+              "PDGFA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Lipoprotein Lipase Activity (GO:0004465)",
+            "p_value": 0.006654484351609861,
+            "p_adj": 0.9865273051261618,
+            "combined_score": 63.44328122931318,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "LIPN",
+              "LIPM",
+              "LIPK"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Oxidoreductase Activity, Acting On The CH-NH2 Group Of Donors, Oxygen As Acceptor (GO:0016641)",
+            "p_value": 0.011013394133616485,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 42.797463099571026,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "AOC3",
+              "AOC2",
+              "RNLS"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "CCR Chemokine Receptor Binding (GO:0048020)",
+            "p_value": 0.013593436634240143,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 12.109240309757938,
+            "n_overlap": 8,
+            "overlap_genes": [
+              "CCL14",
+              "CCL23",
+              "CCL4L1",
+              "CCL4",
+              "CCL18",
+              "DEFB106A",
+              "CCL16",
+              "CCL15"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Phosphatidylinositol-3,5-Bisphosphate Binding (GO:0080025)",
+            "p_value": 0.027754250237411574,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 11.944876785768233,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "SNX3",
+              "SH3PXD2B",
+              "WIPI1",
+              "WIPI2",
+              "CLVS1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "NAD Binding (GO:0051287)",
+            "p_value": 0.038074557050299385,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 9.8529550623608,
+            "n_overlap": 5,
+            "overlap_genes": [
+              "HADHA",
+              "ALDH1B1",
+              "RNLS",
+              "UXS1",
+              "ME1"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABA-A Receptor Activity (GO:0004890)",
+            "p_value": 0.03850815914698439,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 11.778977795351695,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "GABRR2",
+              "GABRR1",
+              "GABRA5",
+              "GABRG3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "enoyl-CoA Hydratase Activity (GO:0004300)",
+            "p_value": 0.04163188308043627,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 15.084251651709932,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA",
+              "ECHDC3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Mechanosensitive Monoatomic Ion Channel Activity (GO:0008381)",
+            "p_value": 0.04163188308043627,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 15.084251651709932,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "TMC8",
+              "TMC6",
+              "TMC4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Monoamine Transmembrane Transporter Activity (GO:0008504)",
+            "p_value": 0.04163188308043627,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 15.084251651709932,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "SLC29A4",
+              "SLC6A3",
+              "SLC6A4"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Phospholipid Scramblase Activity (GO:0017128)",
+            "p_value": 0.04163188308043627,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 15.084251651709932,
+            "n_overlap": 3,
+            "overlap_genes": [
+              "PLSCR1",
+              "PLSCR5",
+              "CLPTM1L"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "3-hydroxyacyl-CoA Dehydrogenase Activity (GO:0003857)",
+            "p_value": 0.046314262150848336,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 25.906629223542005,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "HADHB",
+              "HADHA"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Acetylcholine Receptor Inhibitor Activity (GO:0030550)",
+            "p_value": 0.046314262150848336,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 25.906629223542005,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "LY6H",
+              "LY6E"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "alpha-N-acetylgalactosaminide Alpha-2,6-Sialyltransferase Activity (GO:0001665)",
+            "p_value": 0.046314262150848336,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 25.906629223542005,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "ST6GALNAC3",
+              "ST6GALNAC5"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Malate Dehydrogenase Activity (GO:0016615)",
+            "p_value": 0.046314262150848336,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 25.906629223542005,
+            "n_overlap": 2,
+            "overlap_genes": [
+              "ME1",
+              "ME3"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Chemokine Activity (GO:0008009)",
+            "p_value": 0.04884892007516694,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 6.8640091417298565,
+            "n_overlap": 7,
+            "overlap_genes": [
+              "CCL14",
+              "CCL23",
+              "CCL4L1",
+              "CCL4",
+              "CCL18",
+              "CCL16",
+              "CCL15"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "Triglyceride Lipase Activity (GO:0004806)",
+            "p_value": 0.06334415986804647,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 8.216611991492345,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "DAGLA",
+              "LIPN",
+              "LIPM",
+              "LIPK"
+            ],
+            "paper_term_match": null
+          },
+          {
+            "term": "GABA Receptor Activity (GO:0016917)",
+            "p_value": 0.06334415986804647,
+            "p_adj": 0.9999954458216508,
+            "combined_score": 8.216611991492345,
+            "n_overlap": 4,
+            "overlap_genes": [
+              "GABRR2",
+              "GABRR1",
+              "GABRA5",
+              "GABRG3"
+            ],
+            "paper_term_match": null
+          }
+        ],
+        "n_sig_in_top20": 0,
+        "n_paper_term_matches_top20": 0
+      }
+    }
+  }
+}

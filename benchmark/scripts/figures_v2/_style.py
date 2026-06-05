@@ -8,12 +8,26 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-REPO_ROOT = Path(r"D:/Coding/Projeler/methyl_lib/benchmarkin_merges").resolve()
-DATA_DIR  = REPO_ROOT / "FINAL_REPORT" / "data" / "study3"
-FIG_DIR   = REPO_ROOT / "FINAL_REPORT" / "figures" / "study3_real_GSE263850"
-THREE_WAY = FIG_DIR / "three_way"
-CM_FIG    = FIG_DIR / "chain_merge"
-DSS_FIG   = FIG_DIR / "dss"
+# Self-locating: parents[2] of scripts/figures_v2/_style.py == benchmark/.
+# (Was a hardcoded external benchmarkin_merges/FINAL_REPORT path pre-2026-06;
+# repointed to the current committed epykit3/benchmark tree.)
+BENCH_ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR   = BENCH_ROOT / "data" / "study3"
+# Post-rerun dis.merge sweep + multicore timing live under this sibling tree.
+SWEEP_DIR  = BENCH_ROOT / "data" / "multi_thread_and_chain_sweep" / "chain_merge_dis_merge_sweep"
+FIG_DIR    = BENCH_ROOT / "figures" / "study3_real_GSE263850"
+THREE_WAY  = FIG_DIR / "three_way"
+CM_FIG     = FIG_DIR / "chain_merge"
+DSS_FIG    = FIG_DIR / "dss"
+
+# External reference inputs that are not part of the committed benchmark tree
+# (the source paper's Supp Table 5 and the methylKit-tile real-data run).
+PAPER_T5_XLSX = Path(
+    r"D:/Coding/Projeler/methyl_lib/epykit2/GSE263850_RAW/Paper resources/DMR_total_list.xlsx"
+)
+MK_TILE_DIR = Path(
+    r"D:/Coding/Projeler/methyl_lib/methylkıt_realResults/scripts_and_results/methylkit_results"
+)
 
 # Color palette per caller, consistent across all figures.
 CALLER_COLOR = {

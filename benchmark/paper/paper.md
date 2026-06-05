@@ -745,12 +745,16 @@ hits against each caller:
 | Caller | any-bp hits / 20 | J ≥ 0.5 hits / 20 |
 |---|---:|---:|
 | methylKit-tile | **2 / 20** | 0 / 20 |
-| epykit-chain_merge-100 | **9 / 20** | 5 / 20 |
-| epykit-chain_merge-250 | **11 / 20** | 7 / 20 |
+| epykit-chain_merge-100 | **12 / 20** | 7 / 20 |
+| epykit-chain_merge-250 | **14 / 20** | 9 / 20 |
 | DSS-from-scratch | **18 / 20** | 17 / 20 |
 
-The pattern matches the coord-overlap headline: DSS recovers nearly
-all named genes at strict overlap; chain_merge recovers ~half; the
+Post-rerun, chain_merge-100 hits 12/20 named genes at any-bp overlap
+(NR2E1, OTX1, IRX2, ENPP2, GREB1L, CCDC177, GNG11, EBF1 on the hyper
+side; LOC100131655, OSBPL8, RPLP0P2, FAM87A on the hypo side), rising
+to 14/20 at `dis.merge = 250` (adds OTX2 and PAX7). The pattern matches
+the coord-overlap headline: DSS recovers nearly all named genes at
+strict overlap; chain_merge recovers roughly two-thirds; the
 fixed-tile baseline misses almost all of them. See
 [F4 named-gene heatmap](../figures/study3_real_GSE263850/three_way/F4_top_named_gene_hits.png).
 

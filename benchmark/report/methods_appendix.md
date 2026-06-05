@@ -461,8 +461,8 @@ Gene lists (Methods §B above for 100 kb-rule construction):
 |---|---|---:|
 | paper Table 5 (705 unique) | Supp Table 5 `Gene.Name` column | 705 |
 | methylKit-tile | HOMER-equivalent nearest TSS of every methylKit DMR | 2,111 |
-| ek-chain_merge-100 (100 kb rule) | dmr_gene_links_100kb.csv | 1,112 |
-| ek-chain_merge-250 (100 kb rule) | dmr_gene_links_100kb.csv (sweep) | 1,444 |
+| ek-chain_merge-100 (100 kb rule) | dmr_gene_links_100kb.csv (post-rerun, 852 DMRs) | 1,290 |
+| ek-chain_merge-250 (100 kb rule) | dmr_gene_links_100kb.csv (post-rerun sweep, 1,139 DMRs) | 1,645 |
 | DSS-from-scratch (100 kb rule) | DSS dmr_gene_links_100kb.csv | 1,467 |
 
 Backend: Enrichr REST API (`maayanlab.cloud/Enrichr`), no auth.

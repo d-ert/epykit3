@@ -1,8 +1,9 @@
 """F1 — 3-way DMR overlap, hand-rolled UpSet-style figure.
 
-Sets: paper-Table5 (813), epykit-chain_merge-100 (702),
+Sets: paper-Table5 (813), epykit-chain_merge-100 (852, post-rerun),
 DSS-from-scratch (922). For each DMR we record which sets it belongs
 to (via any-bp adjacency OR J>=0.5). Two panels: any-bp and J>=0.5.
+Set totals are computed dynamically from the input files.
 
 Custom render avoids the upsetplot/matplotlib 3.10 incompatibility.
 """

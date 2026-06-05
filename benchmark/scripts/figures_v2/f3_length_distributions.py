@@ -16,11 +16,11 @@ import pandas as pd
 import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _style import (DATA_DIR, THREE_WAY, CALLER_COLOR, setup, save_dual)
+from _style import (DATA_DIR, SWEEP_DIR, THREE_WAY, CALLER_COLOR, PAPER_T5_XLSX,
+                    MK_TILE_DIR, setup, save_dual)
 
-RAW = Path(r"D:/Coding/Projeler/methyl_lib/epykit2/GSE263850_RAW")
-MK  = Path(r"D:/Coding/Projeler/methyl_lib/methylkıt_realResults/"
-           r"scripts_and_results/methylkit_results/dmr_significant_lenient.csv")
+RAW = PAPER_T5_XLSX.parent.parent
+MK  = MK_TILE_DIR / "dmr_significant_lenient.csv"
 
 
 def length_df(df: pd.DataFrame, label: str) -> pd.DataFrame:
@@ -48,8 +48,7 @@ def main() -> None:
                             "dmr_chain_merge.parquet").to_pandas()
     rows.append(length_df(ek100, "epykit-chain_merge-100"))
     # ek-chain_merge-250
-    ek250 = pl.read_parquet(DATA_DIR / "chain_merge_dis_merge_sweep" /
-                            "dis_merge_250" / "dmr.parquet").to_pandas()
+    ek250 = pl.read_parquet(SWEEP_DIR / "dis_merge_250" / "dmr.parquet").to_pandas()
     rows.append(length_df(ek250, "epykit-chain_merge-250"))
     # DSS
     rows.append(length_df(

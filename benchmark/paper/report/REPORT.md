@@ -551,16 +551,17 @@ DMR-associated genes. Direct coordinate-overlap hits per caller:
 | Caller | any-bp / 20 | J ≥ 0.5 / 20 |
 |---|---:|---:|
 | methylKit-tile | 2 / 20 | 0 / 20 |
-| epykit-chain_merge-100 | 9 / 20 | 5 / 20 |
-| epykit-chain_merge-250 | 11 / 20 | 7 / 20 |
+| epykit-chain_merge-100 | 12 / 20 | 7 / 20 |
+| epykit-chain_merge-250 | 14 / 20 | 9 / 20 |
 | **DSS-from-scratch** | **18 / 20** | **17 / 20** |
 
-Specific hyper-side genes hit by chain_merge-100: NR2E1, OTX1, IRX2,
-ENPP2, GREB1L, CCDC177, EBF1; hypo-side: RPLP0P2, FAM87A (= 9 / 20).
-Notable hyper misses include OTX2, GNG11, PPP2R3B — short,
+Specific hyper-side genes hit by chain_merge-100 (post-rerun): NR2E1,
+OTX1, IRX2, ENPP2, GREB1L, CCDC177, GNG11, EBF1; hypo-side:
+LOC100131655, OSBPL8, RPLP0P2, FAM87A (= 12 / 20). chain_merge-250
+adds OTX2 and PAX7 (= 14 / 20). Remaining misses (OTX2/PPP2R3B at
+dis=100; LOC100506858, KC6, TMEM242, NAALADL2, PDK3) are short,
 low-CpG-density DMRs that pass DSS's smoothed test but fall below
-epykit's LR; hypo misses include LOC100506858, KC6, TMEM242,
-NAALADL2, LOC100131655, PAX7, PDK3, OSBPL8. Source:
+epykit's LR. Source:
 [F4 named-gene heatmap](../figures/study3_real_GSE263850/three_way/F4_top_named_gene_hits.png) +
 [F4 data](../figures/study3_real_GSE263850/three_way/F4_top_named_gene_hits_data.csv).
 
@@ -616,9 +617,14 @@ following counts of top-20 paper-keyword matches:
 |---|---:|---:|---:|
 | paper Table 5 (705 genes) | 705 | 2 | 2 |
 | methylKit-tile (nearest-TSS) | 2,111 | 1 | 1 |
-| ek-chain_merge-100 (100 kb) | 1,112 | 3 | 1 |
-| ek-chain_merge-250 (100 kb) | 1,444 | 1 | 1 |
+| ek-chain_merge-100 (100 kb) | 1,290 | 2 | 1 |
+| ek-chain_merge-250 (100 kb) | 1,645 | 1 | 1 |
 | DSS-from-scratch (100 kb) | 1,467 | 2 | 1 |
+
+(Post-rerun gene lists; enrichment re-run 2026-06-05 against live Enrichr.
+The "Morphine addiction" KEGG Gα(i) term and an "Activation of G Protein
+Gated Potassium Channels" Reactome term remain in the top-20 for every
+chain_merge / DSS caller — the qualitative Panel-D recovery is unchanged.)
 
 Enrichr's full-library BH correction is more aggressive than ShinyGO's
 "Curated.Reactome" — the absolute term counts are smaller than the
