@@ -14,11 +14,12 @@
 #   docker run --rm -v "$PWD":/work -w /work epykit-r \
 #       Rscript benchmark/scripts/run_dmrseq.R --in-dir ... --out ...
 #
-# The rocker/r-ver:4.5.0 base is the canonical "frozen R + system libs"
-# anchor; on top of it we restore the project renv lockfile which pins
-# every R package (CRAN + Bioconductor + dev) to the exact version used
-# by the paper.
-FROM rocker/r-ver:4.5.0
+# The rocker/r-ver:4.5.3 base is the canonical "frozen R + system libs"
+# anchor; it matches the R version recorded in benchmark/renv.lock
+# (R 4.5.3 / Bioconductor 3.22). On top of it we restore the project renv
+# lockfile which pins every R package (CRAN + Bioconductor) to the exact
+# version used by the paper.
+FROM rocker/r-ver:4.5.3
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LC_ALL=C.UTF-8 \
