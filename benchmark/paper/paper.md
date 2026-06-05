@@ -911,6 +911,18 @@ We therefore recommend that users:
   part of why it dominates the low-coverage small-effect bin in §3.1.
   `dispersion="eb"` is designed for heterogeneous regimes but is a no-op
   on this simulator.
+* **The empirical-Bayes dispersion prior is not validated against an external
+  estimator.** The EB shrinkage behind `dispersion="eb"` (and hence the opt-in
+  `lr+` stack) treats per-site Pearson dispersions as draws from an
+  inverse-Gamma prior whose hyperparameters are fit by method-of-moments per
+  chromosome (§2.5). We make no goodness-of-fit claim for that prior: its
+  per-site posterior dispersions have not been Q-Q compared against an
+  independent estimator such as DSS's, and that comparison remains future work.
+  This is acceptable here precisely because `eb`/`lr+` are opt-in research
+  knobs rather than the recommended default — **every headline result in this
+  paper is reported under bare `lr`**, whose dispersion is the binomial-floored
+  quasi-binomial Pearson estimate, not the EB prior. A reader should not read
+  any headline number as depending on, or as evidence for, the EB prior.
 * **Baseline software versions.** Study 1 baseline numbers are from 2021
   software releases. Relative ordering at low coverage / small n is robust
   across recent versions of those tools, but absolute numbers may have
