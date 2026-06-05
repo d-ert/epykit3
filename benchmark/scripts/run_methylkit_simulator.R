@@ -33,7 +33,11 @@ opt_list <- list(
   make_option("--in-dir",  type = "character", help = "Directory containing the 6 .cov.gz files"),
   make_option("--out",     type = "character", help = "Output TSV path for per-CpG results"),
   make_option("--cores",   type = "integer",   default = 1L,
-              help = "mc.cores for calculateDiffMeth (Windows: keep 1)")
+              help = "mc.cores for calculateDiffMeth (Windows: keep 1)"),
+  make_option("--overdispersion", type = "character", default = "none",
+              help = "calculateDiffMeth overdispersion: 'none' (default) or 'MN'"),
+  make_option("--test",    type = "character", default = "default",
+              help = "test: 'default' (F for none / Chisq when MN set) or explicit 'Chisq'/'F'")
 )
 opt <- parse_args(OptionParser(option_list = opt_list))
 if (is.null(opt$`in-dir`) || is.null(opt$out)) {
@@ -81,8 +85,19 @@ cat(sprintf("unite: %d sites covered in all samples\n", nrow(united)))
 t_unite <- proc.time() - t_unite_0
 
 # ---- Phase 2: calculateDiffMeth -------------------------------------------
+# Default (overdispersion="none") preserves the original dispersion-blind call
+# byte-for-byte. overdispersion="MN" enables methylKit's McCullagh-Nelder
+# overdispersion correction (the dispersion-aware mode the paper benchmarks
+# `lr` against); with MN the recommended test is Chisq unless overridden.
 t_diff_0 <- proc.time()
-diff <- calculateDiffMeth(united, mc.cores = opt$cores)
+if (identical(opt$overdispersion, "MN")) {
+  mk_test <- if (identical(opt$test, "default")) "Chisq" else opt$test
+  cat(sprintf("calculateDiffMeth: overdispersion=MN, test=%s\n", mk_test))
+  diff <- calculateDiffMeth(united, overdispersion = "MN", test = mk_test,
+                            mc.cores = opt$cores)
+} else {
+  diff <- calculateDiffMeth(united, mc.cores = opt$cores)
+}
 t_diff <- proc.time() - t_diff_0
 cat(sprintf("calculateDiffMeth: %d sites tested\n", nrow(diff)))
 

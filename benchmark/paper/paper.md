@@ -56,11 +56,13 @@ abstract: |
   is ≈ 33× faster than methylKit and ≈ 33× faster than DSS on per-CpG
   testing; on Study 3 (22 M CpGs), the full epykit DMR pipeline is
   ≈ 18× faster than single-core methylKit and ≈ 3.5× faster than
-  DSS-from-scratch end-to-end (Table 5b). We
-  separately characterise underdispersion of the Piao 2021 simulator
-  (φ ≈ 0.4 vs ≈ 1.5–5 in real WGBS) in §4. All code, ground truth, and
-  figures are provided; the resubmission-bundle benchmark artefacts are
-  versioned under `benchmark/data/`.
+  DSS-from-scratch end-to-end (Table 5b). A dispersion sweep to realistic
+  WGBS overdispersion (Pearson φ ≈ 1.5–5; §3.6) shows detection power is tied
+  across tools (AUROC), but epykit `lr` is the only per-CpG test that holds
+  nominal FDR (≈ 0.02–0.03) as dispersion rises, while methylKit and DSS
+  inflate to 0.10–0.30. All code, ground truth, and figures are provided; the
+  resubmission-bundle benchmark artefacts are versioned under
+  `benchmark/data/`.
 ---
 
 # 1. Introduction
@@ -247,8 +249,13 @@ including methylKit and DSS). Headline numbers appear in §3.
 
 epykit's default DMC engine, `lr`, fits a quasi-binomial logistic regression
 on (M, U) read counts per CpG with closed-form McCullagh–Nelder dispersion
-and a binomial floor (φ ≥ 1). It is statistically equivalent to methylKit's
-`calculateDiffMeth(overdispersion="MN")` at n ≥ 2.
+and a binomial floor (φ ≥ 1). It is the same per-site quasi-binomial LR as
+methylKit's `calculateDiffMeth(overdispersion="MN")`, plus a
+binomial-variance / df floor (the `df_phi` floor below) that keeps it
+calibrated as overdispersion rises. The two agree closely at near-binomial
+dispersion (φ ≈ 1) but diverge in FDR control as φ grows into the real-WGBS
+range: `lr` holds its nominal q-value while methylKit `MN` becomes
+anti-conservative (§3.6).
 
 The `lr+` variant enables four opt-in enhancements designed for low-coverage
 or low-replicate regimes:
@@ -969,23 +976,96 @@ per-engine timing table is `benchmark/data/study1/timings_table.csv`;
 the 7-tool cross-tool wallclock + accuracy comparison is
 `benchmark/docs/timing-comparison.md`.
 
+## 3.6 Behaviour under realistic overdispersion (φ-sweep)
+
+The per-CpG results above are measured at the Piao model's near-binomial
+dispersion (Pearson φ ≈ 1); real WGBS is overdispersed at φ ≈ 1.5–5 (§4). To
+test directly whether the ranking survives at realistic dispersion — rather
+than predicting it — we extended the held-out simulator with a Beta-Binomial
+intraclass-correlation parameter ρ and re-ran the full eight-tool panel at
+ρ ∈ {0, 0.05, 0.1, 0.2, 0.3, 0.44}. At coverage 10 the implied Pearson
+overdispersion is φ = 1 + (coverage − 1)·ρ = {1.0, 1.45, 1.9, 2.8, 3.7, 5.0},
+bracketing the real-WGBS range. Each cell is the median of 10 seeds at 3 vs 3
+(60 cells, 480 tool-runs, 0 failures; `benchmark/scripts/run_phi_sweep.py`).
+The sweep cleanly separates *detection power* from *calibration*.
+
+**Detection power is tied.** Threshold-free AUROC is statistically
+indistinguishable across `lr`, methylKit and DSS at every dispersion level
+(0.93 at φ = 1 falling to 0.76 at φ = 5; the three tools stay within ≈ 0.01 of
+one another throughout). At a *matched* FPR = 0.05 the recovered TPRs are
+likewise equal (epykit `lr` / methylKit-MN / methylKit-default = 0.826 / 0.818
+/ 0.825 at φ ≈ 1; 0.435 / 0.397 / 0.438 at φ ≈ 5). No tool detects more true
+DMCs than another at equal stringency.
+
+**Only `lr` stays calibrated.** The tools diverge entirely on whether the
+nominal q < 0.05 cutoff means what it says (Table S-Phi, Figure 11 centre).
+
+**Table S-Phi.** Realised FDR at nominal q < 0.05 (median of 10 seeds,
+coverage 10, 3 vs 3). methylKit is shown in its overdispersion-aware `MN`
+mode — the like-for-like comparison to `lr`; the dispersion-blind default is
+worse (FDR up to 0.66) and is a secondary point, not a headline.
+
+| φ (Pearson) | epykit `lr` | methylKit (MN) | DSS (no smooth) |
+|---:|---:|---:|---:|
+| 1.0 | 0.026 | 0.044 | 0.033 |
+| 1.45 | 0.028 | 0.102 | 0.087 |
+| 1.9 | 0.029 | 0.157 | 0.133 |
+| 2.8 | 0.027 | 0.229 | 0.197 |
+| 3.7 | 0.029 | 0.279 | 0.244 |
+| 5.0 | 0.021 | 0.300 | 0.282 |
+
+Source: [`eval_phi_sweep_iqr.parquet`](../data/study1b_simulator/eval_phi_sweep_iqr.parquet).
+
+epykit `lr` stays at FDR ≈ 0.02–0.03 from φ = 1 to φ = 5; methylKit-MN controls
+FDR only at φ ≈ 1 and is already anti-conservative by φ ≈ 1.45 (FDR 0.10 — the
+low end of real WGBS), reaching 0.30 at φ ≈ 5. DSS-no-smoothing behaves
+similarly (0.033 → 0.282).
+
+This reframes the low-coverage advantage of §3.1: `lr`'s lower TPR at q < 0.05
+under high dispersion is **not** a sensitivity deficit (AUROC is tied) — it is
+the cost of honest FDR control. The binomial-variance / df floor in the `lr`
+engine (§2.5) keeps the per-site quasi-binomial calibrated as overdispersion
+grows; methylKit's and DSS's per-site dispersion estimates do not, so their
+q-values drift anti-conservative on realistic WGBS, where the false-positive
+cost is borne downstream. Calibration under overdispersion, not raw
+sensitivity, is epykit's substantive per-CpG contribution.
+
+dmrseq and BSmooth are region callers; scored at single-CpG resolution here
+they are uncalibrated (FDR ≈ 0.6–0.7) and not meaningfully comparable per-CpG —
+they enter at the DMR level (§3.1, Study 3) instead. We retain them in this
+sweep only for the resource axis: peak RSS at this cell is epykit `lr` 0.44 GB
+vs DSS 1.3 GB, methylKit 8.8 GB, BSmooth 9.5 GB and dmrseq 30 GB — roughly 20×
+less memory than methylKit (Figure 11, right).
+
+![Figure 11. Dispersion (φ) sweep on the intrinsic-truth simulator (coverage
+10, 3 vs 3, median of 10 seeds; dual ρ / Pearson-φ axis). Left: sensitivity
+(TPR at q < 0.05) falls with dispersion for the calibrated tools. Centre:
+realised FDR at q < 0.05 — only epykit `lr` tracks the nominal 0.05 line across
+the realistic-WGBS band (φ ≈ 1.5–5, shaded); methylKit and DSS inflate 3–10×.
+Right: peak RSS.](../figures/study1_simulated_allPackages/F9_phi_sweep.png)
+
 # 4. Discussion
 
 This Discussion is organised in three parts: §4.1 summarises what the three
 studies establish, §4.2 surfaces the calibration–sensitivity trade-off seen
 most clearly in Study 3, and §4.3 lists limitations.
 
-**A caveat to read first.** The Piao 2021 simulator is *underdispersed*
-relative to real WGBS data: median Pearson φ at coverage 5× is ≈ 0.41 on
-the simulator versus ≈ 1.5–5 on biological samples. epykit's bare `lr`
-engine clamps at the binomial floor (φ = 1), which is nearly correct on
-the simulator and partly explains its dominance in the small-effect bin
-at low coverage (§3.1, Figure 2). On real WGBS with genuine
-overdispersion the gap should narrow, and could reverse for the
-small-effect bin. The held-out simulator (§3.4) and null calibration
-(§3.5) are the additional checks we ran to bracket this question;
-Study 3 (§3.3) is the real-data reality check. Readers should treat the
-simulator headline numbers as upper bounds for real-data behaviour.
+**A caveat, now tested directly (§3.6).** The Piao 2021 simulator is
+*underdispersed* relative to real WGBS data: median Pearson φ at coverage 5× is
+≈ 0.41 on the simulator versus ≈ 1.5–5 on biological samples. epykit's bare
+`lr` engine clamps at the binomial floor (φ = 1), which is nearly correct on
+the simulator and partly explains its raw-TPR dominance in the small-effect bin
+at low coverage (§3.1, Figure 2). Rather than predict what happens at realistic
+dispersion, we swept the simulator's overdispersion up to φ ≈ 5 (§3.6). The raw
+small-effect TPR advantage does narrow — at high dispersion every calibrated
+tool detects the same fraction of true DMCs (tied AUROC) — but it does not so
+much reverse as *change character*: what survives and grows is **calibration**.
+`lr` is the only per-CpG test that holds nominal FDR across the whole φ ≈ 1.5–5
+range, while methylKit and DSS become anti-conservative. Readers should
+therefore treat the simulator's raw TPR-at-q<0.05 numbers as upper bounds, but
+the FDR-calibration ranking (§3.6) as the property that transfers to real WGBS —
+consistent with the held-out simulator (§3.4), null calibration (§3.5), and
+Study 3 (§3.3).
 
 ## 4.1 What the three studies establish
 
@@ -1037,12 +1117,15 @@ false positives. We therefore recommend that users:
 
 ## 4.3 Limitations
 
-* **Simulator underdispersion.** See the framing paragraph at the top of
-  §4 — the Piao 2021 simulator is underdispersed (median φ ≈ 0.41 at 5×)
-  relative to real WGBS (φ ≈ 1.5–5), and `lr`'s binomial-floor clamp is
-  part of why it dominates the low-coverage small-effect bin in §3.1.
-  `dispersion="eb"` is designed for heterogeneous regimes but is a no-op
-  on this simulator.
+* **Simulator underdispersion — measured, not just flagged.** The Piao 2021
+  simulator is underdispersed (median φ ≈ 0.41 at 5×) relative to real WGBS
+  (φ ≈ 1.5–5), and `lr`'s binomial-floor clamp is part of why it leads the
+  low-coverage small-effect bin on raw TPR in §3.1. The φ-sweep (§3.6) measures
+  the consequence directly: at realistic dispersion the raw-TPR lead disappears
+  (AUROC ties across tools), while `lr`'s FDR-calibration advantage strengthens
+  (realised FDR ≈ 0.02–0.03 vs methylKit-MN 0.10–0.30 and DSS 0.09–0.28).
+  `dispersion="eb"` is designed for heterogeneous regimes but is a no-op on the
+  near-binomial default simulator.
 * **The empirical-Bayes dispersion prior is not validated against an external
   estimator.** The EB shrinkage behind `dispersion="eb"` (and hence the opt-in
   `lr+` stack) treats per-site Pearson dispersions as draws from an

@@ -64,7 +64,7 @@ CACHE_ROOT = ROOT / "benchmark" / "_phi_sweep_cache"
 
 DEFAULT_RHOS = (0.0, 0.05, 0.1, 0.2, 0.3, 0.44)
 DEFAULT_SEEDS = tuple(range(2026_000, 2026_010))  # 10 seeds
-DMC_TOOLS = ("epykit_lr", "epykit_lrplus", "methylkit", "dss", "dss_nosmooth")
+DMC_TOOLS = ("epykit_lr", "epykit_lrplus", "methylkit", "methylkit_MN", "dss", "dss_nosmooth")
 DMR_TOOLS = ("dmrseq", "bsmooth")
 COV_GLOB = "amp.coverage=*.sample*.cov.gz"
 
@@ -97,6 +97,13 @@ def _run_tool(tool: str, cell: Path, coverage: int, interval: float) -> dict:
         out = cell / "methylkit.tsv"
         cmd = ["Rscript", str(_HERE / "run_methylkit_simulator.R"),
                "--in-dir", in_dir, "--out", out, "--cores", "8"]
+    elif tool == "methylkit_MN":
+        # methylKit's overdispersion-aware mode (the fair head-to-head against
+        # epykit lr, which the paper claims lr is equivalent to).
+        out = cell / "methylkit_MN.tsv"
+        cmd = ["Rscript", str(_HERE / "run_methylkit_simulator.R"),
+               "--in-dir", in_dir, "--out", out, "--cores", "8",
+               "--overdispersion", "MN", "--test", "Chisq"]
     elif tool == "dss":
         out = cell / "dss.tsv"
         cmd = ["Rscript", str(_HERE / "run_dss_simulator.R"),
@@ -223,7 +230,8 @@ def run_cell(rho: float, seed: int, coverage: int, tools: list[str],
         # resume: skip if output already present
         out_name = {"epykit_lr": "epykit_lr.parquet",
                     "epykit_lrplus": "epykit_lrplus.parquet",
-                    "methylkit": "methylkit.tsv", "dss": "dss.tsv",
+                    "methylkit": "methylkit.tsv", "methylkit_MN": "methylkit_MN.tsv",
+                    "dss": "dss.tsv",
                     "dss_nosmooth": "dss_nosmooth.tsv", "dmrseq": "dmrseq.tsv",
                     "bsmooth": "bsmooth.tsv"}[tool]
         out_path = cell / out_name
@@ -250,9 +258,9 @@ def run_cell(rho: float, seed: int, coverage: int, tools: list[str],
             if tool in ("epykit_lr", "epykit_lrplus"):
                 if out_path.exists():
                     score = _score_dmc(out_path, truth, tool, coverage)
-            elif tool == "methylkit":
+            elif tool in ("methylkit", "methylkit_MN"):
                 if out_path.exists():
-                    score = _score_dmc(_load_methylkit(out_path), truth, "methylkit", coverage)
+                    score = _score_dmc(_load_methylkit(out_path), truth, tool, coverage)
             elif tool in ("dss", "dss_nosmooth"):
                 if out_path.exists():
                     score = _score_dmc(_load_dss(out_path), truth, tool, coverage)
@@ -288,7 +296,15 @@ def run_cell(rho: float, seed: int, coverage: int, tools: list[str],
 
 
 def aggregate(per_cell: pl.DataFrame) -> pl.DataFrame:
-    num = ["tpr", "fpr", "precision", "f1", "auroc", "rss_peak_mb", "wall_s"]
+    # FDR = FP / (FP + TP) -- the quantity BH q<0.05 promises to hold at 0.05.
+    # Computed per-cell before aggregating (DMC tools carry tp/fp; DMR tools
+    # have them too via the region->per-CpG confusion matrix).
+    per_cell = per_cell.with_columns(
+        pl.when((pl.col("fp") + pl.col("tp")) > 0)
+          .then(pl.col("fp") / (pl.col("fp") + pl.col("tp")))
+          .otherwise(None).alias("fdr")
+    )
+    num = ["tpr", "fpr", "fdr", "precision", "f1", "auroc", "rss_peak_mb", "wall_s"]
     aggs = [pl.len().alias("n_seeds")]
     for c in num:
         aggs += [pl.col(c).median().alias(f"{c}_median"),

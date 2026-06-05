@@ -34,12 +34,14 @@ DEFAULT_OUT = ROOT / "benchmark" / "figures" / "study1_simulated_allPackages"
 # Stable colour per tool.
 COLORS = {
     "epykit_lr": "#1f77b4", "epykit_lrplus": "#17becf",
-    "methylkit": "#d62728", "dss": "#2ca02c", "dss_nosmooth": "#98df8a",
+    "methylkit": "#d62728", "methylkit_MN": "#ff7f0e",
+    "dss": "#2ca02c", "dss_nosmooth": "#98df8a",
     "dmrseq": "#9467bd", "bsmooth": "#8c564b",
 }
 LABEL = {
     "epykit_lr": "epykit lr", "epykit_lrplus": "epykit lr+",
-    "methylkit": "methylKit", "dss": "DSS (smooth)",
+    "methylkit": "methylKit (default)", "methylkit_MN": "methylKit (MN)",
+    "dss": "DSS (smooth)",
     "dss_nosmooth": "DSS (no smooth)", "dmrseq": "dmrseq (DMR→CpG)",
     "bsmooth": "BSmooth (DMR→CpG)",
 }
@@ -90,14 +92,17 @@ def main(argv: list[str] | None = None) -> int:
     iqr = pl.read_parquet(args.iqr)
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
-    # 3-panel: TPR, FPR, peak RSS
+    # 3-panel: TPR, FDR (the headline calibration metric), peak RSS
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.6))
     _panel(axes[0], iqr, "tpr", args.coverage, "TPR (recall) @ q<0.05")
-    _panel(axes[1], iqr, "fpr", args.coverage, "FPR @ q<0.05")
+    _panel(axes[1], iqr, "fdr", args.coverage, "FDR @ q<0.05")
     _panel(axes[2], iqr, "rss_peak_mb", args.coverage, "peak RSS (MB)")
+    # nominal FDR line: q<0.05 promises FDR ≤ 0.05
+    axes[1].axhline(0.05, color="black", ls=":", lw=1.2, alpha=0.8)
+    axes[1].text(0.0, 0.06, "nominal 0.05", fontsize=7, va="bottom")
     axes[0].legend(fontsize=7, loc="best", framealpha=0.9)
     axes[0].set_title("Sensitivity vs dispersion")
-    axes[1].set_title("False-positive rate vs dispersion")
+    axes[1].set_title("FDR control vs dispersion (lower = better)")
     axes[2].set_title("Peak memory vs dispersion")
     fig.suptitle("Dispersion (φ) sweep on the intrinsic-truth simulator "
                  "(coverage=%d, grey band = realistic WGBS φ≈1.5–5)" % args.coverage,
