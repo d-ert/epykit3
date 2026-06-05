@@ -69,8 +69,11 @@ JOBS = [
     ("study3/comparisons/per_dmr_stat_concordance.csv", "study3_real", "per_dmr_concordance.tsv"),
     ("study3/comparisons/epykit_vs_dss/panel_e_capture_dss.csv", "study3_real", "panel_e_capture_dss.tsv"),
     ("study3/comparisons/epykit_vs_dss/heatmap_gene_hits_dss.csv", "study3_real", "heatmap_gene_hits_dss.tsv"),
-    ("study3/comparisons_post_phase3/dmr_iou.parquet", "study3_real", "dmr_iou_three_way.tsv"),
-    ("study3/comparisons_post_phase3/per_dmr_stat_concordance.parquet", "study3_real", "per_dmr_concordance_phase3.tsv"),
+    # NOTE: these two use a DIFFERENT (all-q<0.05, 36,811-DMR) chain_merge
+    # set, not the 852 paper-faithful headline set -- segregated under
+    # _other_views/ so the main folder stays headline-consistent.
+    ("study3/comparisons_post_phase3/dmr_iou.parquet", "study3_real/_other_views", "dmr_iou_ALLSIG_chainmerge36811.tsv"),
+    ("study3/comparisons_post_phase3/per_dmr_stat_concordance.parquet", "study3_real/_other_views", "per_dmr_concordance_phase3_allpairs.tsv"),
     ("study3/samplesheet.csv", "study3_real", "samplesheet.tsv"),
 
     # ---- dis.merge sweep (Study 3) ------------------------------------
@@ -109,9 +112,14 @@ def convert(src: Path, dest: Path):
 
 
 def main():
-    if OUT.exists():
-        shutil.rmtree(OUT)
-    OUT.mkdir(parents=True)
+    OUT.mkdir(parents=True, exist_ok=True)
+    # Remove files that were renamed/moved in a prior layout so they don't
+    # linger (overwrite-in-place; safe to re-run with the folder open).
+    for stale in ("study3_real/dmr_iou_three_way.tsv",
+                  "study3_real/per_dmr_concordance_phase3.tsv"):
+        p = OUT / stale
+        if p.exists():
+            p.unlink()
     print(f"Exporting to {OUT}")
     n_ok = 0
     for rel, subdir, name in JOBS:
@@ -144,7 +152,7 @@ def main():
     # Copy the per-figure source TSVs for the Study 3 three-way figures.
     if THREE_WAY_TSV.exists():
         dst = OUT / "study3_real" / "figure_source_tsv"
-        shutil.copytree(THREE_WAY_TSV, dst)
+        shutil.copytree(THREE_WAY_TSV, dst, dirs_exist_ok=True)
         n = len(list(dst.glob("*.tsv")))
         print(f"  study3_real/figure_source_tsv/  ({n} per-figure TSVs copied)")
 
@@ -193,6 +201,17 @@ the intrinsic-vs-threshold M3 panel).
 
 **§3.5 null calibration**: `null_calibration/gse263850_lr_summary.tsv`
 + `gse263850_lr_pvalue_histogram_50bins.tsv`.
+
+## A note on `study3_real/_other_views/`
+Two files there answer a DIFFERENT question than the headline paper and
+are kept separate so they don't confuse:
+- `dmr_iou_ALLSIG_chainmerge36811.tsv` -- three-way IoU using epykit's
+  **all-significant** (q<0.05) DMR set (**36,811** regions), NOT the 852
+  paper-faithful chain_merge set the paper reports on.
+- `per_dmr_concordance_phase3_allpairs.tsv` -- an earlier Phase-4 all-tool
+  concordance computation (2,149 rows). The headline F9 concordance is
+  `study3_real/per_dmr_concordance.tsv` (1,352 ek-vs-DSS matched pairs).
+Everything else in `study3_real/` is the headline 852/922/1,139 data.
 
 ## External inputs (NOT in this folder -- they live outside the repo)
 - Paper Supp Table 5: `epykit2/GSE263850_RAW/Paper resources/DMR_total_list.xlsx`

@@ -44,6 +44,17 @@ the intrinsic-vs-threshold M3 panel).
 **§3.5 null calibration**: `null_calibration/gse263850_lr_summary.tsv`
 + `gse263850_lr_pvalue_histogram_50bins.tsv`.
 
+## A note on `study3_real/_other_views/`
+Two files there answer a DIFFERENT question than the headline paper and
+are kept separate so they don't confuse:
+- `dmr_iou_ALLSIG_chainmerge36811.tsv` -- three-way IoU using epykit's
+  **all-significant** (q<0.05) DMR set (**36,811** regions), NOT the 852
+  paper-faithful chain_merge set the paper reports on.
+- `per_dmr_concordance_phase3_allpairs.tsv` -- an earlier Phase-4 all-tool
+  concordance computation (2,149 rows). The headline F9 concordance is
+  `study3_real/per_dmr_concordance.tsv` (1,352 ek-vs-DSS matched pairs).
+Everything else in `study3_real/` is the headline 852/922/1,139 data.
+
 ## External inputs (NOT in this folder -- they live outside the repo)
 - Paper Supp Table 5: `epykit2/GSE263850_RAW/Paper resources/DMR_total_list.xlsx`
 - methylKit-tile real-data DMRs + step_benchmarks: `methylkit_realResults/...`
