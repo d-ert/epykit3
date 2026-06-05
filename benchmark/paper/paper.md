@@ -136,8 +136,10 @@ therefore report three complementary benchmark studies:
 ## 2.1 Simulated data (Studies 1 and 2)
 
 Both simulated studies use the dataset distributed with Piao et al.
-(2021) [@Piao2021]. The simulator drew 100,000 CpG sites from a methylation
-profile of the IMR90 cell line [@Lister2009]; 20 % of sites were designated
+(2021) [@Piao2021]. The distributed working set comprises 100,000 CpG sites
+drawn from a methylation profile of the IMR90 cell line [@Lister2009] (the
+count of sites in the files we consume; our held-out re-implementation in
+§2.7 matches it); 20 % of sites were designated
 true DMCs with effect sizes `meth_diff ~ U(0.2, 1.0)`, the remaining 80 %
 carried no between-group difference. Reads were drawn per site from
 Beta-Binomial distributions parameterised to match the requested coverage.
