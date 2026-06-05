@@ -1,0 +1,9 @@
+{
+  "n_epykit_tested": 15597046,
+  "n_methylkit_tested": 15600476,
+  "n_shared": 15597046,
+  "pearson_r_meth_diff": 0.9936305179683799,
+  "spearman_rho_meth_diff": 0.9831324914283767,
+  "direction_agree_count": 14669608,
+  "direction_agree_frac": 0.9405375864121963
+}
