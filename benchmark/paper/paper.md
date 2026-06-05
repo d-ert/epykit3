@@ -328,9 +328,10 @@ highest-coverage simulator output — useful as a calibration check but
 circular as a truth definition (truth and tested data come from the same
 generative model). To break this loop we re-implemented the Piao 2021
 simulator in Python (`benchmark/scripts/simulate_piao.py`) and generated
-20 independent seeds at coverage 10 (seeds `2026000`–`2026019`). Each
-seed carries an explicit `is_dmc` flag set at simulation time — intrinsic
-truth, not threshold-reconstructed.
+20 independent seeds at coverage 10 (seeds `2026000`–`2026019`) plus a
+21st frozen-grid control seed (`2026100`). Each seed carries an explicit
+`is_dmc` flag set at simulation time — intrinsic truth, not
+threshold-reconstructed.
 
 Validation: marginal distributions of read counts and effect sizes match
 a Piao 2021 reference sample to within Monte Carlo error
@@ -338,12 +339,13 @@ a Piao 2021 reference sample to within Monte Carlo error
 
 Outputs live under `benchmark/data/study1b_simulator/seed=2026XXX/`. Per-seed
 scoring against intrinsic truth is summarised in
-`eval_simulator_intrinsic_per_seed.parquet` (540 rows: 20 seeds × tools
-× thresholds × effect-size bins) and across-seed IQRs in
-`eval_simulator_intrinsic_iqr.parquet`. Results appear in §3 (Table S-Sim).
+`eval_simulator_intrinsic_per_seed.parquet` (567 rows: 21 seeds × tools
+× thresholds × effect-size bins) and across-seed median + IQRs in
+`eval_simulator_intrinsic_iqr.parquet` (n_seeds = 21 per tool).
+Results appear in §3 (Table S-Sim).
 
 In Phase 4 we also ran methylKit and DSS (smoothing on and off) on each
-of the 20 simulator seeds via `benchmark/scripts/run_external_simulator_sweep.py`
+of the 21 simulator seeds via `benchmark/scripts/run_external_simulator_sweep.py`
 to enable a like-for-like multi-seed intrinsic-truth comparison
 (`benchmark/data/study1b_simulator/parallel_column_summary.md`).
 
