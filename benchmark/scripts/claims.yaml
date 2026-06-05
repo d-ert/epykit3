@@ -87,42 +87,59 @@
   expected: 0.999951
   precision: 0.001
 
-# ── Study 1b: Simulator intrinsic, seed=2026000, cov=10, meth_diff_bin=all, q<0.05 ──
+# ── Study 1b: Simulator intrinsic, 21-seed median+IQR, cov=10, q<0.05 ──
+# Promoted from single-seed (seed=2026000) to 21-seed median in 2026-06-05 polish.
+# Per-seed equivalents remain available in eval_simulator_intrinsic_per_seed.parquet
+# but are no longer cited by the paper.
 
-- claim_id: simulator_methylkit_auroc_seed0_cov10
-  parquet: benchmark/data/study1b_simulator/eval_simulator_intrinsic_per_seed.parquet
-  column: auroc
+- claim_id: simulator_methylkit_auroc_median_cov10
+  parquet: benchmark/data/study1b_simulator/eval_simulator_intrinsic_iqr.parquet
+  column: auroc_median
   filter:
     tool: methylkit
-    seed: 2026000
-    threshold_kind: qvalue
-    threshold: 0.05
-    meth_diff_bin: "all"
-  expected: 0.924632
+  expected: 0.925975
   precision: 0.001
 
-- claim_id: simulator_dss_nosmooth_auroc_seed0_cov10
-  parquet: benchmark/data/study1b_simulator/eval_simulator_intrinsic_per_seed.parquet
-  column: auroc
+- claim_id: simulator_dss_nosmooth_auroc_median_cov10
+  parquet: benchmark/data/study1b_simulator/eval_simulator_intrinsic_iqr.parquet
+  column: auroc_median
   filter:
     tool: dss_nosmooth
-    seed: 2026000
-    threshold_kind: qvalue
-    threshold: 0.05
-    meth_diff_bin: "all"
-  expected: 0.907052
+  expected: 0.908838
   precision: 0.001
 
-- claim_id: simulator_dss_smooth_auroc_seed0_cov10
-  parquet: benchmark/data/study1b_simulator/eval_simulator_intrinsic_per_seed.parquet
-  column: auroc
+- claim_id: simulator_dss_smooth_auroc_median_cov10
+  parquet: benchmark/data/study1b_simulator/eval_simulator_intrinsic_iqr.parquet
+  column: auroc_median
   filter:
     tool: dss
+  expected: 0.629723
+  precision: 0.001
+
+- claim_id: simulator_epykit_lr_auroc_seed0_cov10
+  parquet: benchmark/data/study1b_simulator/eval_per_seed.parquet
+  column: auroc
+  filter:
+    tool: epykit_lr
     seed: 2026000
+    coverage: 10
     threshold_kind: qvalue
     threshold: 0.05
     meth_diff_bin: "all"
-  expected: 0.627174
+  expected: 0.926721
+  precision: 0.001
+
+- claim_id: simulator_epykit_lrplus_auroc_seed0_cov10
+  parquet: benchmark/data/study1b_simulator/eval_per_seed.parquet
+  column: auroc
+  filter:
+    tool: epykit_lrplus
+    seed: 2026000
+    coverage: 10
+    threshold_kind: qvalue
+    threshold: 0.05
+    meth_diff_bin: "all"
+  expected: 0.905198
   precision: 0.001
 
 # ── Null calibration: empirical FDR (gse263850 real dataset, 10 shuffles) ──────
@@ -148,21 +165,17 @@
 # ── Timings: wall-clock seconds at coverage=10 (dmc_coverage scenario) ─────────
 
 - claim_id: headline_wallclock_epykit_lr
-  parquet: benchmark/data/study1/timings_post_phase3.parquet
-  column: wall_s
+  csv: benchmark/data/study1/timings_table.csv
+  column: median_wall_s
   filter:
     tool: epykit_lr
-    scenario: dmc_coverage
-    parameter_value: 10
   expected: 0.858232
   precision: 0.5
 
 - claim_id: headline_wallclock_epykit_lrplus
-  parquet: benchmark/data/study1/timings_post_phase3.parquet
-  column: wall_s
+  csv: benchmark/data/study1/timings_table.csv
+  column: median_wall_s
   filter:
     tool: epykit_lrplus
-    scenario: dmc_coverage
-    parameter_value: 10
   expected: 6.798283
   precision: 0.5

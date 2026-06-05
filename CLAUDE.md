@@ -49,16 +49,28 @@ API mirrors scanpy: `ep.pp.*` (preprocessing — mutates `md.store`), `ep.tl.*` 
 
 Four per-CpG engines survive post-0.7.5: `"lr"` (quasi-binomial likelihood-ratio, default at n ≥ 2), `"welch_t"` (Welch t on raw β), `"fisher"` (pooled Fisher exact, n = 1 fallback), `"glm"` (IRLS binomial with covariates via Wilkinson formula in `_glm.py`). `"auto"` resolves to `"fisher"` at n < 2 and `"lr"` at n ≥ 2. Engines removed in 0.7.5 (raise `ValueError` with a migration hint): `"logit_t"` → use `"welch_t"`; `"bb_lr"` → use `"lr"`; `"score"` → use `"lr"`; `"cmh"` → use `formula='~ group + batch'`. Every engine outputs the same canonical schema (`chrom`, `pos`, `n_case`, `n_control`, `mean_beta_*`, `meth_diff`, `meth_diff_ci_{lo,hi}`, `pvalue`, `qvalue`, `log2_odds_ratio_pooled`) plus engine-specific extras (`coef_treatment` for GLM, `f_stat`/`df1`/`df2` for multi-group F-tests).
 
-**`lr+` power stack** is four opt-in enhancements on top of `lr`, controlled
-via the `power_stack` kwarg in `tl.dmc`. The four knobs (`neighbour_combine`,
-`fdr_method="fdr_tsbh"`, `sep_fallback`, `dispersion="eb"`) are validated
-against methylKit / RADMeth / DSS in `benchmark/REPORT.md`. They are
-**opt-in**, not defaults — bare `lr` is what users get out of the box
-(`power_stack="off"` is the 1.0 default).
+**`lr+` power stack — exploratory opt-in tunable, NOT a headline contribution.**
+`power_stack` is a `tl.dmc` kwarg that bundles four research components
+(`neighbour_combine`, `fdr_method="fdr_tsbh"`, `sep_fallback`,
+`dispersion="eb"`) into one switch. The components are implemented and
+dispatched in `tl.py:498–532`; individual implementations live at
+`dmc.py:2322–2470` (neighbour Stouffer combine), `dmc.py:2567–2649`
+(TSBH via statsmodels), `dmc.py:947–983` (separation fallback) and
+`dmc.py:775–820` (EB dispersion shrinkage).
 
+`lr+` is **not validated as universally superior to bare `lr`** on real
+WGBS. On GSE263850 at q=0.05, `power_stack="lr+"` inflates the DMC call
+count ~13× relative to bare `lr` at the same threshold — consistent
+with FPR drift under realistic dispersion (real WGBS φ ≈ 1.5–5; the
+Piao simulator the `lr+` heuristics were tuned against runs at φ ≈ 0.4).
+Treat `lr+` as a research knob exposed for the community to experiment
+with, not as the recommended default. Bare `lr` is the engine the
+benchmark paper claims around.
+
+`power_stack="off"` (the default) leaves knobs at user-passed values
+and is what `ep.tl.dmc(...)` does out of the box.
 `power_stack="lr+"` / `True` / `"auto"` engages all four at any n.
 `power_stack="conservative"` engages only at n ≤ 2 (legacy behavior).
-`power_stack="off"` / `False` leaves knobs at user-passed values.
 
 When `neighbour_combine=True`, **`pvalue`/`qvalue` remain the raw per-CpG values; the combined values are added as `pvalue_combined`/`qvalue_combined`** (plus `pvalue_combined_n_neighbours` and `qvalue_combined_reject` as audit columns). Downstream code that wants the combined p-values must read the `_combined` columns explicitly. CLI flags for the `lr+` knobs are deferred to 1.1.
 
@@ -76,7 +88,13 @@ Library code (everything under `epykit.*` except `epykit.cli`) emits progress th
 
 ### Benchmark directory
 
-`benchmark/` reproduces a head-to-head against eight published DMC/DMR tools on Piao et al. 2021 simulated data; `benchmark/REPORT.md` is the canonical TPR/FPR/F1 record and is what the `lr+` knobs are validated against. Don't change `lr+` knob defaults without re-running the relevant `benchmark/scripts/ab_*.py` ablations. Raw simulated data and run caches are not bundled — see `benchmark/README.md` for the bootstrap.
+`benchmark/` reproduces a head-to-head against eight published DMC/DMR tools on Piao et al. 2021 simulated data and one real-data cohort (GSE263850). `benchmark/paper/report/REPORT.md` is the canonical TPR/FPR/F1 record; `benchmark/paper/paper.md` is the manuscript. Raw simulated data and run caches are not bundled — see `benchmark/README.md` for the bootstrap.
+
+**Two parallel benchmark trees:**
+- `benchmark/data/` holds the *frozen* parquet sources committed to git. `.gitignore` whitelists the canonical artefacts (seeds.json, eval_*.parquet, MANIFEST.txt, etc.) and ignores everything else.
+- `benchmark/paper_data/` holds TSV mirrors derived from `benchmark/data/`, organised by paper section (01_headline_piao through 06_methodology). Generated for Excel/R/Python human inspection. The paper cites this tree; `regen_all.py` writes the parquet sources in `benchmark/data/`.
+
+Don't change `lr+` knob defaults without re-running the relevant ablations (and remember `lr+` is now positioned as a research knob, not a recommended default — see "lr+ power stack" above).
 
 ## Module map (when to look where)
 

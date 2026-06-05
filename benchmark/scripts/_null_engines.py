@@ -2,7 +2,14 @@
 
 Each registry entry is a factory: ``factory(md) -> closure``, where
 the closure has signature:
-    closure(samples_treatment, samples_control, seed) -> np.ndarray of q-values
+    closure(samples_treatment, samples_control, seed)
+        -> (pvalues: np.ndarray, qvalues: np.ndarray)
+
+Returning both p- and q-values lets the calibration runner build a
+Q-Q plot vs Uniform(0, 1) and a Kolmogorov-Smirnov test in addition
+to the per-shuffle observed-FDR proportion. The legacy single-array
+contract (qvalues only) was sufficient for the FDR summary but
+could not distinguish calibrated-but-noisy from conservative tests.
 
 Factories capture the MethylData object once outside the shuffle loop
 so the parquet store is loaded only once per (engine, scenario).
@@ -11,7 +18,7 @@ Usage in run_null_calibration.py main():
     from _null_engines import ENGINE_REGISTRY
     factory = ENGINE_REGISTRY["lr"]
     closure = factory(md)
-    qvals = closure(samples_treatment=treat, samples_control=ctrl, seed=42)
+    pvals, qvals = closure(samples_treatment=treat, samples_control=ctrl, seed=42)
 """
 from __future__ import annotations
 
@@ -101,11 +108,17 @@ def _dmc_engine(test_name: str, *, lr_plus: bool = False, glm: bool = False) -> 
             else:
                 ep.tl.dmc(md_perm, test=test_name)
             df = md_perm.dmc
+            empty = np.array([], dtype=np.float64)
             if df is None or df.height == 0:
-                return np.array([], dtype=np.float64)
-            # Use qvalue if available, else pvalue.
+                return empty, empty
+            pcol = "pvalue" if "pvalue" in df.columns else None
             qcol = "qvalue" if "qvalue" in df.columns else "pvalue"
-            return df[qcol].to_numpy().astype(np.float64)
+            pvals = (
+                df[pcol].to_numpy().astype(np.float64)
+                if pcol is not None else empty
+            )
+            qvals = df[qcol].to_numpy().astype(np.float64)
+            return pvals, qvals
         return closure
     return factory
 

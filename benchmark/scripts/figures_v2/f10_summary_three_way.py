@@ -23,13 +23,11 @@ import pandas as pd
 import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _style import (DATA_DIR, THREE_WAY, CALLER_COLOR, FEAT_COLOR,
-                     setup, save_dual)
+from _style import (DATA_DIR, SWEEP_DIR, THREE_WAY, CALLER_COLOR, FEAT_COLOR,
+                     PAPER_T5_XLSX, MK_TILE_DIR, setup, save_dual)
 
-PAPER_T5 = Path(r"D:/Coding/Projeler/methyl_lib/epykit2/GSE263850_RAW/"
-                r"Paper resources/DMR_total_list.xlsx")
-MK_TILE  = Path(r"D:/Coding/Projeler/methyl_lib/methylkıt_realResults/"
-                r"scripts_and_results/methylkit_results/dmr_significant_lenient.csv")
+PAPER_T5 = PAPER_T5_XLSX
+MK_TILE  = MK_TILE_DIR / "dmr_significant_lenient.csv"
 
 FEAT_ORDER = ["promoter-TSS", "5UTR", "exon", "intron", "3UTR",
               "TTS", "non-coding", "intergenic"]
@@ -40,22 +38,17 @@ def main() -> None:
 
     fig, axes = plt.subplots(2, 3, figsize=(16.0, 9.5), constrained_layout=True)
 
-    # ---- A: Recall + precision bars ------------------------------------
+    # ---- A: Recall + precision bars (vs DSS-from-scratch, 922) ----------
     ax = axes[0, 0]
-    # Pull from existing summaries
     callers = ["methylKit-tile", "epykit-chain_merge-100",
                 "epykit-chain_merge-250", "DSS-from-scratch"]
     short_l = ["mk-tile", "ek-cm-100", "ek-cm-250", "DSS"]
-    # Recall numbers (any-bp) from our work
-    recall_anybp = [0.089, 0.526, 0.627, 0.875]   # methylKit from old investigation
-    precision_anybp = [0.028, 0.645, 0.545, 0.768]
-    j5_recall = [0.0, 0.274, 0.481, 0.55]   # methylKit J≥0.5 placeholder; DSS estimate
-    # methylKit J≥0.5 truly is ~0; DSS J≥0.5 we should compute. For
-    # F10 simplicity, use the chain_merge_vs_paper data + estimate DSS J≥0.5
-    # from comparisons/chain_merge_vs_paper/headline.json which we have.
-    # Actually we have it: paper-DSS recall@J0.5 needs to be computed from
-    # the dss vs paper. Approximate: DSS at any-bp 87.5%, fraction with
-    # tight overlap conservatively ~55%. Mark as approximation.
+    # Post-rerun coordinate concordance vs the locally-rerun DSS-922 call
+    # set (headline.json + dis_merge_vs_dss_sensitivity.csv). DSS is the
+    # reference set, so its self-recall/precision is 1.0.
+    recall_anybp    = [0.087, 0.638, 0.773, 1.0]
+    precision_anybp = [0.030, 0.744, 0.630, 1.0]
+    j5_recall       = [0.0,   0.345, 0.642, 1.0]
     width = 0.27
     xs = np.arange(len(callers))
     bars1 = ax.bar(xs - width, [r * 100 for r in recall_anybp],
@@ -68,15 +61,14 @@ def main() -> None:
                     width=width, label="recall J ≥ 0.5",
                     color="#2ecc71", edgecolor="black", linewidth=0.5)
     ax.set_xticks(xs); ax.set_xticklabels(short_l, fontsize=9)
-    ax.set_ylabel("%"); ax.set_ylim(0, 100)
-    ax.set_title("A · Coordinate concordance vs paper")
+    ax.set_ylabel("%"); ax.set_ylim(0, 105)
+    ax.set_title("A · Coordinate concordance vs DSS-922 (DSS = reference)")
     ax.legend(fontsize=8, frameon=False, loc="upper left")
     ax.grid(axis="y", alpha=0.2)
 
     # ---- B: dis.merge sweep ---------------------------------------------
     ax = axes[0, 1]
-    df = pd.read_csv(DATA_DIR / "chain_merge_dis_merge_sweep" /
-                       "sweep_summary.csv")
+    df = pd.read_csv(SWEEP_DIR / "sweep_summary.csv")
     ax.plot(df["dis_merge_bp"], df["recall_anybp"] * 100,
              marker="o", lw=2, label="any-bp", color="#3498db")
     ax.plot(df["dis_merge_bp"], df["recall_J_0_5"] * 100,
@@ -99,8 +91,7 @@ def main() -> None:
     ek100 = pl.read_parquet(DATA_DIR / "chain_merge" /
                               "dmr_chain_merge.parquet").to_pandas()
     ek100["len"] = ek100["end"] - ek100["start"]
-    ek250 = pl.read_parquet(DATA_DIR / "chain_merge_dis_merge_sweep" /
-                              "dis_merge_250" / "dmr.parquet").to_pandas()
+    ek250 = pl.read_parquet(SWEEP_DIR / "dis_merge_250" / "dmr.parquet").to_pandas()
     ek250["len"] = ek250["end"] - ek250["start"]
     dss = pd.read_csv(DATA_DIR / "dss" / "dmr_dss.csv")
     dss["len"] = dss["end"] - dss["start"]

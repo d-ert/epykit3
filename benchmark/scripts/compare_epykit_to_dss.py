@@ -36,17 +36,21 @@ import polars as pl
 
 warnings.filterwarnings("ignore")
 
-REPO_ROOT = Path(r"D:/Coding/Projeler/methyl_lib/benchmarkin_merges").resolve()
-CM_DIR    = REPO_ROOT / "FINAL_REPORT" / "data" / "study3" / "chain_merge"
-DM250_PQ  = (REPO_ROOT / "FINAL_REPORT" / "data" / "study3"
-             / "chain_merge_dis_merge_sweep" / "dis_merge_250" / "dmr.parquet")
-DSS_CSV   = REPO_ROOT / "FINAL_REPORT" / "data" / "study3" / "dss" / "dmr_dss.csv"
-PAPER_T5  = Path(r"D:/Coding/Projeler/methyl_lib/epykit2/GSE263850_RAW/"
-                 r"Paper resources/DMR_total_list.xlsx")
-PAPER_T8  = REPO_ROOT / "FINAL_REPORT" / "shinygo_lists" / "outputs" \
-            / "reactome" / "table8.xlsx"
-OUT_DIR   = REPO_ROOT / "FINAL_REPORT" / "data" / "study3" \
-            / "comparisons" / "epykit_vs_dss"
+# Paths repointed at the 2026-06-03 Linux rerun outputs (see
+# benchmark/rerun_outputs_2026-06-03/README.md). dis_merge=250 sweep
+# was not produced in this rerun; we skip the ek-250 block if missing.
+EPYKIT3_ROOT = Path(__file__).resolve().parents[1]
+RERUN_DIR    = EPYKIT3_ROOT / "rerun_outputs_2026-06-03" / "study3"
+CM_DIR       = RERUN_DIR / "chain_merge"
+DM250_PQ     = (RERUN_DIR / "chain_merge_dis_merge_sweep"
+                / "dis_merge_250" / "dmr.parquet")  # may not exist in rerun
+DSS_CSV      = RERUN_DIR / "dss" / "dmr_dss.csv"
+PAPER_T5     = Path(r"D:/Coding/Projeler/methyl_lib/epykit2/GSE263850_RAW/"
+                    r"Paper resources/DMR_total_list.xlsx")
+PAPER_T8     = Path(r"D:/Coding/Projeler/methyl_lib/benchmarkin_merges/"
+                    r"FINAL_REPORT/shinygo_lists/outputs/reactome/table8.xlsx")
+OUT_DIR      = (EPYKIT3_ROOT / "rerun_outputs_2026-06-03" / "study3"
+                / "comparisons" / "epykit_vs_dss")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -222,9 +226,14 @@ def main() -> None:
     ek100 = load_chain_merge(CM_DIR / "dmr_chain_merge.parquet")
     print(f"  {len(ek100)} DMRs")
 
-    print("Loading chain_merge dis.merge=250 …")
-    ek250 = load_chain_merge(DM250_PQ)
-    print(f"  {len(ek250)} DMRs")
+    have_ek250 = DM250_PQ.exists()
+    if have_ek250:
+        print("Loading chain_merge dis.merge=250 …")
+        ek250 = load_chain_merge(DM250_PQ)
+        print(f"  {len(ek250)} DMRs")
+    else:
+        print(f"SKIP chain_merge dis.merge=250 (no file at {DM250_PQ})")
+        ek250 = None
 
     print("Loading DSS …")
     dss = load_dss(DSS_CSV)
@@ -242,23 +251,26 @@ def main() -> None:
     cmp100["query_match"].to_csv(OUT_DIR / "coord_overlap_per_our_dmr.csv",
                                   index=False)
 
-    # ek-250 vs DSS (the morphology-matched operating point)
-    print("\n=== ek-chain_merge-250 vs DSS-922 ===")
-    cmp250 = two_way_compare(ek250, dss, "ek250", "dss")
-    h250 = headline_block(ek250, dss,
-                          cmp250["target_match"], cmp250["query_match"],
-                          "ek250_vs_dss")
-    print(json.dumps(h250, indent=2))
-    cmp250["target_match"].to_csv(OUT_DIR / "coord_overlap_per_dss_dmr_dm250.csv",
-                                   index=False)
-    cmp250["query_match"].to_csv(OUT_DIR / "coord_overlap_per_ek250_dmr_dm250.csv",
-                                  index=False)
+    # ek-250 vs DSS (the morphology-matched operating point) — optional
+    h250 = None
+    g250_df = None
+    if have_ek250:
+        print("\n=== ek-chain_merge-250 vs DSS-922 ===")
+        cmp250 = two_way_compare(ek250, dss, "ek250", "dss")
+        h250 = headline_block(ek250, dss,
+                              cmp250["target_match"], cmp250["query_match"],
+                              "ek250_vs_dss")
+        print(json.dumps(h250, indent=2))
+        cmp250["target_match"].to_csv(
+            OUT_DIR / "coord_overlap_per_dss_dmr_dm250.csv", index=False)
+        cmp250["query_match"].to_csv(
+            OUT_DIR / "coord_overlap_per_ek250_dmr_dm250.csv", index=False)
+        g250_df = gene_overlap_table(ek250, dss, "dss")
+        g250_df.to_csv(OUT_DIR / "gene_overlap_ek250_vs_dss.csv", index=False)
 
     # Gene overlap (nearest-TSS gene set, DSS as target)
     g_df = gene_overlap_table(ek100, dss, "dss")
     g_df.to_csv(OUT_DIR / "gene_overlap_ek100_vs_dss.csv", index=False)
-    g250_df = gene_overlap_table(ek250, dss, "dss")
-    g250_df.to_csv(OUT_DIR / "gene_overlap_ek250_vs_dss.csv", index=False)
 
     # DSS's recall of paper Table 8 (panel-E critical genes)
     panel_e = pd.read_excel(PAPER_T8, sheet_name=0)
@@ -326,8 +338,9 @@ def main() -> None:
         "ek250_vs_dss": h250,
         "ek100_gene_recall_of_dss": round(
             int(g_df["captured_by_query"].sum()) / max(len(g_df), 1), 4),
-        "ek250_gene_recall_of_dss": round(
-            int(g250_df["captured_by_query"].sum()) / max(len(g250_df), 1), 4),
+        "ek250_gene_recall_of_dss": (round(
+            int(g250_df["captured_by_query"].sum()) / max(len(g250_df), 1), 4)
+            if g250_df is not None else None),
         "dss_panel_e_capture": {
             "n_panel_e": int(len(panel_genes)),
             "captured": pe_cap,

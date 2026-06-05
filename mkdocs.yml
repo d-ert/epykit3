@@ -153,6 +153,7 @@ nav:
       - Comparing DMC Tests: cookbook/comparing-dmc-tests.md
       - nf-core Integration: cookbook/nfcore-integration.md
   - Advanced:
+      - Engine Architecture Map: advanced/architecture.md
       - Methylstore Internals: advanced/methylstore.md
       - Low-level Engines: advanced/low-level-engines.md
       - Shrinkage: advanced/shrinkage.md

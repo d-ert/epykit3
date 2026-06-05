@@ -1,0 +1,49 @@
+caller	feature_type	count	fraction	n_total
+paper-DSS (Supp Table 5)	promoter-TSS	7	0.0086	813
+paper-DSS (Supp Table 5)	5UTR	1	0.0012	813
+paper-DSS (Supp Table 5)	exon	24	0.0295	813
+paper-DSS (Supp Table 5)	intron	360	0.4428	813
+paper-DSS (Supp Table 5)	3UTR	13	0.016	813
+paper-DSS (Supp Table 5)	TTS	11	0.0135	813
+paper-DSS (Supp Table 5)	non-coding	4	0.0049	813
+paper-DSS (Supp Table 5)	intergenic	393	0.4834	813
+methylKit-tile	promoter-TSS	56	0.021	2661
+methylKit-tile	5UTR	1	0.0004	2661
+methylKit-tile	exon	43	0.0162	2661
+methylKit-tile	intron	953	0.3581	2661
+methylKit-tile	3UTR	32	0.012	2661
+methylKit-tile	TTS	42	0.0158	2661
+methylKit-tile	non-coding	157	0.059	2661
+methylKit-tile	intergenic	1377	0.5175	2661
+epykit-tile	promoter-TSS	68	0.0198	3433
+epykit-tile	5UTR	3	0.0009	3433
+epykit-tile	exon	54	0.0157	3433
+epykit-tile	intron	1293	0.3766	3433
+epykit-tile	3UTR	46	0.0134	3433
+epykit-tile	TTS	48	0.014	3433
+epykit-tile	non-coding	197	0.0574	3433
+epykit-tile	intergenic	1724	0.5022	3433
+epykit-chain_merge-100	promoter-TSS	22	0.0258	852
+epykit-chain_merge-100	5UTR	0	0.0	852
+epykit-chain_merge-100	exon	69	0.081	852
+epykit-chain_merge-100	intron	358	0.4202	852
+epykit-chain_merge-100	3UTR	0	0.0	852
+epykit-chain_merge-100	TTS	9	0.0106	852
+epykit-chain_merge-100	non-coding	0	0.0	852
+epykit-chain_merge-100	intergenic	394	0.4624	852
+epykit-chain_merge-250	promoter-TSS	32	0.0281	1139
+epykit-chain_merge-250	5UTR	0	0.0	1139
+epykit-chain_merge-250	exon	78	0.0685	1139
+epykit-chain_merge-250	intron	480	0.4214	1139
+epykit-chain_merge-250	3UTR	0	0.0	1139
+epykit-chain_merge-250	TTS	15	0.0132	1139
+epykit-chain_merge-250	non-coding	1	0.0009	1139
+epykit-chain_merge-250	intergenic	533	0.468	1139
+DSS-from-scratch	promoter-TSS	7	0.0076	922
+DSS-from-scratch	5UTR	1	0.0011	922
+DSS-from-scratch	exon	34	0.0369	922
+DSS-from-scratch	intron	358	0.3883	922
+DSS-from-scratch	3UTR	16	0.0174	922
+DSS-from-scratch	TTS	15	0.0163	922
+DSS-from-scratch	non-coding	54	0.0586	922
+DSS-from-scratch	intergenic	437	0.474	922

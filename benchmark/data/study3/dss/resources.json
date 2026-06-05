@@ -1,0 +1,25 @@
+{
+  "system": {
+    "platform": "Linux-6.8.0-111-generic-x86_64-with-glibc2.35",
+    "python": "3.12.13",
+    "psutil": "7.2.2",
+    "cpu_count_logical": 24,
+    "cpu_count_physical": 12,
+    "cpu_freq_mhz": 4450,
+    "total_ram_gb": 62.0,
+    "hostname": "pivoine",
+    "timestamp": "2026-06-03T01:02:17"
+  },
+  "resources": {
+    "samples_collected": 1544,
+    "sample_interval_s": 1.0,
+    "wall_seconds_resume_only": 341.85,
+    "rss_peak_mb": 14320.4,
+    "rss_mean_mb": 8550.1,
+    "uss_peak_mb": 14314.7,
+    "cpu_percent_peak": 980.0,
+    "cpu_percent_mean": 114.0,
+    "threads_peak": 13,
+    "cpu_total_seconds_observed": 426.7
+  }
+}

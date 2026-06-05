@@ -39,6 +39,16 @@ Q_THRESHOLD = 0.05
 METH_DIFF_BINS = ("0.2-0.4", "0.4-0.6", "0.6-0.8", "0.8-1.0")
 DMR_OVERLAP_THRESHOLD = 0.8
 
+# Truth-relabeling threshold for ``truth_mode="threshold"`` in
+# ``score_dmc_parquet``. Matches the Study 1 default. The intrinsic
+# label uses the simulator's ``signed_delta`` (the designed effect);
+# the threshold label uses the *realised* difference between observed
+# treatment and control mean betas, which is what the noisy data
+# actually shows. Reporting both side-by-side defuses the
+# "in-house simulator advantages epykit" critique (M3) without
+# requiring an external simulator.
+TRUTH_THRESHOLD: float = 0.20
+
 
 # ---------------------------------------------------------------------------
 # Engine-loop narrow exception clause
@@ -149,6 +159,72 @@ def _auroc(joined: pl.DataFrame) -> float:
     return u / (n_pos * n_neg)
 
 
+def relabel_truth(
+    truth: pl.DataFrame,
+    truth_mode: str,
+    truth_threshold: float = TRUTH_THRESHOLD,
+) -> pl.DataFrame:
+    """Return a copy of ``truth`` with ``is_dmc`` (re)derived per ``truth_mode``.
+
+    Parameters
+    ----------
+    truth : pl.DataFrame
+        Must carry ``chrom``, ``pos``, ``is_dmc`` and (for threshold mode)
+        ``mean_beta_treat`` + ``mean_beta_ctrl`` from the simulator.
+    truth_mode : {"intrinsic", "threshold"}
+        ``intrinsic`` keeps ``is_dmc`` as-is (the simulator's
+        ``signed_delta != 0`` flag); this is what the engine-internal
+        truth uses and what the original Study 1b labeling does.
+        ``threshold`` recomputes ``is_dmc`` from the *realised*
+        observed difference: ``|mean_beta_treat - mean_beta_ctrl| >= truth_threshold``.
+        The threshold-labeled truth is what the noisy data actually
+        shows; reporting both labelings side by side is required to
+        defuse the "intrinsic truth advantages epykit" critique.
+    truth_threshold : float
+        Cutoff for threshold-mode relabeling. Default 0.20 matches
+        the Study 1 ``TRUTH_THRESHOLD`` constant.
+
+    Returns
+    -------
+    pl.DataFrame
+        Truth frame with ``is_dmc`` set per the requested mode. The
+        ``meth_diff_bin`` column is also recomputed in threshold mode
+        so that per-bin TPR rows reflect the realised effect.
+    """
+    if truth_mode == "intrinsic":
+        return truth
+    if truth_mode != "threshold":
+        raise ValueError(
+            f"truth_mode must be 'intrinsic' or 'threshold'; got {truth_mode!r}"
+        )
+    missing = [
+        c for c in ("mean_beta_treat", "mean_beta_ctrl")
+        if c not in truth.columns
+    ]
+    if missing:
+        raise ValueError(
+            f"truth_mode='threshold' requires columns {missing} in the "
+            f"truth frame; got columns: {truth.columns}"
+        )
+
+    realised = (
+        pl.col("mean_beta_treat").cast(pl.Float64)
+        - pl.col("mean_beta_ctrl").cast(pl.Float64)
+    )
+    abs_d = realised.abs()
+    bin_expr = (
+        pl.when(abs_d >= 0.80).then(pl.lit("0.8-1.0"))
+        .when(abs_d >= 0.60).then(pl.lit("0.6-0.8"))
+        .when(abs_d >= 0.40).then(pl.lit("0.4-0.6"))
+        .when(abs_d >= 0.20).then(pl.lit("0.2-0.4"))
+        .otherwise(pl.lit("none"))
+    )
+    return truth.with_columns(
+        is_dmc=(abs_d >= truth_threshold),
+        meth_diff_bin=bin_expr,
+    )
+
+
 def _join_with_truth(epy_df: pl.DataFrame, truth: pl.DataFrame) -> pl.DataFrame:
     """Project pvalue/qvalue columns and inner-join to the truth table.
 
@@ -182,6 +258,9 @@ def score_dmc_parquet(
     parquet: Path, truth: pl.DataFrame,
     tool: str, scenario: str, parameter: str,
     parameter_value, test: str,
+    *,
+    truth_mode: str = "intrinsic",
+    truth_threshold: float = TRUTH_THRESHOLD,
 ) -> list[dict]:
     """Score one per-cell DMC parquet against the truth table.
 
@@ -196,15 +275,37 @@ def score_dmc_parquet(
     rows whose ``meth_diff_bin`` does not match any of ``METH_DIFF_BINS``
     are silently treated as not in any bin (no per-bin row emitted for
     them).
+
+    Parameters
+    ----------
+    truth_mode : {"intrinsic", "threshold"}, default "intrinsic"
+        Controls how the truth labels are derived. ``intrinsic`` uses
+        the simulator's ``signed_delta != 0`` flag (the designed effect).
+        ``threshold`` re-derives ``is_dmc`` from the realised observed
+        difference at ``truth_threshold``. Every output row records the
+        ``truth_mode`` and ``truth_threshold`` used so the two
+        labelings can be reported side by side without ambiguity.
+    truth_threshold : float
+        Cutoff for ``truth_mode="threshold"``. Default 0.20.
     """
     df = pl.read_parquet(parquet)
     if "pvalue" not in df.columns or "qvalue" not in df.columns:
         logger.warning("skip (no pvalue/qvalue): %s", parquet.name)
         return []
-    joined = _join_with_truth(df, truth)
+    truth_eff = relabel_truth(truth, truth_mode, truth_threshold)
+    joined = _join_with_truth(df, truth_eff)
 
     rows: list[dict] = []
     auroc = _auroc(joined)
+    # Provenance fields appended to every emitted row so the two
+    # truth-labelings can be distinguished in downstream summaries.
+    prov = {
+        "truth_mode": truth_mode,
+        "truth_threshold": (
+            float(truth_threshold) if truth_mode == "threshold"
+            else float("nan")
+        ),
+    }
 
     # All-bins p-value thresholds
     for cut in P_THRESHOLDS:
@@ -213,7 +314,7 @@ def score_dmc_parquet(
             "tool": tool, "scenario": scenario, "parameter": parameter,
             "parameter_value": parameter_value, "test": test,
             "meth_diff_bin": "all", "threshold_kind": "pvalue",
-            "threshold": cut, **m, "auroc": auroc,
+            "threshold": cut, **m, "auroc": auroc, **prov,
         })
 
     # All-bins q-value @ 0.05
@@ -222,7 +323,7 @@ def score_dmc_parquet(
         "tool": tool, "scenario": scenario, "parameter": parameter,
         "parameter_value": parameter_value, "test": test,
         "meth_diff_bin": "all", "threshold_kind": "qvalue",
-        "threshold": Q_THRESHOLD, **m, "auroc": auroc,
+        "threshold": Q_THRESHOLD, **m, "auroc": auroc, **prov,
     })
 
     # Per-bin TPR stratified -- only meaningful when truth carries a
@@ -252,6 +353,7 @@ def score_dmc_parquet(
             "precision": tp / (tp + fp_g) if (tp + fp_g) else 0.0,
             "f1": (2 * tp / (2 * tp + fp_g + fn)) if (2 * tp + fp_g + fn) else 0.0,
             "auroc": float("nan"),
+            **prov,
         })
     return rows
 

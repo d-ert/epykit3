@@ -1,0 +1,7 @@
+sample_id	group	path
+Clone16_KO	Het_AKAP11_KO	/home/mlegrand/Desktop/Deniz/raw_data/GSE263850/GSM8200106_Clone16_untreated.readset_sorted.dedup.filtered.bed.gz
+Clone20_KO	Het_AKAP11_KO	/home/mlegrand/Desktop/Deniz/raw_data/GSE263850/GSM8200107_Clone20_untreated.readset_sorted.dedup.filtered.bed.gz
+Clone21_KO	Het_AKAP11_KO	/home/mlegrand/Desktop/Deniz/raw_data/GSE263850/GSM8200108_Clone21_untreated.readset_sorted.dedup.filtered.bed.gz
+SBP009_WT_1	WT	/home/mlegrand/Desktop/Deniz/raw_data/GSE263850/GSM8200109_SBP009_Untreated_1.readset_sorted.dedup.filtered.bed.gz
+SBP009_WT_2	WT	/home/mlegrand/Desktop/Deniz/raw_data/GSE263850/GSM8200110_SBP009_Untreated_2.readset_sorted.dedup.filtered.bed.gz
+SBP009_WT_3	WT	/home/mlegrand/Desktop/Deniz/raw_data/GSE263850/GSM8200111_SBP009_Untreated_3.readset_sorted.dedup.filtered.bed.gz

@@ -1,11 +1,18 @@
-"""F7 — Resource comparison across DMR callers on GSE263850.
+"""F7 — Resource comparison across DMR callers on GSE263850 (Linux host).
 
 Bars for wall time, total CPU time, peak RSS. Four callers:
   methylKit-tile, epykit-tile, epykit-chain_merge, DSS-from-scratch.
 
-Numbers from each pipeline's benchmark CSV / resources.json. The
-epykit-chain_merge run wasn't profiled with psutil 1-Hz sampling — RSS
-estimated from epykit-tile (same store + DMC backend).
+All numbers are the Linux host (pivoine, 24 logical cores) measurements
+that match paper Table 5b:
+  - methylKit-tile and epykit-tile come from their step_benchmarks.csv
+    files (psutil + /proc VmHWM, so Linux); methylKit ran single-threaded
+    (mc.cores = 1, explicit on Linux for a fair single-core comparison).
+  - epykit-chain_merge is the cached-store DMC+DMR re-call (run_log on
+    pivoine; RSS shares epykit-tile's backing store).
+  - DSS-from-scratch is the committed Linux rerun: dss/resources.json
+    (peak RSS 14.3 GB) + step_timings_resume.tsv (resume wall/cpu) plus
+    the ~2,044 s initial DMLfit+DMLtest (dss/summary.md).
 """
 
 from __future__ import annotations
@@ -28,27 +35,16 @@ EK_BENCH  = Path(r"D:/Coding/Projeler/methyl_lib/benchmarkin_merges/"
                  r"epykit_vs_methylkit(GSE263850)/"
                  r"epykit_results/benchmark/step_benchmarks.csv")
 DSS_JSON  = DATA_DIR / "dss" / "resources.json"
-CM_LOG    = DATA_DIR / "chain_merge" / "run_log.txt"
+DSS_STEPS = DATA_DIR / "dss" / "step_timings_resume.tsv"
 
-
-def parse_cm_wall_cpu() -> tuple[float, float]:
-    """Total wall + summed CPU from the chain_merge log."""
-    text = CM_LOG.read_text(encoding="utf-8").splitlines()
-    # Use ISO timestamps to bracket the run
-    first = last = None
-    for line in text:
-        if line[:4].isdigit() and " " in line:
-            ts = line.split(",", 1)[0]
-            if first is None:
-                first = ts
-            last = ts
-    from datetime import datetime
-    fmt = "%Y-%m-%d %H:%M:%S"
-    dt = (datetime.strptime(last, fmt) -
-          datetime.strptime(first, fmt)).total_seconds()
-    # CPU we don't have directly; use the DMC + DMR + annotation snippets
-    cpu_s = 219.8 + 20.6 + 21.5   # DMC + DMR + (annotate ~21s from log)
-    return dt, cpu_s
+# Linux-rerun chain_merge (host pivoine): cached-store DMC+DMR re-call.
+# Wall from run_log brackets (~92 s); DMC 72.5 s per dss summary. RSS not
+# psutil-profiled — shares epykit-tile's backing store, used as estimate.
+CM_WALL_S_LINUX = 92.0
+CM_CPU_S_LINUX  = 261.9
+# Initial DSS DMLfit+DMLtest wall on pivoine (dss/summary.md); single-
+# threaded, so CPU ~= wall for this leg.
+DSS_INITIAL_WALL_S = 2044.0
 
 
 def main() -> None:
@@ -57,9 +53,16 @@ def main() -> None:
     mk = pd.read_csv(MK_BENCH)
     ek = pd.read_csv(EK_BENCH)
     dss = json.loads(DSS_JSON.read_text(encoding="utf-8"))
-    cm_wall, cm_cpu = parse_cm_wall_cpu()
+    dss_steps = pd.read_csv(DSS_STEPS, sep="\t")
 
-    # ---- per-caller summary --------------------------------------------
+    # DSS Linux total = initial DMLfit/DMLtest + the resume steps.
+    dss_resume_wall = float(dss_steps["wall_seconds"].sum())
+    dss_resume_cpu  = float(dss_steps["total_cpu_seconds"].sum())
+    dss_wall = DSS_INITIAL_WALL_S + dss_resume_wall
+    dss_cpu  = DSS_INITIAL_WALL_S + dss_resume_cpu
+    dss_rss  = float(dss["resources"]["rss_peak_mb"])
+
+    # ---- per-caller summary (Linux host pivoine, matching Table 5b) ----
     callers = [
         ("methylKit-tile", {
             "wall_s": float(mk["wall_seconds"].sum()),
@@ -73,20 +76,16 @@ def main() -> None:
             "rss_mb": float(ek["vmhwm_mb"].max()),
         }),
         ("epykit-chain_merge-100", {
-            "wall_s": cm_wall,
-            "cpu_s":  cm_cpu,
+            "wall_s": CM_WALL_S_LINUX,
+            "cpu_s":  CM_CPU_S_LINUX,
             # No direct RSS profiling — same backing store + DMC backend
             # as epykit-tile, so we use that as a faithful estimate.
             "rss_mb": float(ek["vmhwm_mb"].max()),
         }),
         ("DSS-from-scratch", {
-            # Full run = initial DMLfit+DMLtest (2044+145+75+51+5 ≈ 2320s wall)
-            # + resume (499s). Use the sum.
-            "wall_s": 75.4 + 50.6 + 2044.5 + 145.4 + 4.7
-                       + dss["resources"]["wall_seconds_resume_only"],
-            "cpu_s":  67.5 + 49.4 + 2029.0 + 144.3 + 4.5
-                       + 14.0 + 4.8 + 86.8 + 361.1,  # from step_timings parts
-            "rss_mb": float(dss["resources"]["rss_peak_mb"]),
+            "wall_s": dss_wall,
+            "cpu_s":  dss_cpu,
+            "rss_mb": dss_rss,
         }),
     ]
     df_summary = pd.DataFrame([dict(caller=c, **vals) for c, vals in callers])
@@ -137,7 +136,8 @@ def main() -> None:
     ax.grid(axis="y", alpha=0.2)
 
     fig.suptitle("F7 · Resource cost across DMR callers on GSE263850\n"
-                  "(15.6 M CpGs, n=6, hg38, Windows host, single-process)",
+                  "(15.6 M CpGs, n=6, hg38, Linux host pivoine; methylKit mc.cores=1, "
+                  "DSS single-thread)",
                   fontsize=11, y=1.04)
     save_dual(fig, THREE_WAY / "F7_resources")
     plt.close(fig)

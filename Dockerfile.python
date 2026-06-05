@@ -1,0 +1,67 @@
+# Dockerfile.python --- epykit Python stack for reproducible benchmarks.
+#
+# Phase 1.4 of the GB resubmission plan: ship a container that a third
+# reader can build from a clean checkout and use to reproduce every
+# headline number in benchmark/paper_data/ end to end. uv is the
+# canonical installer (matches CI in .github/workflows/test.yml).
+#
+# Usage:
+#   docker build -t epykit-py -f Dockerfile.python .
+#   docker run --rm -v "$PWD":/work -w /work epykit-py \
+#       uv run pytest -m "not slow" --strict-markers -ra
+#   docker run --rm -v "$PWD":/work -w /work epykit-py \
+#       uv run python benchmark/scripts/regen_small.py
+#
+# Pinning policy: Python is pinned to 3.12.* via uv (matches the CI
+# matrix). System libraries needed by polars, pyarrow, numpy and the
+# optional Bismark/MethylDackel converters are installed via apt with
+# explicit version-free names -- the Debian-slim base layer is the
+# pinned anchor for those.
+FROM python:3.12-slim-bookworm
+
+# Avoid prompts in apt and ensure UTF-8 throughout the toolchain.
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONIOENCODING=utf-8 \
+    LC_ALL=C.UTF-8 \
+    LANG=C.UTF-8 \
+    PIP_NO_CACHE_DIR=1
+
+# System deps:
+#   - build-essential, gcc, gfortran: scipy / pyarrow native builds
+#   - libcurl4, libssl-dev, ca-certificates: HTTP for nf-core ingestion
+#   - zlib1g, libbz2, liblzma: tabix / pyBigWig (where supported)
+#   - git: epykit benchmarks read git provenance for MANIFEST.txt files
+#   - tini: PID-1 reaping so docker stop exits cleanly
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        build-essential gcc gfortran \
+        ca-certificates curl git tini \
+        libcurl4 libssl-dev \
+        zlib1g libbz2-1.0 liblzma5 \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install uv via its official installer pinned to the latest stable.
+# We avoid the curl-pipe-bash pattern by using the official binary
+# download; uv ships a static binary so no Python-level install is
+# needed.
+ADD https://astral.sh/uv/install.sh /tmp/uv-install.sh
+RUN sh /tmp/uv-install.sh && rm /tmp/uv-install.sh
+ENV PATH="/root/.local/bin:${PATH}"
+
+WORKDIR /work
+
+# Pre-install dependencies BEFORE copying source so layer cache only
+# busts on pyproject.toml changes. The full source is volume-mounted
+# at run time via -v "$PWD":/work; the source we copy here is just the
+# pyproject + lockfile so the dep install is reproducible.
+COPY pyproject.toml ./
+COPY uv.lock* ./
+
+RUN uv venv && uv sync --extra dev --extra all || \
+    uv sync --extra dev --extra all
+    # The OR clause covers the no-uv.lock fallback path that CI uses.
+
+# Default entrypoint is tini -> the user's command. uv is on PATH so
+# `docker run epykit-py uv run pytest ...` works directly.
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["bash"]

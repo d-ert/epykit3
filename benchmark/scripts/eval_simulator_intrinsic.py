@@ -96,7 +96,7 @@ def _load_dss(tsv: Path) -> pl.DataFrame:
 
 def _score_external(
     df: pl.DataFrame, tool: str, scenario: str, parameter_value: int,
-    truth: pl.DataFrame,
+    truth: pl.DataFrame, truth_mode: str = "intrinsic",
 ) -> list[dict]:
     """Score an external-tool DataFrame by writing a temp parquet and
     invoking score_dmc_parquet (single-source-of-truth scoring).
@@ -105,6 +105,11 @@ def _score_external(
       - 4 pvalue thresholds (all-bins)
       - 1 qvalue threshold @ 0.05 (all-bins)
       - 4 per-bin qvalue rows
+
+    truth_mode is forwarded to score_dmc_parquet; "threshold" re-derives
+    is_dmc from |mean_beta_treat - mean_beta_ctrl| >= TRUTH_THRESHOLD on
+    the realised counts (M3 reviewer ask). Every emitted row carries
+    provenance fields truth_mode and truth_threshold.
     """
     import tempfile
     with tempfile.TemporaryDirectory() as td:
@@ -115,16 +120,22 @@ def _score_external(
             tool=tool, scenario=scenario,
             parameter="coverage", parameter_value=parameter_value,
             test=tool.replace("epykit_", "").replace("_intrinsic", ""),
+            truth_mode=truth_mode,
         )
 
 
-def _score_one_seed(seed: int, coverage: int) -> list[dict]:
+def _score_one_seed(seed: int, coverage: int, sim_root: Path,
+                    truth_modes: tuple[str, ...] = ("intrinsic",)) -> list[dict]:
     """Run methylkit + dss + dss_nosmooth scoring for one seed.
 
-    Returns a list of row dicts with seed/coverage already stamped.
+    Returns a list of row dicts with seed/coverage already stamped. When
+    multiple truth_modes are passed, each external tool is scored once
+    per mode and the rows are concatenated (provenance via truth_mode
+    column on each row).
+
     Skips silently if any required input is missing.
     """
-    seed_dir = SIM_ROOT / f"seed={seed}"
+    seed_dir = sim_root / f"seed={seed}"
     truth_pq = seed_dir / "truth.parquet"
     methylkit_tsv = seed_dir / "methylkit.tsv"
     dss_tsv = seed_dir / "dss.tsv"
@@ -134,19 +145,20 @@ def _score_one_seed(seed: int, coverage: int) -> list[dict]:
         return []
     truth = pl.read_parquet(truth_pq)
     rows: list[dict] = []
-    rows.extend(_score_external(
-        _load_methylkit(methylkit_tsv), "methylkit",
-        "simulator_intrinsic", coverage, truth,
-    ))
-    rows.extend(_score_external(
-        _load_dss(dss_tsv), "dss",
-        "simulator_intrinsic", coverage, truth,
-    ))
-    if dss_nosmooth_tsv.exists():
+    for tm in truth_modes:
         rows.extend(_score_external(
-            _load_dss(dss_nosmooth_tsv), "dss_nosmooth",
-            "simulator_intrinsic", coverage, truth,
+            _load_methylkit(methylkit_tsv), "methylkit",
+            "simulator_intrinsic", coverage, truth, truth_mode=tm,
         ))
+        rows.extend(_score_external(
+            _load_dss(dss_tsv), "dss",
+            "simulator_intrinsic", coverage, truth, truth_mode=tm,
+        ))
+        if dss_nosmooth_tsv.exists():
+            rows.extend(_score_external(
+                _load_dss(dss_nosmooth_tsv), "dss_nosmooth",
+                "simulator_intrinsic", coverage, truth, truth_mode=tm,
+            ))
     for r in rows:
         r["seed"] = seed
     return rows
@@ -161,8 +173,34 @@ def main(argv: list[str] | None = None) -> int:
                              "emit eval_simulator_intrinsic_per_seed.parquet + iqr summary.")
     parser.add_argument("--coverage", type=int, default=10,
                         help="Coverage cell to evaluate (default: 10)")
+    parser.add_argument("--truth-mode", choices=("intrinsic", "threshold", "both"),
+                        default="intrinsic",
+                        help="Ground-truth labelling. 'intrinsic' uses the "
+                             "simulator's is_dmc; 'threshold' re-derives "
+                             "from |mean_beta_treat-mean_beta_ctrl|>=0.20 "
+                             "on the realised population means (M3 reviewer "
+                             "ask); 'both' emits both labellings side-by-side "
+                             "(disambiguated by the truth_mode provenance "
+                             "column). Default: intrinsic (backward compat).")
+    parser.add_argument("--sim-root", type=Path, default=None,
+                        help="Override the simulator data root. Defaults to "
+                             "benchmark/data/study1b_simulator. Pass an "
+                             "external path to re-score outputs from the "
+                             "rerun staging tree without integrating bulk "
+                             "per-seed TSVs into benchmark/data/.")
+    parser.add_argument("--out-dir", type=Path, default=None,
+                        help="Override where eval parquets land. Defaults to "
+                             "--sim-root (in-place). Set this when scoring "
+                             "from a read-only staging tree.")
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args(argv)
+
+    # Resolve roots (module-level SIM_ROOT is the default).
+    sim_root = (args.sim_root or SIM_ROOT).resolve()
+    out_dir = (args.out_dir or sim_root).resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    truth_modes = (("intrinsic", "threshold") if args.truth_mode == "both"
+                   else (args.truth_mode,))
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -173,17 +211,24 @@ def main(argv: list[str] | None = None) -> int:
     # into a per-seed long-form parquet + an across-seed IQR summary.
     if args.all_seeds:
         seeds = sorted(
-            int(d.name.split("=")[1]) for d in SIM_ROOT.glob("seed=*")
+            int(d.name.split("=")[1]) for d in sim_root.glob("seed=*")
             if (d / "methylkit.tsv").exists() and (d / "dss.tsv").exists()
         )
-        logger.info("multi-seed mode: %d seeds with methylkit + dss outputs", len(seeds))
+        logger.info("multi-seed mode: %d seeds with methylkit + dss outputs "
+                    "(sim_root=%s, truth_modes=%s)", len(seeds), sim_root, truth_modes)
         all_rows: list[dict] = []
         for seed in seeds:
-            seed_rows = _score_one_seed(seed, args.coverage)
+            seed_rows = _score_one_seed(seed, args.coverage, sim_root, truth_modes)
             all_rows.extend(seed_rows)
             logger.info("seed=%d scored: %d rows", seed, len(seed_rows))
         per_seed_df = pl.DataFrame(all_rows)
-        per_seed_pq = SIM_ROOT / "eval_simulator_intrinsic_per_seed.parquet"
+        # When only intrinsic is run, keep the legacy filename for backward
+        # compatibility with downstream paper figures. When threshold OR both
+        # are run, write a distinct file so the dual-labelling result lands
+        # next to the legacy one without overwriting.
+        suffix = ("" if args.truth_mode == "intrinsic"
+                  else f"_truth_{args.truth_mode}")
+        per_seed_pq = out_dir / f"eval_simulator_intrinsic{suffix}_per_seed.parquet"
         per_seed_df.write_parquet(per_seed_pq)
         logger.info("wrote %s (%d rows)", per_seed_pq, per_seed_df.height)
 
@@ -197,7 +242,11 @@ def main(argv: list[str] | None = None) -> int:
         with_fdr = headline.with_columns(
             (pl.col("fp") / (pl.col("tp") + pl.col("fp"))).alias("fdr"),
         )
-        iqr = with_fdr.group_by("tool").agg([
+        # Group by truth_mode AS WELL when multiple modes are present, so
+        # the two labellings stay disambiguated in the headline table.
+        group_keys = (["tool", "truth_mode"]
+                      if len(truth_modes) > 1 else ["tool"])
+        iqr = with_fdr.group_by(group_keys).agg([
             pl.col("tpr").median().alias("tpr_median"),
             pl.col("tpr").quantile(0.25).alias("tpr_q1"),
             pl.col("tpr").quantile(0.75).alias("tpr_q3"),
@@ -212,10 +261,10 @@ def main(argv: list[str] | None = None) -> int:
             pl.col("auroc").quantile(0.25).alias("auroc_q1"),
             pl.col("auroc").quantile(0.75).alias("auroc_q3"),
             pl.len().alias("n_seeds"),
-        ]).sort("tool")
-        iqr_pq = SIM_ROOT / "eval_simulator_intrinsic_iqr.parquet"
+        ]).sort(group_keys)
+        iqr_pq = out_dir / f"eval_simulator_intrinsic{suffix}_iqr.parquet"
         iqr.write_parquet(iqr_pq)
-        logger.info("wrote %s (%d tools across %d seeds)", iqr_pq, iqr.height, len(seeds))
+        logger.info("wrote %s (%d rows across %d seeds)", iqr_pq, iqr.height, len(seeds))
         return 0
 
     # Single-seed mode (original Task 5 Step 4).

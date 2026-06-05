@@ -31,6 +31,16 @@ Simulation model
    fixed-coverage scenarios); replace with a Poisson or Negative Binomial
    draw if heteroscedastic coverage is needed.
 
+   With ``phi > 0`` the simulator draws Beta-Binomial instead. Per-sample,
+   per-site we draw ``p_i ~ Beta(mu * (1/phi - 1), (1-mu) * (1/phi - 1))``
+   then ``count_M ~ Binomial(n=coverage, p=p_i)``. ``phi`` is the
+   beta-binomial intraclass correlation rho in (0, 1); the variance of
+   the BB count is the binomial variance multiplied by ``1 + (n-1) * phi``.
+   Real WGBS dispersion is typically rho ~ 0.01-0.1 at coverage 10-30;
+   the Piao binomial-only simulator (``phi=0``) is therefore under-
+   dispersed relative to real data. Run the simulator at multiple
+   rho values to assess engine sensitivity to overdispersion.
+
 Outputs
 -------
 - AMP-format text files at `out_dir/amp.coverage={K}.sample{i}.txt` for
@@ -65,6 +75,10 @@ class SimConfig:
     chromosome: str = "chr1"  # Piao simulator uses single contiguous CpG track
     pos_spacing_bp: int = 100  # 100 bp inter-CpG (loose CGI density average)
     seed: int = 42
+    # Beta-Binomial intraclass correlation rho in [0, 1). phi=0
+    # collapses to pure Binomial (the original Piao behaviour).
+    # Recommended sweep for sensitivity analysis: {0.0, 0.01, 0.05, 0.1, 0.2}.
+    phi: float = 0.0
 
 
 def _draw_baseline_beta(n: int, rng: np.random.Generator) -> np.ndarray:
@@ -107,6 +121,61 @@ def _assign_dmcs(
     return is_dmc, signed_delta, direction
 
 
+def _draw_beta_binomial(
+    n_trials: int,
+    p: np.ndarray,
+    phi: float,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Draw Beta-Binomial(n, p, phi) where phi is the intraclass correlation.
+
+    Parameters
+    ----------
+    n_trials : int
+        Coverage at each CpG (n in Binomial(n, p)).
+    p : np.ndarray
+        Per-CpG mean methylation probability, shape (n_cpgs,).
+    phi : float
+        Intraclass correlation rho in (0, 1). At phi -> 0 the
+        Beta-Binomial collapses to Binomial(n, p); at phi -> 1 the
+        per-draw probability is fixed at either 0 or 1 with probability
+        1-p, p respectively (extreme over-dispersion).
+    rng : np.random.Generator
+        Random source.
+
+    Returns
+    -------
+    np.ndarray of int64, shape (n_cpgs,) -- per-CpG methylated count.
+
+    Notes
+    -----
+    Parameterisation: ``alpha = p * (1/phi - 1)``,
+    ``beta = (1-p) * (1/phi - 1)``. Then Beta(alpha, beta) has mean p
+    and variance ``p*(1-p)*phi``; the Beta-Binomial variance is
+    ``n*p*(1-p) * (1 + (n-1)*phi)`` versus the pure Binomial
+    ``n*p*(1-p)``.
+    """
+    if phi <= 0.0:
+        raise ValueError(
+            f"_draw_beta_binomial requires phi > 0 (got {phi}); use "
+            f"rng.binomial directly for the phi=0 case."
+        )
+    if phi >= 1.0:
+        raise ValueError(
+            f"_draw_beta_binomial requires phi < 1 (got {phi}); the "
+            f"Beta degenerates at the boundary."
+        )
+    concentration = 1.0 / phi - 1.0
+    # Clip p to avoid Beta(0, *) / Beta(*, 0) degeneracy when the
+    # baseline beta lands at the closed-interval boundary.
+    p_safe = np.clip(p, 1e-6, 1.0 - 1e-6)
+    alpha = p_safe * concentration
+    beta = (1.0 - p_safe) * concentration
+    # Per-CpG p drawn from Beta, then Binomial draw conditional on it.
+    p_draw = rng.beta(alpha, beta)
+    return rng.binomial(n_trials, p_draw).astype(np.int64)
+
+
 def _meth_diff_bin(true_meth_diff: np.ndarray) -> np.ndarray:
     """Stratify |delta| into the paper's bins."""
     abs_d = np.abs(true_meth_diff)
@@ -130,15 +199,23 @@ def simulate_dmc(
     delta_hi: float = 1.00,
     chromosome: str = "chr1",
     pos_spacing_bp: int = 100,
+    phi: float = 0.0,
 ) -> dict:
     """Run one simulation. See module docstring for the model.
 
     Returns dict: {"truth": Path, "amp_files": list[Path], "config": SimConfig}.
     """
+    if not (0.0 <= phi < 1.0):
+        raise ValueError(
+            f"phi must be in [0, 1); got {phi}. Use phi=0 for pure "
+            f"Binomial (the Piao default) or phi in (0, 1) for "
+            f"Beta-Binomial overdispersion."
+        )
     cfg = SimConfig(
         n_cpgs=n_cpgs, n_per_group=n_per_group, coverage=coverage,
         dmc_fraction=dmc_fraction, delta_lo=delta_lo, delta_hi=delta_hi,
         chromosome=chromosome, pos_spacing_bp=pos_spacing_bp, seed=seed,
+        phi=phi,
     )
     out = Path(out_dir) if out_dir is not None else Path.cwd() / "simulate_piao_out"
     out.mkdir(parents=True, exist_ok=True)
@@ -162,10 +239,20 @@ def simulate_dmc(
     treat_count_M = np.zeros((n_per_group, n_cpgs), dtype=np.int64)
     ctrl_count_M = np.zeros((n_per_group, n_cpgs), dtype=np.int64)
 
-    for j in range(n_per_group):
-        treat_count_M[j] = rng.binomial(coverage, treat_beta)
-    for j in range(n_per_group):
-        ctrl_count_M[j] = rng.binomial(coverage, ctrl_beta)
+    if phi <= 0.0:
+        for j in range(n_per_group):
+            treat_count_M[j] = rng.binomial(coverage, treat_beta)
+        for j in range(n_per_group):
+            ctrl_count_M[j] = rng.binomial(coverage, ctrl_beta)
+    else:
+        for j in range(n_per_group):
+            treat_count_M[j] = _draw_beta_binomial(
+                coverage, treat_beta, phi=phi, rng=rng,
+            )
+        for j in range(n_per_group):
+            ctrl_count_M[j] = _draw_beta_binomial(
+                coverage, ctrl_beta, phi=phi, rng=rng,
+            )
 
     # Per-sample mean beta is the realised (noisy) value; truth uses the
     # *expected* mean (clean signal), which is the input beta. The
@@ -242,6 +329,12 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--dmc-fraction", type=float, default=0.20)
+    parser.add_argument(
+        "--phi", type=float, default=0.0,
+        help="Beta-Binomial intraclass correlation (overdispersion). "
+             "Default 0 = pure Binomial (Piao). "
+             "Recommended sweep: 0.0, 0.01, 0.05, 0.1, 0.2.",
+    )
     args = parser.parse_args(argv)
 
     result = simulate_dmc(
@@ -251,8 +344,9 @@ def main(argv: list[str] | None = None) -> None:
         seed=args.seed,
         dmc_fraction=args.dmc_fraction,
         out_dir=args.out,
+        phi=args.phi,
     )
-    print(f"wrote {len(result['amp_files'])} AMP files + {result['truth']}")
+    print(f"wrote {len(result['amp_files'])} AMP files + {result['truth']} (phi={args.phi})")
 
 
 if __name__ == "__main__":

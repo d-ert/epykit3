@@ -14,6 +14,22 @@ This package provides a complete WGBS analysis pipeline:
   - qc:        Bisulfite conversion rate, global methylation, coverage
                uniformity, plus opt-in clinical / cohort checks
 
+DMC engine choice
+-----------------
+Bare ``lr`` is the recommended default and the engine the benchmark paper
+characterises. ``welch_t``, ``fisher`` and ``glm`` are alternative
+engines for specific situations (small samples, single replicates,
+covariate-adjusted designs). The ``power_stack="lr+"`` tunable is an
+*exploratory* research knob: it bundles four extensions (neighbour
+combine, two-stage BH, separation fallback, EB dispersion shrinkage)
+that were tuned on the Piao 2021 simulator and have **not** been shown
+to improve on bare ``lr`` for real-world WGBS at realistic
+overdispersion (real WGBS phi ~ 1.5-5; simulator phi ~ 0.4). On
+GSE263850 ``lr+`` inflates DMC counts ~13x at the same q-threshold,
+consistent with FPR drift. Use ``lr+`` only if you understand its
+heuristics and are willing to validate them on your own data. See
+``docs/architecture.md`` for the engine map.
+
 Logging convention
 ------------------
 Library modules (everything under ``epykit.*`` except ``epykit.cli``) emit

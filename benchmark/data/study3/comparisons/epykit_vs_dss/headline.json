@@ -1,0 +1,29 @@
+{
+  "ek100_vs_dss": {
+    "ek100_vs_dss_n_query": 852,
+    "ek100_vs_dss_n_target": 922,
+    "ek100_vs_dss_target_hit_anybp": 588,
+    "ek100_vs_dss_query_hit_anybp": 634,
+    "ek100_vs_dss_recall_anybp": 0.6377,
+    "ek100_vs_dss_precision_anybp": 0.7441,
+    "ek100_vs_dss_recall_J_0_25": 0.5423,
+    "ek100_vs_dss_recall_J_0_5": 0.3449,
+    "ek100_vs_dss_recall_J_0_75": 0.2278,
+    "ek100_vs_dss_direction_agree_n": 588,
+    "ek100_vs_dss_direction_agree_total": 588,
+    "ek100_vs_dss_direction_agree_frac": 1.0
+  },
+  "ek250_vs_dss": null,
+  "ek100_gene_recall_of_dss": 0.6741,
+  "ek250_gene_recall_of_dss": null,
+  "dss_panel_e_capture": {
+    "n_panel_e": 46,
+    "captured": 37,
+    "recall": 0.8043
+  },
+  "dss_heatmap_gene_hits": {
+    "checked": 10,
+    "with_paper_dmr": 10,
+    "with_dss_coord_overlap": 9
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "paper_reference": "Farhangdoost et al., 2024. AKAP11 heterozygous LOF in human iPSC-derived cortical neurons (GSE263850), hg38.",
+  "dataset": "GSE263850 (n=6: 3 Het-AKAP11-KO + 3 WT)",
+  "ingest": {
+    "samplesheet": "/home/mlegrand/Desktop/Deniz/epykit_bechmarking/epykit3/benchmark/data/study3/samplesheet.csv",
+    "assembly": "hg38",
+    "coverage_min": 5,
+    "unite_mode": "intersect (inner join on chrom+pos across samples)"
+  },
+  "dmltest": {
+    "function": "DSS::DMLfit.multiFactor(smoothing = TRUE) -> DMLtest.multiFactor(coef = <group level>)",
+    "design": "~ group",
+    "smoothing": true
+  },
+  "callDMR": {
+    "function": "DSS::callDMR",
+    "p_threshold": 1e-05,
+    "delta": 0.0,
+    "minlen": 50,
+    "minCG": 3,
+    "dis_merge": 100,
+    "pct_sig": 0.5
+  },
+  "annotation": {
+    "tool": "HOMER-equivalent (UCSC refGene) reimplemented in R",
+    "catalog": "/home/mlegrand/Desktop/Deniz/raw_data/GSE263850/refseq/refGene.txt.gz",
+    "paper_tool": "HOMER annotatePeaks.pl (hg38, RefSeq)"
+  },
+  "gene_linkage_100kb": {
+    "rule": "Every gene whose canonical TSS lies within 100 kb of the DMR midpoint. One row per (DMR, gene).",
+    "max_bp": 100000
+  },
+  "outputs": [
+    "dmr_dss_raw.tsv",
+    "dmr_dss.csv",
+    "dmr_dss.tsv",
+    "dmr_gene_links_100kb.csv",
+    "dmltest_per_cpg.tsv.gz",
+    "step_timings.tsv",
+    "resources.csv",
+    "resources.json",
+    "summary.md",
+    "parameters.json",
+    "run_log.txt",
+    "dss_session_info.txt",
+    "README.md"
+  ]
+}

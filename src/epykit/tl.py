@@ -563,6 +563,16 @@ def dmc(
                 "empirical_fdr": empirical_fdr,
                 "n_perm": n_perm if empirical_fdr else None,
                 "perm_seed": perm_seed if empirical_fdr else None,
+                # lr+ stack knobs: changing any of these changes engine
+                # output, so a cached result computed at different values
+                # must NOT be reused. Omitting any of these from the
+                # signature causes silent cache hits in parameter sweeps.
+                "power_stack": power_stack,
+                "sep_fallback": sep_fallback,
+                "sep_threshold": sep_threshold,
+                "neighbour_combine": neighbour_combine,
+                "neighbour_bp": neighbour_bp,
+                "fdr_method": fdr_method,
             },
         )
         if resume_root:
@@ -590,6 +600,12 @@ def dmc(
                         "empirical_fdr": empirical_fdr,
                         "n_perm": n_perm if empirical_fdr else None,
                         "perm_seed": perm_seed if empirical_fdr else None,
+                        "power_stack": power_stack,
+                        "sep_fallback": sep_fallback,
+                        "sep_threshold": sep_threshold,
+                        "neighbour_combine": neighbour_combine,
+                        "neighbour_bp": neighbour_bp,
+                        "fdr_method": fdr_method,
                         "last_key": resume_stage_name,
                         "resumed": True,
                     }
@@ -735,6 +751,12 @@ def dmc(
         "empirical_fdr": empirical_fdr,
         "n_perm": n_perm if empirical_fdr else None,
         "perm_seed": perm_seed if empirical_fdr else None,
+        "power_stack": power_stack,
+        "sep_fallback": sep_fallback,
+        "sep_threshold": sep_threshold,
+        "neighbour_combine": neighbour_combine,
+        "neighbour_bp": neighbour_bp,
+        "fdr_method": fdr_method,
         # explicit pointer so MethylData.get_dmc() / .dmc resolve to the
         # table the user just wrote, regardless of which other tests have
         # been run in the same session.

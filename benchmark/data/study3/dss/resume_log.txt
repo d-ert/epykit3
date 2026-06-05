@@ -1,0 +1,47 @@
+Resuming DSS replication from cached DMLtest
+Started: 2026-06-03 00:56:45
+Out dir: /home/mlegrand/Desktop/Deniz/epykit_bechmarking/epykit3/benchmark/data/study3/dss
+
+
+[step] load_dmltest_cache ...
+       loaded 22,020,939 rows, 5 cols: chr, pos, stat, pvals, fdrs
+       14.18s wall / 21.68s CPU / R-mem peak 235594808 MB
+
+[step] callDMR ...
+       2.36s wall / 2.35s CPU / R-mem peak 366487453 MB
+
+callDMR -> 922 DMRs; columns: chrom, start, end, length, n_cpgs, meanMethy1, meanMethy2, diff.Methy, areaStat
+
+[step] per_sample_dmr_means ...
+       reading Clone16_KO
+       reading Clone20_KO
+       reading Clone21_KO
+       reading SBP009_WT_1
+       reading SBP009_WT_2
+       reading SBP009_WT_3
+       57.63s wall / 119.24s CPU / R-mem peak 521508802 MB
+Group levels (in order): Het_AKAP11_KO, WT 
+
+DMRs after per-sample mean derivation: 922 (688 hyper, 234 hypo)
+Sign agreement DSSfit vs fromCounts: 0 / 922 disagree
+
+[step] annotate_refgene_homer ...
+
+Loading refGene catalog: /home/mlegrand/Desktop/Deniz/raw_data/GSE263850/refseq/refGene.txt.gz
+Annotating 922 DMRs...
+       249.53s wall / 265.90s CPU / R-mem peak 296317685 MB
+
+[step] build_100kb_gene_links ...
+       0.21s wall / 0.43s CPU / R-mem peak 249868672 MB
+Wrote dmr_gene_links_100kb.csv  (1649 rows, 1467 unique genes)
+
+step_timings_resume.tsv:
+                     step wall_seconds total_cpu_seconds r_mem_peak_mb
+                   <char>        <num>             <num>         <num>
+1:     load_dmltest_cache       14.175            21.684     235594808
+2:                callDMR        2.360             2.351     366487453
+3:   per_sample_dmr_means       57.630           119.238     521508802
+4: annotate_refgene_homer      249.529           265.900     296317685
+5: build_100kb_gene_links        0.215             0.425     249868672
+
+Finished: 2026-06-03 01:02:16

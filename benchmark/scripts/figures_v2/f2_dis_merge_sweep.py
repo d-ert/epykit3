@@ -18,13 +18,12 @@ import pandas as pd
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _style import (DATA_DIR, THREE_WAY, setup, save_dual)
+from _style import (SWEEP_DIR, THREE_WAY, setup, save_dual)
 
 
 def main() -> None:
     setup()
-    df = pd.read_csv(DATA_DIR / "chain_merge_dis_merge_sweep" /
-                     "sweep_summary.csv")
+    df = pd.read_csv(SWEEP_DIR / "sweep_summary.csv")
 
     fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.0), constrained_layout=True)
 
@@ -45,9 +44,9 @@ def main() -> None:
     ax.annotate("morphology-\nmatched (250)", xy=(250, 5), xytext=(255, 5),
                 fontsize=8, color="#27ae60")
     ax.set_xlabel("dis.merge (bp)")
-    ax.set_ylabel("Paper-DMR recall (%)")
-    ax.set_title("A · Recall vs paper Supp Table 5\n(813 DMRs, stratified by Jaccard)")
-    ax.set_ylim(0, 80)
+    ax.set_ylabel("DSS-DMR recall (%)")
+    ax.set_title("A · Recall vs DSS-from-scratch\n(922 DMRs, stratified by Jaccard)")
+    ax.set_ylim(0, 90)
     ax.legend(fontsize=8, frameon=False, loc="lower right")
     ax.grid(alpha=0.2)
 
@@ -64,8 +63,8 @@ def main() -> None:
              marker="s", color="#34495e", lw=2, label="DMR count", ls="--")
     ax2.set_ylabel("DMR count", color="#34495e")
     ax2.tick_params(axis="y", labelcolor="#34495e")
-    ax2.axhline(813, color="#7f8c8d", ls=":", alpha=0.5)
-    ax2.annotate("paper 813", xy=(500, 813), xytext=(380, 830),
+    ax2.axhline(922, color="#7f8c8d", ls=":", alpha=0.5)
+    ax2.annotate("DSS 922", xy=(500, 922), xytext=(380, 940),
                  fontsize=8, color="#7f8c8d")
     ax.set_title("B · Precision and DMR count\n(precision–recall trade-off)")
     ax.grid(alpha=0.2)
@@ -78,8 +77,8 @@ def main() -> None:
     ax.set_xlabel("dis.merge (bp)")
     ax.set_ylabel("Median DMR length (bp)", color="#9b59b6")
     ax.tick_params(axis="y", labelcolor="#9b59b6")
-    ax.axhline(240, color="#7f8c8d", ls=":", alpha=0.5)
-    ax.annotate("paper 240 bp", xy=(500, 240), xytext=(360, 250),
+    ax.axhline(241, color="#7f8c8d", ls=":", alpha=0.5)
+    ax.annotate("DSS 241 bp", xy=(500, 241), xytext=(360, 251),
                 fontsize=8, color="#7f8c8d")
     ax2.plot(df["dis_merge_bp"], df["panel_e_recall_nearest_tss"] * 100,
              marker="s", color="#16a085", lw=2,
@@ -90,7 +89,7 @@ def main() -> None:
     ax.set_title("C · DMR morphology and Panel-E capture\n(Supp Table 8, 46 genes)")
     ax.grid(alpha=0.2)
 
-    fig.suptitle("F2 · dis.merge sweep — paper $D_{is.merge}$=100 vs morphology-matched 250",
+    fig.suptitle("F2 · dis.merge sweep vs DSS-from-scratch (922 DMRs) — paper-faithful 100 vs morphology-matched 250",
                  fontsize=12, y=1.04)
     save_dual(fig, THREE_WAY / "F2_dis_merge_sweep")
     plt.close(fig)
