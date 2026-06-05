@@ -31,6 +31,19 @@ benchmark/**/*.pptx
 # but keep the bulk *_tuned.tsv outputs ignored
 benchmark/data/study2/methylkit_tuned/*.tsv
 
+# M5.3: Study-2 per-scenario DMC outputs backing Tables 1-2 (auditability).
+# methylKit raw per-CpG TSVs (gzipped), epykit lr per-scenario DMC parquets,
+# the DMC ground truth, and timings. Verified to reproduce the n=2 headline
+# (epykit TPR 0.564 / n_sig 11283; methylKit n_sig 6030). The ~1.2 GB DMR-sim
+# per-CpG TSVs are intentionally excluded (reproducible via the simulator).
+!benchmark/data/study2/MANIFEST.md
+!benchmark/data/study2/methylkit_results/
+!benchmark/data/study2/methylkit_results/**
+!benchmark/data/study2/epykit_results/
+!benchmark/data/study2/epykit_results/**
+!benchmark/data/study2/ground_truth/
+!benchmark/data/study2/ground_truth/**
+
 # Phase 4 Task 2: re-run epykit on Piao-as-distributed.
 # Track the paper-critical post-Phase-3 eval summary and its MANIFEST.
 # Per-cell intermediate parquets stay ignored as bulk artefacts.
