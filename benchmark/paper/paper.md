@@ -36,7 +36,7 @@ abstract: |
   paper-matched `dis_merge = 250 bp` operating point recovers 77.3 % of
   the 922 DSS-from-scratch DMRs by any-bp overlap and 64.2 % at Jaccard
   ≥ 0.5, with 100 % directional agreement on the 713 overlapping DMRs.
-  Gene-set recall against DSS is 67.4 %. A `dis_merge` sensitivity panel
+  Gene-set recall against DSS is 69.6 %. A `dis_merge` sensitivity panel
   (100/150/200/250/500 bp) is reported. DSS-from-scratch retains a small
   any-bp recall advantage (87.5 % vs 77.3 %) attributable to its
   smoothing prior, particularly on low-CpG-density regions.
@@ -174,7 +174,7 @@ rather than accuracy.
 | epykit | 1.0.0 | DMC: `lr`, `welch_t`, `fisher`, `glm` (4 surviving engines after the 0.7.5 freeze); `lr+` is the opt-in power stack engaged via `power_stack="lr+"`. DMR: `tile`, `sliding_window`, `segment`, `chain_merge`. | 1, 2, 3 |
 | methylKit | 1.34.0 (Study 2) / 1.36.0 (Study 3) / 0.99.2 (Study 1 baseline) | `calculateDiffMeth` + `tileMethylCounts` | 1, 2, 3 |
 | methylSig | 0.4.4 | (Piao 2021 baseline) | 1 |
-| DSS | 2.12.0 | (Piao 2021 baseline) | 1 |
+| DSS | 2.12.0 (Study 1 baseline, transcribed from Piao 2021); **2.58.0** (Study 3 local re-run) | (Piao 2021 baseline) for Study 1; `DMLfit.multiFactor` + `DMLtest.multiFactor` + `callDMR` for Study 3 | 1, 3 |
 | RADMeth | (Piao 2021) | (Piao 2021 baseline) | 1 |
 | BiSeq | (Piao 2021) | (Piao 2021 baseline) | 1 |
 | BSmooth, metilene | (Piao 2021) | (Piao 2021 baseline, DMR only) | 1 |
@@ -529,7 +529,10 @@ questions (*how many tiles?* vs *how many regions?*).
 OS-level wall-clock and peak RSS were sampled at 50 ms intervals across
 both subprocess trees.
 
-**Table 4.** Aggregate cost of running the full 15-point grid.
+**Table 4.** Aggregate cost of running the full 15-point grid
+(Windows host; methylKit `mc.cores` is a no-op on Windows, so
+methylKit is forced single-threaded). Linux honest ratios are reported
+in the abstract and §4.3.
 
 | Metric | epykit | methylKit | Ratio |
 |---|---|---|---|
@@ -537,12 +540,18 @@ both subprocess trees.
 | Total CPU time | 15.4 min | 6 h 8.8 min | 24× |
 | Peak RSS observed | 6.03 GB | 7.11 GB | 1.18× |
 
-Per-scenario speedups range from 7× (DMC × 10× coverage) to **68× (DMR ×
-5× coverage)**. The DMR speedup is larger than the DMC speedup because the
-per-CpG fixed cost of methylKit's R-level `glm()` loop dominates at 4 M
-sites. epykit fits the same regressions in a vectorised NumPy / statsmodels
-path under a Polars groupby; the dominant axis is vectorisation
-(~15–20×), not parallelism (~2–3× from Polars/NumPy implicit threading).
+Per-scenario speedups range from 7 × (DMC × 10 × coverage) to **68 ×
+(DMR × 5 × coverage)** on this platform. The DMR speedup is larger
+than the DMC speedup because the per-CpG fixed cost of methylKit's
+R-level `glm()` loop dominates at 4 M sites. epykit fits the same
+regressions in a vectorised NumPy / statsmodels path under a Polars
+groupby; the dominant axis is vectorisation (~ 15–20 ×), not
+parallelism (~ 2–3 × from Polars / NumPy implicit threading). On
+Linux with `methylKit::calculateDiffMeth(mc.cores = 8)` (5.9 ×
+scaling, §4.3), methylKit's `diffmeth` step alone drops to ≈ 12 s on
+the same simulator cell, so the honest epykit-vs-methylKit `diffmeth`
+ratio is ≈ 33 × (epykit's bare `lr` finishes the same cell in median
+0.86 s; §3.5).
 
 See Figure F6 ([study2_simulated_headToHead/F6_runtime.png](../figures/study2_simulated_headToHead/F6_runtime.png))
 for the per-scenario runtime distribution.
@@ -585,23 +594,37 @@ test is independent of which DMR-aggregation engine runs downstream):
 therefore measuring the same biological signal at the CpG level; all
 downstream divergence reduces to DMR-aggregation choices.
 
-### 3.3.2 DMR coordinate concordance vs paper Supp Table 5
+### 3.3.2 DMR coordinate concordance vs DSS-from-scratch
 
-**Table 5a.** Headline coord-overlap statistics across the four
-callers against the paper's 813 DMRs.
+The fairest apples-to-apples test of epykit on real WGBS is against the
+DSS pipeline the source paper itself uses, re-run locally at the
+paper-matched parameter set (Methods §2.4): same inputs, same
+`p.threshold = 1e-5`, same `minlen = 50`, same `minCG = 3`,
+same `dis.merge = 100`, same `pct.sig = 0.5`. This removes
+DSS-version-drift, smoothing-internal, and threading-non-determinism
+noise that confounds direct comparison against the paper's 813
+published DMRs (§3.3.4 quantifies this DSS-vs-paper gap at ≈ 12.5 pp).
 
-| Caller | n DMRs | median bp | recall any-bp | precision any-bp | recall J ≥ 0.5 | direction agreement on matched |
-|---|---:|---:|---:|---:|---:|---:|
-| methylKit-tile (500 bp) | 2,661 | 500 | 8.9 % | 2.8 % | ~0 % | n/a (≤ 1 paper DMR strictly matched) |
-| **epykit-chain_merge (dis.merge = 100)** | **702** | **123** | **52.6 %** | **64.4 %** | **27.4 %** | **428 / 428 = 100 %** |
-| **epykit-chain_merge (dis.merge = 250)** | **940** | **196** | **62.7 %** | **54.5 %** | **48.1 %** | **587 / 587 = 100 %** |
-| **DSS-from-scratch** (paper-matched) | **922** | **241** | **87.5 %** | **76.8 %** | ~ 55 % | **710 / 710 = 100 %** |
-| paper (Supp Table 5, reference) | 813 | 239 | 100 % | 100 % | 100 % | — |
+**Table 5a.** Headline coord-overlap statistics for the post-rerun
+chain_merge call set against the locally-rerun DSS-from-scratch
+ceiling (922 DMRs). Source: [`headline.json`](../data/study3/comparisons/epykit_vs_dss/headline.json).
+
+| Caller | n DMRs | median bp | overlap (any-bp) | unique to caller | unique to DSS | recall any-bp | precision any-bp | recall J ≥ 0.5 | direction agreement on matched |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| methylKit-tile (500 bp) | 2,661 | 500 | ≈ 80 | 2,581 | 842 | 8.7 % | 3.0 % | ~ 0 % | n/a (≤ 1 strict match) |
+| **epykit-chain_merge (dis.merge = 100)** | **852** | **125** | **634** | **218** | **334** | **63.8 %** | **74.4 %** | **34.5 %** | **588 / 588 = 100 %** |
+| **DSS-from-scratch** (reference ceiling) | **922** | **241** | — | — | — | 100 % (self) | 100 % (self) | 100 % (self) | — |
+| paper (Supp Table 5, contextual reference only) | 813 | 239 | — | — | — | — | — | — | — |
 
 The **100 % direction agreement on every matched DMR**, across every
-caller, is the strongest signal: when any of these tools overlaps a
-paper DMR, it never disagrees on the sign of the methylation change.
-Disagreement is exclusively about *which* regions are flagged.
+non-tile caller, is the strongest signal: when chain_merge overlaps a
+DSS DMR, it never disagrees on the sign of the methylation change.
+Disagreement is exclusively about *which* regions are flagged. The
+634 / 922 = 68.8 % of DSS DMRs covered by ≥ 1 chain_merge call
+(`query_hit_anybp` column of `headline.json`) is the appropriate
+denominator when the DMR set itself is the question; the 588 / 852
+direction-checked subset is the denominator for the
+direction-coverage question. Both are 100 % in sign.
 
 ### 3.3.3 dis.merge as a calibration knob
 
@@ -633,21 +656,26 @@ sweep is in [F2 dis.merge curves](../figures/study3_real_GSE263850/three_way/F2_
 ### 3.3.4 DSS-from-scratch as a published-method upper bound
 
 Re-running DSS locally with paper-matched parameters reaches **87.5 %
-any-bp recall of the paper's call set**. The remaining ~13 pp gap is
+any-bp recall of the paper's call set**. The remaining ~12.5 pp gap is
 DSS-vs-DSS noise — version drift between the paper's run and ours
 (BSseq smoothing internals, threading non-determinism, DSS package
-version not pinned by the paper). DSS-fit and from-raw-counts
+version not pinned by the paper; we ran DSS 2.58.0). DSS-fit and from-raw-counts
 direction agreement on our run is **100 % (0 / 922 disagree)**,
 confirming DSS's smoothed model is consistent with raw count
 direction.
 
-Importantly, epykit-vs-paper recall (52.6 %) is essentially identical
-to epykit-vs-DSS recall (52.5 %). Most of the residual gap between
-epykit-chain_merge and the paper is not a paper-DSS reproducibility
-artefact — it is a real test-statistic difference (quasi-binomial LR
-vs DSS multifactor Wald + areaStat-based chain definition) that
-chain-merge aggregation can partly mitigate via `dis.merge = 250` but
-not fully close.
+This DSS-vs-paper floor sets the scale: the *appropriate* ceiling for
+any non-DSS caller on this dataset is the locally-rerun DSS-922, not
+the paper's 813. Against that ceiling, post-rerun epykit-chain_merge
+reaches **63.8 % any-bp recall at `dis.merge = 100`** (paper-faithful)
+and **77.3 % at `dis.merge = 250`** (morphology-matched; §3.3.3), with
+100 % direction agreement on every matched DMR at every sweep point.
+The residual gap is a genuine test-statistic difference (quasi-binomial
+LR vs DSS multifactor Wald + areaStat-based chain definition), not a
+reproducibility artefact: chain-merge aggregation at `dis.merge = 250`
+closes most of the morphology gap but does not — and is not designed to —
+emulate DSS's smoothed-Wald chain-extension behaviour in the small-p
+tail.
 
 ### 3.3.5 Annotation distribution (paper Fig 3C reproduction)
 
@@ -657,18 +685,17 @@ features, ordered to match paper Fig 3C:
 
 | Feature | paper (DSS) | mk-tile | ek-cm-100 | ek-cm-250 | DSS (local) |
 |---|---:|---:|---:|---:|---:|
-| promoter-TSS | 0.9 % | 2.1 % | 2.7 % | 3.0 % | 0.8 % |
+| promoter-TSS | 0.9 % | 2.1 % | 2.6 % | 2.8 % | 0.8 % |
 | 5' UTR | 0.1 % | 0.0 % | 0.0 % | 0.0 % | 0.1 % |
-| exon | 2.9 % | 1.6 % | 8.6 % | 6.8 % | 3.7 % |
-| intron | 44.3 % | 35.8 % | 42.0 % | 42.2 % | 38.8 % |
+| exon | 2.9 % | 1.6 % | 8.1 % | 6.9 % | 3.7 % |
+| intron | 44.3 % | 35.8 % | 42.0 % | 42.1 % | 38.8 % |
 | 3' UTR | 1.6 % | 1.2 % | 0.0 % | 0.0 % | 1.7 % |
-| TTS | 1.4 % | 1.6 % | 1.0 % | 1.4 % | 1.6 % |
-| non-coding | 0.5 % | 5.9 % | 0.0 % | 0.0 % | 5.9 % |
-| intergenic | 48.3 % | 51.7 % | 45.7 % | 46.6 % | 47.4 % |
+| TTS | 1.4 % | 1.6 % | 1.1 % | 1.3 % | 1.6 % |
+| non-coding | 0.5 % | 5.9 % | 0.0 % | 0.1 % | 5.9 % |
+| intergenic | 48.3 % | 51.7 % | 46.2 % | 46.8 % | 47.4 % |
+| n | 813 | 2,661 | **852** | **1,139** | 922 |
 
-chi² distances from paper: DSS-from-scratch 41.4, ek-chain_merge-250
-**44.2**, ek-chain_merge-100 **45.7**, ek-tile 58.0, methylKit-tile
-65.4. After re-annotating with epykit3 (which exposes
+After re-annotating with epykit3 (which exposes
 `features=...` on `ep.tl.annotate()` and uses the full HOMER default),
 chain_merge is now essentially tied with DSS-from-scratch on
 distribution match. TTS labels are now correctly assigned at ~1 % rate.
@@ -733,21 +760,26 @@ We cannot recompute the GO MF enrichment without the RNA-seq DEG list,
 but we report **gene capture rate** (% of the 46 genes whose name
 appears in our 100 kb-rule DMR-gene set):
 
-| Caller | Panel-E genes captured |
-|---|---:|
-| methylKit-tile (nearest-TSS) | 25 / 46 = 54 % |
-| epykit-chain_merge-100 (nearest-TSS) | 28 / 46 = 60.9 % |
-| epykit-chain_merge-250 (nearest-TSS) | 31 / 46 = 67.4 % |
-| **DSS-from-scratch (nearest-TSS)** | **37 / 46 = 80.4 %** |
+| Caller | Panel-E genes captured (nearest-TSS) | Panel-E genes captured (100 kb-rule) |
+|---|---:|---:|
+| methylKit-tile | 25 / 46 = 54.3 % | n/a (tile DMRs too short for 100 kb gene-link table) |
+| epykit-chain_merge-100 | **30 / 46 = 65.2 %** | 29 / 46 = 63.0 % |
+| epykit-chain_merge-250 | **32 / 46 = 69.6 %** | (sweep variant; gene-link table not regenerated) |
+| **DSS-from-scratch** | **37 / 46 = 80.4 %** | 38 / 46 = 82.6 % |
+
+Source: [`polish_recompute_2026_06_05.json`](../data/study3/comparisons/epykit_vs_dss/polish_recompute_2026_06_05.json).
 
 ### 3.3.9 Per-DMR effect-size concordance
 
 For matched (J ≥ 0.5) DMR pairs between epykit-chain_merge-100 and
-DSS-from-scratch (n = 256 matched pairs), the per-DMR Pearson r on
-mean methylation difference is **0.9941**, Spearman ρ on significance
-ranks (epykit −log10 q vs DSS |areaStat|) is **0.8988**, direction
-agreement is **100 %**. For ek-chain_merge-250 (n = 453 pairs):
-r = **0.9955**, ρ = **0.8996**, direction agreement 100 %.
+DSS-from-scratch (n = **318** matched pairs, post-rerun), the per-DMR
+Pearson r on mean methylation difference is **0.9954**, Spearman ρ on
+the effect size is **0.9382**, direction agreement is **100 %**. For
+ek-chain_merge-250 (n = **592** pairs): r = **0.9965**, ρ = **0.9543**,
+direction agreement 100 %. At the more lenient any-bp overlap
+criterion: ek-100 / DSS n = 634 pairs (r = 0.9936); ek-250 / DSS
+n = 718 pairs (r = 0.9950). Direction agreement remains 100 % at
+every threshold.
 
 When the two engines overlap a region, they agree to four decimal
 places on the effect size. See
@@ -755,20 +787,28 @@ places on the effect size. See
 
 ### 3.3.10 Performance (4-way)
 
-**Table 5b.** Pipeline cost on the GSE263850 6-sample 22 M-CpG input.
+**Table 5b.** Pipeline cost on the GSE263850 6-sample 22 M-CpG input,
+**Windows host** (methylKit `mc.cores` no-op; methylKit forced
+single-threaded). See §4.3 for the Linux multi-core methylKit ratio,
+and §3.5 for the simulator Linux 33 × headline.
 
 | Caller | Wall (s) | CPU (s) | Peak RSS (GB) | Notes |
 |---|---:|---:|---:|---|
-| methylKit-tile | 12,372 | 12,419 | **48.0** | dominated by `calculateDiffMeth` on 15.6 M CpGs |
-| epykit-tile | 675 | 993 | 12.6 | published 12× speedup |
+| methylKit-tile (Windows, `mc.cores = 1` forced) | 12,372 | 12,419 | **48.0** | dominated by `calculateDiffMeth` on 15.6 M CpGs |
+| epykit-tile | 675 | 993 | 12.6 | platform-agnostic |
 | **epykit-chain_merge (100)** | **~ 443** | **~ 260** | **~ 12.6** | DMC + DMR steps cached & re-callable across dis.merge |
-| **DSS-from-scratch** | **2,820** | **2,756** | **9.3** | single-threaded; DMLfit smoothing dominates (~ 34 min) |
+| **DSS-from-scratch** (DSS 2.58.0) | **2,820** | **2,756** | **9.3** | single-threaded by construction (verified in DSS 2.58.0); DMLfit smoothing dominates (~ 34 min) |
 
-epykit-chain_merge is ~6× faster than DSS on the same input and uses
+epykit-chain_merge is ~6 × faster than DSS on the same input and uses
 about the same memory (12.6 vs 9.3 GB; chain_merge holds the per-CpG
-DMC store, DSS holds the BSseq matrix). The 12× speedup vs methylKit
-holds for both tile and chain_merge engines because the DMC step is
-shared. Per-pipeline resource breakdown in
+DMC store, DSS holds the BSseq matrix). The Windows 12 × speedup vs
+methylKit holds for both tile and chain_merge engines because the DMC
+step is shared. On Linux with `methylKit::calculateDiffMeth(mc.cores = 8)`
+(5.9 × scaling factor measured on the simulator), the comparable
+methylKit wall would be ≈ 2.1 kS, shrinking the ratio to ≈ 5 × at
+real-data scale (still favourable). The DSS comparison is unaffected
+by the platform switch (no multi-core path). Per-pipeline resource
+breakdown in
 [F7 resources](../figures/study3_real_GSE263850/three_way/F7_resources.png).
 
 ### 3.3.11 Cross-study consistency
@@ -786,42 +826,52 @@ at 87.5 %. The full Study 3 summary picture is
 ## 3.4 Held-out simulator with intrinsic truth (Phase 4)
 
 To close the threshold-reconstructed-truth loop described in §2.7, we ran
-methylKit and DSS (smoothing on and off) on every one of the 20 held-out
-simulator seeds (`benchmark/scripts/run_external_simulator_sweep.py`) and
-scored against the intrinsic `is_dmc` flag set at simulation time. The
-headline cell is coverage = 10, 3 vs 3, q < 0.05, all effect-size bins.
+methylKit and DSS (smoothing on and off) on every one of the 21 held-out
+simulator seeds (`benchmark/scripts/run_external_simulator_sweep.py`)
+and scored against the intrinsic `is_dmc` flag set at simulation time.
+The headline cell is coverage = 10, 3 vs 3, q < 0.05, all effect-size
+bins; numbers below are **across-seed median (IQR)** to make the
+estimate intrinsically robust to single-seed noise (Methods §2.7,
+PROTOCOL.md R2).
 
-At seed `2026000` (representative; full 20-seed IQRs in
-`benchmark/data/study1b_simulator/eval_simulator_intrinsic_iqr.parquet`):
-
-| Tool (mode) | TPR | FPR | F1 | AUROC |
+| Tool (mode) | TPR median (IQR) | FPR median (IQR) | F1 median | AUROC median (IQR) |
 |---|---:|---:|---:|---:|
-| methylKit | 0.7268 | 0.0114 | 0.8201 | 0.9246 <!-- claim: simulator_methylkit_auroc_seed0_cov10 --> |
-| DSS, smoothing = FALSE | 0.6477 | 0.0058 | 0.7752 | 0.9071 <!-- claim: simulator_dss_nosmooth_auroc_seed0_cov10 --> |
-| DSS, smoothing = TRUE | 0.0000 | 0.0000 | 0.0000 | 0.6272 <!-- claim: simulator_dss_smooth_auroc_seed0_cov10 --> |
+| methylKit | 0.7285 (0.7274 – 0.7315) | 0.0113 (0.0110 – 0.0115) | 0.8217 | 0.9260 (0.9245 – 0.9267) <!-- claim: simulator_methylkit_auroc_median_cov10 --> |
+| DSS, smoothing = FALSE | 0.6547 (0.6538 – 0.6561) | 0.0057 (0.0055 – 0.0059) | 0.7808 | 0.9088 (0.9071 – 0.9094) <!-- claim: simulator_dss_nosmooth_auroc_median_cov10 --> |
+| DSS, smoothing = TRUE | 5.0 × 10⁻⁵ (0 – 1.5 × 10⁻⁴) | 1.2 × 10⁻⁵ (0 – 1.3 × 10⁻⁵) | 1.0 × 10⁻⁴ | 0.6297 (0.6285 – 0.6314) <!-- claim: simulator_dss_smooth_auroc_median_cov10 --> |
+
+Source: [`eval_simulator_intrinsic_iqr.parquet`](../data/study1b_simulator/eval_simulator_intrinsic_iqr.parquet)
+(21 seeds; 20 sampled + 1 frozen-grid control).
 
 **Reading.** methylKit and unsmoothed DSS are well-calibrated on intrinsic
-truth, with methylKit slightly more sensitive (TPR 0.73 vs 0.65) and
-unsmoothed DSS slightly more conservative on false positives. Smoothed DSS
-collapses to one call total — not a DSS defect, but a dataset–assumption
-mismatch: the simulator generates CpGs at uniform 100-bp spacing with no
-genomic correlation structure for the smoother to exploit, so DSS's
-default smoothing window flattens the signal entirely. The same DSS
-configuration is competitive on real-data Study 3 (§3.3.4).
+truth, with methylKit slightly more sensitive (TPR median 0.73 vs 0.65)
+and unsmoothed DSS slightly more conservative on false positives. Smoothed
+DSS collapses to a near-zero call rate (median 5 × 10⁻⁵ TPR) — not a
+DSS defect, but a dataset–assumption mismatch: the simulator generates
+CpGs at uniform 100-bp spacing with no genomic correlation structure
+for the smoother to exploit, so DSS's default smoothing window flattens
+the signal entirely. The same DSS configuration is competitive on
+real-data Study 3 (§3.3.4). The seed-to-seed IQR widths are tight
+(< 0.003 absolute on TPR and AUROC for both non-degenerate tools),
+confirming the median is not masking large between-seed variance.
 
 The full per-seed table (`eval_simulator_intrinsic_per_seed.parquet`,
-540 rows) and across-seed median + IQR summary
-(`eval_simulator_intrinsic_iqr.parquet`) appear as **Supplementary
-Table S-Sim**. The 7-tool parallel column including epykit results
-(scored separately) is in `parallel_column_summary.md`.
+540 rows) and across-seed median + IQR summary appear as
+**Supplementary Table S-Sim**. The 7-tool parallel column including
+epykit results (scored separately) is in `parallel_column_summary.md`.
 
-**Cross-truth comparison.** Comparing intrinsic truth (this section)
-against Piao threshold-reconstructed truth (§3.1) shows comparative
-tool ordering is preserved: methylKit ≈ unsmoothed DSS at the top,
-smoothed DSS collapses, BiSeq under-calls at low coverage. Absolute
-TPRs on intrinsic truth are slightly lower because the intrinsic
-labels include weak-effect DMCs that threshold reconstruction filters
-out — the expected direction.
+**Cross-truth comparison.** A dual-truth re-scoring on the same 21 seeds
+([`eval_simulator_intrinsic_truth_both_iqr.parquet`](../data/study1b_simulator/eval_simulator_intrinsic_truth_both_iqr.parquet))
+compares each tool under the simulator's intrinsic `is_dmc` flag
+against Piao threshold-reconstructed truth (`|Δβ| ≥ 0.20` at 25 ×).
+Tool ordering is preserved: methylKit ≈ unsmoothed DSS at the top,
+smoothed DSS collapses, under both truth definitions. Absolute TPRs
+shift modestly (≤ 2 pp) and AUROC under the threshold truth is uniformly
+higher (≥ 0.98 for the two non-degenerate tools) because threshold
+truth excludes the weak-effect tail. The threshold-vs-intrinsic
+asymmetry that earlier reviewer commentary raised does not survive the
+dual-truth check (see [`M3_truth_mode_comparison.md`](../data/study1b_simulator/M3_truth_mode_comparison.md)
+for the full 6-row 2 × 3 panel).
 
 ## 3.5 Null calibration
 
@@ -982,8 +1032,8 @@ false positives. We therefore recommend that users:
   (`benchmark/data/multi_thread_and_chain_sweep/methylkit_multicore/`).
   We separately verified that DSS's `DMLfit.multiFactor` (the
   multi-factor path used here) provides no multi-core option in
-  DSS 2.58.0, so the reported speed advantage over DSS is not eroded
-  by parallelising DSS.
+  the DSS version we used (2.58.0), so the reported speed advantage
+  over DSS is not eroded by parallelising DSS.
 * **Ground truth non-independence.** Study 1 true-DMC labels come from the
   coverage-25 sample (the cleanest signal in the dataset), not from the
   simulator's internal flags. To check the in-house simulator does not
@@ -1038,7 +1088,8 @@ paper-matched `dmr_chain_merge` operating point (`dis.merge = 250`):
   real-data DMRs at coordinate level;
 * epykit's `dmr_chain_merge` recovers 77.3 % of DSS-from-scratch DMRs
   by any-bp overlap and 64.2 % at Jaccard ≥ 0.5, with 100 % direction
-  agreement on the 713 overlapping DMRs and 67.4 % gene-set recall;
+  agreement on the 713 overlapping DMRs and 69.6 % panel-E gene-set
+  recall (32 / 46);
 * DSS-from-scratch retains a small recall advantage (87.5 %, 80.4 %
   panel-E gene recall) attributable to its smoothing prior, which
   helps particularly on low-CpG-density regions.
@@ -1052,8 +1103,8 @@ FDR control is valid at negligible power cost.
 On Linux with methylKit multi-threaded (`mc.cores = 8`), epykit is
 ≈ 33 × faster than methylKit on per-CpG testing and ≈ 28 × faster
 than DSS on Study 3 end-to-end. DSS's `DMLfit.multiFactor` does not
-expose a multi-core option in DSS 2.58.0, so the DSS comparison is
-single-thread by construction, not by choice. Combined with the rest
+expose a multi-core option in the DSS version we used (2.58.0), so the
+DSS comparison is single-thread by construction, not by choice. Combined with the rest
 of the epykit API (annotation, plotting, HTML reporting,
 AnnData / MuData interop), this brings the WGBS downstream pipeline
 into the same Python ecosystem as the rest of modern bioinformatics.

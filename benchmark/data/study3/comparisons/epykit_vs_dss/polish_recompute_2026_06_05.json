@@ -1,0 +1,146 @@
+{
+  "generated_at": "2026-06-05",
+  "context": "Phase B recompute for paper \u00a73.3.5 / \u00a73.3.8 / \u00a73.3.9 against post-rerun call sets (ek-cm-100=852, ek-cm-250=1139, DSS=922).",
+  "annotation": {
+    "ek_cm_100": {
+      "label": "ek-cm-100 (852 DMRs)",
+      "n": 852,
+      "counts": {
+        "intergenic": 394,
+        "intron": 358,
+        "exon": 69,
+        "promoter": 22,
+        "TTS": 9
+      },
+      "pct": {
+        "intergenic": 46.24,
+        "intron": 42.02,
+        "exon": 8.1,
+        "promoter": 2.58,
+        "TTS": 1.06
+      }
+    },
+    "ek_cm_250": {
+      "label": "ek-cm-250 (1139 DMRs)",
+      "n": 1139,
+      "counts": {
+        "intergenic": 533,
+        "intron": 480,
+        "exon": 78,
+        "promoter": 32,
+        "TTS": 15,
+        "noncoding": 1
+      },
+      "pct": {
+        "intergenic": 46.8,
+        "intron": 42.14,
+        "exon": 6.85,
+        "promoter": 2.81,
+        "TTS": 1.32,
+        "noncoding": 0.09
+      }
+    },
+    "dss": {
+      "label": "DSS-from-scratch (922 DMRs)",
+      "n": 922,
+      "counts": {
+        "intergenic": 437,
+        "intron": 358,
+        "non-coding": 54,
+        "exon": 34,
+        "3UTR": 16,
+        "TTS": 15,
+        "promoter-TSS": 7,
+        "5UTR": 1
+      },
+      "pct": {
+        "intergenic": 47.4,
+        "intron": 38.83,
+        "non-coding": 5.86,
+        "exon": 3.69,
+        "3UTR": 1.74,
+        "TTS": 1.63,
+        "promoter-TSS": 0.76,
+        "5UTR": 0.11
+      }
+    }
+  },
+  "panel_e": {
+    "ek_cm_100": {
+      "label": "ek-cm-100",
+      "n_panel_e": 46,
+      "captured_nearest_tss": 30,
+      "recall_nearest_tss": 0.6522,
+      "captured_100kb": 29,
+      "recall_100kb": 0.6304,
+      "gene_links_n_pairs": 1501,
+      "gene_links_n_unique_genes": 1290
+    },
+    "ek_cm_250": {
+      "label": "ek-cm-250",
+      "n_panel_e": 46,
+      "captured_nearest_tss": 32,
+      "recall_nearest_tss": 0.6957
+    },
+    "dss": {
+      "label": "DSS-from-scratch",
+      "n_panel_e": 46,
+      "captured_nearest_tss": 37,
+      "recall_nearest_tss": 0.8043,
+      "captured_100kb": 38,
+      "recall_100kb": 0.8261,
+      "gene_links_n_pairs": 1649,
+      "gene_links_n_unique_genes": 1467
+    }
+  },
+  "per_dmr_concordance": {
+    "ek_cm_100_vs_dss_J025": {
+      "n_pairs": 506,
+      "pearson_r": 0.995,
+      "spearman_rho": 0.9357,
+      "direction_agree_n": 506,
+      "direction_agree_total": 506,
+      "direction_agree_frac": 1.0
+    },
+    "ek_cm_100_vs_dss_J050": {
+      "n_pairs": 318,
+      "pearson_r": 0.9954,
+      "spearman_rho": 0.9382,
+      "direction_agree_n": 318,
+      "direction_agree_total": 318,
+      "direction_agree_frac": 1.0
+    },
+    "ek_cm_100_vs_dss_anybp": {
+      "n_pairs": 634,
+      "pearson_r": 0.9936,
+      "spearman_rho": 0.9257,
+      "direction_agree_n": 634,
+      "direction_agree_total": 634,
+      "direction_agree_frac": 1.0
+    },
+    "ek_cm_250_vs_dss_J025": {
+      "n_pairs": 671,
+      "pearson_r": 0.9958,
+      "spearman_rho": 0.9443,
+      "direction_agree_n": 671,
+      "direction_agree_total": 671,
+      "direction_agree_frac": 1.0
+    },
+    "ek_cm_250_vs_dss_J050": {
+      "n_pairs": 592,
+      "pearson_r": 0.9965,
+      "spearman_rho": 0.9543,
+      "direction_agree_n": 592,
+      "direction_agree_total": 592,
+      "direction_agree_frac": 1.0
+    },
+    "ek_cm_250_vs_dss_anybp": {
+      "n_pairs": 718,
+      "pearson_r": 0.995,
+      "spearman_rho": 0.9412,
+      "direction_agree_n": 718,
+      "direction_agree_total": 718,
+      "direction_agree_frac": 1.0
+    }
+  }
+}

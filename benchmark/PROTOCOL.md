@@ -26,8 +26,8 @@ sensitivity panel.**
 | psutil | ≥ 5.9 | Per-scenario peak RSS, 50 ms sampling |
 | R | **4.5.0** (2025-04-11, ucrt, x86_64-w64-mingw32) | Studies 2 and 3 |
 | methylKit | **1.34.0** Study 2; **1.36.0** Study 3 | Two versions disclosed — Study 3 host's installed version differs from Study 2's |
-| DSS | **2.56.0** | Study 3 (ceiling caller) |
-| bsseq | **1.44.1** | Study 3 (DSS dependency) |
+| DSS | **2.58.0** (Study 3 local re-run; see [`data/study3/dss/dss_session_info.txt`](data/study3/dss/dss_session_info.txt)) | Study 3 (ceiling caller) |
+| bsseq | **1.46.0** | Study 3 (DSS dependency; per `data/study3/dss/dss_session_info.txt`) |
 | BiocParallel | 1.42.1 | Study 3 |
 | Study 1 panel baselines | methylKit 0.99.2, methylSig 0.4.4, DSS 2.12.0, RADMeth, BiSeq, Fisher (pooled), BSmooth, metilene | **Transcribed from Piao et al. 2021 supplementary tables — not re-run.** |
 

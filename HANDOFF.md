@@ -51,11 +51,25 @@ b62626a feat(benchmark): A.2 null calibration k=1000 + Q-Q + KS + EB prior valid
 
 ### Windows-side / paper polish
 
-Three deferred items, all flagged in `769c749` commit message:
+Three deferred items from `769c749` were addressed in the 2026-06-05 polish
+pass (commit on this branch). All DONE:
 
-1. **§3.3.2 Table 5a "headline coord-overlap"** — still has pre-rerun chain_merge n=702 / n=940 vs paper-813. Update to rerun n=852 / n=1139 vs DSS-922.
-2. **§3.4 held-out simulator** — single-seed seed=2026000 numbers in the body text. The 20-seed median+IQR is in `eval_simulator_intrinsic_iqr.parquet`; switch the table to medians.
-3. **`claim:` inline-comment validator pass** — run `regen_all.py` (or whatever the validator entrypoint is) to refresh the asserted values throughout the paper.
+1. ~~**§3.3.2 Table 5a "headline coord-overlap"**~~ → **DONE 2026-06-05.**
+   Table restructured to use the locally-rerun DSS-922 as the
+   comparison ceiling (paper-813 reduced to a single contextual row).
+   Post-rerun chain_merge-100 = 852 DMRs (recall 63.8 %), chain_merge-250
+   in §3.3.3 sweep = 1,139 DMRs (recall 77.3 %). All
+   downstream §3.3.4–§3.3.9 numbers harmonised.
+2. ~~**§3.4 held-out simulator single-seed**~~ → **DONE 2026-06-05.**
+   §3.4 promoted to 21-seed median (IQR). `claim:` markers renamed
+   from `_seed0_cov10` → `_median_cov10` and point to
+   `eval_simulator_intrinsic_iqr.parquet`. claims.yaml refreshed.
+3. ~~**`claim:` inline-comment validator pass**~~ → **DONE 2026-06-05.**
+   All 10 markers spot-checked against source parquets; 5 Study-1
+   AUROC/TPR/F1 claims match within stated precision; 3 §3.4
+   claims renamed + values refreshed to medians; 2 wallclock claims
+   verified against `timings_table.csv`. No standalone validator
+   script built (per user direction).
 
 ### Skipped per user instruction
 
@@ -103,7 +117,7 @@ Reviewing M11(b) surfaced that `tl.py:551-575`'s `resume_sig` did not include `s
 Your own 20-seed rerun shows lr+ trades 14× FPR for +7 pp TPR with *lower* F1 (0.746 vs 0.796) and *lower* AUROC (0.907 vs 0.928). The abstract, §4.2, and §4.3 now frame lr+ as a "research knob, not a recommended default" — bare lr is what the abstract numbers are reported against.
 
 ### DSS DMLfit.multiFactor has no multi-core option
-Verified in DSS 2.58.0. So the 33× speedup vs DSS is not eroded by parallelizing DSS — single-thread by construction, not by choice. This is a clean defense, but **note the version**: PROTOCOL.md still pins 2.12.0; resubmission letter should reconcile.
+Verified in DSS 2.58.0. So the 33× speedup vs DSS is not eroded by parallelizing DSS — single-thread by construction, not by choice. **Reconciled 2026-06-05:** the Study 3 local rerun actually ran on DSS 2.58.0 (per `data/study3/dss/dss_session_info.txt`), not 2.56.0 as previously stated. PROTOCOL.md, paper §2.4, REPORT.md, methods_appendix.md, and EXECUTIVE_SUMMARY.md all updated to DSS 2.58.0 for Study 3. Study 1 baseline remains DSS 2.12.0 (transcribed from Piao 2021, not re-run).
 
 ### M5 exhaustive enumeration is *stronger* than the reviewer asked for
 The reviewer asked for k ≥ 1000 random shuffles. For n=6 (3v3) the universe is C(6,3)/2 = 10 distinct partitions; we enumerated all 10. k=1000 random shuffles would draw the same 10 with replacement ~100× each, conveying no extra information. The abstract and §3.5 say this explicitly — pre-empt the "but the reviewer said 1000" comment.
