@@ -224,9 +224,11 @@ def _cmd_dmc(args: argparse.Namespace):
         unite=args.unite,
         min_samples_treatment=args.min_samples_treatment,
         min_samples_control=args.min_samples_control,
+        dispersion=args.dispersion,
+        reference=args.reference,
         return_store=True,
     )
-    dmc_store = dmc.apply_multiple_testing_correction(dmc_store, method="fdr_bh")
+    dmc_store = dmc.apply_multiple_testing_correction(dmc_store, method=args.fdr_method)
     results = dmc_store.to_dataframe()
     results.write_parquet(args.output)
     print(f"DMC results written to {args.output}")
@@ -673,6 +675,22 @@ def main():
             "Default is to refuse -- between-replicate variance is ignored "
             "and p-values are anti-conservative under this fallback."
         ),
+    )
+    # Parity with ep.tl.dmc defaults. Historically the CLI inherited
+    # process_chromosomes_dmc's dispersion="site" default while the Python
+    # API used "eb", so identical input produced different q-values. The
+    # CLI now defaults to the same values tl.dmc uses (M-PKG2).
+    p_dmc.add_argument(
+        "--dispersion", choices=["site", "eb", "shrink", "chrom"], default="eb",
+        help="Dispersion estimator for lr/glm (default: eb, matching ep.tl.dmc).",
+    )
+    p_dmc.add_argument(
+        "--reference", choices=["adaptive", "F", "chi2"], default="adaptive",
+        help="Reference distribution for the lr statistic (default: adaptive).",
+    )
+    p_dmc.add_argument(
+        "--fdr-method", dest="fdr_method", default="fdr_bh",
+        help="Multiple-testing correction method (default: fdr_bh).",
     )
     p_dmc.add_argument(
         "--no-csv", action="store_true", dest="no_csv", default=False,
