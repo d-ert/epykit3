@@ -7,9 +7,45 @@ SemVer (`MAJOR.MINOR.PATCH`).
 ## [Unreleased]
 
 Post-1.0 correctness and reproducibility fixes from a pre-submission code
-review (Tier 1: paper-blockers + silent-wrong-science criticals).
+review (Tier 1: paper-blockers + silent-wrong-science criticals), plus a
+redesigned HTML report.
+
+### Added
+
+- **Redesigned HTML report — MultiQC-style dashboard.** `md.report()` /
+  `epykit report` now render a fixed-sidebar dashboard (numbered table of
+  contents with per-section status dots + scroll-spy, light/dark toggle)
+  over a scannable main panel. New content beyond the previous report: a
+  headline **"Results at a glance"** auto-narrative + KPI strip + analysis-
+  completeness checklist; a preprocessing **step-flow** with per-step
+  site-count deltas; per-sample **QC pass/warn/fail badges** against
+  documented thresholds, a **global-methylation-per-sample bar**, and a
+  clustered **sample-correlation heatmap**; a DMC **p-value histogram**
+  (calibration check); a **DMR size distribution**; a **hyper/hypo-by-feature
+  stacked bar**; a PCA **scree** plot; and an auto-generated, parameter-
+  accurate **Methods & citations** section (with a copy button). Tables are
+  sortable, searchable, and export to CSV client-side. Provenance is rendered
+  as a clean key/value table with the raw JSON in a collapsible.
+- **`self_contained` report flag (default `True`).** `generate_report(...,
+  self_contained=True)` embeds the Plotly bundle inline so the single `.html`
+  works fully offline (e.g. for emailing or archiving with a paper);
+  `self_contained=False` loads Plotly from a CDN for a smaller file. Exposed
+  on the CLI as `epykit report --self-contained / --no-self-contained`.
+- Interactivity is implemented in inlined vanilla JS
+  (`templates/report.js`) — no new runtime dependencies (still `jinja2` +
+  `plotly`). Every section degrades gracefully when its upstream step has not
+  been run.
 
 ### Fixed
+
+- **Report "% significant" denominator (report redesign).** DMC summary
+  statistics and the genome-wide figures (volcano / MA / Manhattan /
+  p-value histogram) now use the full per-CpG result table rather than
+  `md.dmc`, which prefers the annotated table and can be the
+  significant-only subset when annotation was run on significant sites.
+  Previously this could report "% significant = 100%" and drop the
+  non-significant cloud from the volcano. The annotated table is still used
+  for the annotation breakdowns and the top-DMC table.
 
 - **Bismark `.cov` coordinate convention (C1).** `read_bismark` /
   `convert_sample` now ingest standard 1-based Bismark coverage (`start ==
