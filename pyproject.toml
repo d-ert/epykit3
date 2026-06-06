@@ -132,7 +132,7 @@ where = ["src"]
 include = ["epykit*"]
 
 [tool.setuptools.package-data]
-epykit = ["py.typed", "templates/*.j2", "templates/*.css"]
+epykit = ["py.typed", "templates/*.j2", "templates/*.css", "templates/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

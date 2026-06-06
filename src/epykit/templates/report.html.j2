@@ -1,140 +1,248 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }}</title>
 <style>{{ css_inline }}</style>
 </head>
 <body>
-<div class="container">
 
-<header class="section">
-  <h1>{{ title }}</h1>
-  <div class="subtitle">
-    epykit {{ epykit_version }} &middot; {{ generated_at }}
-  </div>
-  <div class="meta-grid">
-    <div><div class="label">Assembly</div><div class="value">{{ assembly }}</div></div>
-    <div><div class="label">Context</div><div class="value">{{ context }}</div></div>
-    <div><div class="label">Samples</div><div class="value">{{ n_samples }}</div></div>
-    <div><div class="label">Sites</div><div class="value">{{ n_sites }}</div></div>
-    <div><div class="label">State</div><div class="value">{{ state or "raw" }}</div></div>
-  </div>
-</header>
-
-<section class="section">
-  <h2>Samples</h2>
-  <div class="tablewrap">{{ samples_table | safe }}</div>
-</section>
-
-<section class="section">
-  <h2>Preprocessing</h2>
-  {% if history %}
-  <ul class="history">
-    {% for h in history %}
-    <li><b>{{ h.step }}</b> &mdash; {{ h.n_sites_str }} sites @ <code>{{ h.path }}</code></li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <div class="skipped">No preprocessing recorded.</div>
-  {% endif %}
-  {% if filter_params %}
-  <details><summary>filter params</summary><pre>{{ filter_params }}</pre></details>
-  {% endif %}
-  {% if regions_params %}
-  <details><summary>region aggregation</summary><pre>{{ regions_params }}</pre></details>
-  {% endif %}
-</section>
-
-<section class="section">
-  <h2>QC</h2>
-  {% if qc_summary %}
-  <div class="tablewrap">{{ qc_summary | safe }}</div>
-  {% endif %}
-  {% if coverage_plot %}
-    {{ coverage_plot | safe }}
-  {% else %}
-    <div class="skipped">No coverage histogram available.</div>
-  {% endif %}
-</section>
-
-<section class="section">
-  <h2>Differential methylation (DMC)</h2>
-  {% if dmc_available %}
-    <div class="kpi-row">
-      <div class="kpi"><div class="num">{{ dmc_n_total }}</div><div class="label">total tested</div></div>
-      <div class="kpi"><div class="num">{{ dmc_n_sig }}</div><div class="label">significant (q&lt;{{ alpha }})</div></div>
-      <div class="kpi hyper"><div class="num">{{ dmc_n_hyper }}</div><div class="label">hyper</div></div>
-      <div class="kpi hypo"><div class="num">{{ dmc_n_hypo }}</div><div class="label">hypo</div></div>
+<aside class="sidebar">
+  <div class="brand">
+    <div class="logo"><div class="mark">ε</div>
+      <div><div class="name">epykit</div><div class="ver">v{{ epykit_version }} · report</div></div>
     </div>
-    {% if volcano_plot %}{{ volcano_plot | safe }}{% endif %}
-    {% if ma_plot %}{{ ma_plot | safe }}{% endif %}
-    {% if manhattan_plot %}{{ manhattan_plot | safe }}{% endif %}
+    <div class="rtitle">{{ title }}</div>
+    <div class="chips">
+      {% if assembly %}<span class="chip">assembly <b>{{ assembly }}</b></span>{% endif %}
+      {% if context %}<span class="chip">context <b>{{ context }}</b></span>{% endif %}
+      <span class="chip"><b>{{ n_samples }}</b> samples</span>
+      {% if n_sites and n_sites != "?" %}<span class="chip"><b>{{ n_sites }}</b> sites</span>{% endif %}
+    </div>
+  </div>
+  <nav class="toc" id="toc">
+    {% for s in sections %}
+    <a href="#{{ s.id }}"><span class="num">{{ s.num }}</span>{{ s.label }}<span class="dot {{ s.status }}"></span></a>
+    {% endfor %}
+  </nav>
+  <div class="side-foot">
+    <div class="row"><span>Theme</span><button class="tbtn" id="themeBtn">🌙 Dark</button></div>
+    <div>Generated <span class="gen">{{ generated_short }}</span></div>
+  </div>
+</aside>
+
+<main>
+
+{# ---------- 00 SUMMARY ---------- #}
+<section id="summary">
+  <div class="sec-head"><span class="n">00</span><h2>Results at a glance</h2><span class="pill ok">complete</span></div>
+  <div class="card"><p class="lede">{{ summary_narrative | safe }}</p></div>
+  {% if kpis %}
+  <div class="kpis" style="margin-bottom:14px">
+    {% for k in kpis %}
+    <div class="kpi {{ k.cls }}">
+      <div class="big">{{ k.big }}</div>
+      <div class="lab">{{ k.label }}</div>
+      {% if k.ctx %}<div class="ctx">{{ k.ctx }}</div>{% endif %}
+      {% if k.spark %}<div class="spark"><i style="width:{{ k.spark.pct }}%;background:{{ k.spark.color }}"></i></div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div class="card">
+    <div style="font-weight:650;margin-bottom:6px">Analysis completeness</div>
+    <ul class="check">
+      {% for c in completeness %}
+      <li>
+        <span class="mk {{ 'ok' if c.done else 'skip' }}">{{ '✓' if c.done else '○' }}</span>
+        {% if c.done %}{{ c.label }}{% else %}<span class="sk">{{ c.label }}{% if c.note %} ({{ c.note }}){% endif %}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+{# ---------- 01 SAMPLES ---------- #}
+<section id="samples">
+  <div class="sec-head"><span class="n">01</span><h2>Samples</h2><span class="pill ok">{{ n_samples }} samples</span></div>
+  <p class="sec-sub">Per-sample metadata and design. Group columns double as GLM covariates.</p>
+  <div class="card">
+    {% if group_counts %}
+    <div style="margin-bottom:10px">
+      {% for g, c in group_counts.items() %}<span class="grp {{ group_class_map.get(g, 'n') }}">{{ g }} · {{ c }}</span>&nbsp; {% endfor %}
+    </div>
+    {% endif %}
+    <div class="tbl-tools"><input class="search" placeholder="Filter samples…" data-for="tSamples"></div>
+    <div class="tablewrap">{{ samples_table | safe }}</div>
+  </div>
+</section>
+
+{# ---------- 02 PREPROCESSING ---------- #}
+<section id="preproc">
+  <div class="sec-head"><span class="n">02</span><h2>Preprocessing trail</h2>
+    {% if preproc_flow %}<span class="pill ok">{{ preproc_flow | length }} steps</span>{% else %}<span class="pill skip">none</span>{% endif %}
+  </div>
+  <p class="sec-sub">Each step writes a new cached methylstore and repoints <code>md.store</code>; site counts are auditable from <code>uns["_store_history"]</code>.</p>
+  <div class="card">
+    {% if preproc_flow %}
+    <div class="flow">
+      {% for s in preproc_flow %}
+      <div class="step"><div class="s-name">{{ s.step }}</div><div class="s-n">{{ s.n_sites_str }}</div>
+        <div class="s-d {{ s.delta_cls }}">{{ s.delta }}</div></div>
+      {% endfor %}
+    </div>
+    {% else %}<div class="skipped">No preprocessing recorded.</div>{% endif %}
+    {% if filter_params %}<details style="margin-top:14px"><summary>filter parameters</summary><pre>{{ filter_params }}</pre></details>{% endif %}
+    {% if regions_params %}<details><summary>region aggregation</summary><pre>{{ regions_params }}</pre></details>{% endif %}
+  </div>
+</section>
+
+{# ---------- 03 QC ---------- #}
+<section id="qc">
+  <div class="sec-head"><span class="n">03</span><h2>Quality control</h2>
+    {% if qc_table %}<span class="pill ok">per-sample</span>{% else %}<span class="pill skip">not run</span>{% endif %}
+  </div>
+  {% if qc_table %}
+    <p class="sec-sub">Per-sample QC metrics with threshold-based flags.{% if qc_legend %} Thresholds: {{ qc_legend | join(' · ') }}.{% endif %}</p>
+    <div class="card"><div class="tablewrap">{{ qc_table | safe }}</div></div>
+  {% else %}
+    <p class="sec-sub">Run <code>ep.tl.qc(md)</code> to populate per-sample QC metrics.</p>
+  {% endif %}
+  <div class="grid2">
+    {% if coverage_plot %}<div class="plot-card">{{ coverage_plot | safe }}<div class="cap"><b>Coverage distribution</b> — genome-wide per-CpG depth.</div></div>{% endif %}
+    {% if global_meth_bar %}<div class="plot-card">{{ global_meth_bar | safe }}<div class="cap"><b>Global methylation per sample</b> — batch-effect eyeball.</div></div>{% endif %}
+  </div>
+  {% if corr_heatmap %}<div class="plot-card">{{ corr_heatmap | safe }}<div class="cap"><b>Sample correlation</b> — all-vs-all, clustered.</div></div>{% endif %}
+  {% if not coverage_plot and not qc_table %}<div class="skipped">No coverage histogram available.</div>{% endif %}
+</section>
+
+{# ---------- 04 DMC ---------- #}
+<section id="dmc">
+  <div class="sec-head"><span class="n">04</span><h2>Differential methylation (DMC)</h2>
+    {% if dmc_available %}<span class="pill ok">{{ dmc_n_sig }} sig</span>{% else %}<span class="pill skip">not run</span>{% endif %}
+  </div>
+  {% if dmc_available %}
+    <p class="sec-sub">Engine <code>{{ dmc_engine }}</code> · {{ dmc_fdr }} FDR · q&lt;{{ alpha }}, |Δβ|≥{{ min_abs_diff }}.</p>
+    <div class="kpis" style="margin-bottom:14px">
+      <div class="kpi"><div class="big">{{ dmc_n_total }}</div><div class="lab">tested</div></div>
+      <div class="kpi"><div class="big">{{ dmc_n_sig }}</div><div class="lab">significant</div></div>
+      <div class="kpi hyper"><div class="big">{{ dmc_n_hyper }}</div><div class="lab">hyper</div></div>
+      <div class="kpi hypo"><div class="big">{{ dmc_n_hypo }}</div><div class="lab">hypo</div></div>
+      {% if dmc_median_abs %}<div class="kpi"><div class="big">{{ dmc_median_abs }}</div><div class="lab">median |Δβ| (sig)</div></div>{% endif %}
+    </div>
+    <div class="grid2">
+      {% if volcano_plot %}<div class="plot-card">{{ volcano_plot | safe }}<div class="cap"><b>Volcano</b> — effect size vs significance.</div></div>{% endif %}
+      {% if pvalue_hist %}<div class="plot-card">{{ pvalue_hist | safe }}<div class="cap"><b>p-value histogram</b> — calibration check (uniform null + spike at 0 is healthy).</div></div>{% endif %}
+    </div>
+    {% if ma_plot %}<div class="plot-card">{{ ma_plot | safe }}<div class="cap"><b>MA plot</b> — effect size vs mean methylation.</div></div>{% endif %}
+    {% if manhattan_plot %}<div class="plot-card">{{ manhattan_plot | safe }}<div class="cap"><b>Manhattan</b> — genome-wide significance.</div></div>{% endif %}
     {% if dmc_top_table %}
-      <h3>Top {{ dmc_top_n }} DMCs</h3>
+    <div class="card">
+      <div class="tbl-tools"><input class="search" placeholder="Filter by gene / chrom…" data-for="tDMC"><button class="tbtn" data-csv="tDMC">⬇ CSV</button></div>
       <div class="tablewrap">{{ dmc_top_table | safe }}</div>
+      <div class="muted" style="font-size:11.5px;margin-top:6px">Top {{ dmc_top_n }} by significance · download for the full visible table</div>
+    </div>
     {% endif %}
   {% else %}
-    <div class="skipped">DMC not yet called &mdash; run <code>ep.tl.dmc(md)</code>.</div>
+    <div class="skipped">DMC not yet called — run <code>ep.tl.dmc(md)</code>.</div>
   {% endif %}
 </section>
 
-<section class="section">
-  <h2>Differentially methylated regions (DMR)</h2>
+{# ---------- 05 DMR ---------- #}
+<section id="dmr">
+  <div class="sec-head"><span class="n">05</span><h2>Differentially methylated regions (DMR)</h2>
+    {% if dmr_available %}<span class="pill ok">{{ dmr_n_total }} DMRs</span>{% else %}<span class="pill skip">not run</span>{% endif %}
+  </div>
   {% if dmr_available %}
-    <div class="kpi-row">
-      <div class="kpi"><div class="num">{{ dmr_n_total }}</div><div class="label">DMRs called</div></div>
-      {% if dmr_n_hyper is defined %}
-      <div class="kpi hyper"><div class="num">{{ dmr_n_hyper }}</div><div class="label">hyper</div></div>
-      <div class="kpi hypo"><div class="num">{{ dmr_n_hypo }}</div><div class="label">hypo</div></div>
+    {% if dmr_caller %}<p class="sec-sub">Caller <code>{{ dmr_caller }}</code>.</p>{% endif %}
+    <div class="kpis" style="margin-bottom:14px">
+      <div class="kpi"><div class="big">{{ dmr_n_total }}</div><div class="lab">DMRs called</div></div>
+      {% if dmr_n_hyper %}<div class="kpi hyper"><div class="big">{{ dmr_n_hyper }}</div><div class="lab">hyper</div></div>
+      <div class="kpi hypo"><div class="big">{{ dmr_n_hypo }}</div><div class="lab">hypo</div></div>{% endif %}
+      {% if dmr_median_cpgs %}<div class="kpi"><div class="big">{{ dmr_median_cpgs }}</div><div class="lab">median CpGs/DMR</div></div>{% endif %}
+    </div>
+    <div class="grid2">
+      {% if dmr_size_hist %}<div class="plot-card">{{ dmr_size_hist | safe }}<div class="cap"><b>DMR size distribution</b> — CpGs per region.</div></div>{% endif %}
+      {% if dmr_top_table %}
+      <div class="card" style="margin:0">
+        <div class="tbl-tools"><button class="tbtn" data-csv="tDMR">⬇ CSV</button></div>
+        <div class="tablewrap" style="max-height:320px">{{ dmr_top_table | safe }}</div>
+      </div>
       {% endif %}
     </div>
-    {% if dmr_top_table %}
-      <h3>Top {{ dmr_top_n }} DMRs</h3>
-      <div class="tablewrap">{{ dmr_top_table | safe }}</div>
-    {% endif %}
   {% else %}
-    <div class="skipped">DMR not yet called &mdash; run <code>ep.tl.dmr(md)</code>.</div>
+    <div class="skipped">DMR not yet called — run <code>ep.tl.dmr(md)</code>.</div>
   {% endif %}
 </section>
 
-<section class="section">
-  <h2>Annotation</h2>
+{# ---------- 06 ANNOTATION ---------- #}
+<section id="annot">
+  <div class="sec-head"><span class="n">06</span><h2>Genomic annotation</h2>
+    {% if feature_pie or cpg_pie %}<span class="pill ok">annotated</span>{% else %}<span class="pill skip">not run</span>{% endif %}
+  </div>
   {% if feature_pie or cpg_pie %}
-    <div style="display:flex;gap:16px;flex-wrap:wrap">
-      {% if feature_pie %}<div style="flex:1 1 380px">{{ feature_pie | safe }}</div>{% endif %}
-      {% if cpg_pie %}<div style="flex:1 1 380px">{{ cpg_pie | safe }}</div>{% endif %}
+    <p class="sec-sub">Distribution of differential cytosines across gene features and CpG-island context.</p>
+    <div class="grid2">
+      {% if feature_pie %}<div class="plot-card">{{ feature_pie | safe }}<div class="cap"><b>Gene feature</b> distribution.</div></div>{% endif %}
+      {% if cpg_pie %}<div class="plot-card">{{ cpg_pie | safe }}<div class="cap"><b>CpG-island context</b>.</div></div>{% endif %}
     </div>
+    {% if feature_stacked %}<div class="plot-card">{{ feature_stacked | safe }}<div class="cap"><b>Hyper vs hypo by feature</b> — directional bias per genomic context.</div></div>{% endif %}
   {% else %}
-    <div class="skipped">No annotations &mdash; run <code>ep.tl.annotate(md, gtf=..., cpg_islands=...)</code>.</div>
+    <div class="skipped">No annotations — run <code>ep.tl.annotate(md, gtf=..., cpg_islands=...)</code>.</div>
   {% endif %}
 </section>
 
-<section class="section">
-  <h2>TSS metaplot</h2>
-  {% if metaplot %}
-    {{ metaplot | safe }}
-  {% else %}
-    <div class="skipped">Metaplot not generated &mdash; pass <code>gtf_path</code> when calling <code>md.report()</code>.</div>
-  {% endif %}
+{# ---------- 07 METAPLOT ---------- #}
+<section id="metaplot">
+  <div class="sec-head"><span class="n">07</span><h2>TSS metaplot</h2>
+    {% if metaplot %}<span class="pill ok">±window</span>{% else %}<span class="pill skip">not run</span>{% endif %}
+  </div>
+  {% if metaplot %}<div class="plot-card">{{ metaplot | safe }}<div class="cap"><b>Mean β around the TSS</b> — group means bold, per-sample faint.</div></div>
+  {% else %}<div class="skipped">Metaplot not generated — pass <code>gtf_path</code> when calling <code>md.report()</code>.</div>{% endif %}
 </section>
 
-<section class="section">
-  <h2>Sample similarity (PCA)</h2>
+{# ---------- 08 PCA ---------- #}
+<section id="pca">
+  <div class="sec-head"><span class="n">08</span><h2>Sample similarity</h2>
+    {% if pca_plot %}<span class="pill ok">PCA</span>{% else %}<span class="pill skip">not run</span>{% endif %}
+  </div>
   {% if pca_plot %}
-    {{ pca_plot | safe }}
-  {% else %}
-    <div class="skipped">PCA could not be computed &mdash; not enough common sites or scikit-learn missing.</div>
-  {% endif %}
+    <div class="grid2">
+      <div class="plot-card">{{ pca_plot | safe }}<div class="cap"><b>PCA</b> of per-sample β profiles.</div></div>
+      {% if scree_plot %}<div class="plot-card">{{ scree_plot | safe }}<div class="cap"><b>Scree</b> — variance explained per component.</div></div>{% endif %}
+    </div>
+  {% else %}<div class="skipped">PCA could not be computed — not enough common sites or scikit-learn missing.</div>{% endif %}
 </section>
 
-<footer class="provenance">
-  <details>
-    <summary>Provenance</summary>
-    <pre>{{ provenance }}</pre>
-  </details>
-</footer>
+{# ---------- 09 METHODS ---------- #}
+<section id="methods">
+  <div class="sec-head"><span class="n">09</span><h2>Methods &amp; citations</h2><span class="pill ok">auto-generated</span></div>
+  <div class="card methods">
+    <button class="tbtn copybtn" id="copyMethods">⧉ Copy</button>
+    <p id="methodsText">{{ methods_text }}</p>
+    <div class="cite"><b>How to cite.</b> If epykit contributed to your analysis, please cite the epykit package (v{{ epykit_version }}). Statistical methods rely on Benjamini &amp; Hochberg (1995), statsmodels, and bioframe.</div>
+    {% if params_rows %}
+    <table class="params">
+      {% for p in params_rows %}<tr><td>{{ p.k }}</td><td>{{ p.v }}</td></tr>{% endfor %}
+    </table>
+    {% endif %}
+  </div>
+</section>
 
-</div>
+{# ---------- 10 PROVENANCE ---------- #}
+<section id="prov">
+  <div class="sec-head"><span class="n">10</span><h2>Provenance</h2><span class="pill ok">reproducible</span></div>
+  <div class="card">
+    <table class="params">
+      {% for p in provenance_rows %}<tr><td>{{ p.k }}</td><td>{{ p.v }}</td></tr>{% endfor %}
+    </table>
+    <details style="margin-top:12px"><summary>Full machine-readable provenance (JSON)</summary><pre>{{ provenance }}</pre></details>
+  </div>
+</section>
+
+</main>
+
+<script>{{ js_inline | safe }}</script>
 </body>
 </html>

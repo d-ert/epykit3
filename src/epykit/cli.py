@@ -471,7 +471,11 @@ def _cmd_report(args: argparse.Namespace):
     """Handler for 'report' subcommand."""
     from .methyldata import MethylData
     md = MethylData.load(args.md)
-    kwargs: dict = {"alpha": args.alpha, "min_abs_diff": args.min_abs_diff}
+    kwargs: dict = {
+        "alpha": args.alpha,
+        "min_abs_diff": args.min_abs_diff,
+        "self_contained": args.self_contained,
+    }
     if args.title:
         kwargs["title"] = args.title
     if args.gtf:
@@ -905,6 +909,12 @@ def main():
     p_rep.add_argument("--alpha", type=float, default=0.05)
     p_rep.add_argument("--min-abs-diff", dest="min_abs_diff",
                        type=float, default=0.1)
+    p_rep.add_argument("--self-contained", dest="self_contained",
+                       action="store_true", default=True,
+                       help="Embed Plotly inline so the HTML works offline (default)")
+    p_rep.add_argument("--no-self-contained", dest="self_contained",
+                       action="store_false",
+                       help="Load Plotly from a CDN (smaller file, needs internet)")
     p_rep.set_defaults(func=_cmd_report)
 
     # aggregate-regions

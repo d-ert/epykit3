@@ -76,3 +76,61 @@ def test_report_skips_unrun_sections(synth_md_filtered, tmp_path):
     html = out.read_text(encoding="utf-8")
     assert "DMC not yet called" in html or "ep.tl.dmc" in html
     assert "DMR not yet called" in html or "ep.tl.dmr" in html
+
+
+def test_report_self_contained_embeds_plotly(synth_md_filtered, tmp_path):
+    """Default self_contained=True embeds Plotly inline (offline-capable)."""
+    import epykit as ep
+
+    ep.tl.dmc(synth_md_filtered, test="lr")
+    out = tmp_path / "sc.html"
+    synth_md_filtered.report(str(out), self_contained=True)
+    html = out.read_text(encoding="utf-8")
+    # No CDN <script src="https://cdn.plot.ly/plotly-...js"> tag (the embedded
+    # bundle does contain an unrelated "cdn.plot.ly/un/" default in its config,
+    # so we must key on the script-src specifically).
+    assert 'src="https://cdn.plot.ly/plotly' not in html
+    assert "Plotly" in html
+    # Full Plotly bundle inlined -> large file
+    assert out.stat().st_size > 1_000_000, f"expected embedded bundle, got {out.stat().st_size}"
+
+
+def test_report_cdn_mode_uses_cdn(synth_md_filtered, tmp_path):
+    """self_contained=False references Plotly from a CDN."""
+    import epykit as ep
+
+    ep.tl.dmc(synth_md_filtered, test="lr")
+    out = tmp_path / "cdn.html"
+    synth_md_filtered.report(str(out), self_contained=False)
+    html = out.read_text(encoding="utf-8")
+    assert 'src="https://cdn.plot.ly/plotly' in html
+
+
+def test_report_dashboard_sections_and_qc_badges(synth_md_filtered, tmp_path):
+    """The dashboard chrome (sidebar anchors, summary, methods) and QC badges
+    render when QC + DMC have run."""
+    import epykit as ep
+
+    md = synth_md_filtered
+    ep.tl.qc(md, run_sample_correlation=True)
+    ep.tl.dmc(md, test="lr")
+    out = tmp_path / "dash.html"
+    md.report(str(out), title="dash")
+    html = out.read_text(encoding="utf-8")
+    for anchor in ('id="summary"', 'id="qc"', 'id="dmc"', 'id="methods"', 'id="prov"'):
+        assert anchor in html, anchor
+    assert "Results at a glance" in html
+    assert "Methods" in html
+    # QC status badges present
+    assert 'class="badge' in html
+    # Sidebar TOC + scroll-spy hook present
+    assert 'id="toc"' in html
+
+
+def test_report_no_data_still_self_contained(synth_md_filtered, tmp_path):
+    """A minimal pipeline (no DMC/DMR/QC) still writes valid HTML and does not
+    crash under self_contained=True."""
+    out = tmp_path / "min.html"
+    synth_md_filtered.report(str(out), self_contained=True)
+    assert out.exists()
+    assert "<html" in out.read_text(encoding="utf-8").lower()
