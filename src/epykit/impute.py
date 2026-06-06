@@ -40,8 +40,19 @@ def impute_knn_beta(
     *,
     k: int = 5,
     max_distance_bp: Optional[int] = 10_000,
-) -> np.ndarray:
+    return_mask: bool = False,
+):
     """Fill NaN entries of ``beta_matrix`` by k-nearest-neighbour kNN.
+
+    .. warning::
+        kNN imputation deflates per-site variance and inflates spatial
+        autocorrelation. **Imputed cells must not be fed to variance- or
+        dispersion-based analyses** (DVC/iEVORA, DMC/DMR calling, any
+        variance test) -- they bias those estimates with no signal that the
+        value is synthetic. Imputation is intended for distance/embedding
+        methods (PCA / UMAP / clustering). Pass ``return_mask=True`` to get a
+        boolean ``was_imputed`` matrix so downstream code can exclude filled
+        cells.
 
     Parameters
     ----------
@@ -62,12 +73,18 @@ def impute_knn_beta(
         nearest k regardless of distance). Default 10 kb (typical
         WGBS CpG-correlation decay scale).
 
+    return_mask : bool
+        When True, also return a boolean ``was_imputed`` matrix (True where a
+        NaN entry was filled). Default False (returns the matrix only).
+
     Returns
     -------
-    np.ndarray
+    np.ndarray, or (np.ndarray, np.ndarray) when ``return_mask=True``
         Copy of ``beta_matrix`` with NaN entries replaced where at
         least one neighbour was found. Entries where every candidate
-        was filtered out by ``max_distance_bp`` remain NaN.
+        was filtered out by ``max_distance_bp`` remain NaN. With
+        ``return_mask=True``, also a boolean ``(n_samples, n_sites)`` array
+        flagging the filled cells.
     """
     if positions.ndim != 1:
         raise ValueError("positions must be 1-D")
@@ -126,6 +143,9 @@ def impute_knn_beta(
             weights = 1.0 / (distances + 1.0)
             out[s, j] = float(np.sum(weights * cand_beta) / weights.sum())
 
+    if return_mask:
+        was_imputed = np.isnan(beta_matrix) & ~np.isnan(out)
+        return out, was_imputed
     return out
 
 

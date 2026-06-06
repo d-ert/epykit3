@@ -246,6 +246,28 @@ def age_clock(
     n_cpgs_used = int(cpg_has_any.sum())
     n_cpgs_missing = int(coords.height - n_cpgs_used)
 
+    # M-SEC1: with impute_missing=False a CpG missing in one sample (but seen
+    # in others) contributes 0 to that sample's linear predictor -- i.e. the
+    # age is a sum over observed CpGs only. (Note: zero-filling and excluding
+    # the term are mathematically identical; the issue is the *bias* from the
+    # missing contributions, not the zero-fill itself.) A clock's intercept is
+    # calibrated assuming all CpGs are present, so this biases absolute ages.
+    if not impute_missing:
+        per_sample_missing = np.isnan(beta) & cpg_has_any[None, :]
+        if bool(per_sample_missing.any()):
+            import warnings
+            warnings.warn(
+                "age_clock(impute_missing=False): some clock CpGs are missing "
+                "in individual samples and contribute 0 to those samples' "
+                "linear predictor (age summed over observed CpGs only). The "
+                "clock intercept assumes full coverage, so absolute ages are "
+                "biased by the missing CpGs' typical contributions. Use "
+                "impute_missing=True (imputes to the per-CpG cohort mean), and "
+                "prefer a clock with complete coverage; treat ages as "
+                "unreliable when missing_frac is non-trivial.",
+                UserWarning, stacklevel=2,
+            )
+
     # Replace NaN coefficientxbeta products with 0 for the sum (post-impute
     # any remaining NaN is exactly the cpg_has_any==False columns).
     beta_clean = np.where(np.isnan(beta_imp), 0.0, beta_imp)
