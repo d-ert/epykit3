@@ -37,6 +37,34 @@ jobs:
           PYTHONIOENCODING: utf-8
         run: uv run --python ${{ matrix.python-version }} pytest -m "not slow" --strict-markers -ra
 
+  slow:
+    name: pytest slow tier (ubuntu, py3.12)
+    # The accuracy / calibration / chain-merge logic lives behind the `slow`
+    # marker and is excluded from the matrix `test` job. Run it here so the
+    # statistical guarantees (incl. real-engine null calibration) are exercised
+    # in CI. Push events only, to bound cost.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Install epykit + test deps
+        run: uv sync --python 3.12 --extra dev --extra all
+
+      - name: Run pytest (slow tier)
+        env:
+          PYTHONIOENCODING: utf-8
+        run: uv run --python 3.12 pytest -m slow --strict-markers -ra
+
   lint:
     name: ruff + mypy
     runs-on: ubuntu-latest
