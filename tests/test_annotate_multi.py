@@ -92,6 +92,39 @@ def test_matching_chrom_names_do_not_raise(synth_gtf):
     assert "feature_type" in out.columns
 
 
+def test_intron_does_not_overextend_into_nested_exon(tmp_path):
+    """M-ANN1: with a nested exon (gene_id pools transcripts), the intron must
+    not cover the big exon's interior. A site inside the big exon must not be
+    tagged 'intron' in all_overlapping_features."""
+    gtf = tmp_path / "nested.gtf"
+    gtf.write_text("\n".join([
+        'chr1\tt\tgene\t100\t1100\t.\t+\t.\tgene_id "g1"; gene_name "G1";',
+        'chr1\tt\texon\t100\t900\t.\t+\t.\tgene_id "g1"; gene_name "G1";',
+        'chr1\tt\texon\t200\t300\t.\t+\t.\tgene_id "g1"; gene_name "G1";',
+        'chr1\tt\texon\t1000\t1100\t.\t+\t.\tgene_id "g1"; gene_name "G1";',
+    ]) + "\n")
+    A._BUILT_FEATURES_CACHE.clear()
+    out = annotate_features(_sites([500]), str(gtf), multi_annotation=True)
+    feats = str(out["all_overlapping_features"][0])
+    assert "intron" not in feats, f"intron over-extended into exon: {feats!r}"
+
+
+def test_equal_priority_overlap_breaks_ties_deterministically(tmp_path):
+    """M-ANN2: a site exonic in two overlapping genes must deterministically
+    pick the lower gene id (stable tie-break), not an arbitrary one."""
+    gtf = tmp_path / "overlap.gtf"
+    gtf.write_text("\n".join([
+        'chr1\tt\tgene\t1000\t3000\t.\t+\t.\tgene_id "g1"; gene_name "GENEA";',
+        'chr1\tt\texon\t1000\t3000\t.\t+\t.\tgene_id "g1"; gene_name "GENEA";',
+        'chr1\tt\tgene\t1500\t3500\t.\t+\t.\tgene_id "g2"; gene_name "GENEB";',
+        'chr1\tt\texon\t1500\t3500\t.\t+\t.\tgene_id "g2"; gene_name "GENEB";',
+    ]) + "\n")
+    A._BUILT_FEATURES_CACHE.clear()
+    out = annotate_features(_sites([2000]), str(gtf))
+    assert out["feature_type"][0] == "exon"
+    assert out["gene_name"][0] == "GENEA"  # g1 < g2
+
+
 def test_default_now_includes_multi_columns(synth_gtf):
     """multi_annotation=True is the default: output includes both legacy
     and annotatr-style columns out of the box."""

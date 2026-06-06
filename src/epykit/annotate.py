@@ -219,7 +219,13 @@ def _build_intron_df(exons_pd, genes_pd) -> "pd.DataFrame":
     if len(ex) == 0:
         return pd.DataFrame(columns=_FEAT_COLS)
     ex = ex.sort_values(["gene_id", "Start"]).reset_index(drop=True)
-    ex["_prev_end"] = ex.groupby("gene_id", sort=False)["End"].shift(1)
+    # Intron = gap between the *running-max* end of all prior exons and the
+    # current exon start. Using shift(1) (the immediately-previous row's End)
+    # over-extends introns into upstream exonic territory whenever a gene has
+    # nested or contained exons across transcripts, since gene_id pools all
+    # transcripts (M-ANN1). cummax gives the correct exon->intron complement.
+    ex["_running_end"] = ex.groupby("gene_id", sort=False)["End"].cummax()
+    ex["_prev_end"] = ex.groupby("gene_id", sort=False)["_running_end"].shift(1)
     first_mask = ex["_prev_end"].isna()
     ex.loc[first_mask, "_prev_end"] = ex.loc[first_mask, "_g_start"]
     ex["_prev_end"] = ex["_prev_end"].astype(np.int64)
@@ -547,8 +553,16 @@ def _pick_best_overlap(joined_df) -> "pd.DataFrame":
     df = joined_df.copy()
     feat_col = "Feature_b" if "Feature_b" in df.columns else "Feature"
     df["_priority"] = df[feat_col].map(_FEATURE_PRIORITY).fillna(99)
+    # Deterministic tie-break: among equal-priority overlaps (e.g. two genes
+    # whose promoter windows cover one site), break ties by gene id so the
+    # chosen gene_id/gene_name is stable across runs and pandas versions. A
+    # bare sort_values uses an unstable quicksort -> arbitrary pick (M-ANN2).
+    gene_col = "gene_id_b" if "gene_id_b" in df.columns else (
+        "gene_id" if "gene_id" in df.columns else None
+    )
+    sort_keys = ["_priority"] + ([gene_col] if gene_col else [])
     return (
-        df.sort_values("_priority")
+        df.sort_values(sort_keys, kind="mergesort")
           .groupby("_row_idx", as_index=False)
           .first()
           .drop(columns=["_priority"])
