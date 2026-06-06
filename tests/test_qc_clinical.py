@@ -66,6 +66,51 @@ def test_power_solves_for_n():
     assert n_needed >= 2
 
 
+def test_power_matches_statsmodels_ttest_oracle():
+    """C5: power must equal statsmodels' exact two-sample t-test power
+    (df=2(n-1), non-centrality d*sqrt(n/2)) -- a real oracle, not a self-check."""
+    from statsmodels.stats.power import TTestIndPower
+
+    meth_diff, coverage, n = 0.15, 20.0, 6
+    baseline, rep_sd, phi, alpha = 0.5, 0.05, 2.0, 0.05
+    got = power(meth_diff=meth_diff, coverage=coverage, n_per_group=n,
+                baseline_beta=baseline, replicate_sd=rep_sd, dispersion=phi,
+                alpha=alpha)
+    sd_single = np.sqrt(phi * baseline * (1 - baseline) / coverage + rep_sd ** 2)
+    d = meth_diff / sd_single
+    exp = TTestIndPower().power(effect_size=d, nobs1=n, alpha=alpha,
+                                ratio=1.0, alternative="two-sided")
+    assert abs(got - exp) < 1e-6, f"got {got}, statsmodels {exp}"
+
+
+def test_power_overdispersion_lowers_power():
+    """C5: higher overdispersion (phi) must reduce power at fixed n."""
+    p1 = power(meth_diff=0.15, coverage=20, n_per_group=6, dispersion=1.0)
+    p5 = power(meth_diff=0.15, coverage=20, n_per_group=6, dispersion=5.0)
+    assert p5 < p1
+
+
+def test_power_multiple_testing_raises_required_n():
+    """C5: a genome-wide multiple-testing burden must increase required n."""
+    n_single = power(meth_diff=0.15, coverage=20, power=0.80)
+    n_genome = power(meth_diff=0.15, coverage=20, power=0.80, n_tests=1_000_000)
+    assert n_genome > n_single
+
+
+def test_power_t_more_conservative_than_naive_z_at_small_n():
+    """C5: at n=2 the t critical value (~4.30) makes power well below the
+    naive-z calculation, so the calculator no longer over-promises."""
+    from scipy import stats
+
+    p = power(meth_diff=0.15, coverage=20, n_per_group=2,
+              dispersion=1.0, replicate_sd=0.05)
+    sd_single = np.sqrt(0.5 * 0.5 / 20 + 0.05 ** 2)
+    d = 0.15 / sd_single
+    ncp = d * np.sqrt(2 / 2.0)
+    z_power = float(stats.norm.sf(stats.norm.isf(0.025) - ncp))
+    assert p < z_power
+
+
 def test_sex_check_unimodal_cohort_falls_back_to_threshold():
     """P1-9: on a synthetic all-female cohort (unimodal chrX-beta
     distribution), the dip-test must trigger and the function must fall

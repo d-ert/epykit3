@@ -727,43 +727,62 @@ def power(
     alpha: float = 0.05,
     baseline_beta: float = 0.5,
     replicate_sd: float = 0.05,
+    dispersion: float = 1.0,
+    n_tests: int | None = None,
     two_sided: bool = True,
 ) -> float | int:
-    """Methylation-specific power / sample-size calculator .
+    """Methylation-specific power / sample-size calculator (two-sample t-test).
 
-    Models beta at each replicate as a mixture of binomial sampling noise
-    (variance ``beta(1-beta)/coverage`` per replicate per CpG) plus between-
-    replicate biological variance ``replicate_sd^2``. Under that model
-    the two-sample z-test power is
+    Models beta at each replicate as binomial sampling noise (variance
+    ``dispersion * beta(1-beta)/coverage`` per replicate per CpG) plus
+    between-replicate biological variance ``replicate_sd^2``. The per-replicate
+    SD is ``sd_single = sqrt(dispersion*beta(1-beta)/coverage + replicate_sd^2)``
+    and the standardized effect (Cohen's d) is ``meth_diff / sd_single``. Power
+    is the exact two-sample t-test power: non-central t with ``df = 2(n-1)`` and
+    non-centrality ``d * sqrt(n/2)``, evaluated at the (optionally
+    multiple-testing-adjusted) critical value.
 
-        sd_diff = sqrt(2 * (baseline_beta * (1 - baseline_beta) / coverage
-                            + replicate_sd**2) / n_per_group)
-        z       = meth_diff / sd_diff
-        power   = Phi(z - z_alpha)    (two-sided -> z_alpha = z_{alpha/2})
+    This corrects three sources of over-optimism in a naive binomial z-test:
 
-    When ``n_per_group`` is supplied (default mode), returns the implied
-    power. When ``power=...`` is supplied instead, returns the smallest
-    ``n_per_group`` (integer, >= 2) achieving that target power.
+    * **t, not z** -- at small n (the solver returns n >= 2) the critical value
+      is the Student-t quantile (t(df=2) ~ 4.30 at n=2), not 1.96.
+    * **overdispersion** -- real WGBS is overdispersed (phi ~ 1.5-5); the
+      binomial-only default (``dispersion=1.0``) understates the per-replicate
+      variance. Set ``dispersion`` to your estimated phi for honest planning.
+    * **multiple testing** -- a genome-wide scan tests millions of CpGs. Pass
+      ``n_tests`` to use a Bonferroni-adjusted per-test alpha (``alpha/n_tests``);
+      the default ``None`` is single-locus and is optimistic for genome-wide use.
+
+    When ``n_per_group`` is supplied (default mode), returns the implied power.
+    When ``power=...`` is supplied instead, returns the smallest ``n_per_group``
+    (integer, >= 2) achieving that target power.
 
     Parameters
     ----------
     meth_diff : float
         Expected effect size Deltabeta (e.g. 0.10 = 10 percentage points).
     coverage : float
-        Mean per-CpG coverage.
+        Mean per-CpG coverage. Must be > 0.
     n_per_group : int, optional
         Sample size per group; pass this to return power.
     power : float, optional
         Target power (e.g. 0.80); pass this to return sample size.
     alpha : float
-        Significance level (default 0.05).
+        Per-test significance level before any multiple-testing adjustment
+        (default 0.05).
     baseline_beta : float
-        Reference methylation level (default 0.5 = worst case for
-        binomial variance).
+        Reference methylation level (default 0.5 = worst case for binomial
+        variance).
     replicate_sd : float
         Between-replicate biological SD.
+    dispersion : float
+        Overdispersion multiplier (phi) on the binomial variance term. 1.0 =
+        binomial (optimistic); real WGBS is typically 1.5-5.
+    n_tests : int, optional
+        Number of CpGs tested genome-wide. When set, the effective per-test
+        alpha is ``alpha / n_tests`` (Bonferroni). Default None = single locus.
     two_sided : bool
-        Use the two-sided z critical value.
+        Use the two-sided critical value.
 
     Returns
     -------
@@ -772,15 +791,25 @@ def power(
     from scipy import stats as sp_stats
     if (n_per_group is None) == (power is None):
         raise ValueError("Pass exactly one of n_per_group, power.")
-    z_alpha = float(
-        sp_stats.norm.isf(alpha / 2.0 if two_sided else alpha)
-    )
+    if coverage <= 0:
+        raise ValueError(f"coverage must be > 0, got {coverage}")
+    eff_alpha = alpha / n_tests if n_tests else alpha
+    sd_single = float(np.sqrt(
+        dispersion * baseline_beta * (1.0 - baseline_beta) / coverage
+        + replicate_sd ** 2
+    ))
+    d = abs(meth_diff) / max(sd_single, 1e-12)  # Cohen's d (per-replicate)
 
     def _power_at_n(n: int) -> float:
-        per_site_var = baseline_beta * (1.0 - baseline_beta) / coverage
-        sd = float(np.sqrt(2.0 * (per_site_var + replicate_sd ** 2) / n))
-        z = abs(meth_diff) / max(sd, 1e-12)
-        return float(sp_stats.norm.sf(z_alpha - z))
+        if n < 2:
+            return 0.0
+        df = 2 * (n - 1)
+        ncp = d * float(np.sqrt(n / 2.0))
+        t_crit = float(sp_stats.t.isf(eff_alpha / 2.0 if two_sided else eff_alpha, df))
+        pwr = float(sp_stats.nct.sf(t_crit, df, ncp))
+        if two_sided:
+            pwr += float(sp_stats.nct.cdf(-t_crit, df, ncp))
+        return min(max(pwr, 0.0), 1.0)
 
     if n_per_group is not None:
         return _power_at_n(int(n_per_group))
