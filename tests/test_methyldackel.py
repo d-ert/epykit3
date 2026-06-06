@@ -56,22 +56,31 @@ def _toy_rows() -> list[tuple[str, int, int, float, int, int]]:
 
 
 def test_methyldackel_roundtrip_matches_bismark(tmp_path):
-    """read_methyldackel + read_bismark on the same data produce identical
-    on-disk parquet stores (same counts at each site).
+    """read_methyldackel + read_bismark on the SAME physical cytosines produce
+    identical on-disk parquet stores.
+
+    MethylDackel bedGraph is 0-based (start = pos); a standard Bismark .cov is
+    1-based for the same cytosine (start = end = pos + 1). The converter's
+    coordinate auto-detect must reconcile the two onto the same 0-based store
+    ``pos`` (C1). A converter that treated Bismark .cov as 0-based would shift
+    the Bismark side by +1 and this equivalence would fail.
     """
     rows = _toy_rows()
+    # Bismark 1-based rows for the SAME cytosines (start == end == mdk_start + 1).
+    bismark_rows = [
+        (chrom, start + 1, start + 1, pct, m, u)
+        for (chrom, start, _end, pct, m, u) in rows
+    ]
 
     md_dir = tmp_path / "md_input"
     bi_dir = tmp_path / "bi_input"
     md_dir.mkdir()
     bi_dir.mkdir()
 
-    # MethylDackel "treatment_1": same counts; "control_1": same counts.
-    # We only need to verify the converter correctly parses the same data.
     _write_methyldackel_bedgraph(md_dir / "t1.bedGraph.gz", rows)
     _write_methyldackel_bedgraph(md_dir / "c1.bedGraph.gz", rows)
-    _write_bismark_cov(bi_dir / "t1.bismark.cov.gz", rows)
-    _write_bismark_cov(bi_dir / "c1.bismark.cov.gz", rows)
+    _write_bismark_cov(bi_dir / "t1.bismark.cov.gz", bismark_rows)
+    _write_bismark_cov(bi_dir / "c1.bismark.cov.gz", bismark_rows)
 
     md_sheet = tmp_path / "md_sheet.csv"
     bi_sheet = tmp_path / "bi_sheet.csv"

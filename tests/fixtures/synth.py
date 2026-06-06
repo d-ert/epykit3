@@ -174,21 +174,25 @@ def _positions(cfg: SimConfig, rng: np.random.Generator) -> np.ndarray:
 
 def _write_cov_gz(path: Path, chroms: np.ndarray, positions: np.ndarray,
                   N_meth: np.ndarray, N_unmeth: np.ndarray) -> None:
-    """Write a Bismark .cov.gz file.
+    """Write a Bismark .cov.gz file in the real (1-based) coverage convention.
 
     Format (tab-separated, no header):
         chrom  start  end  methyl_percent  N_meth  N_unmeth
 
-    epykit's converter treats ``start`` as 0-based (BED-format), matching
-    nf-core/methylseq's bismark2bedGraph output. We write start = pos,
-    end = pos + 1 (single-CpG interval).
+    Standard Bismark coverage files are **1-based** with ``start == end``
+    (each row is a single cytosine). ``positions`` are the 0-based store
+    coordinates the truth table uses, so we write ``start = end = pos + 1``;
+    the converter's coordinate auto-detect shifts 1-based input back by -1 to
+    recover the same 0-based ``pos`` (C1). This keeps the on-disk store
+    invariant while exercising real Bismark coordinates end-to-end.
     """
     coverage = (N_meth + N_unmeth).astype(np.int64)
     methyl_pct = 100.0 * N_meth / np.maximum(coverage, 1)
+    one_based = (positions + 1).astype(np.int64)
     df = pd.DataFrame({
         "chrom": chroms,
-        "start": positions.astype(np.int64),
-        "end": (positions + 1).astype(np.int64),
+        "start": one_based,
+        "end": one_based,
         "methyl_pct": methyl_pct.astype(np.float64),
         "N_meth": N_meth.astype(np.int64),
         "N_unmeth": N_unmeth.astype(np.int64),

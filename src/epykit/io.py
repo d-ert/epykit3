@@ -94,6 +94,7 @@ def _read_methylation_samplesheet(
     store_dir: str,
     context: str,
     reference_fasta: str | None,
+    coordinate_base: str = "auto",
 ) -> MethylData:
     """Backend shared by ``read_bismark`` and ``read_methyldackel``."""
     obs_rows, files = _build_obs_from_samplesheet(
@@ -111,6 +112,7 @@ def _read_methylation_samplesheet(
             context=context,
             reference_fasta=reference_fasta,
             format=source_format,
+            coordinate_base=coordinate_base,
         )
         status = "converted" if converted else "cached"
         logger.info("  %s: %s", sample_id, status)
@@ -148,6 +150,7 @@ def read_bismark(
     context: str = "CpG",
     reference_fasta: str | None = None,
     groups: list[str] | None = None,
+    coordinate_base: str = "auto",
 ) -> MethylData:
     """Read a samplesheet of Bismark ``.cov[.gz]`` files into a MethylData.
 
@@ -174,6 +177,7 @@ def read_bismark(
         store_dir=store_dir,
         context=context,
         reference_fasta=reference_fasta,
+        coordinate_base=coordinate_base,
     )
 
 
@@ -186,6 +190,7 @@ def read_methyldackel(
     context: str = "CpG",
     reference_fasta: str | None = None,
     groups: list[str] | None = None,
+    coordinate_base: str = "auto",
 ) -> MethylData:
     """Read a samplesheet of MethylDackel ``.bedGraph[.gz]`` files into a
     MethylData.
@@ -209,6 +214,7 @@ def read_methyldackel(
         store_dir=store_dir,
         context=context,
         reference_fasta=reference_fasta,
+        coordinate_base=coordinate_base,
     )
 
 

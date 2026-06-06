@@ -4,6 +4,54 @@ All notable changes to **epykit** are tracked here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project uses
 SemVer (`MAJOR.MINOR.PATCH`).
 
+## [Unreleased]
+
+Post-1.0 correctness and reproducibility fixes from a pre-submission code
+review (Tier 1: paper-blockers + silent-wrong-science criticals).
+
+### Fixed
+
+- **Bismark `.cov` coordinate convention (C1).** `read_bismark` /
+  `convert_sample` now ingest standard 1-based Bismark coverage (`start ==
+  end`) correctly. A new `coordinate_base="auto"` (default) detects 1-based
+  vs 0-based input from `start`/`end` and shifts 1-based positions by `-1`
+  so the store is always 0-based. Previously every CpG from a real
+  `*.bismark.cov.gz` was stored 1 bp downstream, mis-annotating sites and
+  breaking cross-format `unite`. MethylDackel / combined-strand BED ingestion
+  and the benchmark numbers are unaffected (both are genuinely 0-based). Pass
+  `coordinate_base="one_based"` / `"zero_based"` to override. **Migration:**
+  the raw-store manifest version bumped to 2, so stores built by an older
+  epykit from real Bismark `.cov` are rebuilt on the next `read_bismark`.
+
+- **Annotation chromosome-name mismatch (C2).** `annotate_features` /
+  `annotate_cpg_islands` now raise on zero chromosome-name overlap (e.g.
+  UCSC `chr1` sites vs Ensembl `1` features) and warn below 50% coverage,
+  instead of silently labelling every site intergenic / open_sea.
+
+- **Horvath epigenetic-clock transform (C3).** The negative branch of the
+  anti-transform dropped the `(1 + adult_age)` factor, producing
+  negative/garbage ages for samples under ~20 years; now `21*exp(x) - 1`.
+
+- **CLI/API q-value parity (M-PKG2).** `epykit dmc` now defaults
+  `dispersion="eb"` (matching `ep.tl.dmc`) instead of inheriting
+  `dispersion="site"`, so the CLI and Python API produce identical q-values.
+  Added `--dispersion` / `--reference` / `--fdr-method` flags.
+
+### Changed
+
+- **`polars>=1.0` required (M-PKG1).** The declared floor was `>=0.20.0`, but
+  the code uses `DataFrame.pivot(on=...)`, a polars-1.0 API. `numba` floor
+  raised to `>=0.60` (numpy-2 support).
+- **`uv.lock` is now committed (M-PKG4)** for reproducibility; documented
+  `uv sync --frozen` and thread-pinning in `benchmark/README.md`.
+
+### Testing
+
+- Real-engine null-calibration test (`tests/test_null_calibration.py`) asserts
+  `lr` / `glm` / `welch_t` are not anti-conservative under the null; a new CI
+  job runs the `slow` tier. Added coordinate-convention and CLI/API parity
+  regression tests.
+
 ## [1.0.0] — 2026-06-02
 
 First stable release. API contract is now SemVer-stable. Three targeted

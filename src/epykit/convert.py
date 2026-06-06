@@ -1,20 +1,28 @@
-"""Bismark .cov -> partitioned Parquet converter.
+"""Bismark .cov / MethylDackel .bedGraph -> partitioned Parquet converter.
 
-Coordinate system: ``start`` is treated as **0-based** (BED-format), which
-is what ``bismark2bedGraph`` and nf-core/methylseq emit. The 1-based
-output of ``bismark_methylation_extractor --comprehensive`` /
-``coverage2cytosine`` must be pre-shifted by -1 before being passed here;
-otherwise every CpG ends up offset by 1 bp relative to GTF / CpG-island
-annotations. (Quick check: a 0-based file has ``start = end - 1``; a
-1-based file has ``start == end``.)
+Coordinate system: the internal methylstore is **0-based** (``pos`` is the
+0-based coordinate of the cytosine). Inputs differ in convention:
+
+* Standard Bismark coverage (``.bismark.cov[.gz]`` from
+  ``bismark_methylation_extractor`` / ``coverage2cytosine``) is **1-based**:
+  each row is a single cytosine with ``start == end``.
+* MethylDackel ``.bedGraph`` and the 12-column combined-strand BED are
+  **0-based** half-open (``end == start + 1``).
+
+``convert_sample(..., coordinate_base="auto")`` (the default) inspects
+``start``/``end`` and shifts 1-based Bismark input by ``-1`` so every source
+lands on the same 0-based ``pos``. Pass ``coordinate_base="one_based"`` or
+``"zero_based"`` to force the convention. (Quick check: a 0-based file has
+``start == end - 1``; a 1-based file has ``start == end``.)
 
 Strand: not present in Bismark merged .cov files. When ``reference_fasta``
-is provided, strand is inferred from the reference base at ``pos`` (``+``
-for C, ``-`` otherwise); without a reference it defaults to ``*``.
+is provided, strand is inferred from the reference base; without a
+reference it defaults to ``*``.
 """
 
 from __future__ import annotations
 
+import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,6 +33,14 @@ from . import _cache
 
 
 RAW_MANIFEST_NAME = ".epykit_raw_manifest.json"
+
+logger = logging.getLogger(__name__)
+
+# Bumped to 2 when the Bismark .cov 1-based coordinate fix (C1) landed.
+# Stores written under manifest_version < 2 may carry +1-shifted positions
+# for real (1-based) Bismark .cov input, so they fail _can_reuse_sample and
+# are rebuilt under the corrected, coordinate-aware converter.
+_MANIFEST_VERSION = 2
 
 # Bismark .cov column order. MethylDackel's extract --mergeContext output
 # uses the same six columns (chrom, start, end, percent, M, U) but prepends
@@ -84,6 +100,8 @@ class _SampleManifest:
     chroms: list[str]
     row_group_size: int
     format: str = "bismark"
+    coordinate_base: str = "auto"            # requested convention
+    resolved_coordinate_base: str = "zero_based"  # convention actually applied
 
 
 _file_signature = _cache.file_signature
@@ -100,20 +118,30 @@ def _manifest_path(sample_dir: Path) -> Path:
 
 def _manifest_payload(manifest: _SampleManifest) -> dict[str, object]:
     return {
+        "manifest_version": _MANIFEST_VERSION,
         "sample_name": manifest.sample_name,
         "source": manifest.source,
         "chroms": manifest.chroms,
         "row_group_size": manifest.row_group_size,
         "format": manifest.format,
+        "coordinate_base": manifest.coordinate_base,
+        "resolved_coordinate_base": manifest.resolved_coordinate_base,
     }
 
 
 def _can_reuse_sample(
     input_path: Path, sample_dir: Path, row_group_size: int,
     format: str = "bismark",
+    coordinate_base: str = "auto",
 ) -> bool:
     manifest = _load_json(_manifest_path(sample_dir))
     if not manifest:
+        return False
+    # Reject stores written before the coordinate fix (C1): they may carry
+    # +1-shifted positions for real 1-based Bismark .cov, so rebuild them.
+    if manifest.get("manifest_version") != _MANIFEST_VERSION:
+        return False
+    if manifest.get("coordinate_base", "auto") != coordinate_base:
         return False
     if manifest.get("source") != _file_signature(input_path):
         return False
@@ -307,6 +335,57 @@ def _infer_strand(df: pl.DataFrame, reference_fasta: str) -> pl.Series:
 
 # Public API
 
+def _resolve_coordinate_offset(
+    raw_lf: pl.LazyFrame, format: str, coordinate_base: str
+) -> tuple[int, str]:
+    """Resolve the ``start -> pos`` offset and the convention actually applied.
+
+    ``pos = start + offset``. Standard Bismark .cov is 1-based (``start ==
+    end``) and is shifted by ``-1``; MethylDackel bedGraph is 0-based
+    half-open (no shift). With ``coordinate_base="auto"`` the convention is
+    detected from a sample of ``start``/``end`` rows; ``"one_based"`` /
+    ``"zero_based"`` force it. (C1)
+    """
+    if coordinate_base == "one_based":
+        return -1, "one_based"
+    if coordinate_base == "zero_based":
+        return 0, "zero_based"
+    if coordinate_base != "auto":
+        raise ValueError(
+            "coordinate_base must be 'auto', 'one_based' or 'zero_based', "
+            f"got {coordinate_base!r}"
+        )
+    # auto-detect
+    if format != "bismark":
+        # MethylDackel bedGraph is 0-based half-open.
+        return 0, "zero_based"
+    sample = raw_lf.select(["start", "end"]).head(2000).collect()
+    if sample.height == 0:
+        return 0, "zero_based"
+    n = sample.height
+    frac_eq = int((sample["start"] == sample["end"]).sum()) / n
+    frac_half = int((sample["end"] == sample["start"] + 1).sum()) / n
+    if frac_eq >= 0.9:
+        logger.info(
+            "convert: detected 1-based Bismark .cov (start == end in %.0f%% "
+            "of sampled rows); shifting pos by -1.", 100 * frac_eq,
+        )
+        return -1, "one_based"
+    if frac_half >= 0.9:
+        logger.info(
+            "convert: detected 0-based input (end == start + 1 in %.0f%% of "
+            "sampled rows); no shift.", 100 * frac_half,
+        )
+        return 0, "zero_based"
+    logger.warning(
+        "convert: ambiguous coordinate convention (%.0f%% start==end, "
+        "%.0f%% end==start+1); assuming 0-based (no shift). Pass "
+        "coordinate_base='one_based' or 'zero_based' to override.",
+        100 * frac_eq, 100 * frac_half,
+    )
+    return 0, "zero_based"
+
+
 def convert_sample(
     input_path: str,
     sample_name: str,
@@ -316,7 +395,8 @@ def convert_sample(
     reference_fasta: str | None = None,
     merge_strands: bool = True,
     format: str = "bismark",
-) -> None:
+    coordinate_base: str = "auto",
+) -> str:
     """Convert a Bismark .cov or MethylDackel .bedGraph file into a
     partitioned Parquet store.
 
@@ -347,11 +427,21 @@ def convert_sample(
         (chrom, start, end, methylation_percent, count_methylated,
         count_unmethylated); MethylDackel prepends a one-line ``track``
         header that is skipped automatically. Default "bismark".
+    coordinate_base : {"auto", "one_based", "zero_based"}
+        Input coordinate convention. ``"auto"`` (default) detects 1-based
+        Bismark .cov (``start == end``) vs 0-based bedGraph and shifts so
+        ``pos`` is always 0-based. Override to force the convention. (C1)
+
+    Returns
+    -------
+    str
+        The coordinate convention actually applied
+        ("one_based" / "zero_based").
 
     Output schema
     -------------
     chrom   Utf8
-    pos     Int32   (0-based, == Bismark start)
+    pos     Int32   (0-based; 1-based Bismark .cov start is shifted -1)
     strand  Utf8    ("+" | "-" | "*")
     context Utf8    ("CpG" | "CHG" | "CHH")
     N_meth  Int32
@@ -372,6 +462,8 @@ def convert_sample(
     if format == "combined_strand_bed":
         # 12-col methylation BED: use the combined-strand triplet (cols 10-12).
         # Project to the canonical Bismark layout so downstream is unchanged.
+        # This BED is genuinely 0-based half-open, so pos = start (no shift).
+        resolved_base = "zero_based"
         lf = (
             pl.scan_csv(
                 str(p),
@@ -393,18 +485,24 @@ def convert_sample(
                      "coverage", "sample", "start"])
         )
     else:
-        lf = pl.scan_csv(
+        raw_lf = pl.scan_csv(
             str(p),
             separator="\t",
             has_header=False,
             skip_rows=_FORMAT_SKIP_ROWS[format],
             new_columns=_COV_COLUMNS,
             schema_overrides=_COV_SCHEMA,
-        ).with_columns(
+        )
+        # Bismark .cov is 1-based (start == end); MethylDackel bedGraph is
+        # 0-based. Resolve the offset so pos is always 0-based. (C1)
+        offset, resolved_base = _resolve_coordinate_offset(
+            raw_lf, format, coordinate_base
+        )
+        lf = raw_lf.with_columns(
             [
                 (pl.col("N_meth") + pl.col("N_unmeth")).alias("coverage"),
                 pl.lit(sample_name).alias("sample"),
-                pl.col("start").alias("pos"),
+                (pl.col("start") + offset).alias("pos"),
                 pl.lit(context).alias("context"),
             ]
         ).select(
@@ -444,6 +542,8 @@ def convert_sample(
             row_group_size=row_group_size,
         )
 
+    return resolved_base
+
 
 def ensure_converted_sample(
     input_path: str,
@@ -453,6 +553,7 @@ def ensure_converted_sample(
     context: str = "CpG",
     reference_fasta: str | None = None,
     format: str = "bismark",
+    coordinate_base: str = "auto",
 ) -> bool:
     """Convert a sample unless a valid on-disk conversion already exists.
 
@@ -466,6 +567,7 @@ def ensure_converted_sample(
     final_sample_dir = _sample_dir(output_root, sample_name)
     if _can_reuse_sample(
         source_path, final_sample_dir, row_group_size, format=format,
+        coordinate_base=coordinate_base,
     ):
         return False
 
@@ -474,7 +576,7 @@ def ensure_converted_sample(
         shutil.rmtree(temp_root)
 
     try:
-        convert_sample(
+        resolved_base = convert_sample(
             input_path,
             sample_name,
             str(temp_root),
@@ -482,6 +584,7 @@ def ensure_converted_sample(
             context=context,
             reference_fasta=reference_fasta,
             format=format,
+            coordinate_base=coordinate_base,
         )
         temp_sample_dir = _sample_dir(temp_root, sample_name)
         chroms = _expected_chrom_dirs(temp_sample_dir)
@@ -491,6 +594,8 @@ def ensure_converted_sample(
             chroms=chroms,
             row_group_size=row_group_size,
             format=format,
+            coordinate_base=coordinate_base,
+            resolved_coordinate_base=resolved_base,
         )
         _write_json(_manifest_path(temp_sample_dir), _manifest_payload(manifest))
         _promote_sample_dir(temp_sample_dir, final_sample_dir)
