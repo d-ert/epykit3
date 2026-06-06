@@ -25,12 +25,8 @@ abstract: |
   On the simulated grid (median of 20 random seeds, 21st a frozen-grid
   control), epykit's quasi-binomial likelihood-ratio engine (`lr`) is
   competitive with the strongest baselines — AUROC 0.928 (IQR
-  0.927–0.929) vs methylKit 0.926 and DSS-no-smoothing 0.909. The opt-in
-  `lr+` variant (four tunable enhancements layered on bare `lr`) trades
-  precision for recall: TPR rises from 0.673 to 0.746 but FPR rises 14-fold
-  (0.0044 → 0.064), F1 drops (0.796 → 0.746), and AUROC drops slightly
-  (0.928 → 0.907). `lr+` is therefore presented as a research-knob panel,
-  not the recommended default. At n = 2 total samples the bare `lr` engine
+  0.927–0.929) vs methylKit 0.926 and DSS-no-smoothing 0.909. At n = 2
+  total samples the bare `lr` engine
   recovers TPR 0.564 vs methylKit's 0.302 at comparably negligible FPR
   (1.2 × 10⁻⁵ vs 0; Study 2, single cell), the niche where the bare
   quasi-binomial advantage is largest.
@@ -193,7 +189,7 @@ rather than accuracy.
 
 | Tool | Version | Backend(s) tested | Studies |
 | --- | --- | --- | --- |
-| epykit | 1.0.0 | DMC: `lr`, `welch_t`, `fisher`, `glm` (4 surviving engines after the 0.7.5 freeze); `lr+` is the opt-in power stack engaged via `power_stack="lr+"`. DMR: `tile`, `sliding_window`, `segment`, `chain_merge`. | 1, 2, 3 |
+| epykit | 1.0.0 | DMC: `lr`, `welch_t`, `fisher`, `glm` (4 surviving engines after the 0.7.5 freeze); an opt-in `lr+` power-stack variant is also available (§2.5). DMR: `tile`, `sliding_window`, `segment`, `chain_merge`. | 1, 2, 3 |
 | methylKit | 1.34.0 (Study 2) / 1.36.0 (Study 3) / 0.99.2 (Study 1 baseline) | `calculateDiffMeth` + `tileMethylCounts` | 1, 2, 3 |
 | methylSig | 0.4.4 | (Piao 2021 baseline) | 1 |
 | DSS | 2.12.0 (Study 1 baseline, transcribed from Piao 2021); **2.58.0** (Study 3 local re-run) | (Piao 2021 baseline) for Study 1; `DMLfit.multiFactor` + `DMLtest.multiFactor` + `callDMR` for Study 3 | 1, 3 |
@@ -224,10 +220,7 @@ Default DMC recipes (headline row, Studies 1 & 2):
 | methylKit | `methRead(..., mincov=10) → normalizeCoverage(method="median") → unite(destrand=FALSE) → calculateDiffMeth(mc.cores=1)` |
 
 **Cutoff (both):** `qvalue < 0.05` AND `|meth_diff| ≥ 0.25` (fractional;
-= 25 on methylKit's percent scale). Tuned recipes use epykit's `lr+`
-(`neighbour_combine` + `sep_fallback` + `fdr_method="fdr_tsbh"`) and a
-methylKit post-hoc adjacent-3-CpG Stouffer combine (`scripts/methylkit_stouffer_combine.R`);
-both are clearly labelled as sensitivity panels, never as headline.
+= 25 on methylKit's percent scale).
 
 Default DMR recipes:
 
@@ -248,68 +241,26 @@ headline cell are summarised in `benchmark/data/study1/timings_table.csv`
 `benchmark/docs/timing-comparison.md` (cross-tool 7-way comparison
 including methylKit and DSS). Headline numbers appear in §3.
 
-## 2.5 The `lr` and `lr+` engines
+## 2.5 The `lr` engine
 
 epykit's default DMC engine, `lr`, fits a quasi-binomial logistic regression
 on (M, U) read counts per CpG with closed-form McCullagh–Nelder dispersion
 and a binomial floor (φ ≥ 1). It is the same per-site quasi-binomial LR as
 methylKit's `calculateDiffMeth(overdispersion="MN")`, plus a
-binomial-variance / df floor (the `df_phi` floor below) that keeps it
+binomial-variance / df floor that keeps it
 calibrated as overdispersion rises. The two agree closely at near-binomial
 dispersion (φ ≈ 1) but diverge in FDR control as φ grows into the real-WGBS
 range: `lr` holds its nominal q-value while methylKit `MN` becomes
 anti-conservative (§3.6).
 
-The `lr+` variant enables four opt-in enhancements designed for low-coverage
-or low-replicate regimes:
-
-1. **Empirical-Bayes dispersion shrinkage** (`dispersion="eb"`) — models the
-   per-site Pearson φ as an Inverse-Gamma draw and returns the posterior
-   mean, with the pseudo-df estimated from the chromosome-wide
-   distribution of φ̂.
-2. **Sign-aware Stouffer neighbour combiner** (`neighbour_combine=True`) —
-   combines each CpG's signed Z-score with same-direction neighbours within
-   200 bp, never inflating the p-value at any site; protected by a
-   sign-agreement guard (≥ 60 %) and a focal-signal gate (raw p < 0.5).
-3. **Separation-aware Fisher fallback** (`sep_fallback=True`) — re-tests
-   sites the LR failed to reject when |Δβ| ≥ 0.9, taking the smaller of
-   the two p-values. Cannot increase any site's significance from the
-   baseline LR call set.
-4. **Storey-style two-stage BH** (`fdr_method="fdr_tsbh"`) — replaces the
-   π₀ = 1 implicit in plain BH with a data-driven estimate; reduces to BH
-   when π₀ = 1.
-
-In epykit 1.0, bare `lr` is the default — none of these four enhancements
-engages unless explicitly requested. Users opt in to the full stack via
-`power_stack="lr+"` (an alias for setting all four knobs at once), or
-combine knobs individually as needed. `power_stack="conservative"`
-reproduces the pre-1.0 carve-out that auto-engaged two of the knobs at
-`min_n ≤ 2`. See the technical report
-([report/REPORT.md](../report/REPORT.md)) for full knob specification.
-
-**Degrees-of-freedom floor under EB shrinkage.** When EB shrinkage is
-active, the effective dispersion uncertainty is summarised by a
-pseudo-df parameter `df_phi` used as the denominator of the
-F(1, df_phi) reference distribution. The shrunk df can be small —
-typically `df_phi ≈ 4` at the n = 3-vs-3 effective sample sizes seen
-on the Piao simulator — and at such small df the F tail is materially
-heavier than the asymptotic chi²(1). At the conventional p = 0.05
-critical value (chi² 95-th percentile ≈ 3.841), F(1, 4) gives
-P(stat ≥ 3.841) ≈ 0.121, an inflation factor of ≈ 2.4× relative to
-chi²(1); F(1, 50) drops the same number to ≈ 0.056, an inflation
-factor of ≈ 1.1×. epykit therefore enforces a floor of `df_phi ≥ 50`
-during the F-vs-chi² adaptive switch, which keeps the per-CpG p-value
-calibration within ≈ 11 % relative of the asymptotic reference — below
-the per-CpG calibration noise floor observed on real GSE263850 data
-(§3.5). The floor value is empirical, not first-principles, and is
-pinned by `tests/test_principled_df.py` so a future change cannot
-silently move the calibration. Independent end-to-end validation
-comes from the exhaustive 10-partition null calibration on
-GSE263850 (§3.5): under realistic WGBS dispersion the lr engine's
-null p-values are close to uniform (mean 0.506, fraction below 0.05
-= 0.047, KS statistic D = 0.051), so the floor is not merely
-conservative — the test is calibrated, with FDR control valid at
-negligible power cost.
+epykit also exposes an opt-in `lr+` variant that bundles four exploratory
+enhancements (empirical-Bayes dispersion shrinkage, a sign-aware Stouffer
+neighbour combiner, a separation-aware Fisher fallback, and Storey
+two-stage BH) behind `power_stack="lr+"`. It targets low-coverage or
+low-replicate regimes and is a research knob, not used for any headline
+result in this paper; none of the four enhancements engages under the
+default bare `lr`. The full knob specification is in the technical report
+([report/REPORT.md](../report/REPORT.md)).
 
 ### 2.5.1 Engines removed in 0.7.5
 
@@ -319,12 +270,12 @@ engine-freeze cutover and now raise `ValueError` with a migration hint:
 | Removed | Replacement | Note |
 |---|---|---|
 | `logit_t` | `welch_t` | Welch t-test on β; same statistical model, honest name |
-| `bb_lr` | `lr` (or `lr+` for the full power stack) | The bare LR engine subsumes the beta-binomial special case |
+| `bb_lr` | `lr` | The bare LR engine subsumes the beta-binomial special case |
 | `score` | `lr` | LR subsumes the score test, with better small-sample calibration |
 | `cmh` | `glm` with `formula="~ group + batch"` | A fully-specified GLM is the modern replacement for stratified CMH |
 
-The freeze fixes the engine surface at four tests; only the opt-in
-power-stack knobs and CI computations have changed since.
+The freeze fixes the engine surface at four tests; only opt-in tuning
+knobs and CI computations have changed since.
 
 ## 2.6 Evaluation metrics
 
@@ -400,17 +351,15 @@ DSS) in every effect-size bin. At coverage = 10× with 3 vs 3 replicates —
 the design point most relevant to typical WGBS studies — `lr` traces a
 near-ideal ROC curve (Figure 1, AUROC = 0.9999 <!-- claim: study1_lr_auroc_cov10 -->),
 capturing 96.2 % <!-- claim: study1_lr_tpr_cov10 --> of true DMCs at
-FPR = 1.2 × 10⁻⁵ (F1 = 0.9807 <!-- claim: study1_lr_f1_cov10 -->). The opt-in
-`lr+` power stack reaches TPR = 99.97 % <!-- claim: study1_lrplus_tpr_cov10 -->
-at the same coverage cell with AUROC = 0.9999 <!-- claim: study1_lrplus_auroc_cov10 -->.
+FPR = 1.2 × 10⁻⁵ (F1 = 0.9807 <!-- claim: study1_lr_f1_cov10 -->).
 This near-perfect AUROC is measured under *threshold-reconstructed* truth (|Δβ| ≥
 0.2; §2.7); under intrinsic held-out truth — which counts every simulated DMC,
 including the weak-effect tail — the same `lr` engine scores AUROC = 0.928, the
 honest operating number the abstract reports. Both figures are real and trace to
 committed data; §3.4 places them side by side and explains the reconciliation.
 
-![Figure 1. ROC at coverage = 10×, 3 vs 3 replicates. epykit `lr` and `lr+`
-overlap the top-left corner; methylKit, RADMeth, DSS, and pooled Fisher
+![Figure 1. ROC at coverage = 10×, 3 vs 3 replicates. epykit `lr`
+overlaps the top-left corner; methylKit, RADMeth, DSS, and pooled Fisher
 cluster at (FPR ≈ 0.003, TPR ≈ 0.93–0.97); methylSig and BiSeq sit at
 higher FPR and lower TPR.](../figures/study1_simulated_allPackages/F1_roc_cov10.png)
 
@@ -430,8 +379,7 @@ above 15×.](../figures/study1_simulated_allPackages/F2_tpr_vs_coverage.png)
 The replicate-count sweep (Figure 3) tells a complementary story. At n = 4
 (2 vs 2), baseline `lr` achieves TPR ≈ 88.0 %, below the R baselines
 (methylKit, DSS, RADMeth all at 100 % in the 0.6–0.8 bin at this design
-point). `lr+` recovers the gap to 99.9 % through the neighbour combiner
-and Storey BH. From n = 6 onward baseline `lr` improves monotonically
+point). From n = 6 onward baseline `lr` improves monotonically
 (95.2 % → 97.9 % → 99.3 % at n = 6, 8, 10).
 
 ![Figure 3. DMC TPR vs replicate count.](../figures/study1_simulated_allPackages/F3_tpr_vs_replicate.png)
@@ -455,19 +403,19 @@ covered at every coverage); DSS, BiSeq, and BSmooth are far behind.
 
 ![Figure 5. DMR detection vs sequencing depth.](../figures/study1_simulated_allPackages/F5_dmr_detection.png)
 
-The DMC engine ablation (Figure 7) confirms that `lr` and `lr+` dominate
+The DMC engine ablation (Figure 7) confirms that `lr` dominates
 across the entire coverage range; `welch_t` degrades sharply at low coverage,
 and `fisher` (pooled-counts fallback for n = 1 per group) is consistently
 less powerful than `lr` whenever n ≥ 2 makes `lr` available. The beta-binomial
 LR engine (`bb_lr`) that appeared in earlier ablations was retired in 0.7.5
-because its small-n behaviour was reproducible from `lr` with the empirical-Bayes
-dispersion knob (`dispersion="eb"`); see §2.5.1 for the full removed-engine list.
+because its small-n behaviour was reproducible from `lr` with its opt-in
+empirical-Bayes dispersion knob (`dispersion="eb"`); see §2.5.1 for the
+full removed-engine list.
 
 ![Figure 7. epykit DMC engine ablation across coverage.](../figures/study1_simulated_allPackages/F7_engine_ablation.png)
 
-Finally, **`lr+` closely tracks the 20K gold-standard target** on DMC
-call count at coverages 10×–25× (20,105 / 20,007 / 19,999 / 20,000 calls
-respectively; Figure 9) — closer to truth than any baseline tool. BiSeq
+Finally, **epykit tracks the 20K gold-standard target** on DMC
+call count across coverages 10×–25× (Figure 9). BiSeq
 over-calls at 5× (~21,500), metilene under-calls everywhere (~500;
 single-CpG-resolution limitation), and BSmooth under-calls due to its
 smoothing prior.
@@ -885,16 +833,14 @@ Source: [`eval_simulator_intrinsic_iqr.parquet`](../data/study1b_simulator/eval_
 (external tools; 21 seeds = 20 sampled + 1 frozen-grid control). Across all 20
 held-out seeds the median epykit `lr` AUROC on intrinsic truth is **0.928**
 (IQR 0.927–0.929; `eval_seed_iqr.parquet`), essentially tied with methylKit
-(0.926); median epykit `lr+` AUROC is 0.907.
+(0.926).
 
 **Reading.** epykit `lr`, methylKit and unsmoothed DSS are all well-calibrated
 on intrinsic truth and rank near-identically (median AUROC 0.928 / 0.926 /
 0.909): methylKit is slightly more sensitive (TPR median 0.73) at a slightly
-higher FPR, epykit `lr` is the most conservative on false positives, and `lr+`
-trades calibration for recall (median TPR 0.746 at FPR 0.064, AUROC 0.907). At
+higher FPR, and epykit `lr` is the most conservative on false positives. At
 the representative single seed 2026000, epykit `lr` AUROC is 0.9267
-<!-- claim: simulator_epykit_lr_auroc_seed0_cov10 --> and `lr+` 0.9052
-<!-- claim: simulator_epykit_lrplus_auroc_seed0_cov10 -->. Smoothed DSS
+<!-- claim: simulator_epykit_lr_auroc_seed0_cov10 -->. Smoothed DSS
 collapses to a near-zero call rate (median 5 × 10⁻⁵ TPR) — not a DSS defect,
 but a dataset–assumption mismatch: the simulator generates CpGs at uniform
 100-bp spacing with no genomic correlation structure for the smoother to
@@ -973,8 +919,7 @@ above supersedes it on the real-data calibration question.
 
 **Performance headline.** epykit's bare `lr` engine completes the same
 coverage = 10, 3 vs 3 cell in median 0.86 s
-<!-- claim: headline_wallclock_epykit_lr -->; the opt-in `lr+` stack
-in 6.80 s <!-- claim: headline_wallclock_epykit_lrplus -->. The full
+<!-- claim: headline_wallclock_epykit_lr -->. The full
 per-engine timing table is `benchmark/data/study1/timings_table.csv`;
 the 7-tool cross-tool wallclock + accuracy comparison is
 `benchmark/docs/timing-comparison.md`.
@@ -1118,8 +1063,7 @@ WGBS pipeline:
 
 * Study 1 places epykit within the **broader ecosystem**: `lr` is
   competitive with the strongest established tools (methylKit, RADMeth, DSS)
-  at moderate to high coverage, and `lr+` reaches the perfect ceiling at
-  every coverage and replicate count ≥ 4 with well-controlled FPR. At low
+  at moderate to high coverage. At low
   coverage and small effects `lr` outperforms several baselines.
 * Study 2 establishes **bit-precise calibration** against methylKit: the
   two implementations agree on TPR, FPR, F1 and AUROC to three decimal
@@ -1145,19 +1089,11 @@ Study 3 surfaces a real choice: at n = 3 per group on biological data,
 methylKit's pooled `overdispersion="MN"` is more aggressive in the
 small-p tail than epykit's per-site McCullagh–Nelder; epykit calls
 fewer DMCs at the same threshold (30,965 vs methylKit 51,792 at
-|d| ≥ 10 %, q < 0.05). The `lr+` recipe emits ≈ 13 × more total
-significant DMCs (406,515 vs 30,965) than bare `lr` at the same
-q-threshold — consistent with the simulator-validated FPR inflation
-under realistic dispersion (§3.4 / §4 framing paragraph). Neither
-operating point is "more correct"; the precision/recall optimum
-depends on the downstream analysis and the user's tolerance for
-false positives. We therefore recommend that users:
-
-* Report results at the default `lr` setting unless they have a specific
-  reason to deviate;
-* Treat `lr+` as a sensitivity-favouring research mode, not a default;
-  reproduce headline findings under bare `lr` as a calibration check;
-* Document any opt-in (`lr+`, `dispersion="shrink"`, etc.) explicitly.
+|d| ≥ 10 %, q < 0.05). Neither operating point is "more correct"; the
+precision/recall optimum depends on the downstream analysis and the
+user's tolerance for false positives. We therefore recommend that users
+report results at the default `lr` setting unless they have a specific
+reason to deviate, and document any opt-in deviation explicitly.
 
 ## 4.3 Limitations
 
@@ -1168,20 +1104,6 @@ false positives. We therefore recommend that users:
   the consequence directly: at realistic dispersion the raw-TPR lead disappears
   (AUROC ties across tools), while `lr`'s FDR-calibration advantage strengthens
   (realised FDR ≈ 0.02–0.03 vs methylKit-MN 0.10–0.30 and DSS 0.09–0.28).
-  `dispersion="eb"` is designed for heterogeneous regimes but is a no-op on the
-  near-binomial default simulator.
-* **The empirical-Bayes dispersion prior is not validated against an external
-  estimator.** The EB shrinkage behind `dispersion="eb"` (and hence the opt-in
-  `lr+` stack) treats per-site Pearson dispersions as draws from an
-  inverse-Gamma prior whose hyperparameters are fit by method-of-moments per
-  chromosome (§2.5). We make no goodness-of-fit claim for that prior: its
-  per-site posterior dispersions have not been Q-Q compared against an
-  independent estimator such as DSS's, and that comparison remains future work.
-  This is acceptable here precisely because `eb`/`lr+` are opt-in research
-  knobs rather than the recommended default — **every headline result in this
-  paper is reported under bare `lr`**, whose dispersion is the binomial-floored
-  quasi-binomial Pearson estimate, not the EB prior. A reader should not read
-  any headline number as depending on, or as evidence for, the EB prior.
 * **Baseline software versions.** Study 1 baseline numbers are from 2021
   software releases. Relative ordering at low coverage / small n is robust
   across recent versions of those tools, but absolute numbers may have
@@ -1247,33 +1169,13 @@ false positives. We therefore recommend that users:
   the exhaustive enumeration to larger cohorts (e.g. TCGA tumour/normal
   with n ≥ 6+6) would require sampling rather than enumeration but is
   not required for the headline calibration claim.
-* **lr+ as a research knob, not a default.** The four-knob `lr+` stack
-  trades precision for recall (Simulator: TPR 0.673 → 0.746 buys a 14×
-  FPR inflation, 0.0044 → 0.064; F1 0.796 → 0.746; AUROC 0.928 → 0.907).
-  We retain `lr+` as a deliberately-opt-in mode for users who want to
-  trade calibration for sensitivity in low-replicate regimes, and
-  document it as such in the API and §2.5. Bare `lr` is the engine
-  the abstract numbers are reported against; `lr+` headline panels are
-  labelled as such throughout §3.
-* **sep_threshold is inert at realistic coverage.** §M11 (sep_threshold)
-  reports that the lr+ separation-aware Fisher fallback never fires on
-  GSE263850 (0 candidate sites across all chromosomes, identical DMC
-  output at sep_threshold ∈ {0.7, 0.8, 0.9, 0.95} on the validated
-  cold-cache sweep). It is a rare-event safeguard for pathologically
-  low-coverage sites that the coverage filter (default ≥ 10×/sample)
-  removes upstream; the default value (0.9) has no effect on any
-  reported number and requires no tuning. Investigating this question
-  surfaced and fixed a cache-key bug in `tl.py` that had previously
-  hidden the inertness behind silent cache reuse.
 
 # 5. Conclusion
 
 epykit is a Python-native pipeline for WGBS downstream analysis whose
 default `lr` engine is competitive with the strongest R/CLI tools
 (simulator: AUROC 0.928 vs methylKit 0.926, DSS-no-smoothing 0.909).
-The opt-in `lr+` stack trades precision for recall (14× FPR inflation
-for +7 pp TPR; lower F1 and AUROC) and is documented as a research
-knob, not a recommended default. On real WGBS (GSE263850), at the
+On real WGBS (GSE263850), at the
 paper-matched `dmr_chain_merge` operating point (`dis.merge = 250`):
 
 * fixed-tile callers (methylKit, epykit-tile) miss ≥ 90 % of focused

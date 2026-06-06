@@ -174,57 +174,6 @@ ep.tl.dmr(md, method="tile", empirical_fdr=True, n_perm=100, perm_seed=42)
 # md.uns["dmr"] now carries empirical_pvalue / empirical_qvalue columns
 ```
 
-### 5. The `lr+` power stack (opt-in research knob)
-
-The bare `lr` engine is a quasi-binomial likelihood-ratio test on per-site
-counts. Out of the box (the 1.0 default), it is conservative — it does not
-borrow strength across neighbouring CpGs, uses BH FDR correction, and falls
-back to the asymptotic LR statistic under quasi-separation. **Bare `lr` is
-the engine the benchmark paper is built around.**
-
-For experimentation, epykit also ships a tunable power stack of four opt-in
-knobs:
-
-| Knob | Default | `lr+` value | What it does |
-|---|---|---|---|
-| `neighbour_combine` | `False` | `True` | Stouffer-combine p-values across adjacent CpGs |
-| `fdr_method` | `"fdr_bh"` | `"fdr_tsbh"` | Two-stage BH FDR (estimates π₀ then corrects) |
-| `sep_fallback` | `False` | `True` | Bias-reduced LR under quasi-separation |
-| `dispersion` | `"eb"` (already) | `"eb"` (already) | Empirical-Bayes dispersion shrinkage |
-
-Engage the stack with `power_stack="lr+"`:
-
-```python
-ep.tl.dmc(md, test="lr", power_stack="lr+")
-# Equivalent to:
-ep.tl.dmc(md, test="lr",
-          neighbour_combine=True, fdr_method="fdr_tsbh", sep_fallback=True)
-```
-
-When `neighbour_combine=True`, the raw per-CpG `pvalue`/`qvalue` columns
-stay as-is and the combined values are added as `pvalue_combined` /
-`qvalue_combined` so downstream code can choose.
-
-> ⚠️ **`lr+` is a research knob, not a recommended default.** On the
-> *simulated* Piao et al. 2021 grid (low dispersion, φ ≈ 0.4 — the regime its
-> heuristics were tuned against) the full stack reaches very high TPR while
-> keeping FPR tight. It is **not validated as universally superior on real
-> WGBS**: under realistic dispersion (φ ≈ 1.5–5) the same settings can inflate
-> the DMC call count substantially (≈13× on GSE263850 at q = 0.05 vs. bare
-> `lr`), consistent with FPR drift. Use it to explore, and validate against
-> your own data before relying on it. See
-> [`benchmark/paper/report/REPORT.md`](benchmark/paper/report/REPORT.md) for
-> the full head-to-head.
-
-Other `power_stack` values:
-
-| Value | Behavior |
-|---|---|
-| `"lr+"` (or `True`) | Engage all four knobs at any sample size |
-| `"auto"` | Alias for `"lr+"` |
-| `"conservative"` | Engage only when `min_n <= 2` (legacy pre-1.0 behavior) |
-| `"off"` (or `False`) | Leave knobs at user-passed values (1.0 default) |
-
 ### 6. Clinical / cohort QC
 
 ```python

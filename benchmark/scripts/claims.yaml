@@ -48,32 +48,6 @@
   expected: 0.980736
   precision: 0.005
 
-- claim_id: study1_lrplus_auroc_cov10
-  parquet: benchmark/data/study1/eval_summary_post_phase3.parquet
-  column: auroc
-  filter:
-    tool: epykit_lrplus
-    scenario: dmc_coverage
-    parameter_value: 10
-    meth_diff_bin: "all"
-    threshold_kind: qvalue
-    threshold: 0.05
-  expected: 0.999976
-  precision: 0.001
-
-- claim_id: study1_lrplus_tpr_cov10
-  parquet: benchmark/data/study1/eval_summary_post_phase3.parquet
-  column: tpr
-  filter:
-    tool: epykit_lrplus
-    scenario: dmc_coverage
-    parameter_value: 10
-    meth_diff_bin: "all"
-    threshold_kind: qvalue
-    threshold: 0.05
-  expected: 0.999700
-  precision: 0.005
-
 - claim_id: study1_fisher_auroc_cov10
   parquet: benchmark/data/study1/eval_summary_post_phase3.parquet
   column: auroc
@@ -129,19 +103,6 @@
   expected: 0.926721
   precision: 0.001
 
-- claim_id: simulator_epykit_lrplus_auroc_seed0_cov10
-  parquet: benchmark/data/study1b_simulator/eval_per_seed.parquet
-  column: auroc
-  filter:
-    tool: epykit_lrplus
-    seed: 2026000
-    coverage: 10
-    threshold_kind: qvalue
-    threshold: 0.05
-    meth_diff_bin: "all"
-  expected: 0.905198
-  precision: 0.001
-
 # ── Null calibration: empirical FDR (gse263850 real dataset, 10 shuffles) ──────
 
 - claim_id: null_calib_lr_gse263850_fdr_median
@@ -149,15 +110,6 @@
   column: observed_fdr_median
   filter:
     engine: lr
-    dataset: gse263850
-  expected: 0.0000153036
-  precision: 0.00001
-
-- claim_id: null_calib_lrplus_gse263850_fdr_median
-  parquet: benchmark/data/null_calibration/summary.parquet
-  column: observed_fdr_median
-  filter:
-    engine: lr_plus
     dataset: gse263850
   expected: 0.0000153036
   precision: 0.00001
@@ -170,12 +122,4 @@
   filter:
     tool: epykit_lr
   expected: 0.858232
-  precision: 0.5
-
-- claim_id: headline_wallclock_epykit_lrplus
-  csv: benchmark/data/study1/timings_table.csv
-  column: median_wall_s
-  filter:
-    tool: epykit_lrplus
-  expected: 6.798283
   precision: 0.5
