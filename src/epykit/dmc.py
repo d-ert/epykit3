@@ -2875,9 +2875,16 @@ def empirical_fdr_for_dmc(
 
     Re-runs :func:`process_chromosomes_dmc` ``n_perm`` times with the
     treatment / control sample labels shuffled. For each observed CpG, the
-    empirical p-value is estimated from the fraction of null DMCs (across
-    all permutations and all sites) with raw p-value <= the observed raw
-    p-value. The result is BH-adjusted to ``empirical_qvalue``.
+    ``empirical_pvalue`` is a **Westfall-Young min-P (FWER-style) statistic**:
+    the fraction of permutations whose genome-wide *minimum* null p-value is
+    ``<=`` the observed raw p-value, with the Phipson-Smyth ``(count + 1) /
+    (n_perm + 1)`` floor so the minimum attainable value is invariant to
+    ``n_perm``. This controls the family-wise error rate and is therefore
+    **conservative at genome scale** (low power across millions of CpGs); it
+    is NOT a pooled-null per-site FDR despite the function name.
+    ``empirical_qvalue`` is a subsequent BH transform of those FWER p-values,
+    provided for convenience. For a less conservative region-level empirical
+    FDR, prefer :func:`epykit.dmr.empirical_fdr_for_dmr` on DMRs.
 
     Parallels :func:`epykit.dmr.empirical_fdr_for_dmr`; same caveats apply:
 

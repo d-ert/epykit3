@@ -640,7 +640,8 @@ def call_dmr_sliding_window(
     return dmr_df
 
 
-# Public API -- chain-and-merge DMR calling (DSS callDMR semantics)
+# Public API -- chain-and-merge DMR calling (DSS-callDMR-*style*; see the
+# "Differences from DSS callDMR" note in call_dmr_chain_merge)
 
 DMR_PRESETS: dict[str, dict] = {
     # "strict": very confident DMRs only. Use when downstream uses cannot
@@ -687,8 +688,9 @@ def call_dmr_chain_merge(
 ) -> pl.DataFrame:
     """Call DMRs by chaining contiguous significant CpGs and merging gaps.
 
-    Reimplements DSS's ``callDMR`` semantics on top of an epykit DMC
-    table:
+    Implements a DSS ``callDMR``-*style* chain-and-merge on top of an epykit
+    DMC table (see "Differences from DSS callDMR" below -- this is a related
+    construction, not a faithful reimplementation):
 
       1. Mark significant CpGs:
          ``(pvalue < alpha) AND (|meth_diff| >= min_abs_meth_diff)``.
@@ -706,6 +708,19 @@ def call_dmr_chain_merge(
          direction (``hyper`` / ``hypo`` / ``mixed``) from the mean
          ``meth_diff`` and per-site sign tally.
       6. BH-correct the surviving combined p-values genome-wide.
+
+    Differences from DSS callDMR (do not treat the two as interchangeable)
+    ----------------------------------------------------------------------
+    * **No smoothing / dispersion shrinkage.** DSS smooths the mean
+      methylation and shrinks the per-CpG dispersion before computing its
+      test statistic; this caller consumes raw, unsmoothed epykit per-CpG
+      p-values. Boundaries and which CpGs pass therefore differ from DSS.
+    * **Non-DSS region statistic.** DSS summarises regions by length / area
+      of the smoothed statistic; the ``combined_pvalue`` here is an epykit
+      signed-Stouffer construct (and is anti-conservative under CpG
+      correlation -- see :func:`_stouffer_combine_signed`).
+    * **Looser default gate.** The ``"default"`` preset uses ``alpha=1e-4``,
+      ~10x looser than DSS callDMR's ``p.threshold=1e-5``.
 
     Geometrically this is more permissive than ``call_dmr_sliding_window``
     for sparse-cluster signal: two sig CpGs 140 bp apart cannot fit in a
@@ -731,8 +746,8 @@ def call_dmr_chain_merge(
 
     For common scenarios prefer the ``preset=`` bundles instead of
     hand-tuning: ``"strict"`` (validation-ready DMRs), ``"default"``
-    (DSS-equivalent, recommended), ``"permissive"`` (exploratory / recall-
-    oriented).
+    (balanced, recommended starting point -- looser than DSS callDMR, see
+    above), ``"permissive"`` (exploratory / recall-oriented).
 
     Parameters
     ----------

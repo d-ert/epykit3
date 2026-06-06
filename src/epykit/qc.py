@@ -566,18 +566,23 @@ def contamination_estimate(
     *,
     min_coverage: int = 10,
 ) -> float:
-    """Estimate sample contamination from the beta distribution shape.
+    """Fraction of well-covered CpGs with intermediate beta (0.2 < beta < 0.8).
 
-    Clean WGBS samples have a strongly bimodal beta distribution: most CpGs
-    are either fully methylated (beta ~= 1) or unmethylated (beta ~= 0).
-    Cross-sample contamination produces an excess of intermediate values
-    (0.2 < beta < 0.8) -- the score is the fraction of well-covered CpGs in
-    that band.
+    .. warning::
+        This is an *intermediate-beta fraction*, NOT a validated contamination
+        estimate, and it is heavily confounded by biology. Intermediate beta
+        is produced by cell-type heterogeneity in bulk tissue, allele-specific
+        methylation, imprinting, and copy-number variation -- none of which is
+        contamination. A heterogeneous-but-clean tissue scores high; a
+        contaminated homogeneous sample may score low. The score is not
+        calibrated against spike-in contamination titrations and is not
+        comparable across tissues. For a genuine contamination estimate, use a
+        genotype/SNP-VAF-bimodality method validated against known mixtures.
+        Treat this as a coarse, tissue-specific QC flag only.
 
-    this is the lightweight "boundary-mass" version. A fuller
-    EM-based three-component mixture is mentioned in the plan but adds
-    a sklearn dep; the histogram score is robust and matches the
-    contamination signal direction in practice.
+    Clean, *homogeneous* WGBS samples have a strongly bimodal beta distribution
+    (most CpGs near 0 or 1); cross-sample contamination is one of several
+    things that adds intermediate-beta mass.
 
     Parameters
     ----------
