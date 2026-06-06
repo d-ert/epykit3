@@ -24,8 +24,40 @@ from ._compute import (
     compute_ma_data,
     compute_manhattan_data,
     compute_annotation_counts,
+    compute_categorical_proportions,
+    compute_pvalue_histogram,
+    compute_dmr_size_distribution,
+    compute_global_methylation,
+    compute_sample_correlation_matrix,
+    compute_scree,
 )
 from ..methyldata import MethylData
+
+# Refined dashboard accents. These affect the interactive *report* figures
+# only; the shared matplotlib ``_style.PALETTE`` is intentionally left
+# untouched so the static plots in ``pl/*.py`` are unchanged.
+_ACCENT = "#2563eb"
+_VIOLET = "#7c3aed"
+
+
+def _dash_layout(go, **over):
+    """Shared white-background layout for dashboard report figures.
+
+    Figures live on white plot-cards in both light and dark report themes,
+    so they never need re-theming when the user toggles the theme.
+    """
+    base = dict(
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font=dict(
+            family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
+            size=12, color="#1a2230",
+        ),
+        margin=dict(l=54, r=18, t=18, b=44),
+        template="simple_white",
+    )
+    base.update(over)
+    return base
 
 
 def _require_plotly():
@@ -259,6 +291,122 @@ def tss_metaplot_plotly(
     return fig
 
 
+def pvalue_histogram_plotly(md: MethylData):
+    """Histogram of raw per-CpG p-values -- a calibration diagnostic."""
+    go = _require_plotly()
+    counts, edges = compute_pvalue_histogram(md, bins=30)
+    centers = (edges[:-1] + edges[1:]) / 2.0
+    width = float(edges[1] - edges[0]) * 0.95
+    fig = go.Figure([go.Bar(
+        x=centers, y=counts, width=width,
+        marker_color=_ACCENT, opacity=0.85,
+    )])
+    fig.update_layout(**_dash_layout(
+        go, title="p-value histogram", xaxis_title="p-value",
+        yaxis_title="CpG count", height=320, bargap=0.02,
+    ))
+    return fig
+
+
+def dmr_size_hist_plotly(md: MethylData):
+    """Distribution of CpGs-per-DMR."""
+    go = _require_plotly()
+    sizes = compute_dmr_size_distribution(md)
+    fig = go.Figure([go.Histogram(
+        x=sizes, marker_color=_VIOLET, opacity=0.85,
+    )])
+    fig.update_layout(**_dash_layout(
+        go, title="DMR size distribution", xaxis_title="CpGs per DMR",
+        yaxis_title="DMR count", height=300, bargap=0.05,
+    ))
+    return fig
+
+
+def global_methylation_bar_plotly(md: MethylData):
+    """Per-sample global methylation, coloured by group (batch eyeball)."""
+    go = _require_plotly()
+    samples, values, groups = compute_global_methylation(md)
+    uniq = list(dict.fromkeys(groups))
+    palette_cycle = [
+        PALETTE["treatment"], PALETTE["control"],
+        PALETTE["island"], PALETTE["shelf"], PALETTE["neutral"],
+    ]
+    cmap = {g: palette_cycle[i % len(palette_cycle)] for i, g in enumerate(uniq)}
+    colors = [cmap.get(g, PALETTE["neutral"]) for g in groups]
+    fig = go.Figure([go.Bar(x=samples, y=values, marker_color=colors)])
+    fig.update_layout(**_dash_layout(
+        go, title="Global methylation per sample",
+        yaxis_title="mean beta", height=300,
+    ))
+    return fig
+
+
+def sample_correlation_plotly(md: MethylData):
+    """Clustered all-vs-all sample correlation heatmap."""
+    go = _require_plotly()
+    mat, labels = compute_sample_correlation_matrix(md)
+    zmin = float(min(0.7, np.nanmin(mat)))
+    fig = go.Figure([go.Heatmap(
+        z=mat, x=labels, y=labels,
+        colorscale=[[0, "#ffffff"], [1, _ACCENT]],
+        zmin=zmin, zmax=1.0,
+        colorbar=dict(thickness=12, len=0.75),
+    )])
+    fig.update_layout(**_dash_layout(
+        go, title="Sample correlation", height=360,
+        margin=dict(l=64, r=20, t=32, b=54),
+    ))
+    return fig
+
+
+def scree_plotly(md: MethylData):
+    """Variance explained by the leading principal components."""
+    go = _require_plotly()
+    ev = compute_scree(md, max_components=6) * 100.0
+    labels = [f"PC{i + 1}" for i in range(len(ev))]
+    fig = go.Figure([go.Bar(x=labels, y=ev, marker_color=_ACCENT)])
+    fig.update_layout(**_dash_layout(
+        go, title="Scree", yaxis_title="% variance explained", height=340,
+    ))
+    return fig
+
+
+def feature_direction_stacked_plotly(md: MethylData):
+    """Hyper- vs hypo-methylation proportion within each gene feature.
+
+    Returns ``None`` when the DMC table is unannotated.
+    """
+    go = _require_plotly()
+    dmc = md.dmc
+    if dmc is None or "feature_type" not in dmc.columns or "meth_diff" not in dmc.columns:
+        return None
+    import polars as _pl
+
+    work = dmc.with_columns(
+        _pl.when(_pl.col("meth_diff") > 0).then(_pl.lit("hyper"))
+        .otherwise(_pl.lit("hypo")).alias("dmr_type")
+    )
+    prop = compute_categorical_proportions(
+        work, group_col="dmr_type", annot_col="feature_type",
+        include_all_group=False, normalize=True,
+    )
+    feats = prop["feature_type"].unique(maintain_order=True).to_list()
+    fig = go.Figure()
+    for direction, color in (("hyper", PALETTE["hyper"]), ("hypo", PALETTE["hypo"])):
+        sub = prop.filter(_pl.col("dmr_type") == direction)
+        ymap = dict(zip(sub["feature_type"].to_list(), sub["proportion"].to_list()))
+        fig.add_trace(go.Bar(
+            x=feats, y=[ymap.get(f, 0.0) for f in feats],
+            name=direction, marker_color=color,
+        ))
+    fig.update_layout(**_dash_layout(
+        go, title="Hyper vs hypo by feature", barmode="stack",
+        yaxis_title="proportion", height=300, showlegend=True,
+        legend=dict(orientation="h"),
+    ))
+    return fig
+
+
 __all__ = [
     "volcano_plotly",
     "ma_plot_plotly",
@@ -268,4 +416,10 @@ __all__ = [
     "feature_pie_plotly",
     "cpg_island_pie_plotly",
     "tss_metaplot_plotly",
+    "pvalue_histogram_plotly",
+    "dmr_size_hist_plotly",
+    "global_methylation_bar_plotly",
+    "sample_correlation_plotly",
+    "scree_plotly",
+    "feature_direction_stacked_plotly",
 ]

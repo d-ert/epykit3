@@ -809,6 +809,113 @@ def compute_categorical_proportions(
     )
 
 
+# ---------------------------------------------------------------------------
+# Dashboard report extras (cheap derivations consumed by report.py / _plotly)
+# ---------------------------------------------------------------------------
+
+
+def compute_pvalue_histogram(md, *, bins: int = 30):
+    """Histogram of raw per-CpG p-values -- a test-calibration check.
+
+    A well-behaved analysis shows a roughly uniform null with a spike near
+    zero. Returns ``(counts, edges)`` with edges spanning ``[0, 1]``.
+    """
+    dmc = md.dmc
+    if dmc is None or "pvalue" not in dmc.columns:
+        raise ValueError("Run ep.tl.dmc(md) first (no 'pvalue' column)")
+    p = dmc["pvalue"].to_numpy()
+    p = p[~np.isnan(p)]
+    counts, edges = np.histogram(p, bins=bins, range=(0.0, 1.0))
+    return counts, edges
+
+
+def compute_dmr_size_distribution(md) -> np.ndarray:
+    """Per-DMR CpG counts (falls back to genomic width when n_cpgs absent)."""
+    dmr = md.uns.get("dmr")
+    if dmr is None or not isinstance(dmr, pl.DataFrame) or dmr.is_empty():
+        raise ValueError("Run ep.tl.dmr(md) first")
+    if "n_cpgs" in dmr.columns:
+        return dmr["n_cpgs"].drop_nulls().to_numpy()
+    if {"start", "end"} <= set(dmr.columns):
+        return (dmr["end"] - dmr["start"]).to_numpy()
+    raise ValueError("DMR table lacks both 'n_cpgs' and 'start'/'end'")
+
+
+def compute_global_methylation(md):
+    """Return ``(samples, values, groups)`` for the per-sample methylation bar.
+
+    Reads the ``global_methylation`` column populated by ``ep.tl.qc``.
+    """
+    obs = md.obs
+    if "global_methylation" not in obs.columns:
+        raise ValueError("Run ep.tl.qc(md) first (no 'global_methylation' in obs)")
+    samples = obs.get_column("sample_id").to_list()
+    values = [float(v) if v is not None else float("nan")
+              for v in obs.get_column("global_methylation").to_list()]
+    _, groups = _resolve_group_col(md, None)
+    return samples, values, groups
+
+
+def compute_sample_correlation_matrix(md):
+    """Densify ``uns['qc_sample_correlation']`` (long form) into a matrix.
+
+    Returns ``(matrix, labels)``. When SciPy is available the rows/cols are
+    reordered by average-linkage hierarchical clustering on ``1 - r`` so
+    related samples sit together; otherwise sample order is preserved.
+    """
+    corr_df = md.uns.get("qc_sample_correlation")
+    if corr_df is None or not isinstance(corr_df, pl.DataFrame) or corr_df.is_empty():
+        raise ValueError(
+            "Run ep.tl.qc(md, run_sample_correlation=True) first"
+        )
+    labels = list(dict.fromkeys(
+        corr_df.get_column("sample_a").to_list()
+        + corr_df.get_column("sample_b").to_list()
+    ))
+    idx = {s: i for i, s in enumerate(labels)}
+    n = len(labels)
+    mat = np.full((n, n), np.nan)
+    for row in corr_df.iter_rows(named=True):
+        i, j = idx[row["sample_a"]], idx[row["sample_b"]]
+        mat[i, j] = mat[j, i] = row["correlation"]
+    np.fill_diagonal(mat, 1.0)
+    try:
+        from scipy.cluster.hierarchy import linkage, leaves_list
+        from scipy.spatial.distance import squareform
+
+        filled = np.where(np.isnan(mat), np.nanmean(mat), mat)
+        dist = 1.0 - filled
+        np.fill_diagonal(dist, 0.0)
+        dist = (dist + dist.T) / 2.0  # enforce symmetry for squareform
+        order = leaves_list(linkage(squareform(dist, checks=False), method="average"))
+        mat = mat[np.ix_(order, order)]
+        labels = [labels[i] for i in order]
+    except Exception:
+        pass
+    return mat, labels
+
+
+def compute_scree(md, *, n_sites: int = 10_000, max_components: int = 6,
+                  seed: int = 42) -> np.ndarray:
+    """Explained-variance ratios for the first ``max_components`` PCs.
+
+    Independent of :func:`compute_pca` (which caches only 2 components) so
+    the scree plot can show the full elbow.
+    """
+    try:
+        from sklearn.decomposition import PCA
+    except ImportError as exc:
+        raise ImportError(
+            "scikit-learn is required for the scree plot. "
+            "Install with: pip install scikit-learn"
+        ) from exc
+    matrix, _samples, _n = compute_sample_site_matrix(md, n_sites=n_sites, seed=seed)
+    k = min(max_components, matrix.shape[0], matrix.shape[1])
+    pca = PCA(n_components=k)
+    pca.fit(matrix)
+    return np.asarray(pca.explained_variance_ratio_, dtype=float)
+
+
 __all__ = [
     "PCAResult",
     "MetaplotResult",
@@ -827,4 +934,9 @@ __all__ = [
     "compute_coannotation_matrix",
     "compute_numerical_by_annotation",
     "compute_categorical_proportions",
+    "compute_pvalue_histogram",
+    "compute_dmr_size_distribution",
+    "compute_global_methylation",
+    "compute_sample_correlation_matrix",
+    "compute_scree",
 ]
