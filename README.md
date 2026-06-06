@@ -1,29 +1,57 @@
-# epykit
+<p align="center">
+  <img src="docs/assets/logo.png" alt="epykit logo" width="340">
+</p>
 
-A Python-native WGBS methylation analysis pipeline built on Parquet partitioning and lazy I/O — from Bismark `.cov` (or MethylDackel `.bedGraph`) files to differentially methylated cytosines (DMCs), differentially methylated regions (DMRs), gene-feature annotation, and shareable HTML reports.
+<p align="center">
+  <strong>A Python-native WGBS methylation analysis pipeline.</strong><br>
+  Bismark / MethylDackel coverage files → DMC → DMR → annotation → shareable HTML reports,<br>
+  over a partitioned-Parquet methylstore with lazy I/O.
+</p>
 
-epykit ingests Bismark / MethylDackel coverage output into a partitioned Parquet **methylstore** and runs the whole downstream analysis (QC → filtering → DMC → DMR → annotation → plotting → report) over that store with [polars](https://pola.rs) and lazy I/O. The Python API is organised in a scanpy-style `pp` / `tl` / `pl` namespace; a CLI mirrors the same operations for scripting.
+<p align="center">
+  <a href="https://github.com/d-ert/epykit3/actions/workflows/test.yml"><img src="https://github.com/d-ert/epykit3/actions/workflows/test.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/version-1.0.0-success" alt="version 1.0.0">
+  <img src="https://img.shields.io/badge/python-3.9%E2%80%933.12-blue" alt="Python 3.9–3.12">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://d-ert.github.io/epykit3/"><img src="https://img.shields.io/badge/docs-d--ert.github.io-informational" alt="Documentation"></a>
+</p>
 
-> **Status:** version 1.0.0 — stable API. MIT licensed.
+<p align="center">
+  <a href="https://d-ert.github.io/epykit3/">Documentation</a> ·
+  <a href="CHANGELOG.md">Changelog</a> ·
+  <a href="benchmark/paper/report/REPORT.md">Benchmark</a>
+</p>
 
-[Documentation](https://d-ert.github.io/epykit3/) | [Changelog](CHANGELOG.md)
+---
 
+epykit ingests Bismark / MethylDackel coverage output into a partitioned Parquet **methylstore** and runs the whole downstream analysis (QC → filtering → DMC → DMR → annotation → plotting → report) over that store with [polars](https://pola.rs) and lazy I/O. Whole-genome data (~22 M CpGs) is never held in RAM as a single frame — every step streams over the partition tree. The Python API is organised in a scanpy-style `pp` / `tl` / `pl` namespace; a CLI mirrors the same operations for scripting.
+
+> **Status:** version 1.0.0 — stable API. MIT licensed. Linux / macOS / Windows.
+
+---
+
+## Why epykit
+
+The WGBS analysis ecosystem is fragmented across R/Bioconductor (methylKit, DSS, BSmooth, methylSig, BiSeq) and command-line tools (RADMeth, metilene), while most modern single-cell and multi-omics workflows live in Python. epykit brings a maintained panel of DMC/DMR engines to Python with three design choices that set it apart:
+
+- **Parquet-first, RAM-light.** Per-chromosome, per-sample columnar storage means whole-genome cohorts run on a laptop — peak memory is O(largest chromosome), not O(genome).
+- **A panel, not a single test.** Four per-CpG engines and four DMR callers, all emitting one canonical schema, so you can switch methods without rewriting downstream code.
+- **Familiar, scanpy-style API.** `ep.pp.*` / `ep.tl.*` / `ep.pl.*` mirrors the conventions Python bioinformaticians already know, with a CLI that exposes the same pipeline for scripting.
 
 ---
 
 ## Highlights
 
 - **Partitioned Parquet methylstore.** Per-chromosome, per-sample columnar storage — never load a whole genome into RAM. DMC results follow the same convention: `tl.dmc(md, resumable=True)` writes per-chromosome parquet files under `<methylstore>/.cache/dmc/<test>/` and exposes a streaming `DMCStore` handle, so peak memory stays at O(largest chromosome) on whole-genome inputs (~22 M CpGs). Advanced users can drive the streaming engines directly via `from epykit.dmc import process_chromosomes_dmc, apply_multiple_testing_correction`.
-- **Statistical engines.** Four per-CpG DMC backends: `lr` (quasi-binomial likelihood-ratio, the default at n ≥ 2; closed-form with McCullagh-Nelder dispersion), `welch_t` (Welch t on raw β), `fisher` (pooled Fisher exact, n = 1 fallback), and `glm` (full IRLS binomial GLM with covariates). `auto` resolves to `fisher` at n < 2 and `lr` at n ≥ 2. Engines removed in 0.7.5: `logit_t`, `bb_lr`, `score`, `cmh` — all raise `ValueError` with a migration hint. Every test surfaces 95 % Wald CIs on `meth_diff`. Permutation empirical FDR is available end-to-end: `tl.dmc(..., empirical_fdr=True)` and `tl.dmr(..., empirical_fdr=True)` shuffle labels, re-run the engine, and add `empirical_pvalue` / `empirical_qvalue` columns.
-- **`lr+` power stack (opt-in, since 0.7.1).** Four enhancements to the `lr` engine — empirical-Bayes dispersion shrinkage (`dispersion="eb"`), Stouffer combiner over neighbouring CpGs (`neighbour_combine=True`), separation-aware Fisher fallback (`sep_fallback=True`), and two-stage BH q-values (`fdr_method="fdr_tsbh"`) — engaged via `power_stack="lr+"`. Out of the box (`power_stack="off"`, the 1.0 default), bare `lr` runs without any of these. All four together push TPR ≥ 0.999 on the Piao et al. 2021 simulated benchmark at every coverage ≥ 10× and every replicate count ≥ 4 while keeping FPR strictly tighter than every R baseline. See [`benchmark/REPORT.md`](benchmark/REPORT.md) for the head-to-head.
+- **Statistical engines.** Four per-CpG DMC backends: `lr` (quasi-binomial likelihood-ratio, the default at n ≥ 2; closed-form with McCullagh-Nelder dispersion), `welch_t` (Welch t on raw β), `fisher` (pooled Fisher exact, n = 1 fallback), and `glm` (full IRLS binomial GLM with covariates). `auto` resolves to `fisher` at n < 2 and `lr` at n ≥ 2. Every test surfaces 95 % Wald CIs on `meth_diff`. Permutation empirical FDR is available end-to-end: `tl.dmc(..., empirical_fdr=True)` and `tl.dmr(..., empirical_fdr=True)` shuffle labels, re-run the engine, and add `empirical_pvalue` / `empirical_qvalue` columns.
 - **Multi-group & covariate contrasts.** `tl.dmc(formula="~ group + age", contrast="group")` runs a joint F-test across factor levels; `contrast="age"` runs a Wald test on a continuous covariate as the primary effect.
-- **Four DMR engines plus permutation FDR.** A DSS-compatible **chain-merge** caller (`tl.dmr(method="chain_merge", preset="strict" | "default" | "permissive")`, the default) that mirrors DSS `callDMR` semantics, plus tile-based (read-pooled) aggregation, per-CpG sliding-window with signed Stouffer's combining, and rule-based 3-state segmentation over `meth_diff` (`method="segment"`; renamed from `"hmm"` in 1.0, same engine). `tl.dmr(..., empirical_fdr=True, n_perm=100)` re-runs the engine on shuffled labels and reports empirical p- and q-values. `tl.diagnose_dmr_calling(md, reference_dmrs)` buckets unrecovered reference DMRs into actionable categories (coverage loss vs. weak test vs. structural filter) for triage.
+- **Four DMR engines plus permutation FDR.** A DSS-compatible **chain-merge** caller (`tl.dmr(method="chain_merge", preset="strict" | "default" | "permissive")`, the default) that mirrors DSS `callDMR` semantics, plus tile-based (read-pooled) aggregation, per-CpG sliding-window with signed Stouffer's combining, and rule-based 3-state segmentation over `meth_diff` (`method="segment"`). `tl.dmr(..., empirical_fdr=True, n_perm=100)` re-runs the engine on shuffled labels and reports empirical p- and q-values. `tl.diagnose_dmr_calling(md, reference_dmrs)` buckets unrecovered reference DMRs into actionable categories (coverage loss vs. weak test vs. structural filter) for triage.
 - **Differential variability.** `tl.dvc(md)` finds CpGs whose between-replicate variance differs between groups even when the means don't — the iEVORA signal that mean-based DMC misses.
 - **Clinical / cohort QC.** Opt-in `qc.sex_check` (chrX mean β), `qc.contamination_estimate` (β-distribution bimodality), `qc.sample_correlation` (sample-swap detection), and `qc.power` (sample-size calculator). Bisulfite conversion rate is reported (CHH context, dashboard + MultiQC) but **not applied** to per-CpG counts — matching `bsseq` / `methylKit` defaults. A poorly converted library should be re-prepped, not papered over with a multiplicative count adjustment.
 - **Replicate-aware throughout.** Per-site `min_samples_treatment` / `min_samples_control` guards, per-site or chromosome-level McCullagh-Nelder dispersion, optional covariate design matrices via Wilkinson formulas.
 - **Annotation.** Gene features (promoter / 5'UTR / exon / intron / 3'UTR) from GENCODE / Ensembl **GTF** or UCSC **`refGene.txt`** (HOMER's default catalog), plus CpG-island context (island / shore / shelf / open-sea). Opt-in `gene_type_filter="protein_coding"` drops lincRNAs / pseudogenes. `multi_annotation=True` (default) adds annotatr-style `nearest_tss_gene` / `nearest_tss_distance` and one-to-many `all_overlapping_genes` / `all_overlapping_features` columns so a site that's intronic for one gene AND in another gene's promoter window is faithfully represented.
 - **Visualisation pack.** matplotlib volcano, MA, Manhattan, coverage histogram, methylation heatmap, PCA, UMAP, sample-correlation heatmap, QC dashboard, DMR boxplot, genomic-context bar, CpG-island pie, TSS metaplot — plus Plotly twins for the HTML report.
-- **Interop.** Self-contained HTML report (`md.report(out.html)`), AnnData (`md.to_anndata()`), MuData (`md.to_mudata()`), methylKit-compatible tabix tables (`md.to_methylkit_tabix(dir)`), MultiQC custom-content JSON (`ep.report_multiqc(md, dir)`), nf-core/methylseq QC ingestion (`ep.read_nfcore_methylseq_qc(...)`).
+- **Interop.** Self-contained HTML report (`md.report("out.html")`), AnnData (`md.to_anndata()`), MuData (`md.to_mudata()`), methylKit-compatible tabix tables (`md.to_methylkit_tabix(dir)`), MultiQC custom-content JSON (`ep.report_multiqc(md, dir)`), nf-core/methylseq QC ingestion (`ep.read_nfcore_methylseq_qc(...)`).
 - **CLI.** `epykit convert | filter | dmc | dmr | annotate | qc-report | smooth | report | aggregate-regions | export` — every stage scriptable from the shell.
 
 ---
@@ -47,6 +75,8 @@ pip install -e ".[all]"
 ```
 
 Core dependencies: `polars`, `pyarrow`, `numpy`, `scipy`, `numba`, `bioframe`, `pyfaidx`, `statsmodels`, `patsy`, `psutil`, `scikit-learn`, `matplotlib`, `seaborn`. Optional extras: `report` (Jinja2 + Plotly), `export` (pyBigWig), `anndata` (anndata + mudata), `viz` (umap-learn), `methylkit` (pysam, for tabix indexing on Linux/macOS). The CLI is installed as the `epykit` console script.
+
+> **Platform note.** The pure-Python core and the `report` / `anndata` / `viz` extras run on Linux, macOS, and Windows (CI covers `{ubuntu, windows} × {py3.9, py3.12}`). A few extras are Linux/macOS only because they have no Windows wheel: `export` (pyBigWig) and the `pysam`-backed `methylkit` / `bam` extras.
 
 ---
 
@@ -144,15 +174,16 @@ ep.tl.dmr(md, method="tile", empirical_fdr=True, n_perm=100, perm_seed=42)
 # md.uns["dmr"] now carries empirical_pvalue / empirical_qvalue columns
 ```
 
-### 5. The `lr+` power stack (opt-in)
+### 5. The `lr+` power stack (opt-in research knob)
 
 The bare `lr` engine is a quasi-binomial likelihood-ratio test on per-site
 counts. Out of the box (the 1.0 default), it is conservative — it does not
 borrow strength across neighbouring CpGs, uses BH FDR correction, and falls
-back to the asymptotic LR statistic under quasi-separation.
+back to the asymptotic LR statistic under quasi-separation. **Bare `lr` is
+the engine the benchmark paper is built around.**
 
-For studies where you want to close the gap to methylKit/DSS, epykit ships
-a tunable power stack of four opt-in knobs:
+For experimentation, epykit also ships a tunable power stack of four opt-in
+knobs:
 
 | Knob | Default | `lr+` value | What it does |
 |---|---|---|---|
@@ -174,6 +205,17 @@ When `neighbour_combine=True`, the raw per-CpG `pvalue`/`qvalue` columns
 stay as-is and the combined values are added as `pvalue_combined` /
 `qvalue_combined` so downstream code can choose.
 
+> ⚠️ **`lr+` is a research knob, not a recommended default.** On the
+> *simulated* Piao et al. 2021 grid (low dispersion, φ ≈ 0.4 — the regime its
+> heuristics were tuned against) the full stack reaches very high TPR while
+> keeping FPR tight. It is **not validated as universally superior on real
+> WGBS**: under realistic dispersion (φ ≈ 1.5–5) the same settings can inflate
+> the DMC call count substantially (≈13× on GSE263850 at q = 0.05 vs. bare
+> `lr`), consistent with FPR drift. Use it to explore, and validate against
+> your own data before relying on it. See
+> [`benchmark/paper/report/REPORT.md`](benchmark/paper/report/REPORT.md) for
+> the full head-to-head.
+
 Other `power_stack` values:
 
 | Value | Behavior |
@@ -182,8 +224,6 @@ Other `power_stack` values:
 | `"auto"` | Alias for `"lr+"` |
 | `"conservative"` | Engage only when `min_n <= 2` (legacy pre-1.0 behavior) |
 | `"off"` (or `False`) | Leave knobs at user-passed values (1.0 default) |
-
-See [`benchmark/REPORT.md`](benchmark/REPORT.md) for TPR/FPR/F1 numbers on `lr` vs `lr+`.
 
 ### 6. Clinical / cohort QC
 
@@ -260,7 +300,7 @@ methyl_store/
         └── methyldata.json
 ```
 
-DMC frames carry: `chrom`, `pos`, `strand`, `n_case`, `n_control`, `mean_beta_case`, `mean_beta_control`, `meth_diff`, `meth_diff_ci_lo`, `meth_diff_ci_hi`, `pvalue`, `qvalue`, `log2_odds_ratio_pooled` (pooled-count tests: `lr`, `fisher`) or `coef_treatment_log2` (GLM backend; logit coefficient in log2 units, not log2 of an odds ratio), plus per-test extras (`coef_treatment` / `coef_se` for GLM; `f_stat` / `df1` / `df2` / per-level `mean_beta_<level>` / `meth_diff_max` for multi-group contrasts) and, after `tl.annotate`, `feature_type` / `gene_id` / `cpg_context`. The legacy `log2_odds_ratio` column is NaN-filled in 0.7.5 (deprecated; removed in 0.8). Tile-DMR frames add `start`, `end`, `n_cpgs`, `dmr_type ∈ {hyper, hypo, mixed}`; permutation FDR adds `empirical_pvalue` / `empirical_qvalue`.
+DMC frames carry: `chrom`, `pos`, `strand`, `n_case`, `n_control`, `mean_beta_case`, `mean_beta_control`, `meth_diff`, `meth_diff_ci_lo`, `meth_diff_ci_hi`, `pvalue`, `qvalue`, `log2_odds_ratio_pooled` (pooled-count tests: `lr`, `fisher`) or `coef_treatment_log2` (GLM backend; logit coefficient in log2 units, not log2 of an odds ratio), plus per-test extras (`coef_treatment` / `coef_se` for GLM; `f_stat` / `df1` / `df2` / per-level `mean_beta_<level>` / `meth_diff_max` for multi-group contrasts) and, after `tl.annotate`, `feature_type` / `gene_id` / `cpg_context`. Tile-DMR frames add `start`, `end`, `n_cpgs`, `dmr_type ∈ {hyper, hypo, mixed}`; permutation FDR adds `empirical_pvalue` / `empirical_qvalue`.
 
 ---
 
@@ -294,15 +334,44 @@ DMC frames carry: `chrom`, `pos`, `strand`, `n_case`, `n_control`, `mean_beta_ca
 
 ---
 
+## Benchmark
+
+`benchmark/` reproduces a head-to-head against eight published DMC/DMR tools on the Piao et al. 2021 simulated dataset, plus a real-data cohort (GSE263850). The canonical TPR / FPR / F1 record is [`benchmark/paper/report/REPORT.md`](benchmark/paper/report/REPORT.md); the manuscript lives in [`benchmark/paper/paper.md`](benchmark/paper/paper.md). Raw simulated data and run caches are not bundled — see [`benchmark/README.md`](benchmark/README.md) for the bootstrap.
+
+The headline claims are made around the bare `lr` engine (the 1.0 default). The `lr+` power stack is positioned as an exploratory research knob — see [Quickstart §5](#5-the-lr-power-stack-opt-in-research-knob).
+
+---
+
 ## Tests
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/
+pytest -m "not slow"        # fast tier (the CI invocation)
+pytest -m slow              # opt-in slow tier (>~5s tests)
+```
+
+---
+
+## Citing epykit
+
+If epykit contributes to your work, please cite it. A benchmark manuscript —
+*"epykit: a Python-native pipeline for differential methylation analysis of
+bisulfite sequencing data, benchmarked on simulated and real WGBS datasets"* —
+is in preparation ([`benchmark/paper/paper.md`](benchmark/paper/paper.md)). In
+the meantime you can cite the software:
+
+```bibtex
+@software{epykit,
+  author  = {Ertuğrul, Deniz},
+  title   = {epykit: a Python-native WGBS methylation analysis pipeline},
+  year    = {2026},
+  version = {1.0.0},
+  url     = {https://github.com/d-ert/epykit3}
+}
 ```
 
 ---
 
 ## License
 
-MIT.
+[MIT](LICENSE).
