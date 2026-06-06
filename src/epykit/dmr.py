@@ -208,9 +208,14 @@ def _stouffer_combine_signed(
     correlation of methylation STATES, not of the test statistics -- which
     systematically over-inflated the variance correction f and weakened
     combined p-values regardless of how strong the per-CpG signal was.
-    Stouffer's Z is robust to mild positive correlation between tests
-    (combined Z is conservative but not over-smoothed) and does not
-    require correlation estimation.
+    Stouffer's Z does NOT model correlation between adjacent CpGs. Because
+    neighbouring WGBS CpGs are positively correlated, the true variance of
+    ``Sigma w_i z_i`` exceeds ``Sigma w_i^2``, so dividing by
+    ``sqrt(Sigma w_i^2)`` understates the SD and makes the combined p-value
+    *anti-conservative* (too small) in dense regions -- the opposite of the
+    over-smoothing the old Brown's-method proxy caused. Treat the region
+    p-value as a ranking signal; for calibrated region-level inference use the
+    permutation empirical FDR (``tl.dmr(..., empirical_fdr=True)``).
 
     Parameters
     ----------
@@ -506,11 +511,17 @@ def call_dmr_sliding_window(
 
         positions  = chrom_df["pos"].to_numpy()
         meth_diffs = chrom_df["meth_diff"].to_numpy(allow_copy=True).astype(np.float32)
-        pvals      = chrom_df[p_col].to_numpy(allow_copy=True).astype(np.float64)
+        # The significance gate uses the FDR-controlled column (qvalue if
+        # present); the Stouffer combine MUST use the raw per-CpG p-values,
+        # which are ~U(0,1) under the null. q-values are not uniform, so
+        # combining them does not yield a valid p-value (M-DMR1). chain-merge
+        # already keeps these two roles separate; sliding-window now matches.
+        sig_vals   = chrom_df[p_col].to_numpy(allow_copy=True).astype(np.float64)
+        raw_pvals  = chrom_df["pvalue"].to_numpy(allow_copy=True).astype(np.float64)
 
         is_sig = (
-            (~np.isnan(pvals))
-            & (pvals < alpha)
+            (~np.isnan(sig_vals))
+            & (sig_vals < alpha)
             & (~np.isnan(meth_diffs))
             & (np.abs(meth_diffs) >= min_abs_meth_diff)
         )
@@ -555,7 +566,7 @@ def call_dmr_sliding_window(
 
         if not cand_starts:
             logger.info("  %s: no candidate windows", chrom)
-            del chrom_df, positions, meth_diffs, pvals, is_sig, is_sig_int
+            del chrom_df, positions, meth_diffs, sig_vals, raw_pvals, is_sig, is_sig_int
             gc.collect()
             continue
 
@@ -572,7 +583,7 @@ def call_dmr_sliding_window(
         for start, end in merged_spans:
             rec = _recompute_dmr_stats(
                 chrom, start, end,
-                positions, meth_diffs, pvals, is_sig,
+                positions, meth_diffs, raw_pvals, is_sig,
                 min_cpgs, min_sites_significant,
                 cum_sig=cum_sig,
             )
@@ -588,7 +599,7 @@ def call_dmr_sliding_window(
         # streaming from a DMCStore on a 22M-site genome: without this
         # the buffer-pool references can pile up and defeat the
         # whole-table-streaming win.
-        del chrom_df, positions, meth_diffs, pvals, is_sig, is_sig_int, cum_sig
+        del chrom_df, positions, meth_diffs, sig_vals, raw_pvals, is_sig, is_sig_int, cum_sig
         gc.collect()
 
     if not all_records:
