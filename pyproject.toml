@@ -36,11 +36,16 @@ classifiers = [
 ]
 
 dependencies = [
-  "polars>=0.20.0",
+  # polars>=1.0 is REQUIRED: the codebase uses DataFrame.pivot(on=...), and the
+  # `on=` keyword replaced `columns=` in polars 1.0.0. A <1.0 resolve imports
+  # fine but raises TypeError on the first pivot (PCA/UMAP/deconvolve).
+  "polars>=1.0,<2",
   "pyarrow>=11.0.0",
   "numpy>=1.23",
   "scipy>=1.11",
-  "numba>=0.59",
+  # numba>=0.60 is the first release with numpy 2.0 support; numpy is uncapped
+  # above, so the numba floor must be numpy-2 aware.
+  "numba>=0.60",
   "bioframe>=0.7",
   "pyfaidx>=0.7",
   "statsmodels>=0.14",
