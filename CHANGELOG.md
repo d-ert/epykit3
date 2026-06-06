@@ -36,6 +36,34 @@ review (Tier 1: paper-blockers + silent-wrong-science criticals).
   `dispersion="eb"` (matching `ep.tl.dmc`) instead of inheriting
   `dispersion="site"`, so the CLI and Python API produce identical q-values.
   Added `--dispersion` / `--reference` / `--fdr-method` flags.
+- **DVC anti-conservative at n=2 (M-DVC1).** At n=2/group Brown-Forsythe is
+  degenerate (within-group SS is a floating-point residual of 0), which
+  exploded the F-statistic into spurious significance — a 2-vs-2 null cohort
+  called ~75% of sites DVC. `_brown_forsythe_vectorised` now requires ≥3 finite
+  obs per group (NaN otherwise) and `process_chromosomes_dvc` warns at n<3.
+- **DVC mislabelled test (M-DVC2).** `tl.dvc` defaulted to `test="bartlett"`
+  with a docstring claiming Bartlett runs and Brown-Forsythe is impossible —
+  the reverse of reality. Default is now `"brown_forsythe"`; `"bartlett"` is a
+  deprecated alias that warns. Added a `min_coverage` floor (M-DVC3).
+- **Sliding-window DMR combined raw p, not q (M-DMR1).** The signed-Stouffer
+  region combine used the FDR-controlled column (qvalue when present), which is
+  not U(0,1) under the null; it now uses raw `pvalue` (the gate still uses
+  qvalue), matching chain-merge. The `_stouffer_combine_signed` docstring's
+  correlation claim was corrected (it is anti-conservative, not conservative;
+  M-DMR2).
+- **Annotation intron over-extension + non-determinism (M-ANN1/2).** Introns are
+  now built from a running-max exon end (not `shift(1)`), so nested exons across
+  transcripts no longer push introns into exonic territory; equal-priority gene
+  overlaps now break ties deterministically (stable sort by gene id).
+- **Epigenetic-clock / imputation hazards (M-SEC1/3).** `age_clock` warns when
+  `impute_missing=False` leaves per-sample-missing CpGs (biased absolute ages);
+  `impute_knn_beta(return_mask=True)` returns a `was_imputed` mask so filled
+  cells can be excluded from variance analyses.
+- **Power calculator (C5).** `qc.power` now uses the exact non-central-t
+  two-sample power (was a z-test), adds an overdispersion (`dispersion`/φ) term
+  and an `n_tests` multiple-testing adjustment, and validates against
+  `statsmodels`. It no longer over-promises (told users they needed too few
+  replicates).
 
 ### Changed
 
@@ -44,6 +72,15 @@ review (Tier 1: paper-blockers + silent-wrong-science criticals).
   raised to `>=0.60` (numpy-2 support).
 - **`uv.lock` is now committed (M-PKG4)** for reproducibility; documented
   `uv sync --frozen` and thread-pinning in `benchmark/README.md`.
+
+### Documentation
+
+- Corrected overstated method-fidelity claims: `call_dmr_chain_merge` is
+  DSS-callDMR-*style* (not a faithful reimplementation — it omits DSS smoothing
+  and uses a non-DSS region statistic; M-DMR4); `empirical_fdr_for_dmc` is a
+  Westfall-Young min-P (FWER) procedure, not a pooled-null FDR (M-STAT5);
+  `contamination_estimate` is an intermediate-β fraction confounded by cell-type
+  heterogeneity / ASM / imprinting / CNV, not validated contamination (M-QC2).
 
 ### Testing
 
