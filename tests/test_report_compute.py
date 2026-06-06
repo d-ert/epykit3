@@ -60,6 +60,35 @@ def test_scree(synth_md_filtered):
     assert (ev >= 0).all()
 
 
+def test_scatter_subsample_keeps_all_significant(synth_md_filtered):
+    """max_points caps total points but never drops a significant CpG, so
+    hyper/hypo counts and Manhattan peaks stay exact on huge tables."""
+    import epykit as ep
+    from epykit.pl._compute import (
+        compute_volcano_data, compute_ma_data, compute_manhattan_data,
+    )
+    ep.tl.dmc(synth_md_filtered, test="lr")
+
+    full = compute_volcano_data(synth_md_filtered, alpha=0.05, min_abs_diff=0.1)
+    n_total = full.meth_diff.size
+    n_sig = int(full.sig.sum())
+    assert n_sig > 0 and n_total > n_sig  # fixture has both sig and ns
+
+    cap = n_sig + 50
+    v = compute_volcano_data(synth_md_filtered, alpha=0.05, min_abs_diff=0.1, max_points=cap)
+    assert v.meth_diff.size <= cap
+    assert int(v.sig.sum()) == n_sig  # every significant point retained
+    assert int(v.hyper.sum()) + int(v.hypo.sum()) == n_sig
+
+    m = compute_ma_data(synth_md_filtered, alpha=0.05, min_abs_diff=0.1, max_points=cap)
+    assert m.mean_beta.size <= cap and int(m.sig.sum()) == n_sig
+
+    # Manhattan: total rendered points (summed over chrom blocks) is capped.
+    man = compute_manhattan_data(synth_md_filtered, alpha=0.05, max_points=cap)
+    rendered = sum(b["n"] for b in man.chrom_blocks)
+    assert rendered <= cap
+
+
 def test_plotly_twins_smoke(synth_md_filtered):
     import epykit as ep
     from epykit.pl import _plotly as P

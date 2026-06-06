@@ -238,7 +238,7 @@ def compute_pca(
     """
     if use_cache:
         cached = _cache_get(md, "pca")
-        if cached is not None:
+        if isinstance(cached, PCAResult):
             return cached
 
     try:
@@ -355,7 +355,7 @@ def compute_tss_metaplot(
     cache_key = f"tss_metaplot:{gtf_path}:{window_bp}:{n_bins}:{group_by}:{max_genes}"
     if use_cache:
         cached = _cache_get(md, cache_key)
-        if cached is not None:
+        if isinstance(cached, MetaplotResult):
             return cached
 
     samples = md.obs.get_column("sample_id").to_list()
@@ -504,12 +504,39 @@ def _dmc_p_col(dmc: pl.DataFrame) -> str:
     return "qvalue" if "qvalue" in dmc.columns else "pvalue"
 
 
+def _subsample_keep_sig(sig: np.ndarray, max_points: Optional[int],
+                        seed: int = 42) -> Optional[np.ndarray]:
+    """Return sorted indices retaining ALL significant rows plus a random
+    sample of the non-significant rows so the total is <= ``max_points``.
+
+    Returns ``None`` when no subsampling is needed (the caller then uses the
+    full arrays). Keeping every significant point means hyper/hypo counts and
+    Manhattan peaks stay exact -- only the dense non-significant background is
+    thinned, which is what bounds memory and HTML size on whole-genome tables
+    (tens of millions of CpGs).
+    """
+    n = int(sig.size)
+    if max_points is None or n <= max_points:
+        return None
+    sig_idx = np.flatnonzero(sig)
+    ns_idx = np.flatnonzero(~sig)
+    budget = max(int(max_points) - sig_idx.size, 0)
+    if budget < ns_idx.size:
+        rng = np.random.default_rng(seed)
+        ns_idx = rng.choice(ns_idx, budget, replace=False)
+    keep = np.concatenate([sig_idx, ns_idx])
+    keep.sort()
+    return keep
+
+
 def compute_volcano_data(
     md,
     *,
     alpha: float = 0.05,
     min_abs_diff: float = 0.1,
     dmc: Optional[pl.DataFrame] = None,
+    max_points: Optional[int] = None,
+    seed: int = 42,
 ) -> VolcanoData:
     if dmc is None:
         dmc = md.dmc
@@ -520,6 +547,9 @@ def compute_volcano_data(
     pval = dmc[p_col].to_numpy()
     neg_log_p = -np.log10(np.maximum(pval, 1e-300))
     sig = (pval < alpha) & (np.abs(diff) >= min_abs_diff)
+    keep = _subsample_keep_sig(sig, max_points, seed)
+    if keep is not None:
+        diff, neg_log_p, sig = diff[keep], neg_log_p[keep], sig[keep]
     return VolcanoData(
         meth_diff=diff, neg_log_p=neg_log_p, p_col=p_col,
         sig=sig, hyper=sig & (diff > 0), hypo=sig & (diff < 0),
@@ -532,6 +562,8 @@ def compute_ma_data(
     alpha: float = 0.05,
     min_abs_diff: float = 0.1,
     dmc: Optional[pl.DataFrame] = None,
+    max_points: Optional[int] = None,
+    seed: int = 42,
 ) -> MAData:
     if dmc is None:
         dmc = md.dmc
@@ -545,6 +577,9 @@ def compute_ma_data(
         + dmc["mean_beta_control"].to_numpy()
     ) / 2.0
     sig = (pval < alpha) & (np.abs(diff) >= min_abs_diff)
+    keep = _subsample_keep_sig(sig, max_points, seed)
+    if keep is not None:
+        mean_beta, diff, sig = mean_beta[keep], diff[keep], sig[keep]
     return MAData(
         mean_beta=mean_beta, meth_diff=diff, p_col=p_col,
         sig=sig, hyper=sig & (diff > 0), hypo=sig & (diff < 0),
@@ -556,6 +591,9 @@ def compute_manhattan_data(
     *,
     alpha: float = 0.05,
     dmc: Optional[pl.DataFrame] = None,
+    max_points: Optional[int] = None,
+    seed: int = 42,
+    canonical_only: bool = True,
 ) -> ManhattanData:
     if dmc is None:
         dmc = md.dmc
@@ -565,12 +603,22 @@ def compute_manhattan_data(
         raise ValueError("DMC table must carry 'chrom' and 'pos' for a Manhattan plot")
     p_col = _dmc_p_col(dmc)
     dmc_sorted = dmc.sort(["chrom", "pos"])
+    if max_points is not None and len(dmc_sorted) > max_points:
+        pv = dmc_sorted[p_col].to_numpy()
+        keep = _subsample_keep_sig(pv < alpha, max_points, seed)
+        if keep is not None:
+            mask = np.zeros(len(dmc_sorted), dtype=bool)
+            mask[keep] = True
+            dmc_sorted = dmc_sorted.filter(pl.Series(mask))
     chroms = dmc_sorted["chrom"].unique().to_list()
     canonical = (
         [f"chr{i}" for i in range(1, 23)]
         + [f"chr{c}" for c in ("X", "Y", "M")]
     )
-    order = canonical + [c for c in chroms if c not in canonical]
+    # Drop unplaced/alt/random contigs (chrUn_*, *_random, *_alt) by default --
+    # they clutter the genome-wide axis with dozens of tiny blocks.
+    extra = [] if canonical_only else [c for c in chroms if c not in canonical]
+    order = canonical + extra
 
     blocks: list[dict] = []
     cumulative = 0.0

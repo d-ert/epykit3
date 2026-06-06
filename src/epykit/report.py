@@ -266,6 +266,7 @@ def _qc_rows(md: MethylData, thresholds: dict) -> tuple[list[dict], list[str]]:
     for row in md.obs.iter_rows(named=True):
         statuses: list[str] = []
         rec = {"sample_id": row.get("sample_id"), "group": row.get("group")}
+        # --- absolute, meaningful per-sample gates: depth, breadth, conversion ---
         if "mean_coverage" in has:
             rec["mean_coverage"] = row.get("mean_coverage")
             s = _qc_status(row.get("mean_coverage"), thresholds["mean_coverage"])
@@ -288,21 +289,45 @@ def _qc_rows(md: MethylData, thresholds: dict) -> tuple[list[dict], list[str]]:
                 statuses.append(s)
         if "min_pairwise_corr" in has:
             rec["min_pairwise_corr"] = row.get("min_pairwise_corr")
-            s = _qc_status(row.get("min_pairwise_corr"),
-                           thresholds["min_pairwise_corr"])
-            if s:
-                statuses.append(s)
         if row.get("low_coverage_flag"):
             statuses.append("warn")
         if row.get("sex_mismatch"):
             statuses.append("fail")
-        order = {"pass": 0, "warn": 1, "fail": 2}
-        worst = max(statuses, key=lambda s: order[s]) if statuses else "pass"
-        rec["_status"] = worst
+        rec["_statuses"] = statuses
         rec["_group_class"] = gmap.get(row.get("group"), "n")
         out.append(rec)
 
-    # Legend
+    # --- sample correlation: outlier-RELATIVE advisory, never an absolute gate ---
+    # Absolute pairwise r depends heavily on the methylation level (a highly
+    # methylated genome saturates beta near 1, so even perfect replicates score
+    # a low rank-correlation) and on the study design (a real case/control
+    # cohort legitimately has moderate cross-group r -- that difference *is* the
+    # signal). So we flag a sample only when its min pairwise r is a clear LOW
+    # OUTLIER versus the cohort (robust MAD rule) or is absolutely broken.
+    corr_floor = None
+    if "min_pairwise_corr" in has:
+        vals = [r["min_pairwise_corr"] for r in out
+                if r.get("min_pairwise_corr") is not None
+                and r["min_pairwise_corr"] == r["min_pairwise_corr"]]
+        if len(vals) >= 4:
+            med = float(np.median(vals))
+            mad = float(np.median([abs(v - med) for v in vals])) * 1.4826
+            corr_floor = (med - 3.0 * mad, 0.9 * med)
+        for r in out:
+            v = r.get("min_pairwise_corr")
+            if v is None or v != v:
+                continue
+            is_outlier = corr_floor is not None and v < corr_floor[0] and v < corr_floor[1]
+            if is_outlier or v < 0.2:
+                r["_statuses"].append("warn")
+
+    # finalize per-sample status as the worst of its flags
+    order = {"pass": 0, "warn": 1, "fail": 2}
+    for r in out:
+        st = r.pop("_statuses")
+        r["_status"] = max(st, key=lambda s: order[s]) if st else "pass"
+
+    # Legend (only the metrics that actually gate pass/warn/fail)
     if "mean_coverage" in has:
         applied.append("mean cov ≥ 10× pass · ≥ 5× warn")
     if "frac_ge_10x" in has:
@@ -310,7 +335,7 @@ def _qc_rows(md: MethylData, thresholds: dict) -> tuple[list[dict], list[str]]:
     if "bisulfite_conversion_rate" in has:
         applied.append("conversion ≥ 99% pass · ≥ 98% warn")
     if "min_pairwise_corr" in has:
-        applied.append("min pairwise r ≥ 0.85 pass · ≥ 0.75 warn")
+        applied.append("min pairwise r is advisory (flags only cohort outliers, not the heatmap below)")
     return out, applied
 
 
@@ -720,8 +745,12 @@ def _make_fig_renderer(self_contained: bool) -> Callable:
         else:
             inc = "cdn"
         try:
+            # responsive=True makes each chart size to its container (and resize
+            # with the window) instead of a fixed ~700px width that overflows the
+            # two-column grid and overlaps the neighbouring card.
             return fig.to_html(include_plotlyjs=inc, full_html=False,
-                               default_height=None)
+                               default_height=None,
+                               config={"responsive": True})
         except Exception as exc:  # pragma: no cover - plotly version drift
             logger.warning("Failed to render Plotly figure: %s", exc)
             return None
@@ -757,6 +786,7 @@ def generate_report(
     metaplot_max_genes: Optional[int] = 5000,
     pca_n_sites: int = 10_000,
     coverage_max_points: int = 200_000,
+    dmc_max_points: int = 200_000,
     clear_cache: bool = False,
     self_contained: bool = True,
     qc_thresholds: Optional[dict] = None,
@@ -792,6 +822,12 @@ def generate_report(
         huge stores; the visual is virtually unchanged below ~20_000.
     coverage_max_points : int
         Cap for points entering the coverage histogram.
+    dmc_max_points : int
+        Cap for points rendered in the volcano / MA / Manhattan scatter
+        figures. ALL significant CpGs are always kept; only the
+        non-significant background is subsampled. Bounds memory and HTML size
+        on whole-genome tables (tens of millions of CpGs) -- without this a
+        genome-wide self-contained report can exhaust RAM. Default 200_000.
     clear_cache : bool
         If True, drop cached compute results on ``md.uns['_report_cache']``
         before rendering. Use after re-running upstream steps so a stale PCA /
@@ -867,10 +903,10 @@ def generate_report(
     coverage_plot = render(_safe(coverage_histogram_plotly, md, max_points=coverage_max_points))
     global_meth_bar = render(_safe(global_methylation_bar_plotly, md))
     corr_heatmap = render(_safe(sample_correlation_plotly, md))
-    volcano_plot = render(_safe(volcano_plotly, md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc_full)) if dmc_stats.get("available") else None
+    volcano_plot = render(_safe(volcano_plotly, md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc_full, max_points=dmc_max_points)) if dmc_stats.get("available") else None
     pvalue_hist = render(_safe(pvalue_histogram_plotly, md, dmc=dmc_full)) if dmc_stats.get("available") else None
-    ma_plot = render(_safe(ma_plot_plotly, md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc_full)) if dmc_stats.get("available") else None
-    manhattan_plot = render(_safe(manhattan_plotly, md, alpha=alpha, dmc=dmc_full)) if dmc_stats.get("available") else None
+    ma_plot = render(_safe(ma_plot_plotly, md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc_full, max_points=dmc_max_points)) if dmc_stats.get("available") else None
+    manhattan_plot = render(_safe(manhattan_plotly, md, alpha=alpha, dmc=dmc_full, max_points=dmc_max_points)) if dmc_stats.get("available") else None
     dmr_size_hist = render(_safe(dmr_size_hist_plotly, md)) if dmr_stats.get("available") else None
     feature_pie = render(_safe(feature_pie_plotly, md))
     cpg_pie = render(_safe(cpg_island_pie_plotly, md))

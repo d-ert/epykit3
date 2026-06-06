@@ -71,9 +71,11 @@ def _require_plotly():
         ) from exc
 
 
-def volcano_plotly(md: MethylData, *, alpha: float = 0.05, min_abs_diff: float = 0.1, dmc=None):
+def volcano_plotly(md: MethylData, *, alpha: float = 0.05, min_abs_diff: float = 0.1,
+                   dmc=None, max_points=None):
     go = _require_plotly()
-    data = compute_volcano_data(md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc)
+    data = compute_volcano_data(md, alpha=alpha, min_abs_diff=min_abs_diff,
+                                dmc=dmc, max_points=max_points)
     ns = ~data.sig
     fig = go.Figure()
     fig.add_trace(go.Scattergl(
@@ -103,9 +105,11 @@ def volcano_plotly(md: MethylData, *, alpha: float = 0.05, min_abs_diff: float =
     return fig
 
 
-def ma_plot_plotly(md: MethylData, *, alpha: float = 0.05, min_abs_diff: float = 0.1, dmc=None):
+def ma_plot_plotly(md: MethylData, *, alpha: float = 0.05, min_abs_diff: float = 0.1,
+                   dmc=None, max_points=None):
     go = _require_plotly()
-    data = compute_ma_data(md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc)
+    data = compute_ma_data(md, alpha=alpha, min_abs_diff=min_abs_diff,
+                           dmc=dmc, max_points=max_points)
     ns = ~data.sig
     fig = go.Figure()
     fig.add_trace(go.Scattergl(
@@ -135,9 +139,9 @@ def ma_plot_plotly(md: MethylData, *, alpha: float = 0.05, min_abs_diff: float =
     return fig
 
 
-def manhattan_plotly(md: MethylData, *, alpha: float = 0.05, dmc=None):
+def manhattan_plotly(md: MethylData, *, alpha: float = 0.05, dmc=None, max_points=None):
     go = _require_plotly()
-    data = compute_manhattan_data(md, alpha=alpha, dmc=dmc)
+    data = compute_manhattan_data(md, alpha=alpha, dmc=dmc, max_points=max_points)
     fig = go.Figure()
     colors = [PALETTE["hypo"], PALETTE["hyper"]]
     for i, block in enumerate(data.chrom_blocks):
@@ -249,6 +253,11 @@ def tss_metaplot_plotly(
     samples = res.samples
     mean_beta = res.mean_beta
     x = res.x
+    # No CpGs fell in any TSS window (e.g. GTF/store chromosome mismatch, or the
+    # store path could not be resolved) -> nothing to draw. Signal "skip" so the
+    # report renders its notice instead of an empty axes.
+    if mean_beta.size == 0 or not np.isfinite(mean_beta).any():
+        return None
 
     fig = go.Figure()
     palette_cycle = [

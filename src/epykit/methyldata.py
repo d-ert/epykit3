@@ -346,6 +346,12 @@ class MethylData:
             varm_format[name] = "parquet"
 
         serialisable_uns = self.uns.copy()
+        # The report compute cache holds transient, non-round-trippable objects
+        # (PCAResult / MetaplotResult dataclasses wrapping numpy arrays). It is
+        # fully reconstructible from the store, so never persist it -- otherwise
+        # json.dumps(default=str) stringifies it and a reloaded analysis returns
+        # those garbage strings instead of recomputing (breaks PCA / metaplot).
+        serialisable_uns.pop("_report_cache", None)
         for key, value in list(serialisable_uns.items()):
             if isinstance(value, pl.DataFrame):
                 parquet_name = f"uns_{key}.parquet"

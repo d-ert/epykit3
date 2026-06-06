@@ -94,10 +94,15 @@ section{ scroll-margin-top:20px; margin-bottom:30px; }
   background:var(--surface); border:1px solid var(--border); border-radius:11px;
   padding:18px 20px; box-shadow:var(--shadow); margin-bottom:14px;
 }
-.plot-card{ background:#fff; border:1px solid var(--border); border-radius:11px; padding:8px; box-shadow:var(--shadow); margin-bottom:14px; }
+.plot-card{ background:#fff; border:1px solid var(--border); border-radius:11px; padding:8px; box-shadow:var(--shadow); margin-bottom:14px; overflow:hidden; }
 .plot-card .cap{ color:#5d6b7a; font-size:12px; padding:4px 12px 10px; }
 .plot-card .cap b{ color:#1a2230; }
+/* Plotly's responsive div fills the card; never let it force the card wider. */
+.plot-card .plotly-graph-div{ width:100% !important; }
 .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+/* Without min-width:0 a wide grid child (a Plotly chart) refuses to shrink,
+   collapsing the two columns into one and overlapping the neighbour. */
+.grid2 > *{ min-width:0; }
 @media(max-width:900px){ .grid2{ grid-template-columns:1fr; } }
 
 /* KPI */
