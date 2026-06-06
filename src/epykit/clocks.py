@@ -108,6 +108,25 @@ def _build_sample_beta_at_clock_cpgs(
     return beta, sample_ids, cpg_ids, missing_frac
 
 
+def _horvath_anti_transform(linear, adult_age: float = 20.0):
+    """Horvath (2013) age anti-transformation (``anti.trafo``).
+
+    ``F(x) = (1 + adult_age) * exp(x) - 1``           for ``x < 0``
+    ``F(x) = (1 + adult_age) * x   + adult_age``       for ``x >= 0``
+
+    With the canonical ``adult_age = 20`` this is ``21*exp(x) - 1`` and
+    ``21*x + 20``. The linear predictor is negative for any predicted age
+    below ``adult_age``, so the ``(1 + adult_age)`` factor on the negative
+    branch is load-bearing for pediatric / young samples.
+    """
+    linear = np.asarray(linear, dtype=float)
+    return np.where(
+        linear < 0,
+        (1.0 + adult_age) * np.exp(linear) - 1.0,
+        (1.0 + adult_age) * linear + adult_age,
+    )
+
+
 def age_clock(
     md,
     coefficients: pl.DataFrame,
@@ -150,7 +169,8 @@ def age_clock(
         Post-linear transformation. ``"horvath"`` applies the standard
         anti-transform for samples >=20 years old::
 
-            age = exp(linear) - 1  if linear < 0 else linear * 21 + 20
+            age = (1 + adult_age)*exp(linear) - 1   if linear < 0
+            age = (1 + adult_age)*linear + adult_age  otherwise   (adult_age = 20)
 
         ``None`` (default) returns the raw linear combination.
     coef_cpg_col, coef_value_col : str
@@ -235,7 +255,7 @@ def age_clock(
     if transform is None:
         age = linear
     elif transform == "horvath":
-        age = np.where(linear < 0, np.exp(linear) - 1.0, linear * 21.0 + 20.0)
+        age = _horvath_anti_transform(linear)
     else:
         raise ValueError(f"Unknown transform {transform!r}; use None or 'horvath'.")
 

@@ -228,16 +228,28 @@ def test_age_clock_recovers_known_age_from_synthetic_data(synth_md_filtered):
 
 
 def test_age_clock_horvath_transform_branches():
-    """The horvath transform piecewise: negative linear -> exp-based,
-    positive linear -> linear-scale."""
-    from epykit.clocks import age_clock as _age_clock_fn  # noqa: F401
-    # Direct math check on the transform formula without running on data.
-    lin_neg = -0.5
-    lin_pos = 1.0
-    transformed_neg = np.exp(lin_neg) - 1.0      # ~= -0.393
-    transformed_pos = lin_pos * 21.0 + 20.0      # = 41.0
-    assert abs(transformed_neg - (-0.39346934)) < 1e-6
-    assert transformed_pos == 41.0
+    """The Horvath anti-transform piecewise, checked against the real
+    implementation (not a re-derived formula in the test).
+
+    Horvath (2013) anti.trafo with adult_age=20:
+        x < 0  -> 21*exp(x) - 1
+        x >= 0 -> 21*x + 20
+    The negative branch MUST carry the (1+adult_age)=21 factor; an earlier
+    bug emitted exp(x)-1 and produced negative ages for young samples.
+    """
+    from epykit.clocks import _horvath_anti_transform
+
+    # Negative branch: 21*exp(-0.5) - 1 = 11.7371438...
+    assert abs(float(_horvath_anti_transform(-0.5)) - 11.7371438) < 1e-5
+    # A young sample (linear predictor below 0) must NOT come out negative.
+    assert float(_horvath_anti_transform(-0.5)) > 0.0
+    # Positive branch: 1.0*21 + 20 = 41.0
+    assert float(_horvath_anti_transform(1.0)) == 41.0
+    # Boundary at 0 uses the positive branch: 21*0 + 20 = 20.
+    assert float(_horvath_anti_transform(0.0)) == 20.0
+    # Vectorised + adult_age override stays well-formed.
+    out = _horvath_anti_transform(np.array([-0.5, 1.0]), adult_age=20.0)
+    assert out.shape == (2,)
 
 
 # Deconvolution (NNLS)
