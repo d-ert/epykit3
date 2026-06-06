@@ -106,7 +106,15 @@ def _brown_forsythe_vectorised(
     Returns
     -------
     p_var : np.ndarray of shape (n_sites,), dtype float64.
-        NaN where either group has fewer than 2 finite observations.
+        NaN where either group has fewer than 3 finite observations.
+
+    Notes
+    -----
+    Requires >=3 per group. At n=2 the two median-centred absolute deviations
+    are identical (median is the midpoint), so the within-group sum of squares
+    is mathematically 0; floating-point residuals then make it a tiny positive
+    number, which inflates the F-statistic and yields spuriously significant
+    p-values (anti-conservative). Excluding n<3 sites keeps the test honest.
     """
     # Stack to (n_samples x n_sites) matrices; NaN = missing.
     mat_a = np.stack(betas_a, axis=0)   # shape (na, n_sites)
@@ -127,7 +135,10 @@ def _brown_forsythe_vectorised(
     n_a = finite_a.sum(axis=0).astype(np.float64)   # (n_sites,)
     n_b = finite_b.sum(axis=0).astype(np.float64)
 
-    valid = (n_a >= 2) & (n_b >= 2)
+    # Brown-Forsythe needs >=3 finite obs per group: at n=2 the median-centred
+    # deviations are identical, so within-group SS is ~0 (a floating-point
+    # residual) and the F-statistic explodes into spurious significance.
+    valid = (n_a >= 3) & (n_b >= 3)
     p_var = np.full(n_sites, np.nan, dtype=np.float64)
     if not np.any(valid):
         return p_var
@@ -172,6 +183,7 @@ def _process_one_chromosome_dvc(
     test: str,
     mean_filter_alpha: float,
     alpha: float,
+    min_coverage: int = 1,
 ) -> pl.DataFrame:
     n_sites = len(canonical_df)
     if n_sites == 0:
@@ -193,14 +205,14 @@ def _process_one_chromosome_dvc(
     for s in samples_treatment:
         meth, cov = _load_sample_chrom(methylstore_path, chrom, s, canonical_pos)
         with np.errstate(invalid="ignore", divide="ignore"):
-            beta = np.where(cov > 0, meth.astype(np.float64) / cov, np.nan)
+            beta = np.where(cov >= min_coverage, meth.astype(np.float64) / cov, np.nan)
         betas_t.append(beta)
         _welford_update(mean_t, M2_t, n_t, meth, cov)
         del meth, cov
     for s in samples_control:
         meth, cov = _load_sample_chrom(methylstore_path, chrom, s, canonical_pos)
         with np.errstate(invalid="ignore", divide="ignore"):
-            beta = np.where(cov > 0, meth.astype(np.float64) / cov, np.nan)
+            beta = np.where(cov >= min_coverage, meth.astype(np.float64) / cov, np.nan)
         betas_c.append(beta)
         _welford_update(mean_c, M2_c, n_c, meth, cov)
         del meth, cov
@@ -263,6 +275,7 @@ def process_chromosomes_dvc(
     unite: bool = True,
     mean_filter_alpha: float = 0.05,
     alpha: float = 0.05,
+    min_coverage: int = 1,
     backend: str = "sequential",
     n_workers: Optional[int] = None,
 ) -> pl.DataFrame:
@@ -274,14 +287,41 @@ def process_chromosomes_dvc(
 
     The variance equality test is Brown-Forsythe (median-centred Levene),
     robust to the U-shaped, bounded [0,1] distribution of beta values.
-    Pass ``test='bartlett'`` only for backward compatibility — it is silently
-    redirected to Brown-Forsythe.
+    ``test='bartlett'`` is a deprecated alias (Bartlett's test is not
+    implemented) and emits a ``UserWarning``.
+
+    ``min_coverage`` masks per-replicate beta below the threshold before the
+    variance test. At very low coverage every beta is forced toward {0, 1}
+    with large, coverage-dependent binomial noise; if coverage is imbalanced
+    between groups that noise reads as differential biological variance.
+    Raise ``min_coverage`` (e.g. 5-10) on cohorts with uneven depth.
     """
+    import warnings
     if test not in ("brown_forsythe", "bartlett"):
         raise ValueError(
             f"DVC test={test!r} not supported. "
             "Use 'brown_forsythe' (default) or legacy alias 'bartlett'."
         )
+    if test == "bartlett":
+        warnings.warn(
+            "DVC test='bartlett' is a deprecated alias: Bartlett's test is "
+            "not implemented and Brown-Forsythe (median-centred Levene) is "
+            "run instead. Pass test='brown_forsythe' to silence this.",
+            UserWarning,
+            stacklevel=2,
+        )
+    min_n = min(len(samples_treatment), len(samples_control))
+    if min_n < 3:
+        warnings.warn(
+            f"DVC: Brown-Forsythe needs >=3 replicates per group to estimate "
+            f"the within-group spread of deviations, but the smaller group has "
+            f"{min_n}. At n=2 the within-group sum of squares is exactly 0, so "
+            f"the variance p-values are NaN and no DVCs will be called. Add "
+            f"replicates or interpret n_dvc=0 as 'test could not run'.",
+            UserWarning,
+            stacklevel=2,
+        )
+    min_coverage = max(1, int(min_coverage))
     store = Path(methylstore_path)
     all_samples = samples_treatment + samples_control
     if chromosomes is None:
@@ -301,6 +341,7 @@ def process_chromosomes_dvc(
             store, chrom, canonical_df,
             samples_treatment, samples_control,
             test=test, mean_filter_alpha=mean_filter_alpha, alpha=alpha,
+            min_coverage=min_coverage,
         )
 
     with tempfile.TemporaryDirectory(prefix="epykit_dvc_") as tmpdir:

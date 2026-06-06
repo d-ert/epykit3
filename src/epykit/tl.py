@@ -1581,10 +1581,11 @@ def diagnose_dmr_calling(
 
 def dvc(
     md: MethylData,
-    test: str = "bartlett",
+    test: str = "brown_forsythe",
     chromosomes: list[str] | None = None,
     alpha: float = 0.05,
     mean_filter_alpha: float = 0.05,
+    min_coverage: int = 1,
     *,
     backend: str = "sequential",
     n_workers: int | None = None,
@@ -1606,11 +1607,19 @@ def dvc(
 
     Parameters
     ----------
-    test : {"bartlett"}
-        Variance-equality test. Only ``"bartlett"`` is supported -- its
-        closed-form expression fits the Welford streaming budget. Levene /
-        Brown-Forsythe would need per-replicate centered deviations that
-        the streaming accumulators don't keep.
+    test : {"brown_forsythe", "bartlett"}
+        Variance-equality test. ``"brown_forsythe"`` (default; median-centred
+        Levene) is robust to the bounded, U-shaped beta distribution and is
+        the test actually run. ``"bartlett"`` is a deprecated alias that runs
+        Brown-Forsythe and emits a ``UserWarning`` (Bartlett's test is not
+        implemented). Brown-Forsythe needs >=3 replicates per group; at n=2
+        the within-group sum of squares is 0 so the variance p-values are NaN
+        and no DVCs are called (a warning is emitted).
+    min_coverage : int
+        Mask per-replicate beta below this coverage before the variance test
+        (default 1, i.e. any covered site). Raise it on cohorts with
+        imbalanced sequencing depth, where low-coverage binomial noise can
+        masquerade as differential biological variance.
     alpha : float
         q-value cutoff on the variance test for the ``is_dvc`` flag.
     mean_filter_alpha : float
@@ -1629,6 +1638,7 @@ def dvc(
         unite=unite,
         mean_filter_alpha=mean_filter_alpha,
         alpha=alpha,
+        min_coverage=min_coverage,
         backend=backend,
         n_workers=n_workers,
     )
