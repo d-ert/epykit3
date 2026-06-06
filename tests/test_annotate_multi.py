@@ -74,6 +74,24 @@ def _sites(positions):
     })
 
 
+def test_chrom_name_mismatch_raises(tmp_path):
+    """C2: 'chr1' sites vs a '1'-named (Ensembl-style) GTF must raise rather
+    than silently annotate every site as intergenic."""
+    gtf = tmp_path / "ensembl_named.gtf"
+    gtf.write_text("\n".join([
+        '1\tt\tgene\t1001\t3000\t.\t+\t.\tgene_id "g1"; gene_name "GENEA";',
+        '1\tt\texon\t1001\t3000\t.\t+\t.\tgene_id "g1"; gene_name "GENEA";',
+    ]) + "\n")
+    with pytest.raises(ValueError, match="chromosome names"):
+        annotate_features(_sites([1500]), str(gtf))
+
+
+def test_matching_chrom_names_do_not_raise(synth_gtf):
+    """Sanity: matching 'chr1' on both sides annotates without raising."""
+    out = annotate_features(_sites([1500]), synth_gtf)
+    assert "feature_type" in out.columns
+
+
 def test_default_now_includes_multi_columns(synth_gtf):
     """multi_annotation=True is the default: output includes both legacy
     and annotatr-style columns out of the box."""

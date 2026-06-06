@@ -990,6 +990,39 @@ def _detect_annotation_source(path: str) -> str:
     )
 
 
+def _check_chrom_name_overlap(site_chroms, feature_chroms, *, kind: str) -> None:
+    """Guard against a chromosome-naming mismatch silently mis-annotating.
+
+    If the site chromosome names share nothing with the annotation's
+    chromosome names (e.g. UCSC ``chr1`` sites vs Ensembl ``1`` features),
+    every per-chromosome lookup misses and *every* site is silently labelled
+    intergenic / open_sea -- a plausible-but-wrong figure. Raise on zero
+    overlap; warn when fewer than half the site chromosomes are covered. (C2)
+    """
+    site_set = {str(c) for c in site_chroms}
+    feat_set = {str(c) for c in feature_chroms}
+    if not site_set or not feat_set:
+        return
+    shared = site_set & feat_set
+    if not shared:
+        raise ValueError(
+            f"No chromosome names are shared between the sites and the {kind} "
+            f"({sorted(site_set)[:5]} vs {sorted(feat_set)[:5]}). This is "
+            "almost always a 'chr1' vs '1' naming mismatch, which would "
+            "silently annotate every site as intergenic/open_sea. Harmonise "
+            "the chromosome naming (add or strip the 'chr' prefix) so the two "
+            "sides use the same convention before annotating."
+        )
+    covered = len(shared) / len(site_set)
+    if covered < 0.5:
+        logger.warning(
+            "Only %.0f%% of site chromosomes are present in the %s; sites on "
+            "%s (and possibly others) will be annotated as intergenic/open_sea. "
+            "Possible chromosome-naming mismatch.",
+            100 * covered, kind, sorted(site_set - feat_set)[:5],
+        )
+
+
 def annotate_features(
     sites: pl.DataFrame,
     annotation: str,
@@ -1130,6 +1163,9 @@ def annotate_features(
     )
     chromosomes = sorted(sites["chrom"].unique().to_list())
     _log(f"  {n:,} sites across {len(chromosomes)} chromosomes: {chromosomes}")
+    _check_chrom_name_overlap(
+        chromosomes, features_by_chrom.keys(), kind="gene-model annotation"
+    )
 
     # ------------------------------------------------------------------
     # Step 7: Per-chromosome annotation loop
@@ -1329,6 +1365,12 @@ def annotate_cpg_islands(
     if len(islands_df) == 0:
         _log("  WARNING: BED is empty -> all sites open_sea")
         return sites.with_columns(pl.lit("open_sea").alias("cpg_context"))
+
+    _check_chrom_name_overlap(
+        sites["chrom"].unique().to_list(),
+        islands_df["Chromosome"].unique(),
+        kind="CpG-island BED",
+    )
 
     SHORE_DIST = 2_000
     SHELF_DIST = 4_000
