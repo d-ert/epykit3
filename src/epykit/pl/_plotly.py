@@ -71,9 +71,9 @@ def _require_plotly():
         ) from exc
 
 
-def volcano_plotly(md: MethylData, *, alpha: float = 0.05, min_abs_diff: float = 0.1):
+def volcano_plotly(md: MethylData, *, alpha: float = 0.05, min_abs_diff: float = 0.1, dmc=None):
     go = _require_plotly()
-    data = compute_volcano_data(md, alpha=alpha, min_abs_diff=min_abs_diff)
+    data = compute_volcano_data(md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc)
     ns = ~data.sig
     fig = go.Figure()
     fig.add_trace(go.Scattergl(
@@ -103,9 +103,9 @@ def volcano_plotly(md: MethylData, *, alpha: float = 0.05, min_abs_diff: float =
     return fig
 
 
-def ma_plot_plotly(md: MethylData, *, alpha: float = 0.05, min_abs_diff: float = 0.1):
+def ma_plot_plotly(md: MethylData, *, alpha: float = 0.05, min_abs_diff: float = 0.1, dmc=None):
     go = _require_plotly()
-    data = compute_ma_data(md, alpha=alpha, min_abs_diff=min_abs_diff)
+    data = compute_ma_data(md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc)
     ns = ~data.sig
     fig = go.Figure()
     fig.add_trace(go.Scattergl(
@@ -135,9 +135,9 @@ def ma_plot_plotly(md: MethylData, *, alpha: float = 0.05, min_abs_diff: float =
     return fig
 
 
-def manhattan_plotly(md: MethylData, *, alpha: float = 0.05):
+def manhattan_plotly(md: MethylData, *, alpha: float = 0.05, dmc=None):
     go = _require_plotly()
-    data = compute_manhattan_data(md, alpha=alpha)
+    data = compute_manhattan_data(md, alpha=alpha, dmc=dmc)
     fig = go.Figure()
     colors = [PALETTE["hypo"], PALETTE["hyper"]]
     for i, block in enumerate(data.chrom_blocks):
@@ -291,10 +291,10 @@ def tss_metaplot_plotly(
     return fig
 
 
-def pvalue_histogram_plotly(md: MethylData):
+def pvalue_histogram_plotly(md: MethylData, *, dmc=None):
     """Histogram of raw per-CpG p-values -- a calibration diagnostic."""
     go = _require_plotly()
-    counts, edges = compute_pvalue_histogram(md, bins=30)
+    counts, edges = compute_pvalue_histogram(md, bins=30, dmc=dmc)
     centers = (edges[:-1] + edges[1:]) / 2.0
     width = float(edges[1] - edges[0]) * 0.95
     fig = go.Figure([go.Bar(

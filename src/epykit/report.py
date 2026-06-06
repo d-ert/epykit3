@@ -465,8 +465,10 @@ def _preproc_flow(md: MethylData) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def _dmc_stats(md: MethylData, alpha: float, min_abs_diff: float) -> dict:
-    dmc = md.dmc
+def _dmc_stats(md: MethylData, alpha: float, min_abs_diff: float,
+               dmc: Optional[pl.DataFrame] = None) -> dict:
+    if dmc is None:
+        dmc = md.dmc
     if dmc is None:
         return {"available": False}
     p_col = "qvalue" if "qvalue" in dmc.columns else "pvalue"
@@ -584,7 +586,7 @@ def _build_kpis(md, facts, dmc_stats, dmr_stats) -> list[dict]:
         ctx = None
         if facts["pct_retained"] is not None and facts["n_sites_raw_str"]:
             ctx = f"of {facts['n_sites_raw_str']} raw ({facts['pct_retained']:.0%})"
-        kpis.append({"big": facts["n_sites_str"], "label": "sites tested",
+        kpis.append({"big": facts["n_sites_str"], "label": "sites retained",
                      "cls": "", "ctx": ctx})
     if dmc_stats.get("available"):
         total = max(dmc_stats["n_hyper"] + dmc_stats["n_hypo"], 1)
@@ -841,7 +843,19 @@ def generate_report(
 
     render = _make_fig_renderer(self_contained)
 
-    dmc_stats = _dmc_stats(md, alpha=alpha, min_abs_diff=min_abs_diff)
+    # Resolve the *full* per-CpG DMC table for genome-wide stats and figures.
+    # ``md.dmc`` prefers the annotated table, which may have been annotated on
+    # only the significant subset -- using it as the denominator for "% sig" or
+    # as the volcano cloud would be wrong. The annotated table is still used
+    # for the annotation pies and the top-DMC table.
+    try:
+        dmc_full = md.get_dmc(annotated=False)
+    except Exception:
+        dmc_full = None
+    if dmc_full is None or (hasattr(dmc_full, "is_empty") and dmc_full.is_empty()):
+        dmc_full = md.dmc
+
+    dmc_stats = _dmc_stats(md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc_full)
     dmr_stats = _dmr_stats(md)
     facts = _build_facts(md, dmc_stats, dmr_stats, alpha, min_abs_diff)
 
@@ -853,10 +867,10 @@ def generate_report(
     coverage_plot = render(_safe(coverage_histogram_plotly, md, max_points=coverage_max_points))
     global_meth_bar = render(_safe(global_methylation_bar_plotly, md))
     corr_heatmap = render(_safe(sample_correlation_plotly, md))
-    volcano_plot = render(_safe(volcano_plotly, md, alpha=alpha, min_abs_diff=min_abs_diff)) if dmc_stats.get("available") else None
-    pvalue_hist = render(_safe(pvalue_histogram_plotly, md)) if dmc_stats.get("available") else None
-    ma_plot = render(_safe(ma_plot_plotly, md, alpha=alpha, min_abs_diff=min_abs_diff)) if dmc_stats.get("available") else None
-    manhattan_plot = render(_safe(manhattan_plotly, md, alpha=alpha)) if dmc_stats.get("available") else None
+    volcano_plot = render(_safe(volcano_plotly, md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc_full)) if dmc_stats.get("available") else None
+    pvalue_hist = render(_safe(pvalue_histogram_plotly, md, dmc=dmc_full)) if dmc_stats.get("available") else None
+    ma_plot = render(_safe(ma_plot_plotly, md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc_full)) if dmc_stats.get("available") else None
+    manhattan_plot = render(_safe(manhattan_plotly, md, alpha=alpha, dmc=dmc_full)) if dmc_stats.get("available") else None
     dmr_size_hist = render(_safe(dmr_size_hist_plotly, md)) if dmr_stats.get("available") else None
     feature_pie = render(_safe(feature_pie_plotly, md))
     cpg_pie = render(_safe(cpg_island_pie_plotly, md))

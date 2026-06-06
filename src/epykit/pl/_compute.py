@@ -509,8 +509,10 @@ def compute_volcano_data(
     *,
     alpha: float = 0.05,
     min_abs_diff: float = 0.1,
+    dmc: Optional[pl.DataFrame] = None,
 ) -> VolcanoData:
-    dmc = md.dmc
+    if dmc is None:
+        dmc = md.dmc
     if dmc is None:
         raise ValueError("Run ep.tl.dmc(md) first")
     p_col = _dmc_p_col(dmc)
@@ -529,8 +531,10 @@ def compute_ma_data(
     *,
     alpha: float = 0.05,
     min_abs_diff: float = 0.1,
+    dmc: Optional[pl.DataFrame] = None,
 ) -> MAData:
-    dmc = md.dmc
+    if dmc is None:
+        dmc = md.dmc
     if dmc is None:
         raise ValueError("Run ep.tl.dmc(md) first")
     p_col = _dmc_p_col(dmc)
@@ -551,8 +555,10 @@ def compute_manhattan_data(
     md,
     *,
     alpha: float = 0.05,
+    dmc: Optional[pl.DataFrame] = None,
 ) -> ManhattanData:
-    dmc = md.dmc
+    if dmc is None:
+        dmc = md.dmc
     if dmc is None:
         raise ValueError("Run ep.tl.dmc(md) first")
     if "chrom" not in dmc.columns or "pos" not in dmc.columns:
@@ -814,13 +820,14 @@ def compute_categorical_proportions(
 # ---------------------------------------------------------------------------
 
 
-def compute_pvalue_histogram(md, *, bins: int = 30):
+def compute_pvalue_histogram(md, *, bins: int = 30, dmc: Optional[pl.DataFrame] = None):
     """Histogram of raw per-CpG p-values -- a test-calibration check.
 
     A well-behaved analysis shows a roughly uniform null with a spike near
     zero. Returns ``(counts, edges)`` with edges spanning ``[0, 1]``.
     """
-    dmc = md.dmc
+    if dmc is None:
+        dmc = md.dmc
     if dmc is None or "pvalue" not in dmc.columns:
         raise ValueError("Run ep.tl.dmc(md) first (no 'pvalue' column)")
     p = dmc["pvalue"].to_numpy()
