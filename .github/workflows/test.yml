@@ -23,8 +23,8 @@ jobs:
         uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
-          # uv.lock is gitignored (library project), so key cache off pyproject.toml.
-          cache-dependency-glob: "pyproject.toml"
+          # uv.lock is committed (reproducibility), so key the cache off it.
+          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
@@ -47,7 +47,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
+          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python
         run: uv python install 3.12
@@ -76,7 +76,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
+          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python 3.12
         run: uv python install 3.12

@@ -122,6 +122,24 @@ chain_merge + a DSS-from-scratch upper bound resolved the picture.
 | R | 4.5.0 (Studies 2, 3) |
 | Python | 3.12 |
 
+### Reproducing the published numbers (pinned Python environment)
+
+The exact resolved Python environment is committed as `uv.lock` at the repo
+root. Reproduce the epykit numbers against that exact environment with:
+
+```bash
+uv sync --frozen --extra dev --extra all
+```
+
+All published epykit timings and per-CpG counts were produced **single-threaded**
+so float-reduction order is deterministic across machines (parallel reductions
+are not associative). Pin the thread pools before running:
+
+```bash
+export POLARS_MAX_THREADS=1
+export OMP_NUM_THREADS=1
+```
+
 ## Date
 
 This consolidated report was assembled on **2026-05-22**. Study 1 was

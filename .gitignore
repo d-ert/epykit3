@@ -267,10 +267,10 @@ ipython_config.py
 # Pipfile.lock
 
 # UV
-#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-uv.lock
+#   uv.lock IS committed (see benchmark/README.md "Reproducing the published
+#   numbers"). The benchmark paper asserts exact TPR/FPR/F1 counts, so the
+#   exact resolved environment is pinned in version control, per the pypa
+#   recommendation to commit uv.lock for reproducibility.
 
 # poetry
 #   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
@@ -388,3 +388,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# GSD planning docs (local-only)
+.planning/
