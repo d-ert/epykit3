@@ -85,6 +85,29 @@ statistics, QC metrics, top DMC/DMR tables, and embedded plots.
 md.report("results/report.html")
 ```
 
+### export_tables
+
+```python
+md.export_tables(
+    out_dir: str,
+    *,
+    alpha: float = 0.05,
+    full: bool = False,
+    fmt: Literal["tsv", "csv"] = "tsv",
+    dmc: bool = True, dmr: bool = True, dvc: bool = True, qc: bool = True,
+) -> dict[str, str]
+```
+
+Write every result table present on the object (DMC, DMR, DVC, and the
+per-sample QC summary) to `out_dir` in one call. Missing tables are skipped
+(nothing is raised). Returns a dict mapping logical table name → path written.
+See [Tabular Exports](../export/tables.md) for the file names and options.
+
+```python
+md.export_tables("results/tables")             # significant tables, .tsv
+md.export_tables("results/tables", full=True)  # + full DMC / DVC tables
+```
+
 ### to_anndata
 
 ```python

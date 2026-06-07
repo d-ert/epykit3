@@ -143,6 +143,115 @@ def _auto_test_simple(md: MethylData, allow_n1: bool = False) -> str:
     return "lr"
 
 
+def _resolve_tsv_output(
+    tsv: str | None,
+    csv: str | None,
+    *,
+    tsv_full: bool = False,
+    csv_full: bool = False,
+    tsv_alpha: float = 0.05,
+    csv_alpha: float = 0.05,
+) -> tuple[str | None, bool, float]:
+    """Resolve the ``tsv*`` output kwargs, honouring the deprecated ``csv*`` aliases.
+
+    ``csv`` / ``csv_full`` / ``csv_alpha`` are deprecated aliases for ``tsv`` /
+    ``tsv_full`` / ``tsv_alpha``. epykit writes tab-delimited TSV by default
+    (pass a path ending in ``.csv`` for comma output), so the ``csv*`` names
+    were misleading. Passing any ``csv*`` value emits a ``DeprecationWarning``
+    and is treated as the matching ``tsv*`` value -- the new ``tsv*`` name wins
+    if both are given. Returns ``(path, full, alpha)``.
+    """
+    if csv is not None or csv_full or csv_alpha != 0.05:
+        import warnings
+        warnings.warn(
+            "The `csv` / `csv_full` / `csv_alpha` arguments are deprecated "
+            "aliases for `tsv` / `tsv_full` / `tsv_alpha` and will be removed in "
+            "a future release. epykit writes tab-delimited TSV by default; pass "
+            "a path ending in `.csv` for comma-separated output.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+    path = tsv if tsv is not None else csv
+    full = tsv_full or csv_full
+    alpha = tsv_alpha if tsv_alpha != 0.05 else csv_alpha
+    return path, full, alpha
+
+
+def _resolve_auto_tsv(
+    md: MethylData,
+    tsv,
+    csv,
+    *,
+    default_name: str,
+    tsv_full: bool = False,
+    csv_full: bool = False,
+    tsv_alpha: float = 0.05,
+    csv_alpha: float = 0.05,
+) -> tuple[str | None, bool, float, bool]:
+    """Resolve TSV output for the **auto-emit** analyses (dmc / dmr / annotate).
+
+    Unlike :func:`_resolve_tsv_output` (opt-in), these write a human-readable
+    table by default: with no explicit path the table is auto-emitted to
+    ``<md.analysis_root>/results/<default_name>`` -- the same place ``md.save``
+    writes. ``tsv`` semantics:
+
+    * ``None`` / ``True`` -> auto-emit (the default)
+    * ``False``           -> don't write
+    * ``"path.tsv"``      -> write there (``.csv`` suffix -> comma-delimited)
+
+    ``csv`` / ``csv_full`` / ``csv_alpha`` are deprecated aliases (warn).
+    Auto-emit is globally suppressed by ``EPYKIT_NO_AUTO_TSV`` and skipped
+    silently when there is no ``analysis_root`` to anchor on (e.g. an in-memory
+    MethylData built without ``store_dir``).
+
+    Returns ``(path_or_None, full, alpha, is_auto)``. ``is_auto`` is True only
+    when the path was auto-derived, so the caller can make the auto write
+    best-effort while letting an explicit path surface errors.
+    """
+    if csv is not None or csv_full or csv_alpha != 0.05:
+        import warnings
+        warnings.warn(
+            "The `csv` / `csv_full` / `csv_alpha` arguments are deprecated "
+            "aliases for `tsv` / `tsv_full` / `tsv_alpha` and will be removed "
+            "in a future release. epykit writes tab-delimited TSV by default; "
+            "pass a path ending in `.csv` for comma-separated output.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+    full = tsv_full or csv_full
+    alpha = tsv_alpha if tsv_alpha != 0.05 else csv_alpha
+
+    explicit = tsv if isinstance(tsv, str) else (csv if isinstance(csv, str) else None)
+    if explicit is not None:
+        return explicit, full, alpha, False
+    if tsv is False:
+        return None, full, alpha, False
+
+    import os
+    if os.environ.get("EPYKIT_NO_AUTO_TSV") in ("1", "true", "True"):
+        return None, full, alpha, False
+    root = getattr(md, "analysis_root", None)
+    if not root:
+        return None, full, alpha, False
+    from pathlib import Path
+    return str(Path(root) / "results" / default_name), full, alpha, True
+
+
+def _emit_result_tsv(write_fn, path: str, *, is_auto: bool) -> None:
+    """Run an export writer, swallowing failures only for the auto-emit path.
+
+    An explicit ``tsv=`` path surfaces errors (the user asked for the file); an
+    auto-emitted default is best-effort, so a write hiccup never aborts the
+    analysis -- the results are already on ``md`` regardless.
+    """
+    try:
+        write_fn()
+    except Exception as exc:  # noqa: BLE001 -- auto-emit must not break the run
+        if not is_auto:
+            raise
+        logger.warning("Auto TSV emit to %s skipped: %s", path, exc)
+
+
 def qc(
     md: MethylData,
     chh_context_store: str | None = None,
@@ -152,7 +261,8 @@ def qc(
     run_sample_correlation: bool = False,
     correlation_method: str = "spearman",
     expected_sex_col: str | None = None,
-    csv: str | None = None,
+    tsv: str | None = None,
+    csv: str | None = None,  # deprecated alias for tsv (epykit writes TSV)
 ) -> None:
     """Populate md.obs with per-sample QC metrics and cache QC tables in md.uns.
 
@@ -249,9 +359,10 @@ def qc(
     md.uns["qc_global_methylation"] = global_report
     md.uns["qc_coverage_uniformity"] = cov_report
 
-    if csv is not None:
+    tsv, _, _ = _resolve_tsv_output(tsv, csv)
+    if tsv is not None:
         from .export import qc_to_tsv
-        qc_to_tsv(md, csv)
+        qc_to_tsv(md, tsv)
 
 
 def dmc(
@@ -293,7 +404,12 @@ def dmc(
     power_stack: Literal["auto", "lr+", "conservative", "off"] | bool = "off",
     # Explicit patsy reference level for categorical factors (since 0.7.5) -
     reference_level: str | None = None,
-    # CSV/TSV output convenience (since 1.0) ------------------------------------
+    # TSV output (since 1.0). Auto-emits significant DMCs to
+    # <analysis_root>/results/dmc.significant.tsv by default; tsv=False disables,
+    # tsv="path" overrides. csv* are deprecated aliases (epykit writes TSV).
+    tsv: str | bool | None = None,
+    tsv_full: bool = False,
+    tsv_alpha: float = 0.05,
     csv: str | None = None,
     csv_full: bool = False,
     csv_alpha: float = 0.05,
@@ -416,6 +532,12 @@ def dmc(
     if min_samples_treatment is None:
         min_samples_treatment = 0
 
+    tsv, tsv_full, tsv_alpha, _tsv_is_auto = _resolve_auto_tsv(
+        md, tsv, csv, default_name="dmc.significant.tsv",
+        tsv_full=tsv_full, csv_full=csv_full,
+        tsv_alpha=tsv_alpha, csv_alpha=csv_alpha,
+    )
+
     if test == "logit_t":
         raise ValueError(
             "test='logit_t' was removed in 0.7.5 (miscalibrated near β=0/1). "
@@ -477,9 +599,12 @@ def dmc(
             "The transitional column is NaN-filled.",
             FutureWarning, stacklevel=2,
         )
-        if csv is not None:
+        if tsv is not None:
             from .export import dmc_to_tsv
-            dmc_to_tsv(md, csv, alpha=csv_alpha, full=csv_full)
+            _emit_result_tsv(
+                lambda: dmc_to_tsv(md, tsv, alpha=tsv_alpha, full=tsv_full),
+                tsv, is_auto=_tsv_is_auto,
+            )
         return
 
     # Unconditional n=1 guard: applies whether test is "auto" or explicit.
@@ -609,9 +734,12 @@ def dmc(
                         "last_key": resume_stage_name,
                         "resumed": True,
                     }
-                    if csv is not None:
+                    if tsv is not None:
                         from .export import dmc_to_tsv
-                        dmc_to_tsv(md, csv, alpha=csv_alpha, full=csv_full)
+                        _emit_result_tsv(
+                            lambda: dmc_to_tsv(md, tsv, alpha=tsv_alpha, full=tsv_full),
+                            tsv, is_auto=_tsv_is_auto,
+                        )
                     return
 
     # Smoothed-input mode: materialise a temp methylstore of smoothed
@@ -825,9 +953,12 @@ def dmc(
         FutureWarning, stacklevel=2,
     )
 
-    if csv is not None:
+    if tsv is not None:
         from .export import dmc_to_tsv
-        dmc_to_tsv(md, csv, alpha=csv_alpha, full=csv_full)
+        _emit_result_tsv(
+            lambda: dmc_to_tsv(md, tsv, alpha=tsv_alpha, full=tsv_full),
+            tsv, is_auto=_tsv_is_auto,
+        )
 
 
 def _run_dmc_contrast(
@@ -1009,6 +1140,9 @@ def dmr(
     backend: str = "sequential",
     n_workers: int | None = None,
     merge_adjacent: bool = True,
+    # Auto-emits the DMR table to <analysis_root>/results/dmr.tsv by default;
+    # tsv=False disables, tsv="path" overrides. csv= is a deprecated alias.
+    tsv: str | bool | None = None,
     csv: str | None = None,
 ) -> None:
     """Run DMR calling and store result in ``md.uns['dmr']``.
@@ -1087,6 +1221,7 @@ def dmr(
     """
     if min_samples_treatment is None:
         min_samples_treatment = 0
+    tsv, _, _, _tsv_is_auto = _resolve_auto_tsv(md, tsv, csv, default_name="dmr.tsv")
     if method == "tile":
         _check_n1_and_union_footgun(
             md, allow_n1, min_samples_treatment, min_samples_control, unit="tiles",
@@ -1217,9 +1352,9 @@ def dmr(
             "n_perm": n_perm if empirical_fdr else None,
             "perm_seed": perm_seed if empirical_fdr else None,
         }
-        if csv is not None:
+        if tsv is not None:
             from .export import dmr_to_tsv
-            dmr_to_tsv(md, csv)
+            _emit_result_tsv(lambda: dmr_to_tsv(md, tsv), tsv, is_auto=_tsv_is_auto)
         return
 
     if method == "sliding_window":
@@ -1273,9 +1408,9 @@ def dmr(
             "min_abs_meth_diff": min_abs_meth_diff,
             "min_mean_qvalue": min_mean_qvalue,
         }
-        if csv is not None:
+        if tsv is not None:
             from .export import dmr_to_tsv
-            dmr_to_tsv(md, csv)
+            _emit_result_tsv(lambda: dmr_to_tsv(md, tsv), tsv, is_auto=_tsv_is_auto)
         return
 
     if method == "segment":
@@ -1298,9 +1433,9 @@ def dmr(
             "min_abs_meth_diff": min_abs_meth_diff,
             "alpha": alpha,
         }
-        if csv is not None:
+        if tsv is not None:
             from .export import dmr_to_tsv
-            dmr_to_tsv(md, csv)
+            _emit_result_tsv(lambda: dmr_to_tsv(md, tsv), tsv, is_auto=_tsv_is_auto)
         return
 
     if method == "chain_merge":
@@ -1356,9 +1491,9 @@ def dmr(
             "use_q_for_sig": use_q_for_sig,
             "min_mean_qvalue": min_mean_qvalue,
         }
-        if csv is not None:
+        if tsv is not None:
             from .export import dmr_to_tsv
-            dmr_to_tsv(md, csv)
+            _emit_result_tsv(lambda: dmr_to_tsv(md, tsv), tsv, is_auto=_tsv_is_auto)
         return
 
     raise ValueError(
@@ -1589,6 +1724,10 @@ def dvc(
     *,
     backend: str = "sequential",
     n_workers: int | None = None,
+    tsv: str | None = None,
+    tsv_full: bool = False,
+    tsv_alpha: float = 0.05,
+    # Deprecated aliases for the tsv* args above (epykit writes TSV by default).
     csv: str | None = None,
     csv_full: bool = False,
     csv_alpha: float = 0.05,
@@ -1652,9 +1791,13 @@ def dvc(
         "unite": unite,
     }
 
-    if csv is not None:
+    tsv, tsv_full, tsv_alpha = _resolve_tsv_output(
+        tsv, csv, tsv_full=tsv_full, csv_full=csv_full,
+        tsv_alpha=tsv_alpha, csv_alpha=csv_alpha,
+    )
+    if tsv is not None:
         from .export import dvc_to_tsv
-        dvc_to_tsv(md, csv, alpha=csv_alpha, full=csv_full)
+        dvc_to_tsv(md, tsv, alpha=tsv_alpha, full=tsv_full)
 
 
 def dvr(
@@ -1781,6 +1924,11 @@ def annotate(
     refgene: str | None = None,
     gene_type_filter: str | list[str] | tuple[str, ...] | None = None,
     features: list[str] | tuple[str, ...] | None = None,
+    # Auto-emits the annotated DMC table to
+    # <analysis_root>/results/dmc_annotated.tsv by default; tsv=False disables,
+    # tsv="path" overrides. csv= is a deprecated alias.
+    tsv: str | bool | None = None,
+    csv: str | None = None,
 ) -> None:
     """Annotate DMC/DMR outputs.
 
@@ -1893,6 +2041,16 @@ def annotate(
     if clear_gtf_cache and gtf:
         _GTF_CACHE.clear()
         gc.collect()
+
+    # Auto-emit the annotated DMC table as a human-readable TSV (default on).
+    tsv_out, _, _, _tsv_is_auto = _resolve_auto_tsv(
+        md, tsv, csv, default_name="dmc_annotated.tsv"
+    )
+    if tsv_out is not None and md.get_dmc(annotated=True) is not None:
+        from .export import dmc_to_tsv
+        _emit_result_tsv(
+            lambda: dmc_to_tsv(md, tsv_out, full=True), tsv_out, is_auto=_tsv_is_auto,
+        )
 
 
 def asm(

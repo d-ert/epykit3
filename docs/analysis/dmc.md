@@ -23,6 +23,35 @@ dmc_results = md.dmc  # shorthand for md.varm["dmc_lr"]
 print(f"Tested {len(dmc_results)} CpG sites")
 ```
 
+### Saving to TSV
+
+`tl.dmc` writes a human-readable TSV **by default** — `ep.tl.dmc(md)` drops
+`dmc.significant.tsv` into `<analysis_root>/results/` (the folder `md.save()`
+uses). Redirect, expand, or disable it with `tsv=`:
+
+```python
+ep.tl.dmc(md, test="lr")                                # -> <root>/results/dmc.significant.tsv
+ep.tl.dmc(md, test="lr", tsv="results/dmc.tsv")         # explicit path
+ep.tl.dmc(md, test="lr", tsv="results/dmc_all.tsv", tsv_full=True)  # every tested CpG
+ep.tl.dmc(md, test="lr", tsv=False)                     # skip the auto-emit
+```
+
+Set `EPYKIT_NO_AUTO_TSV=1` to suppress the default globally. The auto-emit is
+skipped silently if there's no `analysis_root` (an in-memory `MethylData` built
+without `store_dir`).
+
+For finer control, call the writer directly, or dump every result table at once:
+
+```python
+from epykit import export
+export.dmc_to_tsv(md, "results/dmc.tsv", alpha=0.05)  # one table
+md.export_tables("results/tables")                    # DMC + DMR + DVC + QC
+```
+
+Output is tab-delimited by default; a `.csv` suffix switches to commas. See
+[Tabular Exports](../export/tables.md) for the full reference. (The older
+`csv=` argument still works but is deprecated in favour of `tsv=`.)
+
 ## Test Backends
 
 epykit ships 4 statistical backends for DMC calling (plus an `auto` dispatcher).

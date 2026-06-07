@@ -8,6 +8,11 @@ pipelines. All export functions are accessible through the top-level `ep` namesp
 
 | Function | Target | Description |
 |----------|--------|-------------|
+| `md.export_tables()` | TSV / CSV | **All result tables** (DMC / DMR / DVC / QC) in one call |
+| `ep.export.dmc_to_tsv()` | TSV / CSV | DMC table (significant or full) |
+| `ep.export.dmr_to_tsv()` | TSV / CSV | DMR table |
+| `ep.export.dvc_to_tsv()` | TSV / CSV | DVC table (significant or full) |
+| `ep.export.qc_to_tsv()` | TSV / CSV | Per-sample QC summary |
 | `ep.to_bedgraph()` | BedGraph | Genome browser track |
 | `ep.to_bigwig()` | BigWig | Compressed genome browser track |
 | `ep.dmcs_to_bed()` | BED | DMC results as BED |
@@ -18,12 +23,21 @@ pipelines. All export functions are accessible through the top-level `ep` namesp
 | `ep.report_multiqc()` | JSON | MultiQC custom content |
 | `md.report()` | HTML | Interactive HTML report |
 
+The main analyses (`tl.dmc` / `tl.dmr` / `tl.annotate`) write a human-readable
+TSV to `<analysis_root>/results/` **by default** (`tsv=False` to opt out); the
+others take an opt-in `tsv=` path — see [Tabular Exports](tables.md).
+
 ## Quick Start
 
 ```python
 import epykit as ep
 
 md = ep.read_methyl("samplesheet.csv", store="methylstore/")
+
+# Result tables (DMC / DMR / DVC / QC) as TSV -- all at once...
+md.export_tables("results/tables")
+# ...or one at a time with full control
+ep.export.dmc_to_tsv(md, "results/dmc.tsv", alpha=0.05)
 
 # Genome browser tracks
 ep.to_bedgraph(md, sample="tumor_1", output="tumor_1.bedgraph")
@@ -57,6 +71,7 @@ pip install 'epykit[report]'    # Jinja2, Plotly (HTML report)
 
 ## Pages in This Section
 
+- [Tabular Exports](tables.md) -- DMC / DMR / DVC / QC result tables as TSV / CSV
 - [Genome Browser Exports](genome-browsers.md) -- BedGraph, BigWig, BED
 - [AnnData / MuData](anndata.md) -- scverse integration
 - [methylKit Tabix](methylkit.md) -- methylKit-compatible output

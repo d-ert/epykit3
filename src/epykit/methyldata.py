@@ -456,6 +456,37 @@ class MethylData:
         from .export import dmrs_to_bed
         return dmrs_to_bed(self, output)
 
+    def export_tables(
+        self,
+        out_dir: str,
+        *,
+        alpha: float = 0.05,
+        full: bool = False,
+        fmt: Literal["tsv", "csv"] = "tsv",
+        dmc: bool = True,
+        dmr: bool = True,
+        dvc: bool = True,
+        qc: bool = True,
+    ) -> dict:
+        """Dump all available result tables (DMC/DMR/DVC/QC) to ``out_dir``.
+
+        One call instead of four ``ep.export.*_to_tsv`` writers: emits whichever
+        of the DMC / DMR / DVC / QC tables are present and skips the rest. See
+        :func:`epykit.export.export_tables` for the file names and switches.
+
+        Returns a dict mapping logical table name -> path written.
+
+        Examples
+        --------
+        >>> md.export_tables("results/tables")           # significant tables
+        >>> md.export_tables("results/tables", full=True)  # + full DMC/DVC
+        """
+        from .export import export_tables
+        return export_tables(
+            self, out_dir, alpha=alpha, full=full, fmt=fmt,
+            dmc=dmc, dmr=dmr, dvc=dvc, qc=qc,
+        )
+
     def to_anndata(self, **kwargs):
         """Return an AnnData of this MethylData (requires `pp.unite` first)."""
         from .anndata_io import to_anndata

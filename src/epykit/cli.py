@@ -26,7 +26,7 @@ from .convert import convert_sample
 from . import filter, dmc
 
 
-def _auto_csv_path(parquet_path: str, *, suffix: str = "") -> str:
+def _auto_tsv_path(parquet_path: str, *, suffix: str = "") -> str:
     """Derive a sibling .tsv path from a --output parquet path.
 
     ``dmc.parquet`` -> ``dmc.significant.tsv`` (suffix=".significant")
@@ -38,13 +38,43 @@ def _auto_csv_path(parquet_path: str, *, suffix: str = "") -> str:
     return str(p.with_name(f"{stem}{suffix}.tsv"))
 
 
-def _csv_suppressed(args) -> bool:
-    """True if the user opted out of the CLI auto-emit."""
-    if getattr(args, "no_csv", False):
-        return True
-    if os.environ.get("EPYKIT_NO_AUTO_CSV") in ("1", "true", "True"):
-        return True
-    return False
+def _cli_tsv_opts(args):
+    """Resolve the --tsv* auto-emit options, honouring the deprecated --csv* aliases.
+
+    epykit writes tab-delimited TSV by default, so ``--csv`` / ``--no-csv`` /
+    ``--csv-full`` / ``--csv-alpha`` and ``EPYKIT_NO_AUTO_CSV`` were renamed to
+    ``--tsv`` / ``--no-tsv`` / ``--tsv-full`` / ``--tsv-alpha`` and
+    ``EPYKIT_NO_AUTO_TSV``. The old names still work (same code path) but emit a
+    deprecation warning. Returns ``(suppressed, path, full, alpha)``.
+    """
+    env_csv = os.environ.get("EPYKIT_NO_AUTO_CSV") in ("1", "true", "True")
+    used_old = (
+        getattr(args, "no_csv", False)
+        or getattr(args, "csv_path", None) is not None
+        or getattr(args, "csv_full", False)
+        or getattr(args, "csv_alpha", 0.05) != 0.05
+        or env_csv
+    )
+    if used_old:
+        logging.getLogger(__name__).warning(
+            "The --csv / --no-csv / --csv-full / --csv-alpha flags and "
+            "EPYKIT_NO_AUTO_CSV are deprecated aliases for --tsv / --no-tsv / "
+            "--tsv-full / --tsv-alpha and EPYKIT_NO_AUTO_TSV (epykit writes "
+            "tab-delimited TSV by default). The csv names will be removed in a "
+            "future release."
+        )
+    suppressed = (
+        getattr(args, "no_tsv", False)
+        or getattr(args, "no_csv", False)
+        or os.environ.get("EPYKIT_NO_AUTO_TSV") in ("1", "true", "True")
+        or env_csv
+    )
+    path = getattr(args, "tsv_path", None) or getattr(args, "csv_path", None)
+    full = getattr(args, "tsv_full", False) or getattr(args, "csv_full", False)
+    tsv_alpha = getattr(args, "tsv_alpha", 0.05)
+    csv_alpha = getattr(args, "csv_alpha", 0.05)
+    alpha = tsv_alpha if tsv_alpha != 0.05 else csv_alpha
+    return suppressed, path, full, alpha
 
 
 def _write_table_local(df, path: str) -> str:
@@ -237,7 +267,8 @@ def _cmd_dmc(args: argparse.Namespace):
     print(f"  Total sites tested: {len(results):,}")
     print(f"  Significant (q<0.05): {n_sig:,}")
 
-    if not _csv_suppressed(args) and len(results.columns) > 0:
+    tsv_suppressed, tsv_path, tsv_full, tsv_alpha = _cli_tsv_opts(args)
+    if not tsv_suppressed and len(results.columns) > 0:
         import polars as pl
         from .methyldata import MethylData
         from .export import dmc_to_tsv
@@ -248,15 +279,15 @@ def _cmd_dmc(args: argparse.Namespace):
         md_tmp.varm["dmc_lr"] = results
         md_tmp.uns["dmc"] = {"last_key": "dmc_lr"}
 
-        sig_path = args.csv_path or _auto_csv_path(
+        sig_path = tsv_path or _auto_tsv_path(
             args.output, suffix=".significant"
         )
-        dmc_to_tsv(md_tmp, sig_path, alpha=args.csv_alpha)
-        print(f"  Significant CSV:    {sig_path}")
-        if args.csv_full:
-            full_path = _auto_csv_path(args.output)
+        dmc_to_tsv(md_tmp, sig_path, alpha=tsv_alpha)
+        print(f"  Significant TSV:    {sig_path}")
+        if tsv_full:
+            full_path = _auto_tsv_path(args.output)
             dmc_to_tsv(md_tmp, full_path, full=True)
-            print(f"  Full CSV:           {full_path}")
+            print(f"  Full TSV:           {full_path}")
 
 
 def _cmd_dmr(args: argparse.Namespace):
@@ -372,14 +403,15 @@ def _cmd_dmr(args: argparse.Namespace):
         print(f"  Hyper: {n_hyper:,}  Hypo: {n_hypo:,}  Mixed: {n_mixed:,}")
         print(dmr_results.head(10))
 
-    if not _csv_suppressed(args) and len(dmr_results) > 0:
+    tsv_suppressed, tsv_path_opt, _, _ = _cli_tsv_opts(args)
+    if not tsv_suppressed and len(dmr_results) > 0:
         from .methyldata import MethylData
         from .export import dmr_to_tsv
         md_tmp = MethylData(obs=pl.DataFrame({"sample_id": []}), store="")
         md_tmp.uns["dmr"] = dmr_results
-        tsv_path = args.csv_path or _auto_csv_path(args.output)
+        tsv_path = tsv_path_opt or _auto_tsv_path(args.output)
         dmr_to_tsv(md_tmp, tsv_path)
-        print(f"DMR CSV: {tsv_path}")
+        print(f"DMR TSV: {tsv_path}")
 
 
 def _cmd_annotate(args: argparse.Namespace):
@@ -407,10 +439,11 @@ def _cmd_annotate(args: argparse.Namespace):
     sites.write_parquet(args.output)
     print(f"Annotated results written to {args.output}")
 
-    if not _csv_suppressed(args):
-        tsv_path = args.csv_path or _auto_csv_path(args.output)
+    tsv_suppressed, tsv_path_opt, _, _ = _cli_tsv_opts(args)
+    if not tsv_suppressed:
+        tsv_path = tsv_path_opt or _auto_tsv_path(args.output)
         _write_table_local(sites, tsv_path)
-        print(f"Annotated CSV: {tsv_path}")
+        print(f"Annotated TSV: {tsv_path}")
 
 
 def _cmd_qc_report(args: argparse.Namespace):
@@ -419,6 +452,7 @@ def _cmd_qc_report(args: argparse.Namespace):
     from .qc import global_methylation_report, coverage_uniformity
 
     samples = args.samples.split(",")
+    tsv_suppressed = _cli_tsv_opts(args)[0]
 
     print("=== Global methylation report ===")
     meth_report = global_methylation_report(args.methylstore, samples)
@@ -427,7 +461,7 @@ def _cmd_qc_report(args: argparse.Namespace):
         out = Path(args.output_dir)
         out.mkdir(parents=True, exist_ok=True)
         meth_report.write_parquet(str(out / "global_methylation.parquet"))
-        if not _csv_suppressed(args):
+        if not tsv_suppressed:
             _write_table_local(meth_report, str(out / "global_methylation.tsv"))
 
     print("\n=== Coverage uniformity report ===")
@@ -444,7 +478,7 @@ def _cmd_qc_report(args: argparse.Namespace):
     if cov_frames and args.output_dir:
         combined = pl.concat(cov_frames)
         combined.write_parquet(str(Path(args.output_dir) / "coverage_uniformity.parquet"))
-        if not _csv_suppressed(args):
+        if not tsv_suppressed:
             _write_table_local(
                 combined,
                 str(Path(args.output_dir) / "coverage_uniformity.tsv"),
@@ -697,23 +731,38 @@ def main():
         help="Multiple-testing correction method (default: fdr_bh).",
     )
     p_dmc.add_argument(
-        "--no-csv", action="store_true", dest="no_csv", default=False,
+        "--no-tsv", action="store_true", dest="no_tsv", default=False,
         help="Suppress the sibling .significant.tsv auto-emit.",
     )
     p_dmc.add_argument(
-        "--csv", dest="csv_path", default=None,
+        "--tsv", dest="tsv_path", default=None,
         help=(
-            "Override sibling TSV/CSV path. Suffix .csv selects comma "
+            "Override sibling table path. Suffix .csv selects comma "
             "delimiter; otherwise tab. Implies the file is written."
         ),
     )
     p_dmc.add_argument(
+        "--tsv-alpha", dest="tsv_alpha", type=float, default=0.05,
+        help="qvalue threshold for the significant-only table. Default 0.05.",
+    )
+    p_dmc.add_argument(
+        "--tsv-full", dest="tsv_full", action="store_true", default=False,
+        help="Also write the full (unfiltered) table next to the parquet.",
+    )
+    # Deprecated csv* aliases (epykit writes TSV by default) -- still honoured,
+    # but emit a deprecation warning. Hidden from --help to steer users to --tsv*.
+    p_dmc.add_argument(
+        "--no-csv", action="store_true", dest="no_csv", default=False,
+        help=argparse.SUPPRESS,
+    )
+    p_dmc.add_argument("--csv", dest="csv_path", default=None, help=argparse.SUPPRESS)
+    p_dmc.add_argument(
         "--csv-alpha", dest="csv_alpha", type=float, default=0.05,
-        help="qvalue threshold for significant-only CSV. Default 0.05.",
+        help=argparse.SUPPRESS,
     )
     p_dmc.add_argument(
         "--csv-full", dest="csv_full", action="store_true", default=False,
-        help="Also write the full (unfiltered) TSV next to the parquet.",
+        help=argparse.SUPPRESS,
     )
     p_dmc.set_defaults(func=_cmd_dmc)
 
@@ -821,13 +870,19 @@ def main():
     p_dmr.add_argument("--alpha",                type=float, default=0.05)
     p_dmr.add_argument("--min-abs-meth-diff",    type=float, default=0.1)
     p_dmr.add_argument(
-        "--no-csv", action="store_true", dest="no_csv", default=False,
+        "--no-tsv", action="store_true", dest="no_tsv", default=False,
         help="Suppress the sibling .tsv auto-emit.",
     )
     p_dmr.add_argument(
-        "--csv", dest="csv_path", default=None,
-        help="Override sibling TSV/CSV path. .csv suffix -> comma delim.",
+        "--tsv", dest="tsv_path", default=None,
+        help="Override sibling table path. .csv suffix -> comma delim.",
     )
+    # Deprecated csv* aliases (see dmc) -- honoured but warn; hidden from --help.
+    p_dmr.add_argument(
+        "--no-csv", action="store_true", dest="no_csv", default=False,
+        help=argparse.SUPPRESS,
+    )
+    p_dmr.add_argument("--csv", dest="csv_path", default=None, help=argparse.SUPPRESS)
     p_dmr.set_defaults(func=_cmd_dmr)
 
     # annotate
@@ -848,13 +903,19 @@ def main():
     p_ann.add_argument("--promoter-upstream-bp",   type=int, default=2000)
     p_ann.add_argument("--promoter-downstream-bp", type=int, default=200)
     p_ann.add_argument(
-        "--no-csv", action="store_true", dest="no_csv", default=False,
+        "--no-tsv", action="store_true", dest="no_tsv", default=False,
         help="Suppress the sibling .tsv auto-emit.",
     )
     p_ann.add_argument(
-        "--csv", dest="csv_path", default=None,
-        help="Override sibling TSV/CSV path. .csv suffix -> comma delim.",
+        "--tsv", dest="tsv_path", default=None,
+        help="Override sibling table path. .csv suffix -> comma delim.",
     )
+    # Deprecated csv* aliases (see dmc) -- honoured but warn; hidden from --help.
+    p_ann.add_argument(
+        "--no-csv", action="store_true", dest="no_csv", default=False,
+        help=argparse.SUPPRESS,
+    )
+    p_ann.add_argument("--csv", dest="csv_path", default=None, help=argparse.SUPPRESS)
     p_ann.set_defaults(func=_cmd_annotate)
 
     # qc-report
@@ -869,8 +930,13 @@ def main():
         help="Directory for Parquet QC output files (optional)",
     )
     p_qc.add_argument(
-        "--no-csv", action="store_true", dest="no_csv", default=False,
+        "--no-tsv", action="store_true", dest="no_tsv", default=False,
         help="Suppress the sibling .tsv auto-emit alongside the parquets.",
+    )
+    # Deprecated csv alias (see dmc) -- honoured but warn; hidden from --help.
+    p_qc.add_argument(
+        "--no-csv", action="store_true", dest="no_csv", default=False,
+        help=argparse.SUPPRESS,
     )
     p_qc.set_defaults(func=_cmd_qc_report)
 

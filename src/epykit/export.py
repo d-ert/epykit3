@@ -328,14 +328,36 @@ def _separator_for(path: str) -> str:
     return "," if str(path).lower().endswith(".csv") else "\t"
 
 
+def _flatten_nested_for_csv(df: pl.DataFrame) -> pl.DataFrame:
+    """Stringify List/Struct columns so the CSV writer can serialise them.
+
+    polars' ``write_csv`` raises ``CSV format does not support nested data`` on
+    List or Struct columns. Annotated DMC tables carry ``List(String)`` columns
+    (``all_overlapping_genes`` / ``all_overlapping_features``), so without this
+    every ``*_to_tsv`` writer would fail on a post-annotation frame. List
+    columns are joined with ``; ``; Struct columns are JSON-encoded.
+    """
+    exprs = []
+    for name, dtype in df.schema.items():
+        if isinstance(dtype, pl.List):
+            exprs.append(
+                pl.col(name).cast(pl.List(pl.String)).list.join("; ").alias(name)
+            )
+        elif isinstance(dtype, pl.Struct):
+            exprs.append(pl.col(name).struct.json_encode().alias(name))
+    return df.with_columns(exprs) if exprs else df
+
+
 def _write_table(df: pl.DataFrame, path: str) -> str:
     """Write `df` to `path` using the suffix-derived delimiter.
 
-    Returns the resolved absolute path. Creates parent directories.
+    Returns the resolved absolute path. Creates parent directories. Nested
+    (List/Struct) columns are flattened to strings first so annotated frames
+    survive the CSV writer.
     """
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    df.write_csv(str(out), separator=_separator_for(path))
+    _flatten_nested_for_csv(df).write_csv(str(out), separator=_separator_for(path))
     logger.info("Wrote table: %s (%d rows)", out, len(df))
     return str(out.resolve())
 
@@ -439,6 +461,95 @@ def qc_to_tsv(md: MethylData, path: str) -> str:
     return _write_table(md.obs, path)
 
 
+def export_tables(
+    md: MethylData,
+    out_dir: str,
+    *,
+    alpha: float = 0.05,
+    full: bool = False,
+    fmt: Literal["tsv", "csv"] = "tsv",
+    dmc: bool = True,
+    dmr: bool = True,
+    dvc: bool = True,
+    qc: bool = True,
+) -> dict[str, str]:
+    """Dump every available result table to ``out_dir`` in one call.
+
+    A convenience over the individual ``*_to_tsv`` writers: it writes whichever
+    of the DMC / DMR / DVC / QC tables are present on ``md`` and skips the rest
+    silently (nothing is raised for a missing table). Files written:
+
+    * ``<dmc_key>.significant.<ext>`` -- significant DMCs (``qvalue < alpha``).
+      With ``full=True``, also ``<dmc_key>.<ext>`` (every row of the resolved
+      DMC frame; after annotation that frame is the annotated subset).
+    * ``dmr.<ext>``                   -- the DMR table (``md.uns['dmr']``).
+    * ``dvc.significant.<ext>``       -- significant DVCs (``q_variance < alpha``).
+      With ``full=True``, also ``dvc.<ext>``.
+    * ``qc_summary.<ext>``            -- per-sample QC summary (``md.obs``).
+
+    Parameters
+    ----------
+    md : MethylData
+    out_dir : str
+        Directory to write into (created if absent).
+    alpha : float
+        Significance threshold for the significant-only DMC / DVC tables.
+    full : bool
+        Also emit the full (all-rows) DMC and DVC tables alongside the
+        significant ones.
+    fmt : {"tsv", "csv"}
+        ``"tsv"`` -> tab-delimited ``.tsv`` files; ``"csv"`` -> comma ``.csv``.
+    dmc, dmr, dvc, qc : bool
+        Per-table switches; set any to False to skip it.
+
+    Returns
+    -------
+    dict[str, str]
+        Logical table name (``"dmc_significant"``, ``"dmc_full"``, ``"dmr"``,
+        ``"dvc_significant"``, ``"dvc_full"``, ``"qc"``) -> absolute path written.
+        Keys are only present for tables that existed and were exported.
+    """
+    ext = "csv" if fmt == "csv" else "tsv"
+    out = Path(out_dir)
+    written: dict[str, str] = {}
+
+    if dmc:
+        dmc_key = md.uns.get("dmc", {}).get("last_key")
+        if dmc_key is not None and md.get_dmc() is not None:
+            written["dmc_significant"] = dmc_to_tsv(
+                md, str(out / f"{dmc_key}.significant.{ext}"), alpha=alpha
+            )
+            if full:
+                written["dmc_full"] = dmc_to_tsv(
+                    md, str(out / f"{dmc_key}.{ext}"), full=True
+                )
+
+    if dmr:
+        dmr_df = md.uns.get("dmr")
+        if isinstance(dmr_df, pl.DataFrame) and len(dmr_df):
+            written["dmr"] = dmr_to_tsv(md, str(out / f"dmr.{ext}"))
+
+    if dvc:
+        dvc_df = md.varm.get("dvc")
+        if isinstance(dvc_df, pl.DataFrame) and len(dvc_df):
+            written["dvc_significant"] = dvc_to_tsv(
+                md, str(out / f"dvc.significant.{ext}"), alpha=alpha
+            )
+            if full:
+                written["dvc_full"] = dvc_to_tsv(
+                    md, str(out / f"dvc.{ext}"), full=True
+                )
+
+    if qc and md.obs is not None and len(md.obs):
+        written["qc"] = qc_to_tsv(md, str(out / f"qc_summary.{ext}"))
+
+    logger.info(
+        "export_tables wrote %d table(s) to %s: %s",
+        len(written), out, ", ".join(sorted(written)) or "(none)",
+    )
+    return written
+
+
 __all__ = [
     "to_bedgraph",
     "to_bigwig",
@@ -448,4 +559,5 @@ __all__ = [
     "dmc_to_tsv",
     "dvc_to_tsv",
     "qc_to_tsv",
+    "export_tables",
 ]

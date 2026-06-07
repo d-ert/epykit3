@@ -144,6 +144,7 @@ nav:
   - Query: query/index.md
   - Export:
       - Overview: export/index.md
+      - Tabular (TSV / CSV): export/tables.md
       - AnnData / MuData: export/anndata.md
       - methylKit: export/methylkit.md
       - Genome Browsers: export/genome-browsers.md

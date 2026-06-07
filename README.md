@@ -51,6 +51,7 @@ The WGBS analysis ecosystem is fragmented across R/Bioconductor (methylKit, DSS,
 - **Replicate-aware throughout.** Per-site `min_samples_treatment` / `min_samples_control` guards, per-site or chromosome-level McCullagh-Nelder dispersion, optional covariate design matrices via Wilkinson formulas.
 - **Annotation.** Gene features (promoter / 5'UTR / exon / intron / 3'UTR) from GENCODE / Ensembl **GTF** or UCSC **`refGene.txt`** (HOMER's default catalog), plus CpG-island context (island / shore / shelf / open-sea). Opt-in `gene_type_filter="protein_coding"` drops lincRNAs / pseudogenes. `multi_annotation=True` (default) adds annotatr-style `nearest_tss_gene` / `nearest_tss_distance` and one-to-many `all_overlapping_genes` / `all_overlapping_features` columns so a site that's intronic for one gene AND in another gene's promoter window is faithfully represented.
 - **Visualisation pack.** matplotlib volcano, MA, Manhattan, coverage histogram, methylation heatmap, PCA, UMAP, sample-correlation heatmap, QC dashboard, DMR boxplot, genomic-context bar, CpG-island pie, TSS metaplot — plus Plotly twins for the HTML report.
+- **Result tables as TSV/CSV.** The main analyses write a human-readable TSV by default: `ep.tl.dmc(md)`, `ep.tl.dmr(md)`, and `ep.tl.annotate(md)` drop `dmc.significant.tsv` / `dmr.tsv` / `dmc_annotated.tsv` into `<methylstore>/results/` (override with `tsv="path"`, disable with `tsv=False` or `EPYKIT_NO_AUTO_TSV=1`). Or dump **all** result tables (DMC / DMR / DVC / QC) at once with `md.export_tables("results/")`. Tab-delimited by default (the genomics convention); a `.csv` suffix switches to commas. The individual writers (`ep.export.dmc_to_tsv`, `dmr_to_tsv`, `dvc_to_tsv`, `qc_to_tsv`) are there for fine control, and the CLI auto-emits a sibling `.tsv` next to every parquet output.
 - **Interop.** Self-contained HTML report (`md.report("out.html")`), AnnData (`md.to_anndata()`), MuData (`md.to_mudata()`), methylKit-compatible tabix tables (`md.to_methylkit_tabix(dir)`), MultiQC custom-content JSON (`ep.report_multiqc(md, dir)`), nf-core/methylseq QC ingestion (`ep.read_nfcore_methylseq_qc(...)`).
 - **CLI.** `epykit convert | filter | dmc | dmr | annotate | qc-report | smooth | report | aggregate-regions | export` — every stage scriptable from the shell.
 
@@ -137,6 +138,10 @@ ep.tl.annotate(
 # Persist the analysis and emit a shareable HTML report.
 md.save("cd55_analysis")
 md.report("cd55_report.html")             # interactive Plotly + Jinja2
+# tl.dmc / tl.dmr / tl.annotate already auto-wrote human-readable TSVs to
+# methyl_store/results/ by default (dmc.significant.tsv, dmr.tsv, dmc_annotated.tsv;
+# pass tsv=False or set EPYKIT_NO_AUTO_TSV=1 to opt out, or tsv="path" to redirect).
+md.export_tables("results/tables")        # or grab everything (incl. DVC/QC) in one call
 
 # Plotting (pl.*) — works on a freshly loaded MethylData.
 md = ep.load("methyl_store/results/cd55_analysis")
@@ -271,7 +276,7 @@ DMC frames carry: `chrom`, `pos`, `strand`, `n_case`, `n_control`, `mean_beta_ca
 | `tl.py`            | High-level orchestrators: `tl.qc`, `tl.dmc`, `tl.dmr`, `tl.dvc`, `tl.annotate` |
 | `pl/`              | Plotting — `qc`, `differential`, `genomic`, `clustering`, `metaplot`, `embedding`, `correlation`, `dashboard`, `dmr_boxplot`, plus Plotly twins |
 | `report.py`        | Self-contained interactive HTML report (Jinja2 + Plotly) |
-| `export.py`        | BedGraph / BigWig / DMC-BED / DMR-BED export |
+| `export.py`        | TSV/CSV result tables (`dmc_to_tsv`, `dmr_to_tsv`, `dvc_to_tsv`, `qc_to_tsv`, `export_tables`) + BedGraph / BigWig / DMC-BED / DMR-BED |
 | `anndata_io.py`    | AnnData export |
 | `mudata_io.py`     | MuData export (multi-omics bundling) |
 | `methylkit_io.py`  | methylKit-compatible tabix tables |

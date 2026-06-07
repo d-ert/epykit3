@@ -83,7 +83,7 @@ from .qc import (
 from ._glm import build_design
 
 # Export / interop (lazy heavy deps inside)
-from .export import to_bedgraph, to_bigwig, dmcs_to_bed, dmrs_to_bed
+from .export import to_bedgraph, to_bigwig, dmcs_to_bed, dmrs_to_bed, export_tables
 from .anndata_io import to_anndata, to_mudata
 from .methylkit_io import to_methylkit_tabix
 from .multiqc_export import report_multiqc
@@ -152,6 +152,7 @@ __all__ = [
     "to_bigwig",
     "dmcs_to_bed",
     "dmrs_to_bed",
+    "export_tables",
     "to_anndata",
     "to_mudata",
     "to_methylkit_tabix",
