@@ -33,6 +33,49 @@ def test_to_methylkit_tabix_writes_files(synth_md_filtered, tmp_path):
     assert all(f.stat().st_size > 0 for f in sample_files)
 
 
+def test_to_methylkit_export_is_1_based(synth_md_filtered, tmp_path):
+    """M9: methylKit (Bioconductor/GenomicRanges) is 1-based, so the exported
+    ``base``/``chrBase`` columns must be the 0-based store ``pos`` PLUS ONE.
+    The pre-fix writer emitted the raw 0-based pos, shifting every CpG 1 bp
+    left versus annotations."""
+    import gzip
+    import io
+
+    md = synth_md_filtered
+    sample = md.obs.get_column("sample_id").to_list()[0]
+
+    # 0-based positions in the store for this sample (export filters cov>0).
+    store_positions = set(
+        pl.scan_parquet(str(Path(md.store) / f"sample={sample}" / "**" / "*.parquet"))
+        .filter(pl.col("coverage") > 0)
+        .select("pos")
+        .collect()
+        .get_column("pos")
+        .to_list()
+    )
+    assert store_positions, "fixture sample has no covered sites"
+
+    out_dir = Path(md.to_methylkit_tabix(str(tmp_path / "mk_out")))
+    txt_gz = out_dir / f"{sample}.methylraw.txt.gz"
+    assert txt_gz.exists()
+
+    with gzip.open(txt_gz, "rt") as fh:
+        rows = list(io.StringIO(fh.read()))
+    header = rows[0].rstrip("\n").split("\t")
+    bi, ci = header.index("base"), header.index("chrBase")
+    exported_bases = set()
+    for line in rows[1:]:
+        cols = line.rstrip("\n").split("\t")
+        base = int(cols[bi])
+        # chrBase is "<chr>.<base>" -- the base component must match.
+        assert int(cols[ci].split(".")[-1]) == base
+        exported_bases.add(base)
+
+    # Every exported base is exactly one greater than a 0-based store pos,
+    # and the sets line up one-to-one.
+    assert exported_bases == {p + 1 for p in store_positions}
+
+
 def test_multiqc_export_writes_json(synth_md_filtered, tmp_path):
     md = synth_md_filtered
     # Run a quick QC pass so there's something to write.

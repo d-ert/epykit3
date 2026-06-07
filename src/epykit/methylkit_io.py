@@ -68,14 +68,19 @@ def _write_one_sample(
                 if len(df) == 0:
                     continue
                 for row in df.iter_rows(named=True):
-                    pos = int(row["pos"])
+                    # epykit stores 0-based `pos`; methylKit (Bioconductor /
+                    # GenomicRanges) is 1-based, so its `base`/`chrBase`
+                    # columns must carry pos+1. Writing the raw 0-based pos
+                    # shifted every exported CpG 1 bp left vs annotations
+                    # (M9).
+                    base = int(row["pos"]) + 1
                     cov = int(row["coverage"])
                     n_meth = int(row["N_meth"])
                     freq_c = 100.0 * n_meth / max(cov, 1)
                     freq_t = 100.0 - freq_c
                     strand = row.get("strand") or "*"
                     fh.write(
-                        f"{chrom}.{pos}\t{chrom}\t{pos}\t{strand}\t"
+                        f"{chrom}.{base}\t{chrom}\t{base}\t{strand}\t"
                         f"{cov}\t{freq_c:.6f}\t{freq_t:.6f}\n"
                     )
                     written += 1
