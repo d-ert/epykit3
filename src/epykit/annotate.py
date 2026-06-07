@@ -340,9 +340,11 @@ def _build_tts_df(
         return pd.DataFrame(columns=_FEAT_COLS)
     plus  = genes_pd[genes_pd["Strand"] == "+"].copy()
     minus = genes_pd[genes_pd["Strand"] == "-"].copy()
-    # + strand: TES = End -> window [End-upstream, End+downstream)
-    plus["Start"] = (plus["End"] - upstream_bp).clip(lower=0)
-    plus["End"]   = plus["End"] + downstream_bp
+    # + strand: TES = End-1 (the last transcribed base; End is one past it in
+    # the 0-based half-open [Start, End)) -> window [TES-upstream, TES+downstream)
+    tts_plus = plus["End"] - 1
+    plus["Start"] = (tts_plus - upstream_bp).clip(lower=0)
+    plus["End"]   = tts_plus + downstream_bp
     # - strand: TES = Start -> window [Start-downstream, Start+upstream)
     tts_minus = minus["Start"].copy()
     minus["Start"] = (tts_minus - downstream_bp).clip(lower=0)
