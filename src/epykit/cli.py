@@ -133,13 +133,18 @@ def _read_samplesheet_groups(samplesheet: str, treatment_group: str, control_gro
 
 def _cmd_convert(args: argparse.Namespace):
     """Handler for 'convert' subcommand."""
+    # --merge-cpg/--no-merge-cpg is a tri-state flag with a None sentinel
+    # (neither flag given). Resolve None -> True so a bare ``epykit convert``
+    # merges CpG dyads, matching the API default (convert_sample/read_bismark
+    # default merge_strands=True). Explicit flags force True/False (D10).
+    merge_strands = True if args.merge_cpg is None else args.merge_cpg
     convert_sample(
         args.input,
         args.sample_id,
         args.output_dir,
         context=args.context,
         reference_fasta=args.reference_fasta,
-        merge_strands=args.merge_cpg,  # CLI flag is --merge-cpg; param is merge_strands
+        merge_strands=merge_strands,  # CLI flag is --merge-cpg; param is merge_strands
         format=args.format,
     )
 
@@ -656,8 +661,18 @@ def main():
         "--context", choices=["CpG", "CHG", "CHH"], default="CpG",
     )
     p_conv.add_argument("--reference-fasta")
-    p_conv.add_argument("--merge-cpg",    dest="merge_cpg", action="store_true")
-    p_conv.add_argument("--no-merge-cpg", dest="merge_cpg", action="store_false")
+    p_conv.add_argument(
+        "--merge-cpg", dest="merge_cpg", action="store_true",
+        help=(
+            "Merge symmetric CpG dyads (+/- strand) into one record. This is "
+            "the default (matching the Python API merge_strands=True); the flag "
+            "is accepted for explicitness."
+        ),
+    )
+    p_conv.add_argument(
+        "--no-merge-cpg", dest="merge_cpg", action="store_false",
+        help="Disable CpG-dyad merging; keep per-strand records.",
+    )
     p_conv.set_defaults(merge_cpg=None, func=_cmd_convert)
 
     # filter
