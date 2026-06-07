@@ -40,10 +40,12 @@ jobs:
   slow:
     name: pytest slow tier (ubuntu, py3.12)
     # The accuracy / calibration / chain-merge logic lives behind the `slow`
-    # marker and is excluded from the matrix `test` job. Run it here so the
-    # statistical guarantees (incl. real-engine null calibration) are exercised
-    # in CI. Push events only, to bound cost.
-    if: github.event_name == 'push'
+    # marker and is excluded from the matrix `test` job. Run it here on both
+    # push AND pull_request (M9) so the statistical guarantees (incl.
+    # real-engine null calibration) are exercised BEFORE merge, not only after.
+    # It's a single ubuntu/py3.12 job, so the per-PR cost stays bounded; the
+    # fast engine-oracle tests (tests/test_engine_oracles.py) additionally run
+    # in the full matrix incl. Windows on every PR.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
