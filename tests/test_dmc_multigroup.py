@@ -214,3 +214,47 @@ def test_named_contrast_single_row(multigroup_md):
     # Should have produced *some* finite p-values on a fixture this size.
     finite_p = df.filter(pl.col("pvalue").is_finite()).height
     assert finite_p > 0, "all p-values NaN -- contrast silently failed"
+
+
+def test_contrast_honors_fdr_method(multigroup_md):
+    """The GLM-contrast path must apply the user's ``fdr_method`` (not a
+    hardcoded ``fdr_bh``) and record it in ``md.uns['dmc']`` for audit parity
+    with the binary path.
+
+    Pre-fix the contrast branch called
+    ``apply_multiple_testing_correction(..., method='fdr_bh')`` unconditionally
+    and never recorded ``fdr_method`` in ``md.uns['dmc']`` -- so a user asking
+    for ``fdr_by`` silently got BH q-values and no audit trail.
+    """
+    md, _truth, _cfg = multigroup_md
+
+    ep.tl.dmc(md, formula="~ group", contrast="group", fdr_method="fdr_bh")
+    assert md.uns["dmc"]["fdr_method"] == "fdr_bh"
+    q_bh = (
+        md.varm["dmc_glm_contrast"]
+        .select(["chrom", "pos", "qvalue"])
+        .sort(["chrom", "pos"])
+    )
+
+    ep.tl.dmc(md, formula="~ group", contrast="group", fdr_method="fdr_by")
+    assert md.uns["dmc"]["fdr_method"] == "fdr_by", (
+        "contrast path must record the user's fdr_method, not hardcode fdr_bh"
+    )
+    q_by = (
+        md.varm["dmc_glm_contrast"]
+        .select(["chrom", "pos", "qvalue"])
+        .rename({"qvalue": "qvalue_by"})
+        .sort(["chrom", "pos"])
+    )
+
+    # fdr_by (Benjamini-Yekutieli) is strictly more conservative than fdr_bh:
+    # if the method were silently ignored the two q-value vectors would be
+    # bit-identical. Assert at least one site moved.
+    merged = q_bh.join(q_by, on=["chrom", "pos"], how="inner")
+    a = merged.get_column("qvalue").to_numpy()
+    b = merged.get_column("qvalue_by").to_numpy()
+    finite = np.isfinite(a) & np.isfinite(b)
+    assert finite.any(), "no finite q-values to compare"
+    assert np.any(b[finite] > a[finite] + 1e-9), (
+        "fdr_by q-values are identical to fdr_bh -- fdr_method was ignored"
+    )

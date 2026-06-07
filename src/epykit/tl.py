@@ -639,6 +639,7 @@ def dmc(
             min_samples_treatment=min_samples_treatment,
             min_samples_control=min_samples_control,
             dispersion=dispersion, reference=reference,
+            fdr_method=fdr_method,
             reference_level=reference_level,
         )
         # P1-11 deprecation notice for GLM / contrast path.
@@ -1080,6 +1081,7 @@ def _run_dmc_contrast(
     min_samples_control: int,
     dispersion: str,
     reference: str,
+    fdr_method: str = "fdr_bh",
     reference_level: str | None = None,
 ) -> None:
     """Internal: multi-group / continuous-covariate primary-effect DMC.
@@ -1177,7 +1179,7 @@ def _run_dmc_contrast(
         return_store=True,
     )
     dmc_store_contrast = apply_multiple_testing_correction(
-        dmc_store_contrast, method="fdr_bh"
+        dmc_store_contrast, method=fdr_method
     )
     result = dmc_store_contrast.to_dataframe()
 
@@ -1197,6 +1199,7 @@ def _run_dmc_contrast(
         "min_samples_control": min_samples_control,
         "dispersion": dispersion,
         "reference": reference,
+        "fdr_method": fdr_method,
         "last_key": key,
         "store_path": str(dmc_store_contrast.path),
     }
