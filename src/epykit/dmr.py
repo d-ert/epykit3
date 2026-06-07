@@ -1373,17 +1373,29 @@ def _empirical_pvalues_from_null_pool(
     null_pvalues_pool: np.ndarray,
     n_perm_used: int,
 ) -> np.ndarray:
-    """Pooled-null Westfall-Young empirical p-values.
+    """Empirical p-values via count-of-null-at-or-below-observed.
 
     Returns ``(n_null_at_or_below_observed + 1) / (n_perm_used + 1)`` per
     observed p-value -- the standard pseudo-count adjustment.
+
+    The function is agnostic to *which* null statistic is passed in: callers
+    may pass a pooled null (every null p-value across every permutation) OR
+    a per-perm summary (e.g. the minimum null p-value of each permutation,
+    which is the max-T / Westfall-Young construction used by both
+    ``empirical_fdr_for_dmr`` and ``empirical_fdr_for_dmc``). The contract
+    the caller must honour is that ``n_perm_used`` equals the number of
+    independent permutation contributions reflected in ``null_pvalues_pool``
+    -- failed perms must be excluded from BOTH the array and the
+    denominator.
 
     Parameters
     ----------
     observed_pvalues
         Observed per-region (or per-site) p-values.
     null_pvalues_pool
-        Pooled null p-values from successful permutations only.
+        Null p-values from successful permutations only. May be a pooled
+        null (one entry per (perm, region)) or a per-perm summary (one
+        entry per perm) -- the caller chooses; the helper is agnostic.
     n_perm_used
         Number of permutations that produced at least one usable null
         p-value. Failed permutations (zero null regions, exception in the
