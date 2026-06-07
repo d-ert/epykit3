@@ -260,23 +260,32 @@ def _merge_cpg_pairs(df: pl.DataFrame) -> pl.DataFrame:
 def _infer_strand(df: pl.DataFrame, reference_fasta: str) -> pl.Series:
     """Infer strand from reference sequence for each CpG position.
 
-    A cytosine on the + strand sits at position `start` in the reference.
-    Its complement on the - strand is at `start + 1`. Bismark merged .cov
-    coordinates are 0-based start, 1-based end (BED-like).
+    The lookup uses the internal **0-based ``pos``** coordinate (the
+    cytosine's own position), NOT the raw input ``start``. Bismark ``.cov``
+    is 1-based, so indexing the 0-based reference array by ``start`` would
+    read the base one position 3' of the cytosine and systematically
+    mislabel + strand CpGs as - (it would land on the forward G of the
+    dinucleotide). Reading ``pos`` is correct for every source format
+    because ``pos`` is normalised to 0-based at ingestion (see
+    ``_resolve_coordinate_offset``).
+
+    A cytosine measured on the + strand has reference base C at its own
+    ``pos``; the cytosine measured on the - strand pairs with a forward G,
+    so its forward reference base at ``pos`` is G.
 
     Requires pyfaidx:  pip install pyfaidx
 
     Parameters
     ----------
     df : pl.DataFrame
-        Must contain columns: chrom (str), start (Int32)
+        Must contain columns: chrom (str), pos (Int32, 0-based)
     reference_fasta : str
         Path to indexed reference FASTA (.fai index must exist)
 
     Returns
     -------
     pl.Series (Utf8)
-        "+" where the reference base at `start` is C (or c),
+        "+" where the reference base at ``pos`` is C (or c),
         "-" where it is G (complement C on the - strand),
         "*" for anything else (non-CpG context or N base).
     """
@@ -293,11 +302,11 @@ def _infer_strand(df: pl.DataFrame, reference_fasta: str) -> pl.Series:
     fasta = Fasta(reference_fasta, as_raw=True)
 
     # Per-chromosome vectorised lookup: load each chromosome sequence
-    # once, index by all of its `start` positions in bulk via numpy.
+    # once, index by all of its 0-based `pos` coordinates in bulk via numpy.
     # Preserves the per-row "+"/"-"/"*" mapping and the KeyError/
     # IndexError -> "*" fallback of the original Python loop.
     chrom_arr = df["chrom"].to_numpy()
-    start_arr = df["start"].to_numpy()
+    pos_arr = df["pos"].to_numpy()
     out = np.full(df.height, ord("*"), dtype=np.uint8)
 
     C, c_lower = ord("C"), ord("c")
@@ -316,7 +325,7 @@ def _infer_strand(df: pl.DataFrame, reference_fasta: str) -> pl.Series:
         seq = np.frombuffer(seq_bytes, dtype=np.uint8)
 
         mask = chrom_arr == chrom
-        positions = start_arr[mask]
+        positions = pos_arr[mask]
         in_bounds = positions < seq.size
         safe_pos = np.where(in_bounds, positions, 0)
         bases = seq[safe_pos]
@@ -507,7 +516,8 @@ def convert_sample(
             ]
         ).select(
             ["chrom", "pos", "context", "N_meth", "N_unmeth", "coverage", "sample",
-             "start"]   # keep start temporarily for strand inference
+             "start"]   # start retained only to be dropped below; strand
+                        # inference uses the 0-based `pos` column
         )
 
     df = lf.collect()
