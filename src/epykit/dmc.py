@@ -969,8 +969,15 @@ def _score_finalize(
     #   2) the LR p-value did not reject at p > 0.05 (i.e. the asymptotic
     #      test failed despite the large effect), AND
     #   3) both groups have at least one read.
-    # Sites that already reject under LR are left alone; the fallback can
-    # only re-test sites the LR test missed, so FPR is unchanged.
+    # Sites that already reject under LR are left alone. NOTE: this is NOT
+    # FPR-neutral. Taking min(p_LR, p_Fisher) over a subset selected by a
+    # large *observed* |meth_diff| is anti-conservative: a low-coverage null
+    # site can show a large |meth_diff| by sampling chance and then earn a
+    # Fisher p < 0.05 it would not have under LR, so type-I error among the
+    # re-tested sites rises. The |meth_diff| >= sep_threshold gate and the
+    # default sep_threshold=0.9 keep the affected set tiny, and this is an
+    # opt-in lr+ knob (off by default) -- but treat it as a power-vs-FPR
+    # trade, not a free lunch, and validate FPR on your own data before use.
     if sep_fallback:
         with np.errstate(invalid="ignore"):
             obs_diff = np.abs(pi_case - pi_ctrl)
@@ -1537,8 +1544,12 @@ def _process_one_chromosome(
         #
         # We load every sample's (meth, cov) for this chromosome into an
         # (n_sites, n_samples) stack so the batched IRLS can fit one GLM
-        # per site against the shared design matrix. At the tile level
-        # n_sites is small (~10^4-10^5), so this is a few MB of int32.
+        # per site against the shared design matrix. n_sites here is the
+        # WHOLE chromosome (this function is not tiled), so the stacks are
+        # O(chrom_sites x n_samples) int32 -- e.g. ~120 MB at 2.5M CpGs x 6
+        # samples on chr1, plus the (n_sites, p, p) einsum arrays in _glm.
+        # Still per-chromosome (within the O(largest-chrom) budget), but with
+        # an (n_samples + p^2) multiplier the lr path does not carry.
         if design_full is None or design_reduced is None or coef_idx is None:
             raise ValueError(
                 "test='glm' requires design_full, design_reduced, and "
@@ -2710,9 +2721,15 @@ def apply_multiple_testing_correction(
 
     The return type matches the input type.
 
-    For a ``DMCStore``, BH runs in a streaming two-pass pattern so the only
-    full-table-sized allocation is the float64 pvalue vector itself
-    (~176 MB at 22M sites) -- no DataFrame copies, no concat.
+    For a ``DMCStore``, BH runs in a streaming two-pass pattern: it never
+    holds a DataFrame copy or concat, but it is still a genome-global O(N)
+    step. The base pvalue vector is ~176 MB at 22M sites, and
+    ``statsmodels.multipletests`` is not in-place -- it allocates an argsort
+    plus several full-length temporaries (and ``fdr_tsbh`` runs it twice) --
+    so the realistic transient peak is ~0.8-1.2 GB at 22M sites, not 176 MB.
+    FDR is inherently genome-global (you cannot rank-correct without all
+    p-values); this is the one unavoidable O(N) step outside the per-chrom
+    O(largest-chromosome) budget.
 
     ``method`` selects the FDR procedure:
 
@@ -2783,8 +2800,10 @@ def _apply_bh_to_store(
     preallocated float64 vector. Track ``(chrom, start, end)`` spans.
     Pass 2: compute BH on the vector, then for each chrom read its
     parquet, attach the qvalue / reject slices, and rewrite the chrom
-    parquet atomically. Memory peak is ~3x the pvalue vector (input +
-    qvals + reject), independent of the rest of the table.
+    parquet atomically. Memory peak is the pvalue vector plus the qvals /
+    reject outputs AND statsmodels.multipletests' internal argsort +
+    full-length temporaries (it is not in-place), i.e. several x the pvalue
+    vector (~0.8-1.2 GB at 22M sites), independent of the rest of the table.
     """
     total = store.total_sites
     if total == 0:
