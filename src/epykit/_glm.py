@@ -716,6 +716,7 @@ def reference_pvalues(
     phi_eff: np.ndarray,
     df_resid: np.ndarray,
     reference: str = "adaptive",
+    df_floor: float = 0.0,
 ) -> np.ndarray:
     """Convert a (already dispersion-corrected) chi-sq statistic to p-values.
 
@@ -725,6 +726,13 @@ def reference_pvalues(
     behaviour for quasi-binomial GLMs whose dispersion estimate is noisy
     at small samples. ``"F"`` and ``"chi2"`` force a single reference
     distribution regardless of per-site dispersion.
+
+    ``df_floor`` (default 0 = no floor) lower-bounds the F-reference
+    denominator df via ``max(df_resid, df_floor)``. The ``lr`` engine floors
+    this at ``DF_PHI_FLOOR`` (50) because ``F(1, ~4)`` is ~250x more
+    conservative than ``chi2(1)`` at typical statistics; the GLM callers
+    pass the same floor so ``glm`` is not systematically more conservative
+    than ``lr`` on identical data (M4).
     """
     if reference == "methylkit":
         raise ValueError(
@@ -736,12 +744,14 @@ def reference_pvalues(
         )
     from scipy import stats as sp_stats
 
+    df_eff = np.maximum(df_resid, df_floor) if df_floor else df_resid
+
     if reference == "adaptive":
-        p_F = sp_stats.f.sf(stat, dfn=1, dfd=df_resid)
+        p_F = sp_stats.f.sf(stat, dfn=1, dfd=df_eff)
         p_chi2 = sp_stats.chi2.sf(stat, df=1)
         return np.where(phi_eff > 1.0, p_F, p_chi2)
     if reference == "F":
-        return sp_stats.f.sf(stat, dfn=1, dfd=df_resid)
+        return sp_stats.f.sf(stat, dfn=1, dfd=df_eff)
     return sp_stats.chi2.sf(stat, df=1)
 
 
@@ -839,6 +849,7 @@ def wald_test(
     phi_eff: Optional[np.ndarray] = None,
     df_resid: Optional[np.ndarray] = None,
     reference: str = "adaptive",
+    df_floor: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray, np.signedinteger]:
     """Per-site Wald / joint-F test of H0: C*beta_i = 0.
 
@@ -924,15 +935,22 @@ def wald_test(
                 except np.linalg.LinAlgError:
                     pass
 
-    # Reference distribution -> p-value
+    # Reference distribution -> p-value. df_floor lower-bounds the F
+    # denominator df (the GLM callers pass DF_PHI_FLOOR so glm matches lr;
+    # see reference_pvalues for the rationale -- M4).
+    df_eff = (
+        np.maximum(df_resid, df_floor)
+        if (df_resid is not None and df_floor)
+        else df_resid
+    )
     if df_resid is None or reference == "chi2":
         pvalue = sp_stats.chi2.sf(stat, df=k)
     elif reference == "F":
         f_stat = stat / k
-        pvalue = sp_stats.f.sf(f_stat, dfn=k, dfd=df_resid)
+        pvalue = sp_stats.f.sf(f_stat, dfn=k, dfd=df_eff)
     else:  # adaptive: per-site switch between F and chi2
         f_stat = stat / k
-        p_F = sp_stats.f.sf(f_stat, dfn=k, dfd=df_resid)
+        p_F = sp_stats.f.sf(f_stat, dfn=k, dfd=df_eff)
         p_chi2 = sp_stats.chi2.sf(stat, df=k)
         if phi_eff is None:
             pvalue = p_chi2

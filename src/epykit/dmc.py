@@ -1614,6 +1614,7 @@ def _process_one_chromosome(
         # shrinkage-effective df. Same bug-fix as in _score_finalize.
         pvals = _glm.reference_pvalues(
             chi2_stat, phi_eff, df_phi, reference=reference,
+            df_floor=DF_PHI_FLOOR,
         )
 
         # Effect-size columns from the GLM coefficient (log-odds) and its SE.
@@ -1704,6 +1705,7 @@ def _process_one_chromosome(
         stat, pvals, k_rank_np = _glm.wald_test(
             beta_full, cov_beta, contrast_matrix,
             phi_eff=phi_eff, df_resid=df_phi, reference=reference,
+            df_floor=DF_PHI_FLOOR,
         )
         k_rank = int(k_rank_np)
 
