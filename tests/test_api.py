@@ -337,6 +337,81 @@ def _write_bed(path, rows):
     return path
 
 
+def test_assign_cpgs_to_regions_handles_nested_and_overlapping():
+    """M7: each CpG must be assigned to EVERY region it overlaps. The old
+    searchsorted-keep-one logic dropped CpGs past an inner region's end
+    inside an outer region, and gave overlapping regions only one of their
+    shared CpGs."""
+    from epykit.pp import _assign_cpgs_to_regions
+
+    cpgs = pl.DataFrame({
+        "chrom": ["chr1"] * 4,
+        "pos": [12, 20, 105, 50],
+        "strand": ["*"] * 4,
+        "context": ["CpG"] * 4,
+        "N_meth": [1, 2, 3, 4],
+        "N_unmeth": [0, 0, 0, 0],
+        "coverage": [1, 2, 3, 4],
+        "sample": ["s"] * 4,
+    })
+    # outer [0,30) nests inner [10,15); ovlA [100,110) overlaps ovlB [103,108)
+    regions = pl.DataFrame({
+        "chrom": ["chr1"] * 4,
+        "start": [0, 10, 100, 103],
+        "end": [30, 15, 110, 108],
+        "region_id": ["outer", "inner", "ovlA", "ovlB"],
+    }).sort("start")
+
+    assigned = _assign_cpgs_to_regions(cpgs, regions)
+    pairs = set(zip(assigned["pos"].to_list(), assigned["region_id"].to_list()))
+
+    assert (12, "outer") in pairs and (12, "inner") in pairs   # nested: both
+    assert (20, "outer") in pairs                              # outer, past inner end
+    assert (20, "inner") not in pairs                          # genuinely outside inner
+    assert (105, "ovlA") in pairs and (105, "ovlB") in pairs   # overlap: both
+    assert 50 not in {p for p, _ in pairs}                     # in no region
+
+
+def test_aggregate_regions_clears_stale_store(synth_md_filtered, tmp_path):
+    """M6: re-running aggregate_regions with a different BED must not leave
+    prior partitions on disk (which would mix regions from two BEDs)."""
+    import epykit as ep
+
+    md = synth_md_filtered
+    src_store = md.store  # the pre-regions (filtered) store
+    chrom_bounds = (
+        pl.scan_parquet(f"{src_store}/sample=*/chrom=*/part-*.parquet")
+        .group_by("chrom")
+        .agg([pl.min("pos").alias("lo"), pl.max("pos").alias("hi")])
+        .collect()
+    )
+    bed1_rows, bed2_rows = [], []
+    for r in chrom_bounds.iter_rows(named=True):
+        lo, hi = int(r["lo"]), int(r["hi"])
+        if hi - lo < 4:
+            continue
+        bed1_rows.append((r["chrom"], lo, hi + 1, f"{r['chrom']}_V1"))
+        mid = (lo + hi) // 2
+        bed2_rows.append((r["chrom"], lo, mid + 1, f"{r['chrom']}_V2"))
+    bed1 = _write_bed(tmp_path / "b1.bed", bed1_rows)
+    bed2 = _write_bed(tmp_path / "b2.bed", bed2_rows)
+
+    ep.pp.aggregate_regions(md, str(bed1), min_cpgs_per_region=1)
+    # Re-aggregate from the ORIGINAL store with a different BED (the realistic
+    # re-run: a freshly pointed md.store back to the source).
+    md.store = src_store
+    ep.pp.aggregate_regions(md, str(bed2), min_cpgs_per_region=1)
+
+    region_ids = set(
+        pl.read_parquet(f"{md.store}/sample=*/chrom=*/part-*.parquet")["region_id"].to_list()
+    )
+    assert region_ids, "no regions written"
+    assert all("_V1" not in rid for rid in region_ids), (
+        f"stale V1 regions survived re-aggregation: {region_ids}"
+    )
+    assert any("_V2" in rid for rid in region_ids)
+
+
 def test_aggregate_regions_round_trip(synth_md_filtered, tmp_path):
     """Aggregating to a few wide regions yields a row per (region, sample)."""
     import epykit as ep

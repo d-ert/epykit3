@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 import warnings
 from pathlib import Path
 
@@ -311,9 +312,24 @@ def aggregate_regions(
         out = f"{md.store}_regions"
 
     out_path = Path(out)
+    src = Path(md.store)
+    # Clear any stale store from a previous run before writing. filter_sites
+    # and normalize_coverage_store both rmtree their output for this reason;
+    # without it, re-running aggregate_regions with a different BED (or a
+    # stricter min_cpgs_per_region) left prior chrom partitions on disk and
+    # md.store was repointed at a store mixing regions from two BEDs (M6).
+    # Guard against nuking the source: if out_path IS the current store
+    # (a degenerate re-aggregation on an already-aggregated md), refuse
+    # rather than delete the data we are about to read.
+    if out_path.exists() and out_path.resolve() == src.resolve():
+        raise ValueError(
+            f"aggregate_regions output {out_path} is the current md.store; "
+            f"re-aggregate from the original (pre-regions) store instead."
+        )
+    if out_path.exists():
+        shutil.rmtree(out_path)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    src = Path(md.store)
     sample_dirs = sorted(src.glob("sample=*"))
     if not sample_dirs:
         raise ValueError(f"No sample=* directories found in {md.store}")
@@ -340,10 +356,10 @@ def aggregate_regions(
             if len(cpgs) == 0:
                 continue
 
-            # Range-join: for each CpG, find the FIRST overlapping region
-            # via binary search on sorted starts. (Polars 0.20+ has
-            # join_asof but no native interval join; we approximate with
-            # explicit cross-merge of pre-sorted arrays.)
+            # Range-join: each CpG is assigned to EVERY region it overlaps
+            # (half-open [start, end)). Overlapping / nested BED regions are
+            # common (gene bodies, promoters, enhancers) and a CpG inside
+            # several regions must contribute to all of them.
             assigned = _assign_cpgs_to_regions(cpgs, regions_chrom)
             if assigned is None or len(assigned) == 0:
                 continue
@@ -404,38 +420,32 @@ def aggregate_regions(
 def _assign_cpgs_to_regions(
     cpgs: pl.DataFrame, regions_chrom: pl.DataFrame
 ) -> pl.DataFrame | None:
-    """Assign each CpG to its first overlapping region (half-open intervals).
+    """Assign each CpG to EVERY region it overlaps (half-open intervals).
 
     Returns a DataFrame with the CpG columns plus ``region_id``, ``start``,
-    ``end``. Returns None if no CpGs overlap any region.
+    ``end`` -- one row per (CpG, overlapping region) pair, so a CpG inside
+    nested or overlapping regions contributes to all of them. Returns None
+    if no CpGs overlap any region.
+
+    The previous implementation kept only the single region at
+    ``searchsorted(starts, pos) - 1`` (the last region whose start <= pos),
+    which silently dropped CpGs that fell past an inner region's end inside
+    an outer region, and gave overlapping regions only one of their shared
+    CpGs -- under-counting ``N_meth``/``N_unmeth``/``n_cpgs`` (M7). A range
+    join over the half-open intervals is correct for all BED topologies.
     """
-    import numpy as np
-
-    pos = cpgs["pos"].to_numpy()
-    if pos.dtype != np.int64:
-        pos = pos.astype(np.int64)
-    starts = regions_chrom["start"].to_numpy()
-    ends = regions_chrom["end"].to_numpy()
-    ids = regions_chrom["region_id"].to_list()
-
-    # np.searchsorted on sorted starts finds insertion index. The candidate
-    # region is at idx-1 (the region whose start <= pos). Then check
-    # pos < end[idx-1] for the overlap.
-    insert_idx = np.searchsorted(starts, pos, side="right")
-    cand_idx = insert_idx - 1
-    in_region = (cand_idx >= 0) & (cand_idx < len(starts)) & (pos < ends[np.clip(cand_idx, 0, len(starts) - 1)])
-    if not in_region.any():
+    # Inequality (range) join: pos in [start, end). Polars >= 1.7 join_where
+    # handles nested/overlapping regions natively (each CpG pairs with every
+    # region it falls in). Select only the region columns we need so the
+    # shared ``chrom`` column doesn't collide on the join.
+    region_cols = regions_chrom.select(["region_id", "start", "end"])
+    matched = cpgs.join_where(
+        region_cols,
+        pl.col("pos") >= pl.col("start"),
+        pl.col("pos") < pl.col("end"),
+    )
+    if len(matched) == 0:
         return None
-
-    keep_mask = in_region
-    chosen = cand_idx[keep_mask]
-    matched = cpgs.filter(pl.Series(keep_mask))
-
-    matched = matched.with_columns([
-        pl.Series("region_id", [ids[i] for i in chosen]),
-        pl.Series("start", starts[chosen].astype(np.int64)),
-        pl.Series("end", ends[chosen].astype(np.int64)),
-    ])
     return matched
 
 
