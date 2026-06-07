@@ -74,6 +74,97 @@ def test_reference_level_respected(synth_md_filtered, tmp_path):
     )
 
 
+def test_glm_reports_covariate_adjusted_effect_and_ci(synth_md_filtered):
+    """M2: the GLM (single-coef contrast) reports a covariate-ADJUSTED effect
+    size and a delta-method CI that brackets it -- not the raw marginal
+    difference of group means sitting next to an adjusted p-value.
+
+    The distinguishing signal is that ``meth_diff`` no longer equals
+    ``mean_beta_case - mean_beta_control`` (which is exactly what the buggy
+    pre-M2 code emitted): it is the delta-method central estimate from the
+    fitted logit coefficient, and the reported CI brackets *that* value.
+    """
+    md = synth_md_filtered
+    groups = md.obs.get_column("group").to_list()
+    md.obs = md.obs.with_columns(
+        (pl.col("group") == "treatment").cast(int).alias("treatment")
+    )
+    # Confound a batch covariate with group (most treatment -> b1, most
+    # control -> b2) but cross one sample per group so it isn't collinear.
+    seen_t = seen_c = 0
+    batch: list[str] = []
+    for g in groups:
+        if g == "treatment":
+            seen_t += 1
+            batch.append("b2" if seen_t == 1 else "b1")
+        else:
+            seen_c += 1
+            batch.append("b1" if seen_c == 1 else "b2")
+    md.obs = md.obs.with_columns(pl.Series("batch", batch))
+
+    ep.tl.dmc(md, test="glm", formula="~ treatment + batch", contrast="treatment")
+    df = md.dmc
+
+    for col in (
+        "meth_diff", "meth_diff_ci_lo", "meth_diff_ci_hi",
+        "mean_beta_case", "mean_beta_control", "coef_se",
+    ):
+        assert col in df.columns, f"missing {col}: {df.columns}"
+
+    eff = df["meth_diff"].to_numpy()
+    lo = df["meth_diff_ci_lo"].to_numpy()
+    hi = df["meth_diff_ci_hi"].to_numpy()
+    mbc = df["mean_beta_case"].to_numpy()
+    mbk = df["mean_beta_control"].to_numpy()
+    raw_marginal = mbc - mbk
+    finite = (
+        np.isfinite(eff) & np.isfinite(lo) & np.isfinite(hi)
+        & np.isfinite(raw_marginal)
+    )
+    assert finite.sum() > 100, "too few finite sites for a meaningful test"
+
+    # (1) THE fix: the reported effect is the ADJUSTED estimate, not the raw
+    # marginal difference of group means. Pre-M2 these were identical (diff
+    # == 0); post-M2 they differ at a substantial fraction of sites.
+    differs = np.abs(eff[finite] - raw_marginal[finite]) > 1e-3
+    assert differs.mean() > 0.3, (
+        f"adjusted meth_diff matches the raw marginal at "
+        f"{(1 - differs.mean()) * 100:.0f}% of sites -- the delta-method "
+        "effect is not wired in"
+    )
+
+    # (2) The CI brackets the reported (adjusted) effect and stays in [-1, 1].
+    assert np.all(lo[finite] <= eff[finite] + 1e-6)
+    assert np.all(eff[finite] <= hi[finite] + 1e-6)
+    assert np.all(lo[finite] >= -1.0 - 1e-6) and np.all(hi[finite] <= 1.0 + 1e-6)
+
+    # (3) mean_beta_case / mean_beta_control remain the RAW marginal group
+    # means (still proper proportions in [0, 1]); the adjustment lives only in
+    # meth_diff / coef_*.
+    mb_finite = np.isfinite(mbc) & np.isfinite(mbk)
+    assert np.all((mbc[mb_finite] >= -1e-9) & (mbc[mb_finite] <= 1 + 1e-9))
+    assert np.all((mbk[mb_finite] >= -1e-9) & (mbk[mb_finite] <= 1 + 1e-9))
+
+
+def test_glm_meth_diff_ci_widens_with_dispersion():
+    """The GLM CI is phi-scaled: delta_method_meth_diff_ci on a dispersion-
+    inflated SE is wider than on the raw binomial SE (the consistency that
+    makes the CI agree with the phi-corrected p-value)."""
+    from epykit._glm import delta_method_meth_diff_ci
+
+    coef = np.full(20, 0.4)
+    coef_se = np.full(20, 0.1)
+    ref_eta = np.full(20, 0.0)  # control mean = 0.5
+    phi = 4.0
+
+    _, hi_binom = delta_method_meth_diff_ci(coef, coef_se, ref_eta=ref_eta)
+    _, hi_disp = delta_method_meth_diff_ci(
+        coef, np.sqrt(phi) * coef_se, ref_eta=ref_eta,
+    )
+    # sqrt(4)=2x the SE -> a wider upper bound (same centre).
+    assert np.all(hi_disp > hi_binom)
+
+
 def test_nonconverged_irls_sites_are_nan(synth_md_filtered, caplog):
     """P1-5: non-converged IRLS sites must have NaN Wald statistics
     and a WARNING must be logged when the fraction exceeds 1%."""

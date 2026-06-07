@@ -1757,7 +1757,10 @@ def _process_one_chromosome(
     #
     # lr and fisher: Newcombe (1998) hybrid Wilson-score CI on pooled counts.
     #   Asymmetric and bounded to [-1,1]; better than Wald near boundary betas.
-    # welch_t and glm: Welch-normal Wald CI (Welford accumulators or model-based).
+    # glm: covariate-ADJUSTED effect + delta-method CI from the fitted logit
+    #   coefficient (M2) -- the marginal Welch CI would contradict the adjusted
+    #   p-value (even in sign on a confounded design).
+    # welch_t: Welch-normal Wald CI from the Welford accumulators.
     from . import _glm as _glm_for_ci
     if not multigroup_mode:
         if _newcombe_meth_a is not None:
@@ -1769,8 +1772,51 @@ def _process_one_chromosome(
                 _newcombe_meth_b, _newcombe_cov_b,
                 phi=_newcombe_phi, df=_newcombe_df,
             )
+        elif "coef_treatment" in extras:
+            # M2: covariate-ADJUSTED effect + CI for the single-coef GLM paths
+            # (test="glm" deviance-LR, and glm_contrast with a single-coef
+            # contrast -- the public tl.dmc(formula=..., contrast=...) route).
+            # The raw Welford group means (Welch branch below) give the
+            # UNADJUSTED marginal difference, which can disagree -- even in
+            # sign -- with the covariate-adjusted p-value; only the GLM
+            # coefficient reflected the adjustment. Map that logit coefficient
+            # to the meth scale via the delta method, evaluated at the control
+            # group's fitted mean, and phi-scale its SE so the CI shares the
+            # quasi-binomial variance model the p-value uses. Read from
+            # `extras` (the contrast branch stores Cb/cse there under different
+            # local names).
+            coef_t  = np.asarray(extras["coef_treatment"], dtype=np.float64)
+            coef_s  = np.asarray(extras["coef_se"], dtype=np.float64)
+            eps = _BETA_EPSILON
+            ctrl_clip = np.clip(mean_ctrl.astype(np.float64), eps, 1.0 - eps)
+            ref_eta = np.log(ctrl_clip / (1.0 - ctrl_clip))   # logit(control mean)
+            se_disp = np.sqrt(np.maximum(phi_eff, 0.0)) * coef_s
+            ci_lo, ci_hi = _glm_for_ci.delta_method_meth_diff_ci(
+                coef_t, se_disp, ref_eta=ref_eta,
+            )
+            # Adjusted central estimate (= delta_method_meth_diff_ci's central
+            # diff), so the CI brackets it by construction. mean_beta_case /
+            # mean_beta_control stay the RAW marginal means -- for the adjusted
+            # GLM, meth_diff != mean_beta_case - mean_beta_control by design.
+            with np.errstate(over="ignore", under="ignore"):
+                p_treat = 1.0 / (1.0 + np.exp(-np.clip(ref_eta + coef_t, -30.0, 30.0)))
+                p_ref   = 1.0 / (1.0 + np.exp(-np.clip(ref_eta, -30.0, 30.0)))
+            meth_diff_adj = p_treat - p_ref
+            # Preserve the existing boundary semantics: NaN where either raw
+            # group mean is undefined (zero valid replicates). For a pure
+            # continuous-covariate contrast with no binary case/control split
+            # both means are NaN, so meth_diff/CI stay NaN (as today) rather
+            # than reporting an ill-defined baseline.
+            valid_eff = np.isfinite(mean_beta_case) & np.isfinite(mean_beta_ctrl)
+            meth_diff = np.where(valid_eff, meth_diff_adj, np.nan).astype(np.float32)
+            ci_lo = np.where(valid_eff, ci_lo, np.nan)
+            ci_hi = np.where(valid_eff, ci_hi, np.nan)
+            # Emit the phi-scaled SE so coef_se, the CI and the p-value are
+            # mutually reproducible (the one intentional value change to the
+            # GLM-only coef_se column).
+            extras["coef_se"] = se_disp
         else:
-            # welch_t and glm paths -- Wald CI from Welford accumulators.
+            # welch_t (and glm_contrast single-coef) -- Wald CI from Welford.
             vm_case = _welford_var_mean(M2_case, n_valid_case)
             vm_ctrl = _welford_var_mean(M2_ctrl, n_valid_ctrl)
             ci_lo, ci_hi = _glm_for_ci.welch_meth_diff_ci(
