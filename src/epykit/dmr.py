@@ -1367,6 +1367,37 @@ def call_dmr_tile_based(
 
 # Permutation-based empirical FDR
 
+def _stratified_permutation_assignment(
+    *,
+    strata_map: dict[str, list[str]],
+    samples_treatment: list[str],
+    samples_control: list[str],
+    rng: np.random.Generator,
+) -> tuple[list[str], list[str]]:
+    """Per-stratum k-of-n permutation.
+
+    For each stratum, randomly select k samples as treatment, where k equals
+    the original number of treatment samples in that stratum. The remaining
+    samples become control. Preserves per-stratum group sizes -- the
+    invariant pre-fix code violated by shuffling within strata and then
+    splitting globally.
+
+    NOTE: The contract that ``samples_treatment`` is consulted for membership
+    is load-bearing. Refactors that drop the original treatment set from
+    callers (e.g. ``empirical_fdr_for_dmr``) will silently break stratified
+    permutation -- the helper must be able to derive k_treat per stratum.
+    """
+    treat_set = set(samples_treatment)
+    perm_treat: list[str] = []
+    perm_ctrl: list[str] = []
+    for stratum_samples in strata_map.values():
+        k_treat = sum(1 for s in stratum_samples if s in treat_set)
+        shuffled = list(rng.permutation(stratum_samples))
+        perm_treat.extend(shuffled[:k_treat])
+        perm_ctrl.extend(shuffled[k_treat:])
+    return perm_treat, perm_ctrl
+
+
 def empirical_fdr_for_dmr(
     methylstore_path: str,
     samples_treatment: list[str],
@@ -1443,15 +1474,17 @@ def empirical_fdr_for_dmr(
         # Local RNG so parallel workers stay deterministic.
         local_rng = np.random.default_rng(seed + perm_idx + 1)
         if empirical_strata is not None:
-            # Shuffle within each stratum and re-assemble the pool.
-            shuffled: list[str] = []
-            for group_samples in empirical_strata.values():
-                shuffled.extend(local_rng.permutation(group_samples).tolist())
+            perm_treat, perm_ctrl = _stratified_permutation_assignment(
+                strata_map=empirical_strata,
+                samples_treatment=samples_treatment,
+                samples_control=samples_control,
+                rng=local_rng,
+            )
         else:
             shuffled = pool.copy()
             local_rng.shuffle(shuffled)
-        perm_treat = shuffled[:n_treat]
-        perm_ctrl = shuffled[n_treat:]
+            perm_treat = shuffled[:n_treat]
+            perm_ctrl = shuffled[n_treat:]
         # Force test='lr' or whatever observed used; do not run annotation.
         kwargs = dict(dmr_kwargs)
         kwargs.pop("samples_case", None)
