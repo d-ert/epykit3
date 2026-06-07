@@ -32,10 +32,10 @@ jobs:
       - name: Install epykit + test deps
         run: uv sync --python ${{ matrix.python-version }} --extra dev --extra all
 
-      - name: Run pytest (skip slow)
+      - name: Run pytest (skip slow, with coverage)
         env:
           PYTHONIOENCODING: utf-8
-        run: uv run --python ${{ matrix.python-version }} pytest -m "not slow" --strict-markers -ra
+        run: uv run --python ${{ matrix.python-version }} pytest -m "not slow" --strict-markers -ra --cov=epykit --cov-report=term-missing
 
   slow:
     name: pytest slow tier (ubuntu, py3.12)
@@ -118,3 +118,34 @@ jobs:
         env:
           PYTHONIOENCODING: utf-8
         run: uv run --python 3.12 python benchmark/scripts/regen_small.py
+
+  build:
+    # Build the sdist + wheel, validate the package metadata, and smoke-test
+    # the installed wheel in a clean environment so a broken sdist, missing
+    # package-data, or bad metadata is caught before it reaches PyPI (M-pkg4).
+    name: build + wheel smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Build sdist + wheel
+        run: uv run --python 3.12 --with build python -m build
+
+      - name: Validate package metadata
+        run: uv run --python 3.12 --with twine twine check dist/*
+
+      - name: Install the built wheel in a clean env and smoke-test the CLI
+        run: |
+          uv venv --python 3.12 /tmp/wheelcheck
+          uv pip install --python /tmp/wheelcheck/bin/python dist/*.whl
+          /tmp/wheelcheck/bin/epykit --help
+          /tmp/wheelcheck/bin/python -c "import epykit; print('epykit', epykit.__version__)"
