@@ -2633,6 +2633,45 @@ def _apply_storey_qvalues(pvals: np.ndarray) -> tuple[np.ndarray, np.ndarray, fl
     return reject, qvals, pi0
 
 
+def _fdr_correct_finite(
+    pvals: np.ndarray, method: str
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Run the FDR procedure over the FINITE p-values only (M6).
+
+    NaN p-values mark *untested* hypotheses -- sites masked by the
+    ``min_samples_*`` guard or degenerate sites whose test was never
+    computed -- not p=1 observations. They are excluded from the
+    multiple-testing denominator ``n``: filling them with 1.0 and feeding
+    the full vector to BH / Storey would inflate ``n`` and make every real
+    q-value conservative (a power loss, not a false-positive risk). This is
+    what the ``min_samples`` guard's "effectively excluded from genome-wide
+    FDR control" contract has always promised, and what
+    :func:`epykit.dvc.process_chromosomes_dvc` already does.
+
+    When there are no NaN p-values (the intersect-mode default), this is
+    byte-identical to running ``multipletests`` on the whole vector.
+
+    Returns full-length ``(reject, qvalue)`` arrays aligned to ``pvals``
+    with ``False`` / ``NaN`` at the non-finite positions, plus the Storey
+    ``pi0`` estimate (1.0 for the non-Storey methods).
+    """
+    qvals = np.full(pvals.shape, np.nan, dtype=np.float64)
+    reject = np.zeros(pvals.shape, dtype=bool)
+    finite = np.isfinite(pvals)
+    if not finite.any():
+        return reject, qvals, 1.0
+    p_fin = pvals[finite]
+    if method == "fdr_storey":
+        rej_fin, q_fin, pi0 = _apply_storey_qvalues(p_fin)
+    else:
+        from statsmodels.stats.multitest import multipletests
+        rej_fin, q_fin, _, _ = multipletests(p_fin, method=method)
+        pi0 = 1.0
+    qvals[finite] = q_fin
+    reject[finite] = rej_fin
+    return reject, qvals, pi0
+
+
 @overload
 def apply_multiple_testing_correction(
     dmc_results: DMCStore,
@@ -2715,19 +2754,15 @@ def apply_multiple_testing_correction(
             return dmc_results
         return _apply_bh_to_store(dmc_results, method, pvalue_col, qvalue_col)
 
-    pvals       = dmc_results[pvalue_col].to_numpy()
-    nan_mask    = np.isnan(pvals)
-    pvals_clean = np.where(nan_mask, 1.0, pvals)
-
+    pvals = dmc_results[pvalue_col].to_numpy()
+    # NaN p-values are excluded from the FDR denominator, not counted as
+    # p=1.0 (M6); see _fdr_correct_finite.
+    reject, qvals, pi0_hat = _fdr_correct_finite(pvals, method)
     if method == "fdr_storey":
-        reject, qvals, pi0_hat = _apply_storey_qvalues(pvals_clean)
-        logger.info("Storey FDR: pi0_hat = %.4f (pvals=%d)", pi0_hat, len(pvals_clean))
-    else:
-        from statsmodels.stats.multitest import multipletests
-        reject, qvals, _, _ = multipletests(pvals_clean, method=method)
-
-    qvals  = np.where(nan_mask, np.nan,  qvals)
-    reject = np.where(nan_mask, False,   reject)
+        logger.info(
+            "Storey FDR: pi0_hat = %.4f (finite pvals=%d / %d)",
+            pi0_hat, int(np.isfinite(pvals).sum()), len(pvals),
+        )
 
     reject_col = "reject" if qvalue_col == "qvalue" else f"{qvalue_col}_reject"
     return dmc_results.with_columns([
@@ -2780,17 +2815,15 @@ def _apply_bh_to_store(
     # Truncate if any chroms returned fewer rows than the manifest claimed.
     pvals = pvals[:offset]
 
-    nan_mask    = np.isnan(pvals)
-    pvals_clean = np.where(nan_mask, 1.0, pvals)
+    # NaN p-values are excluded from the FDR denominator, not counted as
+    # p=1.0 (M6); see _fdr_correct_finite.
+    reject, qvals, pi0_hat = _fdr_correct_finite(pvals, method)
     if method == "fdr_storey":
-        reject, qvals, pi0_hat = _apply_storey_qvalues(pvals_clean)
-        logger.info("Storey FDR: pi0_hat = %.4f (pvals=%d)", pi0_hat, len(pvals_clean))
-    else:
-        from statsmodels.stats.multitest import multipletests
-        reject, qvals, _, _ = multipletests(pvals_clean, method=method)
-    qvals  = np.where(nan_mask, np.nan,  qvals)
-    reject = np.where(nan_mask, False,   reject)
-    del pvals, pvals_clean, nan_mask
+        logger.info(
+            "Storey FDR: pi0_hat = %.4f (finite pvals=%d / %d)",
+            pi0_hat, int(np.isfinite(pvals).sum()), len(pvals),
+        )
+    del pvals
 
     logger.info("BH correction (streaming): writing q-values back per chromosome...")
     for chrom, start, end in spans:
