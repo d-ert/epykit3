@@ -95,25 +95,44 @@ def bisulfite_conversion_rate(
             f"CHH store does not contain sample '{sample}': {sample_dir}"
         )
 
+    # Honour the documented contract: verify the sample exists in the CpG
+    # methylstore the rate is reported alongside (warn rather than fail, since
+    # the rate is computed purely from the CHH store).
+    if methylstore_path:
+        cpg_sample_dir = Path(methylstore_path) / f"sample={sample}"
+        if not cpg_sample_dir.exists():
+            logger.warning(
+                "bisulfite_conversion_rate: sample '%s' not found in the CpG "
+                "methylstore %s; reporting the CHH-derived rate anyway.",
+                sample, methylstore_path,
+            )
+
     parts = list(sample_dir.rglob("part-*.parquet"))
     if not parts:
         raise ValueError(
             f"No Parquet files found for sample '{sample}' in {chh_store}"
         )
 
-    # Load only the count columns; ignore chrom partition
+    # Load only the count columns; ignore chrom partition.
     lf = pl.scan_parquet(str(sample_dir / "**" / "part-*.parquet"))
+    # Guard against being pointed at a non-CHH store: if a context column is
+    # present, restrict to CHH. A CpG store would otherwise silently return
+    # 1 - mean(CpG beta) ~= 0.2 as a bogus "conversion rate".
+    if "context" in lf.collect_schema().names():
+        lf = lf.filter(pl.col("context") == "CHH")
     agg = lf.select([
         pl.sum("N_meth").alias("total_meth"),
         pl.sum("coverage").alias("total_cov"),
     ]).collect()
 
-    total_meth = int(agg["total_meth"][0])
-    total_cov  = int(agg["total_cov"][0])
+    total_meth = int(agg["total_meth"][0] or 0)
+    total_cov  = int(agg["total_cov"][0] or 0)
 
     if total_cov == 0:
         raise ValueError(
-            f"Zero CHH coverage for sample '{sample}'; cannot estimate rate."
+            f"Zero CHH coverage for sample '{sample}'. If you pointed "
+            f"chh_context_store at a CpG (or otherwise non-CHH) store, supply "
+            f"a CHH-context store instead."
         )
 
     mean_chh_methylation = total_meth / total_cov
@@ -357,9 +376,13 @@ def coverage_uniformity(
         "sample":        sample,
         "chrom":         "genome",
         "n_sites":       total_n,
+        # Site-weighted (consistent with the frac_ge_Tx aggregates below):
+        # an unweighted mean of per-chromosome means lets a tiny
+        # high-coverage contig skew the genome figure.
         "mean_coverage": float(
-            np.mean([r["mean_coverage"] for r in chrom_rows
-                     if not np.isnan(r["mean_coverage"])])
+            sum(r["mean_coverage"] * r["n_sites"] for r in chrom_rows
+                if not np.isnan(r["mean_coverage"]))
+            / total_n
         ) if total_n > 0 else float("nan"),
     }
     for t in thresholds:
@@ -632,6 +655,7 @@ def sample_correlation(
     method: str = "spearman",
     min_coverage: int = 10,
     chromosomes: list[str] | None = None,
+    max_sites: int = 200_000,
 ) -> pl.DataFrame:
     """Pairwise sample-vs-sample beta correlation matrix .
 
@@ -649,6 +673,12 @@ def sample_correlation(
         basis.
     chromosomes : list[str], optional
         Restrict to these chromosomes. Auto-detected when None.
+    max_sites : int
+        Cap the correlation basis at a deterministic random panel of this
+        many intersected CpGs (default 200k). Sample-vs-sample correlation
+        is stable on a large random panel, so this keeps the dense matrix
+        and the Spearman rank copy from scaling to genome size (~GBs at
+        22M CpGs). Set to 0 to use every intersected CpG.
 
     Returns
     -------
@@ -702,6 +732,20 @@ def sample_correlation(
     beta_matrix = np.column_stack([
         np.concatenate(beta_chunks[s]) for s in samples
     ])  # shape (n_sites_intersection, n_samples)
+    del beta_chunks
+
+    n_total = beta_matrix.shape[0]
+    if max_sites and n_total > max_sites:
+        # Deterministic random panel (fixed seed) so the dense matrix and the
+        # spearman rank copy stay bounded regardless of genome size.
+        rng = np.random.default_rng(0)
+        idx = np.sort(rng.choice(n_total, size=max_sites, replace=False))
+        beta_matrix = beta_matrix[idx]
+        logger.info(
+            "sample_correlation: using a random %s-CpG panel of %s "
+            "intersected CpGs (max_sites; seed=0) to bound memory.",
+            f"{max_sites:,}", f"{n_total:,}",
+        )
 
     if method == "spearman":
         from scipy import stats as sp_stats
