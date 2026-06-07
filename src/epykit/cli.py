@@ -294,9 +294,11 @@ def _cmd_dmr(args: argparse.Namespace):
     """Handler for 'dmr' subcommand."""
     import polars as pl
     from .dmr import (
+        _DMR_DEFAULT_MIN_CPGS,
         call_dmr_chain_merge,
         call_dmr_sliding_window,
         call_dmr_tile_based,
+        resolve_layer_min_cpgs,
     )
 
     # M2 gate (mirror of tl.dmr): empirical_fdr is wired only for method=tile.
@@ -319,16 +321,19 @@ def _cmd_dmr(args: argparse.Namespace):
             raise ValueError("method=chain_merge requires --dmc-results.")
 
         dmc_results = pl.read_parquet(args.dmc_results)
-        # --min-cpgs defaults to None so the engine can resolve it from the
-        # preset (or fall back to 3). An explicit --min-cpgs N flows through
-        # and overrides the preset. Pre-fix this branch dropped min_cpgs.
+        # Resolve --min-cpgs at the layer (shared with tl.dmr) so bare CLI
+        # chain_merge matches bare API: explicit --min-cpgs N wins; else the
+        # active --preset's value; else 5 (the paper default). Passing the
+        # concrete value overrides the engine's own preset resolution
+        # deterministically. The resolver also validates --preset.
+        cm_min_cpgs = resolve_layer_min_cpgs(args.min_cpgs, args.preset)
         dmr_results = call_dmr_chain_merge(
             dmc_results,
             preset=args.preset,
             alpha=args.alpha,
             min_abs_meth_diff=args.min_abs_meth_diff,
             dis_merge_bp=args.dis_merge_bp,
-            min_cpgs=args.min_cpgs,
+            min_cpgs=cm_min_cpgs,
             pct_sig=args.pct_sig,
             minlen_bp=args.minlen_bp,
             use_q_for_sig=args.use_q_for_sig,
@@ -391,7 +396,7 @@ def _cmd_dmr(args: argparse.Namespace):
         dmc_results = pl.read_parquet(args.dmc_results)
         dmr_results = call_dmr_rule_segment(
             dmc_results,
-            min_cpgs=args.min_cpgs if args.min_cpgs is not None else 5,
+            min_cpgs=args.min_cpgs if args.min_cpgs is not None else _DMR_DEFAULT_MIN_CPGS,
             min_abs_meth_diff=args.min_abs_meth_diff,
             alpha=args.alpha,
         )
@@ -405,7 +410,7 @@ def _cmd_dmr(args: argparse.Namespace):
             dmc_results,
             window_bp=args.window_bp,
             step_bp=args.step_bp,
-            min_cpgs=args.min_cpgs if args.min_cpgs is not None else 5,
+            min_cpgs=args.min_cpgs if args.min_cpgs is not None else _DMR_DEFAULT_MIN_CPGS,
             min_sites_significant=args.min_sites_significant,
             alpha=args.alpha,
             min_abs_meth_diff=args.min_abs_meth_diff,
@@ -863,8 +868,9 @@ def main():
     p_dmr.add_argument("--step-bp",              type=int,   default=250)
     p_dmr.add_argument(
         "--min-cpgs", type=int, default=None,
-        help="Minimum CpGs per DMR. Default: 5 for sliding_window/segment; "
-             "for chain_merge, the active --preset's value (or 3 if no preset).",
+        help="Minimum CpGs per DMR. Default when unset: the active --preset's "
+             "value if a preset is given, otherwise 5 (chain_merge, "
+             "sliding_window, and segment all share this default).",
     )
     p_dmr.add_argument("--min-sites-significant",type=int,   default=3)
 

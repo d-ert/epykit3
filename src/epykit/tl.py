@@ -23,11 +23,13 @@ from .dmc import (
     process_chromosomes_dmc,
 )
 from .dmr import (
+    _DMR_DEFAULT_MIN_CPGS,
     DMR_PRESETS,  # noqa: F401 -- public re-export: `from epykit.tl import DMR_PRESETS`
     call_dmr_chain_merge,
     call_dmr_sliding_window,
     call_dmr_tile_based,
     empirical_fdr_for_dmr,
+    resolve_layer_min_cpgs,
 )
 from .methyldata import MethylData
 from .qc import bisulfite_conversion_rate, coverage_uniformity, global_methylation_report
@@ -1533,7 +1535,7 @@ def dmr(
             )
 
         # None sentinel -> sliding_window's documented default of 5.
-        sw_min_cpgs = min_cpgs if min_cpgs is not None else 5
+        sw_min_cpgs = min_cpgs if min_cpgs is not None else _DMR_DEFAULT_MIN_CPGS
         dmr_df = call_dmr_sliding_window(
             dmc_results=dmc_input,
             window_bp=window_bp,
@@ -1574,7 +1576,7 @@ def dmr(
                 "method='segment' needs a DMC table on md. Run ep.tl.dmc(md) first."
             )
         # None sentinel -> segment's documented default of 5.
-        seg_min_cpgs = min_cpgs if min_cpgs is not None else 5
+        seg_min_cpgs = min_cpgs if min_cpgs is not None else _DMR_DEFAULT_MIN_CPGS
         dmr_df = call_dmr_rule_segment(
             dmc_df,
             min_cpgs=seg_min_cpgs,
@@ -1616,20 +1618,17 @@ def dmr(
                 "Run ep.tl.dmc(md) first."
             )
 
-        # Resolve min_cpgs with a None sentinel (M10). Explicit value wins;
-        # else defer to the preset's value (preset active); else 5 -- the
+        # Resolve min_cpgs with a None sentinel (M10) via the shared
+        # layer-level resolver so the CLI and tl.dmr agree exactly: explicit
+        # value wins; else the active preset's value; else 5 -- the
         # documented chain_merge default, which keeps the benchmark paper's
         # bare-default behavior unchanged. We compute the concrete value
         # here (rather than threading None into the engine) so dmr_params
         # records the value actually used, and pass it explicitly so it
         # overrides the engine's own preset resolution deterministically.
-        if min_cpgs is not None:
-            cm_min_cpgs = min_cpgs
-        elif preset is not None:
-            from .dmr import DMR_PRESETS
-            cm_min_cpgs = DMR_PRESETS[preset]["min_cpgs"]
-        else:
-            cm_min_cpgs = 5
+        # The resolver also validates ``preset`` (friendly ValueError, not a
+        # bare KeyError, on a typo'd preset name).
+        cm_min_cpgs = resolve_layer_min_cpgs(min_cpgs, preset)
         dmr_df = call_dmr_chain_merge(
             dmc_input,
             preset=preset,

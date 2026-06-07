@@ -674,6 +674,34 @@ DMR_PRESETS: dict[str, dict] = {
 }
 
 
+_DMR_DEFAULT_MIN_CPGS = 5
+"""Default min CpGs/DMR for the CLI and tl.dmr layers (matches the
+benchmark paper's chain_merge default). NOTE: this intentionally differs
+from call_dmr_chain_merge's own bare default of 3 (the DSS engine default
+for direct engine callers). The high-level layers default to 5; direct
+engine callers default to 3. Do not 'reconcile' these without re-running
+the chain_merge benchmark -- the paper's numbers depend on the 5."""
+
+
+def resolve_layer_min_cpgs(min_cpgs: int | None, preset: str | None) -> int:
+    """Resolve the effective min_cpgs for the CLI / tl.dmr layer.
+
+    Precedence: an explicit ``min_cpgs`` wins; else a preset's bundled
+    ``min_cpgs``; else ``_DMR_DEFAULT_MIN_CPGS`` (5). Validates ``preset``
+    with the same message ``call_dmr_chain_merge`` uses, so an invalid
+    preset raises a friendly ValueError rather than a bare KeyError.
+    """
+    if min_cpgs is not None:
+        return min_cpgs
+    if preset is not None:
+        if preset not in DMR_PRESETS:
+            raise ValueError(
+                f"Unknown preset {preset!r}. Choose from {list(DMR_PRESETS)}."
+            )
+        return DMR_PRESETS[preset]["min_cpgs"]
+    return _DMR_DEFAULT_MIN_CPGS
+
+
 def call_dmr_chain_merge(
     dmc_results: Union[pl.DataFrame, DMCStore, str, Path],
     *,

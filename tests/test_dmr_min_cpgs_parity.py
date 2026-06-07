@@ -29,7 +29,11 @@ import polars as pl
 import pytest
 
 import epykit as ep
-from epykit.dmr import DMR_PRESETS, call_dmr_chain_merge
+from epykit.dmr import (
+    DMR_PRESETS,
+    call_dmr_chain_merge,
+    resolve_layer_min_cpgs,
+)
 
 
 def _mk_dmc_frame(rows: list[dict]) -> pl.DataFrame:
@@ -173,9 +177,10 @@ def test_cli_chain_merge_forwards_min_cpgs(tmp_path, monkeypatch):
     )
 
 
-def test_cli_chain_merge_unset_min_cpgs_flows_none(tmp_path, monkeypatch):
-    """With --min-cpgs unset (argparse default None), the CLI forwards None
-    so the engine resolves via preset/3 rather than a hard-coded value."""
+def test_cli_chain_merge_unset_min_cpgs_resolves_preset(tmp_path, monkeypatch):
+    """With --min-cpgs unset (argparse default None) and a preset active, the
+    CLI resolves min_cpgs to the preset's value at the layer (matching the
+    API), rather than forwarding None to the engine."""
     import epykit.dmr as ep_dmr
     from epykit.cli import _cmd_dmr
 
@@ -201,6 +206,94 @@ def test_cli_chain_merge_unset_min_cpgs_flows_none(tmp_path, monkeypatch):
     )
     _cmd_dmr(args)
     assert "min_cpgs" in captured, "chain_merge branch must forward min_cpgs"
-    assert captured["min_cpgs"] is None, (
-        "unset --min-cpgs must flow None so the preset's value wins"
+    assert captured["min_cpgs"] == DMR_PRESETS["strict"]["min_cpgs"], (
+        "unset --min-cpgs with a preset must resolve to the preset's value"
     )
+
+
+# 8. CLI: bare chain_merge (no preset, no --min-cpgs) resolves to 5,
+#    matching the API -- the M10 parity goal on the default DMR caller.
+
+
+def _capture_cli_chain_merge_min_cpgs(tmp_path, monkeypatch, *, preset, min_cpgs):
+    """Run _cmd_dmr for chain_merge and return the min_cpgs forwarded to
+    call_dmr_chain_merge."""
+    import epykit.dmr as ep_dmr
+    from epykit.cli import _cmd_dmr
+
+    dmc = _strict_region(5)
+    dmc_path = tmp_path / "dmc.parquet"
+    dmc.write_parquet(dmc_path)
+
+    captured: dict = {}
+    real = ep_dmr.call_dmr_chain_merge
+
+    def _capturing(dmc_results, **kwargs):
+        captured.update(kwargs)
+        return real(dmc_results, **kwargs)
+
+    monkeypatch.setattr(ep_dmr, "call_dmr_chain_merge", _capturing)
+
+    args = argparse.Namespace(
+        method="chain_merge", empirical_fdr=False,
+        dmc_results=str(dmc_path), preset=preset,
+        alpha=0.05, min_abs_meth_diff=0.1, dis_merge_bp=500,
+        pct_sig=0.5, minlen_bp=50, use_q_for_sig=False,
+        min_cpgs=min_cpgs, output=str(tmp_path / "out.parquet"), no_tsv=True,
+    )
+    _cmd_dmr(args)
+    return captured.get("min_cpgs")
+
+
+def test_cli_chain_merge_bare_default_is_five(tmp_path, monkeypatch):
+    """Bare ``epykit dmr --method chain_merge`` (no preset, no --min-cpgs)
+    must resolve to 5 -- the API/paper default -- not the engine's 3."""
+    got = _capture_cli_chain_merge_min_cpgs(
+        tmp_path, monkeypatch, preset=None, min_cpgs=None
+    )
+    assert got == 5, (
+        "bare CLI chain_merge must resolve min_cpgs to 5 (was 3 pre-fix)"
+    )
+
+
+def test_cli_api_bare_chain_merge_parity(tmp_path, monkeypatch, synth_md_filtered):
+    """CLI-bare and API-bare chain_merge must resolve to the SAME min_cpgs."""
+    cli_val = _capture_cli_chain_merge_min_cpgs(
+        tmp_path, monkeypatch, preset=None, min_cpgs=None
+    )
+
+    md = synth_md_filtered
+    ep.tl.dmc(md, test="lr")
+    ep.tl.dmr(md, method="chain_merge", min_mean_qvalue=None)
+    api_val = md.uns["dmr_params"]["min_cpgs"]
+
+    assert cli_val == api_val == 5, (
+        f"CLI-bare ({cli_val}) and API-bare ({api_val}) chain_merge must "
+        f"both resolve to 5"
+    )
+
+
+# 9. API: an invalid preset raises a friendly ValueError, not a bare KeyError.
+
+
+def test_tl_dmr_invalid_preset_friendly_error(synth_md_filtered):
+    """``tl.dmr(method='chain_merge', preset='defualt')`` (typo, no
+    min_cpgs) must raise a friendly ValueError, not a raw KeyError."""
+    md = synth_md_filtered
+    ep.tl.dmc(md, test="lr")
+    with pytest.raises(ValueError, match="Unknown preset"):
+        ep.tl.dmr(md, method="chain_merge", preset="defualt", min_mean_qvalue=None)
+
+
+# 10. Layer resolver unit test.
+
+
+def test_resolve_layer_min_cpgs():
+    assert resolve_layer_min_cpgs(None, None) == 5
+    assert resolve_layer_min_cpgs(None, "default") == 3
+    assert resolve_layer_min_cpgs(None, "strict") == 5
+    assert resolve_layer_min_cpgs(None, "permissive") == 3
+    assert resolve_layer_min_cpgs(7, "strict") == 7   # explicit wins
+    assert resolve_layer_min_cpgs(7, None) == 7
+    with pytest.raises(ValueError, match="Unknown preset"):
+        resolve_layer_min_cpgs(None, "defualt")
