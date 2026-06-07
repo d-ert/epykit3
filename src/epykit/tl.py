@@ -933,6 +933,14 @@ def dmc(
                 min_samples_control=min_samples_control,
                 dispersion=dispersion,
                 reference=reference,
+                # M3: engine knobs that can overwrite the per-site p-value
+                # MUST be applied identically in observed and null runs,
+                # otherwise the Westfall-Young statistic compares deflated
+                # observed p-values against an un-deflated null pool.
+                sep_fallback=sep_fallback,
+                sep_threshold=sep_threshold,
+                smoothing=smoothing,
+                smoothing_span_bp=smoothing_span_bp,
             )
     finally:
         if _smoothed_tmp is not None:

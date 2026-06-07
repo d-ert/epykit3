@@ -2988,6 +2988,10 @@ def empirical_fdr_for_dmc(
     n_perm: int = 100,
     seed: int = 42,
     n_jobs: int = 1,
+    sep_fallback: bool = False,
+    sep_threshold: float = 0.9,
+    smoothing: bool = False,
+    smoothing_span_bp: int = 500,
     **dmc_kwargs,
 ) -> pl.DataFrame:
     """Empirical (permutation) FDR for per-CpG DMC results.
@@ -3030,6 +3034,16 @@ def empirical_fdr_for_dmc(
     n_jobs
         joblib parallel worker count. -1 uses all cores. Falls back to
         serial execution when joblib is not installed. Default 1.
+    sep_fallback, sep_threshold, smoothing, smoothing_span_bp
+        Engine knobs that can overwrite the per-site p-value during the
+        observed run. They MUST be forwarded into every permutation so
+        the Westfall-Young statistic compares like-for-like p-values;
+        otherwise the observed side is deflated relative to an
+        un-deflated null pool, producing anti-conservative empirical p.
+        See ``docs/review/2026-06-07-epykit-codebase-audit.md`` (M3).
+        Defaults match :func:`tl.dmc` defaults (``sep_threshold=0.9``,
+        ``smoothing_span_bp=500``) so passing nothing reproduces the
+        old behaviour for callers that never enabled either knob.
     **dmc_kwargs
         Forwarded to :func:`process_chromosomes_dmc` for each permutation;
         should match the observed run's settings (test, chromosomes,
@@ -3066,6 +3080,14 @@ def empirical_fdr_for_dmc(
         # Strip deprecated aliases so they don't double-bind.
         kwargs.pop("samples_case", None)
         kwargs.pop("min_samples_case", None)
+        # sep_fallback / smoothing are now explicit parameters of
+        # empirical_fdr_for_dmc (M3 forwarding fix) -- pop them from
+        # **dmc_kwargs to avoid double-binding if a caller routed them
+        # through the variadic kwargs.
+        kwargs.pop("sep_fallback", None)
+        kwargs.pop("sep_threshold", None)
+        kwargs.pop("smoothing", None)
+        kwargs.pop("smoothing_span_bp", None)
         # Each permutation runs DMC; we only need the pvalue column.
         # Use a throwaway out_dir per-perm so n_perm runs don't leave
         # n_perm stores littering the cache, and use return_store=True
@@ -3081,6 +3103,10 @@ def empirical_fdr_for_dmc(
                 samples_control=perm_ctrl,
                 out_dir=perm_dir,
                 return_store=True,
+                sep_fallback=sep_fallback,
+                sep_threshold=sep_threshold,
+                smoothing=smoothing,
+                smoothing_span_bp=smoothing_span_bp,
                 **kwargs,
             )
         except Exception as exc:
