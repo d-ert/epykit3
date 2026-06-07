@@ -343,6 +343,13 @@ def _cmd_dmr(args: argparse.Namespace):
             minlen_bp=args.minlen_bp,
             use_q_for_sig=args.use_q_for_sig,
         )
+        # Region-level q-value post-filter, mirroring tl.dmr's chain_merge
+        # branch exactly (same column fallback). Pre-fix the CLI skipped this,
+        # so CLI chain_merge output was less filtered than the API (D11).
+        _min_q = getattr(args, "min_mean_qvalue", None)
+        if len(dmr_results) > 0 and _min_q is not None:
+            q_col = "combined_qvalue" if "combined_qvalue" in dmr_results.columns else "combined_pvalue"
+            dmr_results = dmr_results.filter(pl.col(q_col) < _min_q)
     elif args.method == "tile":
         # --- tile-based path. Needs methylstore + samplesheet. ---
         if not args.methylstore or not args.samplesheet:
@@ -420,6 +427,12 @@ def _cmd_dmr(args: argparse.Namespace):
             alpha=args.alpha,
             min_abs_meth_diff=args.min_abs_meth_diff,
         )
+        # Same region-level q-value post-filter as tl.dmr's sliding_window
+        # branch (BH-corrected combined_qvalue, falling back to combined_pvalue).
+        _min_q = getattr(args, "min_mean_qvalue", None)
+        if len(dmr_results) > 0 and _min_q is not None:
+            q_col = "combined_qvalue" if "combined_qvalue" in dmr_results.columns else "combined_pvalue"
+            dmr_results = dmr_results.filter(pl.col(q_col) < _min_q)
 
     dmr_results.write_parquet(args.output)
     print(f"DMR results written to {args.output}")
@@ -610,21 +623,12 @@ def _configure_logging(verbosity: int) -> None:
         logging.getLogger().setLevel(level)
 
 
-def main():
-    # Help strings and log messages embed unicode (beta, ->, mu, ...). On
-    # Windows the default console codec is cp1252 and argparse's
-    # `--help` print crashes with UnicodeEncodeError before any
-    # subcommand runs. Reconfigure both streams to UTF-8 with
-    # replacement so we never crash on a glyph the terminal can't draw.
-    for stream in (sys.stdout, sys.stderr):
-        reconfigure = getattr(stream, "reconfigure", None)
-        if reconfigure is not None:
-            try:
-                reconfigure(encoding="utf-8", errors="replace")
-            except (OSError, ValueError):
-                # Detached / non-text stream; nothing to do.
-                pass
+def build_parser() -> argparse.ArgumentParser:
+    """Construct the epykit CLI argument parser.
 
+    Extracted from ``main`` so tests can introspect flags/defaults without
+    spawning a subprocess.
+    """
     from . import __version__
 
     ap  = argparse.ArgumentParser(
@@ -913,6 +917,12 @@ def main():
     p_dmr.add_argument("--alpha",                type=float, default=0.05)
     p_dmr.add_argument("--min-abs-meth-diff",    type=float, default=0.1)
     p_dmr.add_argument(
+        "--min-mean-qvalue", type=float, default=0.05,
+        help="(chain_merge, sliding_window) Region-level q-value cutoff "
+             "applied as a post-filter, matching ep.tl.dmr (default 0.05). "
+             "Set to a high value (e.g. 1.0) to disable.",
+    )
+    p_dmr.add_argument(
         "--no-tsv", action="store_true", dest="no_tsv", default=False,
         help="Suppress the sibling .tsv auto-emit.",
     )
@@ -1067,6 +1077,25 @@ def main():
     sp_r.add_argument("--output", required=True)
     sp_r.set_defaults(func=_cmd_export)
 
+    return ap
+
+
+def main():
+    # Help strings and log messages embed unicode (beta, ->, mu, ...). On
+    # Windows the default console codec is cp1252 and argparse's
+    # `--help` print crashes with UnicodeEncodeError before any
+    # subcommand runs. Reconfigure both streams to UTF-8 with
+    # replacement so we never crash on a glyph the terminal can't draw.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):
+                # Detached / non-text stream; nothing to do.
+                pass
+
+    ap = build_parser()
     args = ap.parse_args()
     _configure_logging(verbosity=args.verbose - args.quiet)
     try:
