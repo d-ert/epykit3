@@ -75,7 +75,7 @@ def test_empirical_fdr_for_dmc_forwards_sep_and_smoothing(monkeypatch):
         samples_treatment=["s1", "s2", "s3"],
         samples_control=["c1", "c2", "c3"],
         observed_dmc=observed,
-        n_perm=2,
+        n_perm=3,
         seed=0,
         n_jobs=1,
         test="lr",
@@ -85,8 +85,8 @@ def test_empirical_fdr_for_dmc_forwards_sep_and_smoothing(monkeypatch):
         smoothing_span_bp=500,
     )
 
-    assert len(captured) >= 2, (
-        f"Expected >=2 per-perm calls, got {len(captured)}. The patched "
+    assert len(captured) >= 3, (
+        f"Expected >=3 per-perm calls, got {len(captured)}. The patched "
         f"engine may have been bypassed."
     )
     for kwargs in captured:
@@ -95,4 +95,57 @@ def test_empirical_fdr_for_dmc_forwards_sep_and_smoothing(monkeypatch):
         )
         assert kwargs.get("sep_threshold") == 0.05, kwargs
         assert kwargs.get("smoothing") is True, kwargs
+        assert kwargs.get("smoothing_span_bp") == 500, kwargs
+
+
+def test_empirical_fdr_for_dmc_defaults_do_not_leak_into_perms(monkeypatch):
+    """Negative-path companion to the forwarding test: when the user does
+    NOT pass sep_fallback/smoothing kwargs, each per-perm call must see the
+    documented defaults (False / False / 0.9 / 500). Guards against a future
+    maintainer flipping a default and silently changing behaviour for every
+    existing caller of empirical_fdr_for_dmc."""
+    import polars as pl
+
+    captured: list[dict] = []
+
+    class _FakeDMCStore:
+        total_sites = 0
+
+        def iter_chroms(self, columns=None):
+            return iter(())
+
+        def cleanup(self):
+            pass
+
+    def _fake_process_chromosomes_dmc(*args, **kwargs):
+        captured.append(dict(kwargs))
+        return _FakeDMCStore()
+
+    monkeypatch.setattr(
+        ep_dmc, "process_chromosomes_dmc", _fake_process_chromosomes_dmc
+    )
+
+    observed = pl.DataFrame({
+        "chrom": ["chr1"], "pos": [100],
+        "pvalue": [1e-3], "meth_diff": [0.4],
+    })
+
+    # NB: deliberately omit sep_fallback / sep_threshold / smoothing /
+    # smoothing_span_bp -- we want the helper's defaults to flow through.
+    ep_dmc.empirical_fdr_for_dmc(
+        methylstore_path="/__unused__",
+        samples_treatment=["s1", "s2", "s3"],
+        samples_control=["c1", "c2", "c3"],
+        observed_dmc=observed,
+        n_perm=3,
+        seed=0,
+        n_jobs=1,
+        test="lr",
+    )
+
+    assert len(captured) >= 3
+    for kwargs in captured:
+        assert kwargs.get("sep_fallback") is False, kwargs
+        assert kwargs.get("sep_threshold") == 0.9, kwargs
+        assert kwargs.get("smoothing") is False, kwargs
         assert kwargs.get("smoothing_span_bp") == 500, kwargs
