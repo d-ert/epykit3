@@ -1028,18 +1028,52 @@ def newcombe_diff_ci(
     meth_b: np.ndarray,
     cov_b: np.ndarray,
     alpha: float = 0.05,
+    *,
+    phi: Optional[np.ndarray] = None,
+    df: Optional[np.ndarray] = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Newcombe (1998) hybrid Wilson-score CI for pi_a - pi_b on POOLED counts.
 
     Used by the binomial-pool tests (lr, fisher) where no per-replicate
     variance is accumulated. Uses Wilson-score CIs on each
     pooled proportion, then combines them per Newcombe method 10.
+
+    Overdispersion (``phi`` / ``df``)
+    ---------------------------------
+    The quasi-binomial ``lr`` test divides its statistic by a per-site
+    McCullagh-Nelder dispersion ``phi`` and references F(1, df) / chi^2(1).
+    Pass per-site ``phi`` (and ``df``, already floored by the caller with the
+    same ``DF_PHI_FLOOR`` the p-value uses) so this interval shares that
+    variance model rather than being an anti-conservatively narrow binomial
+    interval next to a dispersion-aware p-value: at sites with ``phi > 1``
+    each Wilson half-width is widened by ``sqrt(phi)`` and a t(df) tail
+    replaces the normal z; where ``phi`` was clamped to 1 (the quasi-binomial
+    collapses to a binomial) the normal z is used and the interval is
+    identical to the phi-free form. ``phi=None`` (the default, used by
+    ``fisher`` which has no dispersion estimate) reproduces the exact binomial
+    Newcombe interval -- byte-identical to the pre-phi behaviour.
     """
     from scipy import stats as sp_stats
-    z = float(sp_stats.norm.isf(alpha / 2.0))
+    z_norm = float(sp_stats.norm.isf(alpha / 2.0))
+    if phi is None:
+        z_eff = z_norm
+    else:
+        phi = np.asarray(phi, dtype=np.float64)
+        if df is None:
+            t_mult: np.ndarray | float = z_norm
+        else:
+            # df is expected pre-floored by the caller (DF_PHI_FLOOR); the
+            # max(., 1) is a numerical guard only.
+            df = np.asarray(df, dtype=np.float64)
+            t_mult = sp_stats.t.isf(alpha / 2.0, np.maximum(df, 1.0))
+        # Mirror the adaptive p-value: inflate by sqrt(phi) with a t(df) tail
+        # only where there is genuine overdispersion (phi > 1); fall back to
+        # the binomial normal interval where phi was clamped to 1.
+        z_eff = np.where(phi > 1.0, np.sqrt(phi) * t_mult, z_norm)
 
     def _wilson(m, n):
         m = m.astype(np.float64); n = n.astype(np.float64)
+        z = z_eff  # scalar (fisher) or per-site array (lr); broadcasts on n
         with np.errstate(invalid="ignore", divide="ignore"):
             p_hat = np.where(n > 0, m / n, np.nan)
             denom = 1.0 + (z * z) / np.maximum(n, 1e-12)

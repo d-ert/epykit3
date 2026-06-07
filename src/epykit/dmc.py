@@ -598,7 +598,7 @@ def _score_finalize(
     reference:      str   = "adaptive",
     sep_fallback:   bool  = False,
     sep_threshold:  float = 0.9,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, np.ndarray, np.ndarray]:
     """Compute per-site score p-values with McCullagh-Nelder overdispersion.
 
     Parameters
@@ -689,6 +689,13 @@ def _score_finalize(
     phi_hat : float
         Chromosome-pooled dispersion estimate, returned for logging /
         downstream introspection regardless of which mode was used.
+    phi_eff : float64 array
+        Per-site effective dispersion actually used to scale the statistic
+        (mode-dependent: site / chrom / shrink / eb). Surfaced so the CI can
+        share the test's variance model (see ``newcombe_diff_ci``).
+    df_phi : float64 array
+        Per-site degrees of freedom backing ``phi_eff`` (NOT pre-floored;
+        callers apply ``DF_PHI_FLOOR`` to match the p-value's reference).
     """
     if dispersion not in {"site", "chrom", "shrink", "eb"}:
         raise ValueError(
@@ -1002,7 +1009,7 @@ def _score_finalize(
                 chrom_name, n_fb, sep_threshold, n_improved,
             )
 
-    return pvals, log2_or, pi_case, pi_ctrl, phi_hat
+    return pvals, log2_or, pi_case, pi_ctrl, phi_hat, phi_eff, df_phi
 
 
 def _beta_binom_mom_from_welford_logit(
@@ -1379,6 +1386,10 @@ def _process_one_chromosome(
     _newcombe_cov_a: Optional[np.ndarray] = None
     _newcombe_meth_b: Optional[np.ndarray] = None
     _newcombe_cov_b: Optional[np.ndarray] = None
+    # Per-site dispersion for a phi-aware Newcombe CI (lr only). Left None for
+    # fisher (no dispersion estimate -> binomial CI, byte-identical).
+    _newcombe_phi: Optional[np.ndarray] = None
+    _newcombe_df: Optional[np.ndarray] = None
 
     # --- Statistical test ---
     if test == "fisher":
@@ -1466,7 +1477,7 @@ def _process_one_chromosome(
             _welford_update(mean_ctrl, M2_ctrl, n_valid_ctrl, meth, cov)
             del meth, cov
 
-        pvals, log2_ors, pi_case, pi_ctrl, _phi_hat = _score_finalize(
+        pvals, log2_ors, pi_case, pi_ctrl, _phi_hat, _phi_eff, _df_phi = _score_finalize(
             sn_case, sm_case, sm2n_case, nv_case,
             sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl,
             chrom_name=chrom,
@@ -1492,6 +1503,13 @@ def _process_one_chromosome(
         _newcombe_cov_a  = sn_case.copy()
         _newcombe_meth_b = sm_ctrl.copy()
         _newcombe_cov_b  = sn_ctrl.copy()
+        # Share the test's variance model with the CI: per-site dispersion
+        # and its df (pre-floored to DF_PHI_FLOOR, matching the adaptive
+        # F(1, df_phi) reference the p-value uses). Without this the CI is an
+        # anti-conservatively narrow binomial interval next to an
+        # overdispersion-aware p-value (M1).
+        _newcombe_phi = _phi_eff
+        _newcombe_df  = np.maximum(_df_phi, DF_PHI_FLOOR)
 
         del sn_case, sm_case, sm2n_case, nv_case
         del sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl
@@ -1744,9 +1762,12 @@ def _process_one_chromosome(
     if not multigroup_mode:
         if _newcombe_meth_a is not None:
             # P1-3: lr and fisher paths -- use Newcombe CI on pooled counts.
+            # lr passes per-site phi/df so the interval shares the test's
+            # overdispersion model (M1); fisher passes None (binomial).
             ci_lo, ci_hi = _glm_for_ci.newcombe_diff_ci(
                 _newcombe_meth_a, _newcombe_cov_a,
                 _newcombe_meth_b, _newcombe_cov_b,
+                phi=_newcombe_phi, df=_newcombe_df,
             )
         else:
             # welch_t and glm paths -- Wald CI from Welford accumulators.
