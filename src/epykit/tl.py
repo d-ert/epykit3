@@ -59,6 +59,29 @@ def _auto_test(
 # user explicitly selects ``test="fisher"`` in a session. We don't want to
 # spam them across thousands of chromosomes/sites -- once is enough.
 _FISHER_WARNED = False
+_DMR_FDR_NOTED = False
+
+
+def _note_dmr_fdr_calibration_once() -> None:
+    """One-shot note that asymptotic DMR q-values are not a calibrated FDR.
+
+    The region ``combined_qvalue`` / tile ``qvalue`` are BH corrections of
+    Stouffer-combined per-CpG p-values; under CpG spatial correlation they
+    are anti-conservative (a ranking signal, not a calibrated region-level
+    FDR). Emitted at INFO (not a warning) so it informs interactive users
+    without polluting stderr. Fires only when ``empirical_fdr=False``.
+    """
+    global _DMR_FDR_NOTED
+    if _DMR_FDR_NOTED:
+        return
+    _DMR_FDR_NOTED = True
+    logger.info(
+        "DMR q-values (combined_qvalue / tile qvalue) are asymptotic BH on "
+        "Stouffer-combined p-values: a well-calibrated *ranking* signal, but "
+        "anti-conservative as a region-level FDR under CpG spatial "
+        "correlation. For calibrated region inference pass empirical_fdr=True "
+        "(tile / sliding_window) and threshold empirical_qvalue."
+    )
 
 
 def _warn_fisher_once() -> None:
@@ -1239,6 +1262,23 @@ def dmr(
       substantially lower-power than tile-based aggregation at typical
       WGBS coverage.
 
+    Region-level FDR calibration (important)
+    ----------------------------------------
+    The DMR-level ``combined_qvalue`` (chain_merge / sliding_window /
+    segment) and tile ``qvalue`` are BH corrections of **asymptotic** region
+    p-values built by combining per-CpG p-values with signed Stouffer's Z.
+    Stouffer's combination assumes the per-CpG statistics are independent;
+    adjacent WGBS CpGs are positively correlated, so the combined null
+    variance exceeds 1 and these region q-values are **anti-conservative**
+    (too small) in CpG-dense regions. Treat them as a well-calibrated
+    *ranking* signal, **not** a calibrated region-level FDR. For trustworthy
+    region-level inference pass ``empirical_fdr=True`` (``method="tile"`` or
+    ``"sliding_window"``), which re-runs the engine on shuffled labels and
+    adds permutation ``empirical_pvalue`` / ``empirical_qvalue`` columns;
+    threshold ``empirical_qvalue`` instead of ``combined_qvalue`` for FDR
+    control. (Running without ``empirical_fdr`` logs a one-time INFO note to
+    this effect.)
+
     Parameters
     ----------
     method : {"tile", "sliding_window", "segment", "chain_merge"}
@@ -1289,6 +1329,11 @@ def dmr(
     if min_samples_treatment is None:
         min_samples_treatment = 0
     tsv, _, _, _tsv_is_auto = _resolve_auto_tsv(md, tsv, csv, default_name="dmr.tsv")
+    if not empirical_fdr:
+        # Asymptotic DMR q-values are a ranking signal, not a calibrated
+        # region-level FDR under CpG spatial correlation (M5). Point users at
+        # empirical_fdr=True for calibrated inference.
+        _note_dmr_fdr_calibration_once()
     if method == "tile":
         _check_n1_and_union_footgun(
             md, allow_n1, min_samples_treatment, min_samples_control, unit="tiles",
