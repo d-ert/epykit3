@@ -82,6 +82,19 @@ def normalize_coverage(md: MethylData, method: str = "median") -> None:
     ``ep.tl.dmr(method='tile')`` is -- running normalisation between
     coverage filtering and tile aggregation removes that bias.
 
+    .. warning::
+
+        This rescales integer read counts by a per-sample factor and rounds
+        back to integers, so it **fabricates / discards reads**: a low-depth
+        sample (factor > 1) has its counts scaled *up*, inflating the
+        apparent precision the binomial / quasi-binomial count model reads
+        off coverage. It is **optional**, not a default step -- reach for it
+        when downstream coverage imbalance is a real problem (notably
+        ``tl.dmr(method='tile')``), and prefer leaving it off for the
+        per-CpG ``tl.dmc`` engines, which already weight by coverage and are
+        little affected by imbalance. Same trade-off as ``methylKit``'s
+        ``normalizeCoverage``.
+
     Call order: ``filter_coverage`` -> ``normalize_coverage`` -> ``unite``.
 
     Parameters

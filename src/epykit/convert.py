@@ -533,9 +533,23 @@ def convert_sample(
          "sample"]
     )
 
-    # CpG strand merging : merge + and - strand pairs if requested
+    # CpG strand merging : merge + and - strand pairs if requested.
+    # Merging needs strand labels, which only exist when a reference_fasta was
+    # supplied. Without one, strand is "*" and a two-strand .cov is left
+    # UNMERGED -- each CpG dyad survives as two rows at half coverage. Warn so
+    # this isn't a silent double-count (pre-merged input, e.g. bismark2bedGraph
+    # / coverage2cytosine, is unaffected and the warning is harmless there).
     if merge_strands and reference_fasta is not None:
         df = _merge_cpg_pairs(df)
+    elif merge_strands and reference_fasta is None:
+        logger.warning(
+            "convert: merge_strands=True but no reference_fasta given, so "
+            "strand is unknown and +/- CpG pairs cannot be merged. If '%s' is "
+            "a two-strand .cov (separate + and - rows per CpG), each dyad will "
+            "be double-counted at half coverage; pass reference_fasta= to "
+            "merge, or ignore this if the input is already strand-merged.",
+            sample_name,
+        )
 
     # Write one Parquet file per chromosome. partition_by is a single
     # hash-partition pass; the prior unique()+filter() loop scanned the
