@@ -76,7 +76,7 @@ When `neighbour_combine=True`, **`pvalue`/`qvalue` remain the raw per-CpG values
 
 ### DMR engines (`dmr.py`)
 
-Four callers — DSS-compatible `chain_merge` (default) with presets (`strict`/`default`/`permissive`), tile-based (read-pooled), sliding-window with signed Stouffer combining, and HMM segmentation. All support optional permutation empirical FDR via `tl.dmr(..., empirical_fdr=True, n_perm=N)` which shuffles labels, re-runs the engine, and adds `empirical_pvalue` / `empirical_qvalue`.
+Four callers — DSS-compatible `chain_merge` (default) with presets (`strict`/`default`/`permissive`), tile-based (read-pooled), sliding-window with signed Stouffer combining, and HMM segmentation. Permutation empirical FDR is implemented for `method='tile'` only; the tile path shuffles labels, re-runs the engine, and adds `empirical_pvalue` / `empirical_qvalue`. The other callers raise `NotImplementedError` on `empirical_fdr=True` (per-method permutation harnesses are deferred to a Batch-4 follow-up — each caller's region-definition needs its own shuffle scheme).
 
 ### Logging convention (load-bearing)
 

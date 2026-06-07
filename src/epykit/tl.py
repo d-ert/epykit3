@@ -69,7 +69,11 @@ def _note_dmr_fdr_calibration_once() -> None:
     Stouffer-combined per-CpG p-values; under CpG spatial correlation they
     are anti-conservative (a ranking signal, not a calibrated region-level
     FDR). Emitted at INFO (not a warning) so it informs interactive users
-    without polluting stderr. Fires only when ``empirical_fdr=False``.
+    without polluting stderr. Fired on every ``tl.dmr`` call (M2): the
+    caveat applies to the asymptotic ``combined_qvalue`` even when an
+    empirical-FDR run is overlaid on top, and was previously hidden from
+    users running ``empirical_fdr=True`` who still reported the asymptotic
+    q-values upstream.
     """
     global _DMR_FDR_NOTED
     if _DMR_FDR_NOTED:
@@ -1280,12 +1284,11 @@ def dmr(
     variance exceeds 1 and these region q-values are **anti-conservative**
     (too small) in CpG-dense regions. Treat them as a well-calibrated
     *ranking* signal, **not** a calibrated region-level FDR. For trustworthy
-    region-level inference pass ``empirical_fdr=True`` (``method="tile"`` or
-    ``"sliding_window"``), which re-runs the engine on shuffled labels and
-    adds permutation ``empirical_pvalue`` / ``empirical_qvalue`` columns;
-    threshold ``empirical_qvalue`` instead of ``combined_qvalue`` for FDR
-    control. (Running without ``empirical_fdr`` logs a one-time INFO note to
-    this effect.)
+    region-level inference pass ``empirical_fdr=True`` with ``method="tile"``,
+    which re-runs the engine on shuffled labels and adds permutation
+    ``empirical_pvalue`` / ``empirical_qvalue`` columns; threshold
+    ``empirical_qvalue`` instead of ``combined_qvalue`` for FDR control.
+    Every ``tl.dmr`` call logs a one-time INFO note about this caveat.
 
     Parameters
     ----------
@@ -1337,11 +1340,30 @@ def dmr(
     if min_samples_treatment is None:
         min_samples_treatment = 0
     tsv, _, _, _tsv_is_auto = _resolve_auto_tsv(md, tsv, csv, default_name="dmr.tsv")
-    if not empirical_fdr:
-        # Asymptotic DMR q-values are a ranking signal, not a calibrated
-        # region-level FDR under CpG spatial correlation (M5). Point users at
-        # empirical_fdr=True for calibrated inference.
-        _note_dmr_fdr_calibration_once()
+    # M2 (Batch-1): empirical_fdr is currently wired only for method='tile'.
+    # The chain_merge / sliding_window / segment branches previously accepted
+    # the kwarg and silently no-op'd (no empirical_pvalue / empirical_qvalue
+    # columns added), AND suppressed the calibration-warning note. Raise
+    # explicitly so users don't unknowingly threshold combined_qvalue as if
+    # it were FDR-controlled. Per-method permutation harnesses for the other
+    # callers are deferred to a Batch-4 follow-up (each caller's region
+    # definition needs its own shuffle scheme).
+    if empirical_fdr and method != "tile":
+        raise NotImplementedError(
+            f"empirical_fdr=True is currently implemented only for "
+            f"method='tile'. Got method={method!r}. Use method='tile' or "
+            f"omit empirical_fdr=True. (Follow-up: implement permutation "
+            f"FDR for chain_merge/sliding_window/segment -- tracked in "
+            f"docs/superpowers/plans/2026-06-07-epykit-audit-fixes.md "
+            f"Batch-4 follow-up.)"
+        )
+    # Asymptotic DMR q-values are a ranking signal, not a calibrated
+    # region-level FDR under CpG spatial correlation (M5). Point users at
+    # empirical_fdr=True for calibrated inference. Fired regardless of the
+    # flag: for non-tile methods the flag now raises before getting here,
+    # and for the tile path users still benefit from seeing the caveat
+    # (the empirical run uses the same Stouffer combine internally).
+    _note_dmr_fdr_calibration_once()
     if method == "tile":
         _check_n1_and_union_footgun(
             md, allow_n1, min_samples_treatment, min_samples_control, unit="tiles",
