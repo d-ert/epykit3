@@ -84,7 +84,8 @@ def _note_dmr_fdr_calibration_once() -> None:
         "Stouffer-combined p-values: a well-calibrated *ranking* signal, but "
         "anti-conservative as a region-level FDR under CpG spatial "
         "correlation. For calibrated region inference pass empirical_fdr=True "
-        "(tile / sliding_window) and threshold empirical_qvalue."
+        "with method='tile' (currently the only method that wires it; other "
+        "methods raise NotImplementedError) and threshold empirical_qvalue."
     )
 
 
