@@ -1367,6 +1367,37 @@ def call_dmr_tile_based(
 
 # Permutation-based empirical FDR
 
+def _empirical_pvalues_from_null_pool(
+    *,
+    observed_pvalues: np.ndarray,
+    null_pvalues_pool: np.ndarray,
+    n_perm_used: int,
+) -> np.ndarray:
+    """Pooled-null Westfall-Young empirical p-values.
+
+    Returns ``(n_null_at_or_below_observed + 1) / (n_perm_used + 1)`` per
+    observed p-value -- the standard pseudo-count adjustment.
+
+    Parameters
+    ----------
+    observed_pvalues
+        Observed per-region (or per-site) p-values.
+    null_pvalues_pool
+        Pooled null p-values from successful permutations only.
+    n_perm_used
+        Number of permutations that produced at least one usable null
+        p-value. Failed permutations (zero null regions, exception in the
+        engine) MUST be excluded -- the denominator is ``n_perm_used + 1``,
+        not ``n_perm_requested + 1``. With ``n_perm_used = 0`` the function
+        returns an array of 1.0 (most conservative).
+    """
+    if null_pvalues_pool.size == 0 or n_perm_used <= 0:
+        return np.ones_like(observed_pvalues, dtype=np.float64)
+    sorted_null = np.sort(null_pvalues_pool)
+    counts = np.searchsorted(sorted_null, observed_pvalues, side="right")
+    return (counts.astype(np.float64) + 1.0) / (float(n_perm_used) + 1.0)
+
+
 def _stratified_permutation_assignment(
     *,
     strata_map: dict[str, list[str]],
@@ -1516,36 +1547,51 @@ def empirical_fdr_for_dmr(
             logger.warning("joblib not installed; falling back to serial execution.")
             null_pvals_list = [_run_one_perm(i) for i in range(n_perm)]
 
-    if all(len(arr) == 0 for arr in null_pvals_list):
+    # Failed permutations (engine exception, zero null DMRs) MUST be
+    # excluded from the empirical-p denominator. Pre-fix code divided by
+    # n_perm + 1 regardless, biasing emp_p downward by the failure rate.
+    # See docs/review/2026-06-07-epykit-codebase-audit.md (m-perm-1).
+    n_perm_used = sum(1 for arr in null_pvals_list if arr.size > 0)
+    n_perm_failed = n_perm - n_perm_used
+    if n_perm_failed > 0:
+        logger.info(
+            "empirical_fdr_for_dmr: %d/%d permutations produced zero null "
+            "DMRs; denominator uses n_perm_used=%d.",
+            n_perm_failed, n_perm, n_perm_used,
+        )
+    if n_perm_used == 0:
         logger.warning(
             "All %d permutations produced zero null DMRs. Empirical "
-            "p-values default to 1 / (1 + n_perm).",
+            "p-values default to 1.0 (most conservative).",
             n_perm,
         )
 
     # Per-permutation tail count (max-T style):
-    # For each observed DMR with p = p_obs, count the number of
+    # For each observed DMR with p = p_obs, count the number of *successful*
     # permutations that produced at least one null DMR with p <= p_obs.
-    # Denominator is n_perm + 1 (not |pooled null| + 1) so the empirical
-    # p-value floor is 1 / (n_perm + 1), independent of how many DMRs
-    # each permutation emitted. This is the standard region-statistic
-    # FDR; pooling p-values across perms would inflate the denominator
-    # and anti-conservatively shrink emp_p.
+    # Denominator is n_perm_used + 1 (not n_perm + 1, not |pooled null| + 1)
+    # so the empirical-p floor is 1 / (n_perm_used + 1), independent of how
+    # many DMRs each permutation emitted but honest about how many perms
+    # actually contributed a null. This is the standard region-statistic
+    # FDR; pooling p-values across perms would inflate the denominator and
+    # anti-conservatively shrink emp_p.
     obs_p = observed_dmr.get_column("pvalue").to_numpy()
     obs_finite_mask = np.isfinite(obs_p)
     obs_safe = np.where(obs_finite_mask, obs_p, 1.0)
 
-    # min_null_p_per_perm[i] = min p across all null DMRs from perm i
-    # (1.0 if perm produced no DMRs). The number of perms with at least
-    # one null <= p_obs is then sum(min_null_p_per_perm <= p_obs).
-    min_null_p_per_perm = np.array([
-        float(arr.min()) if len(arr) > 0 else 1.0
-        for arr in null_pvals_list
-    ], dtype=np.float64)
-    min_null_sorted = np.sort(min_null_p_per_perm)
-    # For each obs p, count perms with min_null <= obs p.
-    counts = np.searchsorted(min_null_sorted, obs_safe, side="right")
-    emp_p = (counts + 1.0) / (n_perm + 1.0)
+    # min_null_p_per_perm collects one value per *successful* permutation:
+    # the min p across that perm's null DMRs. Failed perms are dropped.
+    # The number of successful perms with at least one null <= p_obs is then
+    # sum(min_null_p_per_perm <= p_obs).
+    min_null_p_per_perm = np.array(
+        [float(arr.min()) for arr in null_pvals_list if arr.size > 0],
+        dtype=np.float64,
+    )
+    emp_p = _empirical_pvalues_from_null_pool(
+        observed_pvalues=obs_safe,
+        null_pvalues_pool=min_null_p_per_perm,
+        n_perm_used=n_perm_used,
+    )
     emp_p = np.clip(emp_p, 0.0, 1.0)
     emp_p = np.where(obs_finite_mask, emp_p, np.nan)
 

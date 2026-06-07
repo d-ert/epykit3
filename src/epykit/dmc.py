@@ -3118,10 +3118,24 @@ def empirical_fdr_for_dmc(
             )
             null_pvals_list = [_run_one_perm(i) for i in range(n_perm)]
 
-    if all(len(arr) == 0 for arr in null_pvals_list):
+    # Failed permutations (engine exception, zero null sites) MUST be
+    # excluded from the empirical-p denominator. Pre-fix code divided by
+    # n_perm + 1 regardless, biasing emp_p downward by the failure rate.
+    # See docs/review/2026-06-07-epykit-codebase-audit.md (m-perm-1).
+    from .dmr import _empirical_pvalues_from_null_pool
+
+    n_perm_used = sum(1 for arr in null_pvals_list if arr.size > 0)
+    n_perm_failed = n_perm - n_perm_used
+    if n_perm_failed > 0:
+        logger.info(
+            "empirical_fdr_for_dmc: %d/%d permutations produced zero null "
+            "sites; denominator uses n_perm_used=%d.",
+            n_perm_failed, n_perm, n_perm_used,
+        )
+    if n_perm_used == 0:
         logger.warning(
             "All %d DMC permutations produced zero null sites. Empirical "
-            "p-values default to 1 / (1 + n_perm).",
+            "p-values default to 1.0 (most conservative).",
             n_perm,
         )
     # `pvalue` is the per-CpG raw p-value by contract (P0-1 fix). The
@@ -3138,27 +3152,28 @@ def empirical_fdr_for_dmc(
         )
     obs_p = observed_dmc.get_column("pvalue").to_numpy()
     # Per-permutation tail count: for each observed p, count the number
-    # of permutations that produced at least one null site with p <= obs_p.
-    # Denominator is n_perm + 1 (not |pooled null| + 1) so the empirical
-    # p-value floor is 1/(n_perm+1), independent of how many sites each
-    # permutation emitted.  This is the same formula used by
-    # empirical_fdr_for_dmr (P0-2 fix) and ensures that the floor is
-    # invariant to the permutation count rather than growing as n_perm
-    # grows (the old pooled formula was anti-conservative for the same
-    # reason).
+    # of *successful* permutations that produced at least one null site
+    # with p <= obs_p. Denominator is n_perm_used + 1 (not n_perm + 1,
+    # not |pooled null| + 1) so the empirical-p floor is
+    # 1 / (n_perm_used + 1), independent of how many sites each perm
+    # emitted but honest about how many perms actually contributed a null.
+    # Same formula as empirical_fdr_for_dmr.
     obs_finite_mask = np.isfinite(obs_p)
     obs_safe = np.where(obs_finite_mask, obs_p, 1.0)
 
-    # min_null_p_per_perm[i] = min p across all null sites from perm i
-    # (1.0 if perm produced no sites). The number of perms with at least
-    # one null site with p <= obs_p is then sum(min_null_p[i] <= obs_p).
-    min_null_p_per_perm = np.array([
-        float(arr.min()) if len(arr) > 0 else 1.0
-        for arr in null_pvals_list
-    ], dtype=np.float64)
-    min_null_sorted = np.sort(min_null_p_per_perm)
-    counts = np.searchsorted(min_null_sorted, obs_safe, side="right")
-    emp_p = (counts + 1.0) / (n_perm + 1.0)
+    # min_null_p_per_perm collects one value per *successful* permutation:
+    # the min p across that perm's null sites. Failed perms are dropped.
+    # The number of successful perms with at least one null site
+    # <= obs_p is then sum(min_null_p_per_perm <= obs_p).
+    min_null_p_per_perm = np.array(
+        [float(arr.min()) for arr in null_pvals_list if arr.size > 0],
+        dtype=np.float64,
+    )
+    emp_p = _empirical_pvalues_from_null_pool(
+        observed_pvalues=obs_safe,
+        null_pvalues_pool=min_null_p_per_perm,
+        n_perm_used=n_perm_used,
+    )
     emp_p = np.clip(emp_p, 0.0, 1.0)
     emp_p = np.where(obs_finite_mask, emp_p, np.nan)
 
