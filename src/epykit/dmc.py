@@ -2557,7 +2557,12 @@ def combine_neighbour_pvalues(
         sign = np.sign(diffs)
         sign[sign == 0] = 1.0  # zero meth_diff: still combine, treat as +
         z = sign * abs_z
-        z = np.where(np.isnan(p_clip), 0.0, z)
+        # Untested sites (NaN p) keep z = NaN so the window mask below
+        # (~np.isnan(slice_z)) excludes them from both the Stouffer sum AND
+        # the neighbour count. The old `z = where(isnan(p), 0.0, z)` line
+        # set them to 0, which passed the mask -> untested CpGs were counted
+        # as contributing neighbours (strictly conservative power loss + a
+        # wrong `_n_neighbours` audit count) (D9).
 
         # Two-pointer sliding window: for each i, advance left/right to
         # the bounds [pos_i - W, pos_i + W]. O(n_sites) per chromosome.
