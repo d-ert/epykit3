@@ -1451,6 +1451,8 @@ def empirical_fdr_for_dmr(
     seed: int = 42,
     n_jobs: int = 1,
     empirical_strata: "dict[str, list[str]] | None" = None,
+    merge_adjacent: bool = True,
+    backend: str = "sequential",
     **dmr_kwargs,
 ) -> pl.DataFrame:
     """Empirical (permutation) FDR for tile-based DMRs.
@@ -1481,6 +1483,15 @@ def empirical_fdr_for_dmr(
         stratum rather than globally.  Build this dict from ``md.obs`` in
         the caller (see :func:`epykit.tl.dmr`).  When ``None`` (default),
         the standard global shuffle is used.
+    merge_adjacent
+        Forwarded to each per-permutation ``call_dmr_tile_based`` call.
+        Must match the observed run; otherwise observed and null regions
+        are computed under different merge rules and ``empirical_pvalue``
+        is distorted (m-perm-2).
+    backend
+        Forwarded to each per-permutation ``call_dmr_tile_based`` call.
+        Must match the observed run for the same reason as
+        ``merge_adjacent``.
     **dmr_kwargs
         Forwarded to ``call_dmr_tile_based`` for each permutation; should
         match the observed run's settings (tile_size_bp, test, alpha,
@@ -1532,11 +1543,18 @@ def empirical_fdr_for_dmr(
         kwargs = dict(dmr_kwargs)
         kwargs.pop("samples_case", None)
         kwargs.pop("min_samples_case", None)
+        # Defensive: if a caller accidentally also threads merge_adjacent /
+        # backend through **dmr_kwargs, prefer the explicit named params
+        # below so we never double-pass.
+        kwargs.pop("merge_adjacent", None)
+        kwargs.pop("backend", None)
         try:
             null_df = call_dmr_tile_based(
                 methylstore_path=methylstore_path,
                 samples_treatment=perm_treat,
                 samples_control=perm_ctrl,
+                merge_adjacent=merge_adjacent,
+                backend=backend,
                 **kwargs,
             )
         except Exception as exc:

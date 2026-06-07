@@ -1470,6 +1470,8 @@ def dmr(
                     min_samples_control=min_samples_control,
                     dispersion=dispersion,
                     reference=reference,
+                    merge_adjacent=merge_adjacent,
+                    backend=backend,
                 )
 
         md.uns["dmr"] = dmr_df
