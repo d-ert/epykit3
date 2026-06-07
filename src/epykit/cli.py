@@ -201,9 +201,10 @@ def _cli_n1_and_footgun_checks(args, unit: str = "sites") -> None:
         )
     if (not args.unite) and args.min_samples_treatment == 0 and args.min_samples_control == 0:
         warnings.warn(
-            f"--no-unite + min_samples_*=0 will test {unit} covered in only "
-            f"one sample per group. Recommended: --min-samples-treatment 2 "
-            f"--min-samples-control 2.",
+            f"Union mode (the default) + min_samples_*=0 will test {unit} "
+            f"covered in only one sample per group. Recommended: "
+            f"--min-samples-treatment 2 --min-samples-control 2, or pass "
+            f"--unite to restrict to sites covered in all samples.",
             UserWarning, stacklevel=2,
         )
 
@@ -776,9 +777,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--covariates", default=None,
         help="Comma-separated list of nuisance covariate columns on md.obs.",
     )
+    # Unite mode. Default is union (sites in at least one sample), matching
+    # the ep.tl.dmc API with no prior pp.unite step. Pass --unite to restrict
+    # to sites covered in ALL samples (intersect). --no-unite is kept as an
+    # explicit, backward-compatible way to request the default (union).
     p_dmc.add_argument(
-        "--no-unite", action="store_false", dest="unite", default=True,
-        help="Include sites seen in at least one sample (default: only sites in all samples)",
+        "--unite", action="store_true", dest="unite", default=False,
+        help="Intersect: restrict to sites covered in ALL samples "
+             "(default: union -- sites in at least one sample, matching ep.tl.dmc).",
+    )
+    p_dmc.add_argument(
+        "--no-unite", action="store_false", dest="unite", default=False,
+        help="Union: include sites covered in at least one sample (the default).",
     )
     _add_min_samples_args(p_dmc)
     p_dmc.add_argument(
@@ -899,9 +909,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--perm-seed", type=int, default=42,
         help="(tile only) Seed for permutation RNG.",
     )
+    # Default is union, matching ep.tl.dmr (no pp.unite step). --unite forces
+    # intersect (tiles covered in ALL samples); --no-unite explicitly selects
+    # the default union, kept for backward compatibility.
     p_dmr.add_argument(
-        "--no-unite", action="store_false", dest="unite", default=True,
-        help="(tile only) Test tiles covered in at least one sample (default: intersect).",
+        "--unite", action="store_true", dest="unite", default=False,
+        help="(tile only) Intersect: restrict to tiles covered in ALL samples "
+             "(default: union, matching ep.tl.dmr).",
+    )
+    p_dmr.add_argument(
+        "--no-unite", action="store_false", dest="unite", default=False,
+        help="(tile only) Union: test tiles covered in at least one sample (the default).",
     )
     _add_min_samples_args(p_dmr, scope_help_prefix="(tile only) ")
     p_dmr.add_argument(
