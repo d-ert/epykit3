@@ -389,6 +389,11 @@ def dmc(
     n_workers: int | None = None,
     glm_backend: str = "cpu",
     resumable: bool = False,
+    # Memory contract (since 1.0.1): materialize=True assembles the full
+    # per-CpG result onto md.varm (the historical behaviour, ~700 MB at
+    # 22M CpGs); materialize=False keeps only the streaming DMCStore handle
+    # so peak memory stays O(largest chromosome) end-to-end.
+    materialize: bool = True,
     use_smoothed: bool = False,
     smoothing: bool = False,
     smoothing_span_bp: int = 500,
@@ -469,6 +474,21 @@ def dmc(
     ``contrast``, ``covariates``, ``min_samples_*``, ``dispersion``,
     ``reference``. Set False (the default) to preserve pre-0.4
     behaviour -- no manifest read, no skip, no sidecar write.
+
+    Memory contract (``materialize``)
+    ---------------------------------
+    DMC *computation* is O(largest chromosome): the engine streams
+    chromosome-by-chromosome and BH correction rewrites per-chrom parquet
+    in place. ``materialize=True`` (the default) then assembles the full
+    per-CpG table onto ``md.varm`` for plotting / report / export (a
+    whole-genome operation; ~700 MB at 22M CpGs). Pass
+    ``materialize=False`` to keep peak memory at O(largest chromosome)
+    end-to-end: the result lives only as the on-disk ``DMCStore`` (reachable
+    via ``md.dmc_store`` and streamed by ``tl.dmr``); ``md.dmc`` then
+    materialises on demand when accessed. ``materialize=False`` is
+    incompatible with the eager-only post-processors ``neighbour_combine``,
+    ``empirical_fdr`` and ``use_smoothed`` (they raise ``ValueError``), and
+    suppresses TSV auto-export.
 
     Parameters
     ----------
@@ -661,6 +681,31 @@ def dmc(
     unite_info = md.uns.get("unite")
     unite = (unite_info is not None) and (unite_info.get("type") == "intersect")
 
+    # materialize=False keeps only the streaming DMCStore handle, so it
+    # cannot run the eager-only post-processors that need the full in-memory
+    # result table. Reject the combination explicitly rather than silently
+    # producing different output. (neighbour_combine may have been
+    # auto-enabled just above by power_stack='lr+'; use_smoothed routes
+    # through a temp store that is cleaned up on return, so its DMCStore
+    # would not survive.)
+    if not materialize:
+        _incompat = [
+            name for name, on in (
+                ("neighbour_combine", neighbour_combine),
+                ("empirical_fdr", empirical_fdr),
+                ("use_smoothed", use_smoothed),
+            ) if on
+        ]
+        if _incompat:
+            raise ValueError(
+                "materialize=False keeps only the streaming DMCStore handle "
+                "and cannot run features that post-process the full in-memory "
+                f"result table: {', '.join(_incompat)}. Re-run with "
+                "materialize=True (the default) for these, or disable them "
+                "(neighbour_combine may have been auto-enabled by "
+                "power_stack='lr+')."
+            )
+
     # 0.4.0 checkpoint/resume: when resumable=True, fingerprint the input
     # + params and look up a prior matching run in the pipeline manifest.
     resume_root = None
@@ -810,12 +855,20 @@ def dmc(
         )
         dmc_store = apply_multiple_testing_correction(dmc_store, method=fdr_method)
 
-        # Materialise the full DataFrame for md.varm back-compat
-        # (plot.py / report.py / pl modules consume md.dmc as a
-        # DataFrame). With chrom/strand stored as pl.Enum this is
-        # roughly 700 MB at 22M rows vs. ~2 GB before -- manageable
-        # alongside the per-chrom DMR working set.
-        result = dmc_store.to_dataframe()
+        if materialize:
+            # Materialise the full DataFrame for md.varm back-compat
+            # (plot.py / report.py / pl modules consume md.dmc as a
+            # DataFrame). With chrom/strand stored as pl.Enum this is
+            # roughly 700 MB at 22M rows vs. ~2 GB before -- manageable
+            # alongside the per-chrom DMR working set.
+            result = dmc_store.to_dataframe()
+        else:
+            # Keep only the streaming DMCStore handle (O(largest chromosome)
+            # end-to-end). neighbour_combine / empirical_fdr were rejected
+            # above, so the post-processing blocks below are inert
+            # (their guards short-circuit on the False flag before touching
+            # `result`). md.dmc materialises on demand from store_path.
+            result = None
 
         # Neighbour-aware p-value combining (RADMeth-style, since 0.7.1).
         # When enabled, run the signed-Stouffer combiner over the per-CpG
@@ -866,11 +919,18 @@ def dmc(
     from .dmc import _canonicalise_test_name
     canonical_used = _canonicalise_test_name(selected_test)
     key = f"dmc_{canonical_used}_smoothed" if use_smoothed else f"dmc_{canonical_used}"
-    md.varm[key] = result
+    if materialize:
+        md.varm[key] = result
+        n_sites = len(result)
+    else:
+        # No eager table on varm; the DMCStore is the source of truth.
+        # md.get_dmc() / md.dmc resolve it on demand from store_path.
+        n_sites = dmc_store.total_sites if dmc_store is not None else 0
     md.uns["dmc"] = {
         "test_requested": test,
         "test_used": canonical_used,
-        "n_sites": len(result),
+        "n_sites": n_sites,
+        "materialized": bool(materialize),
         "unite": unite,
         "min_samples_treatment": min_samples_treatment,
         "min_samples_control": min_samples_control,
@@ -911,7 +971,7 @@ def dmc(
     # so a subsequent resumable=True call with the same fingerprint can
     # skip the computation entirely. Best-effort: a failed write logs but
     # does not propagate (the in-memory result is still valid).
-    if resumable and resume_root and resume_sig and resume_stage_name:
+    if resumable and resume_root and resume_sig and resume_stage_name and result is not None:
         try:
             from ._cache import manifest_append
             from pathlib import Path
@@ -954,11 +1014,18 @@ def dmc(
     )
 
     if tsv is not None:
-        from .export import dmc_to_tsv
-        _emit_result_tsv(
-            lambda: dmc_to_tsv(md, tsv, alpha=tsv_alpha, full=tsv_full),
-            tsv, is_auto=_tsv_is_auto,
-        )
+        if materialize:
+            from .export import dmc_to_tsv
+            _emit_result_tsv(
+                lambda: dmc_to_tsv(md, tsv, alpha=tsv_alpha, full=tsv_full),
+                tsv, is_auto=_tsv_is_auto,
+            )
+        else:
+            logger.info(
+                "materialize=False: skipping DMC TSV auto-export (no "
+                "in-memory result table). Export later via "
+                "ep.export.dmc_to_tsv(md) or re-run with materialize=True."
+            )
 
 
 def _run_dmc_contrast(

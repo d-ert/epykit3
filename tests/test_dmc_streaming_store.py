@@ -129,3 +129,83 @@ def test_dmc_legacy_manifest_without_input_sig_still_weak_hits(synth_md_filtered
     assert upgraded.get("input_sig"), (
         "weak-hit path must upgrade legacy manifests with a fresh input_sig"
     )
+
+
+# ---------------------------------------------------------------------------
+# materialize= contract (C2): the default assembles the full per-CpG table
+# onto md.varm; materialize=False keeps only the streaming DMCStore handle so
+# peak memory stays O(largest chromosome) end-to-end.
+# ---------------------------------------------------------------------------
+
+
+def test_materialize_true_default_populates_varm(synth_md_filtered):
+    """The default (materialize=True) assembles the full table onto md.varm,
+    md.dmc and md.dmc_store both resolve, their sizes agree, and the canonical
+    DMC schema is unchanged (1.0 back-compat)."""
+    md = synth_md_filtered
+    ep.tl.dmc(md, test="lr", tsv=False)
+
+    assert md.uns["dmc"]["materialized"] is True
+    df = md.dmc
+    assert df is not None
+    store = md.dmc_store
+    assert store is not None
+    assert len(df) == store.total_sites == md.uns["dmc"]["n_sites"] > 0
+
+    for col in (
+        "chrom", "pos", "pvalue", "qvalue", "meth_diff",
+        "meth_diff_ci_lo", "meth_diff_ci_hi",
+    ):
+        assert col in df.columns, f"canonical column {col!r} missing"
+
+
+def test_materialize_false_keeps_only_store(synth_md_filtered):
+    """materialize=False leaves no dmc_* key on md.varm but exposes the
+    streaming DMCStore; md.dmc materialises on demand to the same size."""
+    md = synth_md_filtered
+    ep.tl.dmc(md, test="lr", materialize=False)
+
+    meta = md.uns["dmc"]
+    assert meta["materialized"] is False
+    # No eager varm table was assembled.
+    assert not any(k.startswith("dmc") for k in md.varm), dict(md.varm)
+    # Streaming handle is present and sized from the manifest.
+    store = md.dmc_store
+    assert store is not None
+    assert store.total_sites == meta["n_sites"] > 0
+    # On-demand materialisation works and matches the store.
+    on_demand = md.dmc
+    assert on_demand is not None
+    assert len(on_demand) == store.total_sites
+
+
+def test_materialize_false_dmr_equivalent(synth_md_filtered):
+    """sliding-window DMR is driven by the on-disk DMCStore, so it produces
+    the same result whether or not the eager table was materialised onto
+    md.varm."""
+    md = synth_md_filtered
+
+    # Streaming path: no eager varm table.
+    ep.tl.dmc(md, test="lr", materialize=False)
+    ep.tl.dmr(md, method="sliding_window", window_bp=1000, step_bp=500, min_cpgs=2)
+    dmr_stream = md.uns["dmr"]
+
+    # Materialised path on the same store (per-chrom cache hit -> same
+    # store_path); md.varm now carries the eager table.
+    ep.tl.dmc(md, test="lr", materialize=True, tsv=False)
+    assert any(k.startswith("dmc") for k in md.varm)
+    ep.tl.dmr(md, method="sliding_window", window_bp=1000, step_bp=500, min_cpgs=2)
+    dmr_mat = md.uns["dmr"]
+
+    assert dmr_stream.equals(dmr_mat), (
+        "sliding-window DMR differs between materialize=False and "
+        "materialize=True paths -- it should be store-driven and identical"
+    )
+
+
+def test_materialize_false_rejects_neighbour_combine(synth_md_filtered):
+    """materialize=False cannot run the eager-only post-processors; it raises
+    rather than silently producing different output."""
+    md = synth_md_filtered
+    with pytest.raises(ValueError, match="materialize=False"):
+        ep.tl.dmc(md, test="lr", materialize=False, neighbour_combine=True)

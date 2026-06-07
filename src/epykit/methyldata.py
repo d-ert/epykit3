@@ -216,7 +216,28 @@ class MethylData:
             ann_key = f"{key}_annotated"
             if ann_key in self.varm:
                 return self.varm[ann_key]
-        return self.varm.get(key)
+        if key in self.varm:
+            return self.varm[key]
+        # materialize=False fallback: the eager table was never assembled,
+        # but the streaming DMCStore is the source of truth. Resolve it on
+        # demand for the last-written key. This assembles the full table in
+        # memory (the user opted out of holding it persistently on varm).
+        dmc_meta = self.uns.get("dmc", {})
+        if (
+            isinstance(dmc_meta, dict)
+            and key == dmc_meta.get("last_key")
+            and dmc_meta.get("store_path")
+        ):
+            store_dir = Path(dmc_meta["store_path"])
+            if (store_dir / ".epykit_dmc_manifest.json").exists():
+                from ._dmc_store import DMCStore
+                logger.info(
+                    "get_dmc: materializing %s from the streaming DMCStore at "
+                    "%s (materialize=False was used; this assembles the full "
+                    "table in memory).", key, store_dir,
+                )
+                return DMCStore.open(store_dir).to_dataframe()
+        return None
 
     @property
     def dmc(self) -> Optional[pl.DataFrame]:
@@ -243,6 +264,29 @@ class MethylData:
             ann_key = f"{key}_annotated"
             return self.varm.get(ann_key, self.varm.get(key))
         return None
+
+    @property
+    def dmc_store(self):
+        """Streaming ``DMCStore`` handle for the most-recent DMC run, or None.
+
+        Populated whenever ``ep.tl.dmc`` has run (independent of
+        ``materialize=``), since the engine always writes the per-chromosome
+        parquet store and records its path in ``uns["dmc"]["store_path"]``.
+        Lets callers stream the per-CpG result chromosome-by-chromosome
+        (``tl.dmr`` consumes it directly) instead of holding the full table.
+        Returns None if no DMC has run or the store directory is gone.
+        """
+        dmc_meta = self.uns.get("dmc", {})
+        if not isinstance(dmc_meta, dict):
+            return None
+        store_path = dmc_meta.get("store_path")
+        if not store_path:
+            return None
+        store_dir = Path(store_path)
+        if not (store_dir / ".epykit_dmc_manifest.json").exists():
+            return None
+        from ._dmc_store import DMCStore
+        return DMCStore.open(store_dir)
 
     @property
     def significant_dmcs(self) -> Optional[pl.DataFrame]:
