@@ -32,3 +32,15 @@ def test_tile_empirical_fdr_still_works(md_with_dmc):
     dmr = md_with_dmc.uns["dmr"]
     assert "empirical_pvalue" in dmr.columns
     assert "empirical_qvalue" in dmr.columns
+
+
+@pytest.mark.parametrize("method", ["chain_merge", "sliding_window", "segment"])
+def test_cli_dmr_non_tile_empirical_fdr_raises_notimplemented(method):
+    """CLI mirror of the API gate. Pre-fix `_cmd_dmr` accepted --empirical-fdr
+    against any --method and silently dropped it on non-tile callers; users
+    were left thresholding combined_qvalue as if it were FDR-controlled."""
+    import argparse
+    from epykit.cli import _cmd_dmr
+    args = argparse.Namespace(method=method, empirical_fdr=True)
+    with pytest.raises(NotImplementedError, match=r"empirical[-_]fdr.*tile"):
+        _cmd_dmr(args)

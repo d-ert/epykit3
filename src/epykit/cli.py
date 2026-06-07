@@ -299,6 +299,20 @@ def _cmd_dmr(args: argparse.Namespace):
         call_dmr_tile_based,
     )
 
+    # M2 gate (mirror of tl.dmr): empirical_fdr is wired only for method=tile.
+    # Pre-fix the CLI accepted --empirical-fdr against any method and silently
+    # dropped it on chain_merge/sliding_window/segment, leaving users
+    # thresholding an uncalibrated combined_qvalue as if it were FDR-controlled.
+    if getattr(args, "empirical_fdr", False) and args.method != "tile":
+        raise NotImplementedError(
+            f"--empirical-fdr is currently implemented only for "
+            f"--method=tile. Got --method={args.method!r}. Use --method=tile "
+            f"or omit --empirical-fdr. (Follow-up: implement permutation FDR "
+            f"for chain_merge/sliding_window/segment -- tracked in "
+            f"docs/superpowers/plans/2026-06-07-epykit-audit-fixes.md "
+            f"Batch-4 follow-up.)"
+        )
+
     if args.method == "chain_merge":
         # --- DSS-style chain-merge path: takes a DMC parquet ---
         if not args.dmc_results:
