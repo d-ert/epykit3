@@ -255,6 +255,143 @@ def _merge_cpg_pairs(df: pl.DataFrame) -> pl.DataFrame:
     return merged.sort("pos")
 
 
+def _merge_cpg_pairs_by_position(df: pl.DataFrame) -> pl.DataFrame:
+    """Merge CpG dyad rows by position when strand labels are unavailable.
+
+    A two-strand Bismark ``.cov`` emits two rows per CpG dinucleotide — the
+    + strand cytosine at position P and the − strand cytosine at position P+1.
+    When no reference FASTA was supplied, all rows carry ``strand='*'`` and
+    ``_merge_cpg_pairs`` cannot be used (it needs explicit +/- labels).
+
+    This function recovers the dyad structure from position alone, operating
+    **per chromosome** so positions are only compared within a chromosome:
+
+    1. Sort positions.
+    2. Greedy left-to-right scan: take the lowest unconsumed position ``p``.
+       If ``p+1`` is present in the chromosome's position set, pair them and
+       consume both; otherwise emit ``p`` alone.
+    3. For a merged pair: sum ``N_meth``, ``N_unmeth``, ``coverage``; keep the
+       lower position as the site coordinate; set ``strand='*'`` (genuinely
+       unknown without a reference).
+
+    This is **heuristic** — a leading unpaired − strand site (where the +
+    strand row is absent or zero-coverage) can cause a mis-pair.  A one-time
+    warning advises users to pass ``reference_fasta=`` for guaranteed accuracy.
+
+    Parameters
+    ----------
+    df : pl.DataFrame
+        Full-genome frame with columns
+        ``["chrom","pos","strand","context","N_meth","N_unmeth","coverage","sample"]``.
+        All rows should carry ``strand='*'`` (the no-reference path).
+
+    Returns
+    -------
+    pl.DataFrame
+        Same column set and sort order (sorted by chrom then pos within each
+        chromosome partition; final frame sorted by the original chrom order
+        then pos).
+    """
+    if df.is_empty():
+        return df
+
+    import numpy as np
+
+    chrom_col   = df["chrom"].to_numpy()
+    pos_col     = df["pos"].to_numpy()
+    nm_col      = df["N_meth"].to_numpy()
+    nu_col      = df["N_unmeth"].to_numpy()
+    cov_col     = df["coverage"].to_numpy()
+    strand_col  = df["strand"].to_numpy()
+    context_col = df["context"].to_numpy()
+    sample_col  = df["sample"].to_numpy()
+
+    out_chrom:   list = []
+    out_pos:     list = []
+    out_strand:  list = []
+    out_context: list = []
+    out_nm:      list = []
+    out_nu:      list = []
+    out_cov:     list = []
+    out_sample:  list = []
+
+    n_paired_total   = 0
+    n_unpaired_total = 0
+
+    # Process per-chromosome so positions are only compared within a chrom.
+    unique_chroms, chrom_first_idx = np.unique(chrom_col, return_index=True)
+    # Preserve original chromosome order (np.unique sorts lexicographically).
+    chrom_order = unique_chroms[np.argsort(chrom_first_idx)]
+
+    for chrom in chrom_order:
+        mask = chrom_col == chrom
+        idx  = np.where(mask)[0]
+        # Sort by position within chromosome.
+        order = np.argsort(pos_col[idx], kind="stable")
+        idx   = idx[order]
+
+        positions = pos_col[idx]
+        pos_set   = set(positions.tolist())
+
+        consumed = np.zeros(len(idx), dtype=bool)
+        # Map position -> local index in `idx` for fast partner lookup.
+        pos_to_local: dict[int, int] = {int(p): i for i, p in enumerate(positions)}
+
+        for i, p in enumerate(positions.tolist()):
+            if consumed[i]:
+                continue
+            p1 = p + 1
+            if p1 in pos_set:
+                j = pos_to_local[p1]
+                if not consumed[j]:
+                    # Pair (i, j)
+                    gi = idx[i]
+                    gj = idx[j]
+                    out_chrom.append(chrom)
+                    out_pos.append(p)
+                    out_strand.append("*")
+                    out_context.append(context_col[gi])
+                    out_nm.append(int(nm_col[gi]) + int(nm_col[gj]))
+                    out_nu.append(int(nu_col[gi]) + int(nu_col[gj]))
+                    out_cov.append(int(cov_col[gi]) + int(cov_col[gj]))
+                    out_sample.append(sample_col[gi])
+                    consumed[i] = True
+                    consumed[j] = True
+                    n_paired_total += 1
+                    continue
+            # Singleton — no ±1 neighbour (or neighbour already consumed).
+            gi = idx[i]
+            out_chrom.append(chrom)
+            out_pos.append(p)
+            out_strand.append(str(strand_col[gi]))
+            out_context.append(context_col[gi])
+            out_nm.append(int(nm_col[gi]))
+            out_nu.append(int(nu_col[gi]))
+            out_cov.append(int(cov_col[gi]))
+            out_sample.append(sample_col[gi])
+            n_unpaired_total += 1
+
+    logger.warning(
+        "convert: merge_strands=True but no reference_fasta given — "
+        "CpG dyads are merged by position (strand-free heuristic). "
+        "Paired %d dyads, left %d positions unpaired. "
+        "For guaranteed strand-aware merging pass reference_fasta=.",
+        n_paired_total,
+        n_unpaired_total,
+    )
+
+    return pl.DataFrame({
+        "chrom":    out_chrom,
+        "pos":      pl.Series(out_pos, dtype=pl.Int32),
+        "strand":   out_strand,
+        "context":  out_context,
+        "N_meth":   pl.Series(out_nm,  dtype=pl.Int32),
+        "N_unmeth": pl.Series(out_nu,  dtype=pl.Int32),
+        "coverage": pl.Series(out_cov, dtype=pl.Int32),
+        "sample":   out_sample,
+    })
+
+
 # Optional strand inference
 
 def _infer_strand(df: pl.DataFrame, reference_fasta: str) -> pl.Series:
@@ -534,22 +671,16 @@ def convert_sample(
     )
 
     # CpG strand merging : merge + and - strand pairs if requested.
-    # Merging needs strand labels, which only exist when a reference_fasta was
-    # supplied. Without one, strand is "*" and a two-strand .cov is left
-    # UNMERGED -- each CpG dyad survives as two rows at half coverage. Warn so
-    # this isn't a silent double-count (pre-merged input, e.g. bismark2bedGraph
-    # / coverage2cytosine, is unaffected and the warning is harmless there).
+    # When reference_fasta is given, strand labels (+/-) are available and
+    # _merge_cpg_pairs uses them directly.  Without a reference, strand is
+    # unknown ("*") for every row; _merge_cpg_pairs_by_position recovers
+    # dyad structure from position alone via a greedy per-chrom pairwise pass
+    # (heuristic -- a one-time warning advises users to pass reference_fasta=
+    # for guaranteed accuracy).
     if merge_strands and reference_fasta is not None:
         df = _merge_cpg_pairs(df)
     elif merge_strands and reference_fasta is None:
-        logger.warning(
-            "convert: merge_strands=True but no reference_fasta given, so "
-            "strand is unknown and +/- CpG pairs cannot be merged. If '%s' is "
-            "a two-strand .cov (separate + and - rows per CpG), each dyad will "
-            "be double-counted at half coverage; pass reference_fasta= to "
-            "merge, or ignore this if the input is already strand-merged.",
-            sample_name,
-        )
+        df = _merge_cpg_pairs_by_position(df)
 
     # Write one Parquet file per chromosome. partition_by is a single
     # hash-partition pass; the prior unique()+filter() loop scanned the

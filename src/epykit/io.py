@@ -165,6 +165,26 @@ def read_bismark(
       subset of groups. ``obs.treatment`` is added only if
       ``treatment_group`` is also supplied; otherwise the column is
       omitted and downstream code falls back to formula-based contrasts.
+
+    Parameters
+    ----------
+    reference_fasta : str, optional
+        Path to an indexed FASTA file (a ``.fai`` index must exist alongside
+        it).  When supplied, strand is inferred from the reference base at
+        each position (C → ``+``; G → ``-``) and CpG-dyad merging uses
+        exact strand labels — this is the **recommended** path for two-strand
+        ``bismark_methylation_extractor`` output.
+
+        Without a reference, strand defaults to ``"*"`` for all rows and
+        CpG-dyad merging (``merge_strands=True``, which is the default in the
+        converter) falls back to a **position-based heuristic**: each position
+        P is paired with P+1 using a greedy left-to-right pass per chromosome.
+        This correctly handles the common case (well-separated dyads, both
+        strands present) but can mis-pair sites when a leading − strand row
+        has no corresponding + strand row.  A warning is emitted; pass
+        ``reference_fasta=`` to guarantee correct strand-aware merging.
+        Files that are already strand-collapsed (e.g. from ``bismark2bedGraph``
+        or ``coverage2cytosine``) are unaffected by either path.
     """
     return _read_methylation_samplesheet(
         samplesheet,
