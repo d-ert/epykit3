@@ -169,7 +169,10 @@ def _cmd_sample_summary(args: argparse.Namespace):
 
 
 def _cli_n1_and_footgun_checks(args, unit: str = "sites") -> None:
-    """Mirror tl.* guards on the CLI side."""
+    """Mirror tl.* guards on the CLI side.
+
+    May resolve ``args.test`` to 'fisher' when --allow-n1 is set at n<2.
+    """
     treatment_samples, control_samples = args._samples  # set by caller
     n_min = min(len(treatment_samples), len(control_samples))
     if n_min < 2 and not args.allow_n1:
@@ -314,6 +317,7 @@ def _cmd_dmr(args: argparse.Namespace):
     import polars as pl
     from .dmr import (
         _DMR_DEFAULT_MIN_CPGS,
+        apply_region_qfilter,
         call_dmr_chain_merge,
         call_dmr_sliding_window,
         call_dmr_tile_based,
@@ -358,12 +362,12 @@ def _cmd_dmr(args: argparse.Namespace):
             use_q_for_sig=args.use_q_for_sig,
         )
         # Region-level q-value post-filter, mirroring tl.dmr's chain_merge
-        # branch exactly (same column fallback). Pre-fix the CLI skipped this,
-        # so CLI chain_merge output was less filtered than the API (D11).
-        _min_q = getattr(args, "min_mean_qvalue", None)
-        if len(dmr_results) > 0 and _min_q is not None:
-            q_col = "combined_qvalue" if "combined_qvalue" in dmr_results.columns else "combined_pvalue"
-            dmr_results = dmr_results.filter(pl.col(q_col) < _min_q)
+        # branch exactly via the shared apply_region_qfilter helper. Pre-fix
+        # the CLI skipped this, so CLI chain_merge output was less filtered
+        # than the API (D11).
+        dmr_results = apply_region_qfilter(
+            dmr_results, getattr(args, "min_mean_qvalue", None)
+        )
     elif args.method == "tile":
         # --- tile-based path. Needs methylstore + samplesheet. ---
         if not args.methylstore or not args.samplesheet:
@@ -395,6 +399,18 @@ def _cmd_dmr(args: argparse.Namespace):
             unite=args.unite,
             min_samples_treatment=args.min_samples_treatment,
             min_samples_control=args.min_samples_control,
+        )
+        # Optional stricter-than-alpha q-value post-filter on the per-tile
+        # `qvalue` column, mirroring tl.dmr's tile branch via the shared
+        # helper. Applied BEFORE empirical FDR so the permutation BH
+        # correction sees the same region set as tl.dmr (which also filters
+        # before empirical_fdr_for_dmr). Pre-fix the CLI tile branch skipped
+        # this entirely, so `epykit dmr --method tile` diverged from
+        # tl.dmr(method='tile') when --min-mean-qvalue != alpha (D11 gap).
+        dmr_results = apply_region_qfilter(
+            dmr_results,
+            getattr(args, "min_mean_qvalue", None),
+            candidate_cols=("qvalue",),
         )
         if getattr(args, "empirical_fdr", False) and len(dmr_results) > 0:
             from .dmr import empirical_fdr_for_dmr
@@ -442,11 +458,11 @@ def _cmd_dmr(args: argparse.Namespace):
             min_abs_meth_diff=args.min_abs_meth_diff,
         )
         # Same region-level q-value post-filter as tl.dmr's sliding_window
-        # branch (BH-corrected combined_qvalue, falling back to combined_pvalue).
-        _min_q = getattr(args, "min_mean_qvalue", None)
-        if len(dmr_results) > 0 and _min_q is not None:
-            q_col = "combined_qvalue" if "combined_qvalue" in dmr_results.columns else "combined_pvalue"
-            dmr_results = dmr_results.filter(pl.col(q_col) < _min_q)
+        # branch, via the shared apply_region_qfilter helper (BH-corrected
+        # combined_qvalue, falling back to combined_pvalue).
+        dmr_results = apply_region_qfilter(
+            dmr_results, getattr(args, "min_mean_qvalue", None)
+        )
 
     dmr_results.write_parquet(args.output)
     print(f"DMR results written to {args.output}")
@@ -934,9 +950,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_dmr.add_argument("--min-abs-meth-diff",    type=float, default=0.1)
     p_dmr.add_argument(
         "--min-mean-qvalue", type=float, default=0.05,
-        help="(chain_merge, sliding_window) Region-level q-value cutoff "
+        help="(chain_merge, sliding_window, tile) Region-level q-value cutoff "
              "applied as a post-filter, matching ep.tl.dmr (default 0.05). "
-             "Set to a high value (e.g. 1.0) to disable.",
+             "The filter is strict (q < cutoff), so set to a value above 1.0 "
+             "(e.g. 1.1) to disable -- 1.0 still drops regions with q == 1.0.",
     )
     p_dmr.add_argument(
         "--no-tsv", action="store_true", dest="no_tsv", default=False,

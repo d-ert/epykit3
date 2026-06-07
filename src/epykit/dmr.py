@@ -702,6 +702,39 @@ def resolve_layer_min_cpgs(min_cpgs: int | None, preset: str | None) -> int:
     return _DMR_DEFAULT_MIN_CPGS
 
 
+def apply_region_qfilter(
+    dmr_df: pl.DataFrame,
+    min_mean_qvalue: float | None,
+    *,
+    candidate_cols: tuple[str, ...] = ("combined_qvalue", "combined_pvalue"),
+) -> pl.DataFrame:
+    """Drop DMRs whose region-level q-value (or p-value fallback) is not
+    below ``min_mean_qvalue``.
+
+    Shared by ``tl.dmr`` and the ``epykit dmr`` CLI so the chain_merge /
+    sliding_window / tile post-filters stay byte-identical across the API
+    and CLI (the whole point of the parity batch). ``segment`` deliberately
+    does NOT call this -- it has no region-level q post-filter.
+
+    The first column in ``candidate_cols`` that is present in ``dmr_df`` is
+    used; if none are present, or ``min_mean_qvalue is None``, or the frame
+    is empty, the frame is returned unchanged.
+
+    - chain_merge / sliding_window use the default
+      ``("combined_qvalue", "combined_pvalue")`` (BH-corrected combined
+      q-value, falling back to the raw combined p-value).
+    - tile uses ``("qvalue",)`` (its own per-tile BH q-value); the
+      "first present candidate else unchanged" rule reproduces the prior
+      ``"qvalue" in dmr_df.columns`` guard exactly.
+    """
+    if min_mean_qvalue is None or len(dmr_df) == 0:
+        return dmr_df
+    for col in candidate_cols:
+        if col in dmr_df.columns:
+            return dmr_df.filter(pl.col(col) < min_mean_qvalue)
+    return dmr_df
+
+
 def call_dmr_chain_merge(
     dmc_results: Union[pl.DataFrame, DMCStore, str, Path],
     *,

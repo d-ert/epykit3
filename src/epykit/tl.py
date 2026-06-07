@@ -25,6 +25,7 @@ from .dmc import (
 from .dmr import (
     _DMR_DEFAULT_MIN_CPGS,
     DMR_PRESETS,  # noqa: F401 -- public re-export: `from epykit.tl import DMR_PRESETS`
+    apply_region_qfilter,
     call_dmr_chain_merge,
     call_dmr_sliding_window,
     call_dmr_tile_based,
@@ -1431,9 +1432,12 @@ def dmr(
         )
 
         # Optional q-value post-filter (the tile path already filtered at
-        # `alpha`, but a stricter user threshold is allowed here).
-        if len(dmr_df) > 0 and min_mean_qvalue is not None and "qvalue" in dmr_df.columns:
-            dmr_df = dmr_df.filter(pl.col("qvalue") < min_mean_qvalue)
+        # `alpha`, but a stricter user threshold is allowed here). Shared with
+        # the CLI tile branch via apply_region_qfilter so the two cannot drift;
+        # tile filters on the per-tile `qvalue` column only.
+        dmr_df = apply_region_qfilter(
+            dmr_df, min_mean_qvalue, candidate_cols=("qvalue",)
+        )
 
         # permutation FDR. Refuses to run when a covariate design
         # is in play (shuffling treatment labels invalidates the assumed
@@ -1547,10 +1551,9 @@ def dmr(
         )
         # filter on the BH-corrected DMR-level q-value, not the raw
         # combined p-value. ``call_dmr_sliding_window`` now adds
-        # ``combined_qvalue`` itself.
-        if len(dmr_df) > 0 and min_mean_qvalue is not None:
-            q_col = "combined_qvalue" if "combined_qvalue" in dmr_df.columns else "combined_pvalue"
-            dmr_df = dmr_df.filter(pl.col(q_col) < min_mean_qvalue)
+        # ``combined_qvalue`` itself. Shared with the CLI via
+        # apply_region_qfilter (default candidate cols).
+        dmr_df = apply_region_qfilter(dmr_df, min_mean_qvalue)
 
         md.uns["dmr"] = dmr_df
         md.uns["dmr_params"] = {
@@ -1643,9 +1646,8 @@ def dmr(
 
         # Same post-hoc q-value filter as the sliding-window path: drop
         # candidate DMRs whose BH-corrected combined q-value isn't sig.
-        if len(dmr_df) > 0 and min_mean_qvalue is not None:
-            q_col = "combined_qvalue" if "combined_qvalue" in dmr_df.columns else "combined_pvalue"
-            dmr_df = dmr_df.filter(pl.col(q_col) < min_mean_qvalue)
+        # Shared with the CLI via apply_region_qfilter (default candidate cols).
+        dmr_df = apply_region_qfilter(dmr_df, min_mean_qvalue)
 
         md.uns["dmr"] = dmr_df
         md.uns["dmr_params"] = {

@@ -124,6 +124,98 @@ def test_cli_sliding_window_applies_q_filter(tmp_path):
     )
     _cmd_dmr(args)
     got = pl.read_parquet(args.output)
-    assert len(got) == len(expected), (
-        "CLI sliding_window must apply the same q-filter as tl.dmr"
+    assert got.sort("chrom").equals(expected.sort("chrom")), (
+        "CLI sliding_window must apply the same q-filter as tl.dmr exactly "
+        "(not merely the same row count)"
     )
+
+
+# tile filtering parity (D11 follow-up: the CLI tile branch was missing the
+# qvalue post-filter that tl.dmr's tile path applies, so `epykit dmr
+# --method tile` diverged from tl.dmr(method='tile') when --min-mean-qvalue
+# was tighter than alpha).
+
+
+def test_cli_tile_applies_qvalue_filter(tmp_path, monkeypatch):
+    """CLI tile output must equal tl.dmr tile's ``qvalue < min_mean_qvalue``
+    post-filtered set. The tile engine is stubbed so the test pins the CLI's
+    post-filter behavior (the part that was missing) rather than the tile
+    statistics. With a threshold tighter than alpha the filter must drop the
+    marginal tile -- proving the parity gap is closed."""
+    import epykit.cli as ep_cli
+    import epykit.dmr as ep_dmr
+
+    # Two tiles that both already passed the engine's alpha=0.05 filter: one
+    # strongly significant, one marginal. tl.dmr tile filters on ``qvalue``.
+    tile_frame = pl.DataFrame(
+        {
+            "chrom": ["chr1", "chr2"],
+            "start": [100, 100],
+            "end": [200, 200],
+            "pvalue": [1e-6, 0.04],
+            "qvalue": [1e-6, 0.04],
+            "meth_diff": [0.4, 0.2],
+        }
+    )
+    monkeypatch.setattr(ep_dmr, "call_dmr_tile_based", lambda *a, **k: tile_frame)
+    monkeypatch.setattr(
+        ep_cli, "_read_samplesheet_groups", lambda *a, **k: (["t0", "t1"], ["c0", "c1"])
+    )
+    monkeypatch.setattr(ep_cli, "_cli_n1_and_footgun_checks", lambda *a, **k: None)
+
+    threshold = 0.01  # tighter than alpha=0.05 -> must drop the q=0.04 tile
+    # The expected survivor set is exactly tl.dmr tile's filter: qvalue-only.
+    expected = tile_frame.filter(pl.col("qvalue") < threshold)
+    assert len(expected) == 1, "premise: threshold drops the marginal tile"
+
+    args = argparse.Namespace(
+        method="tile", empirical_fdr=False,
+        methylstore="store", samplesheet="ss.csv",
+        treatment_group="A", control_group="B",
+        tile_size_bp=1000, test="lr", min_cpgs_per_tile=3,
+        alpha=0.05, min_abs_meth_diff=0.1, unite=True,
+        min_samples_treatment=2, min_samples_control=2,
+        min_mean_qvalue=threshold,
+        output=str(tmp_path / "tile.parquet"), no_tsv=True,
+    )
+    _cmd_dmr(args)
+    got = pl.read_parquet(args.output)
+    assert got.sort("chrom").equals(expected.sort("chrom")), (
+        "CLI tile output must equal tl.dmr tile's qvalue-filtered set exactly"
+    )
+
+
+def test_cli_tile_none_disables_q_filter(tmp_path, monkeypatch):
+    """``min_mean_qvalue=None`` keeps every tile (filter disabled)."""
+    import epykit.cli as ep_cli
+    import epykit.dmr as ep_dmr
+
+    tile_frame = pl.DataFrame(
+        {
+            "chrom": ["chr1", "chr2"],
+            "start": [100, 100],
+            "end": [200, 200],
+            "pvalue": [1e-6, 0.04],
+            "qvalue": [1e-6, 0.04],
+            "meth_diff": [0.4, 0.2],
+        }
+    )
+    monkeypatch.setattr(ep_dmr, "call_dmr_tile_based", lambda *a, **k: tile_frame)
+    monkeypatch.setattr(
+        ep_cli, "_read_samplesheet_groups", lambda *a, **k: (["t0", "t1"], ["c0", "c1"])
+    )
+    monkeypatch.setattr(ep_cli, "_cli_n1_and_footgun_checks", lambda *a, **k: None)
+
+    args = argparse.Namespace(
+        method="tile", empirical_fdr=False,
+        methylstore="store", samplesheet="ss.csv",
+        treatment_group="A", control_group="B",
+        tile_size_bp=1000, test="lr", min_cpgs_per_tile=3,
+        alpha=0.05, min_abs_meth_diff=0.1, unite=True,
+        min_samples_treatment=2, min_samples_control=2,
+        min_mean_qvalue=None,
+        output=str(tmp_path / "tile.parquet"), no_tsv=True,
+    )
+    _cmd_dmr(args)
+    got = pl.read_parquet(args.output)
+    assert len(got) == 2, "None must disable the q-filter (both tiles kept)"

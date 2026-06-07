@@ -52,6 +52,30 @@ def test_allow_n1_explicit_welch_t_not_overridden():
     assert args.test == "welch_t"
 
 
+def test_allow_n1_resolves_auto_to_fisher():
+    """``--test auto`` is in the resolve set: at n=1 with --allow-n1 it must
+    resolve to fisher (auto has no n=1 path of its own at this layer)."""
+    from epykit.cli import _cli_n1_and_footgun_checks
+
+    args = _checks_namespace(test="auto", allow_n1=True)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        _cli_n1_and_footgun_checks(args, unit="sites")
+    assert args.test == "fisher"
+
+
+def test_allow_n1_n2_lr_not_changed():
+    """Isolates the ``n_min < 2`` gate: at n>=2, lr + --allow-n1 is left
+    untouched (allow_n1 alone must not trigger the fisher resolution)."""
+    from epykit.cli import _cli_n1_and_footgun_checks
+
+    args = _checks_namespace(test="lr", allow_n1=True, n_treat=2, n_ctrl=2)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        _cli_n1_and_footgun_checks(args, unit="sites")
+    assert args.test == "lr"
+
+
 def test_allow_n1_explicit_glm_not_overridden():
     from epykit.cli import _cli_n1_and_footgun_checks
 
