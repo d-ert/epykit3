@@ -1024,19 +1024,30 @@ def welch_meth_diff_ci(
     mean_ctrl: np.ndarray,
     var_mean_ctrl: np.ndarray,
     alpha: float = 0.05,
+    dof: Optional[np.ndarray] = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Normal CI on Deltabeta from per-group Welford accumulators.
+    """CI on Deltabeta from per-group Welford accumulators.
 
     ``var_mean_*`` is the variance OF THE MEAN (= s^2 / n), so the SE of the
     difference is ``sqrt(var_mean_case + var_mean_ctrl)``. CI clamped to
     [-1, 1].
+
+    ``dof`` (the Welch-Satterthwaite degrees of freedom, per site) makes the
+    interval use the ``t(dof)`` critical value that the welch_t **p-value**
+    uses (``t.sf(|t|, dof)``). Without it the interval falls back to the
+    normal quantile ``z=1.96``, which at n=3 (dof~4, t_.025=2.78) is ~30%
+    too narrow relative to its own test -- a CI/test disagreement (M13).
+    ``dof=None`` preserves the legacy normal interval.
     """
     from scipy import stats as sp_stats
-    z = float(sp_stats.norm.isf(alpha / 2.0))
+    if dof is None:
+        crit: np.ndarray | float = float(sp_stats.norm.isf(alpha / 2.0))
+    else:
+        crit = sp_stats.t.isf(alpha / 2.0, np.maximum(np.asarray(dof, dtype=np.float64), 1.0))
     se = np.sqrt(np.maximum(var_mean_case + var_mean_ctrl, 0.0))
     diff = mean_case - mean_ctrl
-    lo = np.clip(diff - z * se, -1.0, 1.0)
-    hi = np.clip(diff + z * se, -1.0, 1.0)
+    lo = np.clip(diff - crit * se, -1.0, 1.0)
+    hi = np.clip(diff + crit * se, -1.0, 1.0)
     return lo, hi
 
 

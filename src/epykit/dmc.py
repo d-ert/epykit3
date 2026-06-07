@@ -1832,9 +1832,20 @@ def _process_one_chromosome(
             # welch_t (and glm_contrast single-coef) -- Wald CI from Welford.
             vm_case = _welford_var_mean(M2_case, n_valid_case)
             vm_ctrl = _welford_var_mean(M2_ctrl, n_valid_ctrl)
+            # Welch-Satterthwaite df, identical to the welch_t p-value path
+            # (t.sf(|t|, dof)), so the CI critical value matches the test (M13).
+            _dof_num = (vm_case + vm_ctrl) ** 2
+            _dof_den = (
+                np.where(n_valid_case > 1, vm_case ** 2 / np.maximum(n_valid_case - 1, 1), 0.0)
+                + np.where(n_valid_ctrl > 1, vm_ctrl ** 2 / np.maximum(n_valid_ctrl - 1, 1), 0.0)
+            )
+            with np.errstate(invalid="ignore", divide="ignore"):
+                _welch_dof = np.where(_dof_den > 0, _dof_num / _dof_den, 1.0)
+            _welch_dof = np.maximum(_welch_dof, 1.0)
             ci_lo, ci_hi = _glm_for_ci.welch_meth_diff_ci(
                 mean_case.astype(np.float64), vm_case,
                 mean_ctrl.astype(np.float64), vm_ctrl,
+                dof=_welch_dof,
             )
         ci_lo = ci_lo.astype(np.float32)
         ci_hi = ci_hi.astype(np.float32)
