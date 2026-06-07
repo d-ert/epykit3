@@ -681,7 +681,7 @@ def call_dmr_chain_merge(
     alpha: float = 0.05,
     min_abs_meth_diff: float = 0.1,
     dis_merge_bp: int = 500,
-    min_cpgs: int = 3,
+    min_cpgs: int | None = None,
     pct_sig: float = 0.5,
     minlen_bp: int = 50,
     use_q_for_sig: bool = False,
@@ -772,8 +772,11 @@ def call_dmr_chain_merge(
         tuning guidance above -- this is the first knob to loosen if
         recall is too low.
     min_cpgs
-        Minimum total CpGs (sig + non-sig) inside a chain's span. DSS
-        default: 3.
+        Minimum total CpGs (sig + non-sig) inside a chain's span. Uses a
+        ``None`` sentinel: when ``None`` (the default) the value is taken
+        from the active ``preset`` if one is given, otherwise it falls
+        back to ``3`` (the DSS engine default). Pass an explicit integer
+        to override any preset.
     pct_sig
         Minimum fraction of CpGs in the span that must be significant.
         DSS default: 0.5. Note: this knob is effectively dead at strict
@@ -793,8 +796,11 @@ def call_dmr_chain_merge(
     """
     # Resolve preset bundle. Caller-provided kwargs override bundled values
     # by tracking which params arrived at their default values vs explicit.
-    # Easiest way: re-bind locals from the preset only if they match the
-    # signature defaults (signaling "user didn't set this").
+    # Most params re-bind from the preset only if they match the signature
+    # defaults (signaling "user didn't set this"). ``min_cpgs`` is special:
+    # its tl.dmr/CLI default of 5 collides with this ==default sentinel
+    # scheme, so it uses an explicit ``None`` sentinel instead (None ->
+    # preset value if a preset is active, else 3; any int overrides).
     if preset is not None:
         if preset not in DMR_PRESETS:
             raise ValueError(
@@ -804,14 +810,19 @@ def call_dmr_chain_merge(
         # Default sentinels match the signature defaults above.
         _SIG_DEFAULTS = dict(
             alpha=0.05, min_abs_meth_diff=0.1, dis_merge_bp=500,
-            min_cpgs=3, pct_sig=0.5, minlen_bp=50,
+            pct_sig=0.5, minlen_bp=50,
         )
         if alpha == _SIG_DEFAULTS["alpha"]:                       alpha = bundle["alpha"]
         if min_abs_meth_diff == _SIG_DEFAULTS["min_abs_meth_diff"]: min_abs_meth_diff = bundle["min_abs_meth_diff"]
         if dis_merge_bp == _SIG_DEFAULTS["dis_merge_bp"]:         dis_merge_bp = bundle["dis_merge_bp"]
-        if min_cpgs == _SIG_DEFAULTS["min_cpgs"]:                 min_cpgs = bundle["min_cpgs"]
+        if min_cpgs is None:                                     min_cpgs = bundle["min_cpgs"]
         if pct_sig == _SIG_DEFAULTS["pct_sig"]:                   pct_sig = bundle["pct_sig"]
         if minlen_bp == _SIG_DEFAULTS["minlen_bp"]:               minlen_bp = bundle["minlen_bp"]
+    # No preset (or preset bundle lacked min_cpgs): fall back to the DSS
+    # engine default. After this point min_cpgs is always a concrete int,
+    # so the cache key and the per-chain filter see a resolved value.
+    if min_cpgs is None:
+        min_cpgs = 3
     if isinstance(dmc_results, (str, Path)):
         dmc_results = DMCStore.open(dmc_results)
 

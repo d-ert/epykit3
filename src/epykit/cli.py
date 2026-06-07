@@ -319,12 +319,16 @@ def _cmd_dmr(args: argparse.Namespace):
             raise ValueError("method=chain_merge requires --dmc-results.")
 
         dmc_results = pl.read_parquet(args.dmc_results)
+        # --min-cpgs defaults to None so the engine can resolve it from the
+        # preset (or fall back to 3). An explicit --min-cpgs N flows through
+        # and overrides the preset. Pre-fix this branch dropped min_cpgs.
         dmr_results = call_dmr_chain_merge(
             dmc_results,
             preset=args.preset,
             alpha=args.alpha,
             min_abs_meth_diff=args.min_abs_meth_diff,
             dis_merge_bp=args.dis_merge_bp,
+            min_cpgs=args.min_cpgs,
             pct_sig=args.pct_sig,
             minlen_bp=args.minlen_bp,
             use_q_for_sig=args.use_q_for_sig,
@@ -387,7 +391,7 @@ def _cmd_dmr(args: argparse.Namespace):
         dmc_results = pl.read_parquet(args.dmc_results)
         dmr_results = call_dmr_rule_segment(
             dmc_results,
-            min_cpgs=args.min_cpgs,
+            min_cpgs=args.min_cpgs if args.min_cpgs is not None else 5,
             min_abs_meth_diff=args.min_abs_meth_diff,
             alpha=args.alpha,
         )
@@ -401,7 +405,7 @@ def _cmd_dmr(args: argparse.Namespace):
             dmc_results,
             window_bp=args.window_bp,
             step_bp=args.step_bp,
-            min_cpgs=args.min_cpgs,
+            min_cpgs=args.min_cpgs if args.min_cpgs is not None else 5,
             min_sites_significant=args.min_sites_significant,
             alpha=args.alpha,
             min_abs_meth_diff=args.min_abs_meth_diff,
@@ -857,7 +861,11 @@ def main():
                             "Parquet file from 'epykit dmc'")
     p_dmr.add_argument("--window-bp",            type=int,   default=500)
     p_dmr.add_argument("--step-bp",              type=int,   default=250)
-    p_dmr.add_argument("--min-cpgs",             type=int,   default=5)
+    p_dmr.add_argument(
+        "--min-cpgs", type=int, default=None,
+        help="Minimum CpGs per DMR. Default: 5 for sliding_window/segment; "
+             "for chain_merge, the active --preset's value (or 3 if no preset).",
+    )
     p_dmr.add_argument("--min-sites-significant",type=int,   default=3)
 
     # Chain-merge-method options (DSS callDMR semantics). Knob defaults match

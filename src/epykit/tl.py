@@ -1220,7 +1220,7 @@ def dmr(
     # Sliding-window options ------------------------------------------------
     window_bp: int = 500,
     step_bp: int = 250,
-    min_cpgs: int = 5,
+    min_cpgs: int | None = None,
     min_sites_significant: int = 3,
     # Chain-merge options (DSS callDMR semantics) --------------------------
     dis_merge_bp: int = 500,
@@ -1321,8 +1321,14 @@ def dmr(
         Restrict tile-method processing to these chromosomes.
     min_samples_treatment, min_samples_control : int
         Per-tile sample-count guard for tile-method.
-    window_bp, step_bp, min_cpgs, min_sites_significant : int
+    window_bp, step_bp, min_sites_significant : int
         Sliding-window method options.
+    min_cpgs : int or None
+        Minimum CpGs per DMR. ``None`` (the default) resolves per method:
+        ``5`` for ``sliding_window`` / ``segment``; for ``chain_merge``
+        it defers to the active ``preset``'s value, or ``5`` when no
+        preset is given (preserving the documented chain_merge default).
+        An explicit integer always wins and overrides a preset.
     alpha : float
         q-value threshold for "significant" at the DMC / tile level
         (used by both methods, with different downstream meanings).
@@ -1526,11 +1532,13 @@ def dmr(
                 "method='tile' which goes directly to the methylstore."
             )
 
+        # None sentinel -> sliding_window's documented default of 5.
+        sw_min_cpgs = min_cpgs if min_cpgs is not None else 5
         dmr_df = call_dmr_sliding_window(
             dmc_results=dmc_input,
             window_bp=window_bp,
             step_bp=step_bp,
-            min_cpgs=min_cpgs,
+            min_cpgs=sw_min_cpgs,
             min_sites_significant=min_sites_significant,
             alpha=alpha,
             min_abs_meth_diff=min_abs_meth_diff,
@@ -1547,7 +1555,7 @@ def dmr(
             "method": "sliding_window",
             "window_bp": window_bp,
             "step_bp": step_bp,
-            "min_cpgs": min_cpgs,
+            "min_cpgs": sw_min_cpgs,
             "min_sites_significant": min_sites_significant,
             "alpha": alpha,
             "min_abs_meth_diff": min_abs_meth_diff,
@@ -1565,16 +1573,18 @@ def dmr(
             raise ValueError(
                 "method='segment' needs a DMC table on md. Run ep.tl.dmc(md) first."
             )
+        # None sentinel -> segment's documented default of 5.
+        seg_min_cpgs = min_cpgs if min_cpgs is not None else 5
         dmr_df = call_dmr_rule_segment(
             dmc_df,
-            min_cpgs=min_cpgs,
+            min_cpgs=seg_min_cpgs,
             min_abs_meth_diff=min_abs_meth_diff,
             alpha=alpha,
         )
         md.uns["dmr"] = dmr_df
         md.uns["dmr_params"] = {
             "method": "segment",
-            "min_cpgs": min_cpgs,
+            "min_cpgs": seg_min_cpgs,
             "min_abs_meth_diff": min_abs_meth_diff,
             "alpha": alpha,
         }
@@ -1606,13 +1616,27 @@ def dmr(
                 "Run ep.tl.dmc(md) first."
             )
 
+        # Resolve min_cpgs with a None sentinel (M10). Explicit value wins;
+        # else defer to the preset's value (preset active); else 5 -- the
+        # documented chain_merge default, which keeps the benchmark paper's
+        # bare-default behavior unchanged. We compute the concrete value
+        # here (rather than threading None into the engine) so dmr_params
+        # records the value actually used, and pass it explicitly so it
+        # overrides the engine's own preset resolution deterministically.
+        if min_cpgs is not None:
+            cm_min_cpgs = min_cpgs
+        elif preset is not None:
+            from .dmr import DMR_PRESETS
+            cm_min_cpgs = DMR_PRESETS[preset]["min_cpgs"]
+        else:
+            cm_min_cpgs = 5
         dmr_df = call_dmr_chain_merge(
             dmc_input,
             preset=preset,
             alpha=alpha,
             min_abs_meth_diff=min_abs_meth_diff,
             dis_merge_bp=dis_merge_bp,
-            min_cpgs=min_cpgs,
+            min_cpgs=cm_min_cpgs,
             pct_sig=pct_sig,
             minlen_bp=minlen_bp,
             use_q_for_sig=use_q_for_sig,
@@ -1630,7 +1654,7 @@ def dmr(
             "alpha": alpha,
             "min_abs_meth_diff": min_abs_meth_diff,
             "dis_merge_bp": dis_merge_bp,
-            "min_cpgs": min_cpgs,
+            "min_cpgs": cm_min_cpgs,
             "pct_sig": pct_sig,
             "minlen_bp": minlen_bp,
             "use_q_for_sig": use_q_for_sig,
