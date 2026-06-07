@@ -194,7 +194,11 @@ def _build_promoter_df(genes_pd, upstream_bp: int, downstream_bp: int) -> "pd.Da
     minus = genes_pd[genes_pd["Strand"] == "-"].copy()
     plus["End"]    = plus["Start"] + downstream_bp
     plus["Start"]  = (plus["Start"] - upstream_bp).clip(lower=0)
-    tss_minus      = minus["End"].copy()
+    # Genes are 0-based half-open [Start, End). The minus-strand TSS is the
+    # gene's highest-coordinate transcribed base = End - 1 (NOT End, which is
+    # one past the gene), mirroring the plus-strand anchor on Start. Using End
+    # made the promoter window and TSS distances 1 bp asymmetric vs + strand.
+    tss_minus      = minus["End"] - 1
     minus["Start"] = (tss_minus - downstream_bp).clip(lower=0)
     minus["End"]   = tss_minus + upstream_bp
     combined = pd.concat([plus, minus], ignore_index=True)
@@ -305,9 +309,14 @@ def _parse_gtf_utrs(gtf_path: str) -> "pd.DataFrame":
                     "Feature": "5UTR" if feature == "five_prime_utr" else "3UTR",
                 })
     except Exception:
-        _log(f"  warning: UTR parse failed for {gtf_path}; "
-             "falling back to no-UTR mode")
-        rows = []
+        # Keep the UTR rows parsed before the failing line rather than
+        # discarding all of them (M8): one malformed line should not silently
+        # delete every UTR annotation. Surface at WARNING, not DEBUG.
+        logger.warning(
+            "UTR parse error in %s after %d UTR row(s); keeping those and "
+            "treating the remainder as no-UTR (affected sites fall through to "
+            "exon/intron).", gtf_path, len(rows),
+        )
 
     cols = ["Chromosome", "Start", "End", "Strand", "gene_id", "gene_name", "Feature"]
     out = pd.DataFrame(rows) if rows else pd.DataFrame(columns=cols)
@@ -613,7 +622,11 @@ def _annotate_chromosome_chunk(
         sites_pd["_row_idx"] = np.arange(chunk_n, dtype=np.int32)
         _log(f"  {chrom}: sites DataFrame built in {time.time()-t0:.1f}s")
     except Exception:
-        _log(f"  {chrom}: ERROR building sites DataFrame:\n{traceback.format_exc()}")
+        logger.warning(
+            "%s: annotation failed building the sites frame -> this whole "
+            "chromosome is labelled all-intergenic:\n%s",
+            chrom, traceback.format_exc(),
+        )
         return result
 
     _log(f"  {chrom}: features DataFrame ({len(chrom_features_df):,} features)")
@@ -631,7 +644,11 @@ def _annotate_chromosome_chunk(
         join_rows = len(joined)
         _log(f"  {chrom}: overlap done in {time.time()-t0:.1f}s  -> {join_rows:,} rows")
     except Exception:
-        _log(f"  {chrom}: ERROR during overlap:\n{traceback.format_exc()}")
+        logger.warning(
+            "%s: bioframe overlap failed -> this whole chromosome is labelled "
+            "all-intergenic:\n%s",
+            chrom, traceback.format_exc(),
+        )
         return result
 
     if join_rows == 0:
@@ -708,7 +725,12 @@ def _annotate_chromosome_chunk(
         _log(f"  {chrom}: {n_annotated:,}/{chunk_n:,} sites annotated")
 
     except Exception:
-        _log(f"  {chrom}: ERROR during post-join assembly:\n{traceback.format_exc()}")
+        logger.warning(
+            "%s: post-join annotation assembly failed -> this chromosome's "
+            "single-best annotation is unreliable (left as seeded intergenic); "
+            "investigate before trusting its feature distribution:\n%s",
+            chrom, traceback.format_exc(),
+        )
 
     return result
 
@@ -869,7 +891,11 @@ def _build_features_index(
             if len(intron_df) > 0:
                 feature_dfs.append(intron_df[_FEAT_COLS])
         except Exception:
-            _log(f"  ERROR building introns:\n{traceback.format_exc()}")
+            logger.warning(
+                "Intron construction failed -> introns dropped from the "
+                "feature set; intronic sites will be labelled intergenic:\n%s",
+                traceback.format_exc(),
+            )
 
     # HOMER-style additions. UTRs come from a second GTF pass (cheap with
     # the dedicated UTR cache); TTS is derived from gene-body coordinates;
@@ -914,7 +940,11 @@ def _build_features_index(
         )
         _log(f"  {_df_info('all_features_df', all_features_df)}  ({time.time()-t0:.1f}s)")
     else:
-        _log("  WARNING: no feature DataFrames built; all sites will be intergenic")
+        logger.warning(
+            "No feature intervals were built from the annotation source -> "
+            "EVERY site will be labelled intergenic. Check the GTF/refGene "
+            "input and the requested `features` set."
+        )
         all_features_df = pd.DataFrame(columns=_FEAT_COLS)
 
     del feature_dfs
@@ -943,10 +973,15 @@ def _build_features_index(
         genes_pd[["gene_id", "Chromosome", "Start", "End", "Strand", "gene_name"]]
         .drop_duplicates("gene_id")
     )
+    # 0-based half-open [Start, End): + strand TSS = Start (first base);
+    # - strand TSS = End - 1 (the highest-coordinate transcribed base, NOT
+    # the exclusive End). End would put every minus-strand TSS 1 bp 3' of the
+    # gene, making distance_to_tss / nearest_tss_distance / promoter windows
+    # 1 bp asymmetric across strands.
     tss_values = np.where(
         _g["Strand"].to_numpy() != "-",
         _g["Start"].to_numpy(),
-        _g["End"].to_numpy(),
+        _g["End"].to_numpy() - 1,
     ).astype(np.int64)
     tss_series = pd.Series(tss_values, index=_g["gene_id"].to_numpy(), dtype="Int64")
     strand_lut = pd.Series(
@@ -1208,7 +1243,11 @@ def annotate_features(
             annot_parts.append(part)
             _log(f"  {chrom}: done in {time.time()-t0:.1f}s")
         except Exception:
-            _log(f"  {chrom}: UNHANDLED ERROR:\n{traceback.format_exc()}")
+            logger.warning(
+                "%s: unhandled error annotating this chromosome -> it is "
+                "labelled all-intergenic:\n%s",
+                chrom, traceback.format_exc(),
+            )
             part = pd.DataFrame({
                 "_orig_idx":    chrom_sites["_orig_idx"].to_numpy(),
                 "gene_id":      np.full(chunk_n, "", dtype=object),
@@ -1233,7 +1272,11 @@ def annotate_features(
             .reset_index(drop=True)
         )
     else:
-        _log("  WARNING: annot_parts is empty -- returning all-intergenic")
+        logger.warning(
+            "Annotation produced no rows for any chromosome -> ALL sites "
+            "labelled intergenic. Check the annotation source and chromosome "
+            "naming (chr1 vs 1)."
+        )
         annot_all = pd.DataFrame({
             "_orig_idx":    np.arange(n, dtype=np.int32),
             "gene_id":      np.full(n, "", dtype=object),
@@ -1268,8 +1311,8 @@ def annotate_features(
         .to_numpy(dtype=np.float64, na_value=np.nan)
     )
 
-    # TSS distance: positive = downstream. On - strand, TSS sits at End and a
-    # higher genomic coordinate is upstream, so flip the sign. ``strand_lut``
+    # TSS distance: positive = downstream. On - strand, TSS sits at End-1 and
+    # a higher genomic coordinate is upstream, so flip the sign. ``strand_lut``
     # came from the cached feature index, so this is O(1) on a rerun.
     strand_arr  = pd.Series(gene_ids.tolist()).map(strand_lut).to_numpy(dtype=object)
     strand_sign = np.where(strand_arr == "-", -1.0, 1.0).astype(np.float64)
@@ -1377,7 +1420,9 @@ def annotate_cpg_islands(
         raise
 
     if len(islands_df) == 0:
-        _log("  WARNING: BED is empty -> all sites open_sea")
+        logger.warning(
+            "CpG-island BED is empty -> EVERY site labelled open_sea."
+        )
         return sites.with_columns(pl.lit("open_sea").alias("cpg_context"))
 
     _check_chrom_name_overlap(
@@ -1437,7 +1482,11 @@ def annotate_cpg_islands(
             hit_idxs = overlap["_row_idx"].drop_duplicates().to_numpy(dtype=np.int32)
             cpg_context[hit_idxs] = ctx_label
         except Exception:
-            _log(f"  ERROR during {ctx_label} overlap:\n{traceback.format_exc()}")
+            logger.warning(
+                "CpG-island %s overlap failed -> affected sites keep a weaker "
+                "/ open_sea context:\n%s",
+                ctx_label, traceback.format_exc(),
+            )
 
     counts = {lbl: int((cpg_context == lbl).sum())
               for lbl in ["island", "shore", "shelf", "open_sea"]}

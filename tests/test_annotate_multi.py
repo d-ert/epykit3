@@ -203,15 +203,17 @@ def test_nearest_tss_can_differ_from_best_pick(synth_gtf):
 
 
 def test_nearest_tss_minus_strand_sign_flip(synth_gtf):
-    """GENEC is on "-" strand with TSS at 10000 (gene end). For an upstream
-    site at pos=8000, raw delta is -2000, but the sign must flip on "-"
-    strand so the reported distance is +2000 (downstream in transcription
+    """GENEC is on "-" strand with gene end at 1-based 10000. The minus-strand
+    TSS is the highest-coordinate transcribed base = 0-based End-1 = 9999
+    (mirroring the plus-strand 0-based Start anchor; see the 701-vs-700 note
+    above). For an upstream site at pos=8000, raw delta is 8000-9999 = -1999,
+    and the sign flips on "-" strand to +1999 (downstream in transcription
     direction)."""
     sites = _sites([8000])
     out = annotate_features(sites, synth_gtf, multi_annotation=True)
     row = out.row(0, named=True)
     assert row["nearest_tss_gene"] == "GENEC"
-    assert row["nearest_tss_distance"] == 2000
+    assert row["nearest_tss_distance"] == 1999
 
 
 def test_all_overlapping_captures_one_to_many(synth_gtf):
@@ -236,12 +238,11 @@ def test_no_overlap_site_gets_empty_lists_and_still_finds_nearest(synth_gtf):
     assert row["gene_name"] == ""
     assert list(row["all_overlapping_genes"]) == []
     assert list(row["all_overlapping_features"]) == []
-    # Nearest TSS: GENEC at 10000 is 4000 away (after "-" flip: +4000);
-    # GENEA at 1000 is 5000 away; GENEB at 2000 is 4000 away (no flip).
-    # Tie at |4000| -- bisect picks one deterministically; we just assert it
-    # didn't fall back to "" and the magnitude is right.
-    assert row["nearest_tss_gene"] in {"GENEB", "GENEC"}
-    assert abs(row["nearest_tss_distance"]) == 4000
+    # Nearest TSS (0-based internal coords): GENEC TSS = End-1 = 9999, so
+    # |6000-9999| = 3999 (after "-" flip: +3999); GENEB TSS = Start = 1999, so
+    # |6000-1999| = 4001; GENEA TSS = 999, so 5001. GENEC (3999) is nearest.
+    assert row["nearest_tss_gene"] == "GENEC"
+    assert abs(row["nearest_tss_distance"]) == 3999
 
 
 def test_multi_annotation_reuses_built_features_cache(synth_gtf):
@@ -367,13 +368,15 @@ def test_refgene_source_produces_legacy_columns(synth_refgene):
 
 def test_refgene_source_supports_multi_annotation(synth_refgene):
     """Multi-annotation on a refGene source. The convention is
-    "positive = downstream in transcription direction", so for the "-"
-    strand NCRNA_RG (TSS at 6000):
+    "positive = downstream in transcription direction". NCRNA_RG is "-"
+    strand with 0-based half-open txEnd=6000, so its TSS is the last
+    transcribed base at End-1 = 5999 (mirroring the plus-strand Start
+    anchor):
 
       - site at 5000 (lower genomic coord) is DOWNSTREAM in transcription
-        direction -> positive distance (+1000).
+        direction -> positive distance: -1 * (5000 - 5999) = +999.
       - site at 7000 (higher genomic coord) is UPSTREAM in transcription
-        direction -> negative distance (-1000).
+        direction -> negative distance: -1 * (7000 - 5999) = -1001.
     """
     sites = _sites([5000, 7000])
     out = annotate_features(
@@ -381,9 +384,9 @@ def test_refgene_source_supports_multi_annotation(synth_refgene):
     )
     rows = out.to_dicts()
     assert rows[0]["nearest_tss_gene"] == "NCRNA_RG"
-    assert rows[0]["nearest_tss_distance"] == 1000   # downstream
+    assert rows[0]["nearest_tss_distance"] == 999    # downstream
     assert rows[1]["nearest_tss_gene"] == "NCRNA_RG"
-    assert rows[1]["nearest_tss_distance"] == -1000  # upstream
+    assert rows[1]["nearest_tss_distance"] == -1001  # upstream
 
 
 def test_refgene_gene_type_filter_works(synth_refgene):
