@@ -101,6 +101,60 @@ redesigned HTML report.
   `statsmodels`. It no longer over-promises (told users they needed too few
   replicates).
 
+<!-- Second pre-submission review (2026-06-07 audit) -->
+
+- **Empirical/permutation FDR correctness (M1–M3, perm-1/2).** Stratified
+  permutation now permutes *within* each stratum preserving its original
+  treatment/control split (the old global split made paired/batch designs a
+  degenerate, maximally-confounded null — M1). `empirical_fdr=True` on a
+  non-tile DMR caller (`chain_merge`/`sliding_window`/`segment`) now raises
+  `NotImplementedError` instead of silently no-opping and suppressing the
+  calibration warning (M2). The DMC permutation null now reproduces the
+  observed run's `sep_fallback`/`smoothing` (was anti-conservative — M3).
+  Failed permutations are excluded from the empirical-p denominator (perm-1),
+  and tile permutations inherit `merge_adjacent`/`backend` (perm-2).
+- **`merge_strands=True` without a reference (M5).** A default
+  `read_bismark("x.cov")` no longer leaves symmetric CpG dyads un-merged
+  (2× sites at ½ coverage). When `merge_strands=True` and no `reference_fasta`
+  is given, dyads are merged by position (C at N with its − strand partner at
+  N+1); pass `reference_fasta=` for strand-aware merging. **Behavior change**
+  on two-strand `.cov` input.
+- **GLM over-conservative vs `lr` (M4).** The `glm` p-value path now applies
+  the same `DF_PHI_FLOOR=50` to the F-reference df that `lr` uses, so
+  `test="glm"` is no longer systematically less powerful than `test="lr"` on
+  identical data. **Behavior change:** glm p-values decrease (toward `lr`); the
+  bias was conservative so the bare-`lr` headline is unaffected.
+- **`aggregate_regions` stale output + overlapping BEDs (M6, M7).** The regions
+  store is cleared before re-writing (re-running with a different BED no longer
+  mixes regions from two BEDs — M6), and each CpG is now assigned to *every*
+  region it overlaps via a range join, fixing dropped/under-counted CpGs for
+  nested or overlapping BED regions (M7).
+- **methylKit export off-by-one (M9).** `to_methylkit_tabix` now writes
+  1-based `base`/`chrBase` (methylKit is 1-based); previously every exported
+  CpG was shifted 1 bp left versus annotations. **Behavior change** for
+  existing methylKit exports.
+- **`welch_t` CI used the normal quantile (M13).** The Δβ CI now uses
+  `t(Satterthwaite df)`, matching its own p-value (was `z=1.96`, ~30% too
+  narrow at n=3 — a CI/test disagreement).
+- **Segment DMR caller unsigned Stouffer (D1).** `dmr_segment` now combines
+  per-CpG p-values with the signed Stouffer Z (shared with the other callers),
+  so a region's p no longer shrinks toward 0 as it grows when directions are
+  mixed (was anti-conservative).
+- **Neighbour combine counted untested sites (D9).** `combine_neighbour_pvalues`
+  excludes NaN-p (untested) neighbours from both the Stouffer sum and the
+  `_n_neighbours` audit count.
+- **CLI/API parity (M10, D10–D12, contrast forwarding).** `epykit dmr
+  --min-cpgs` is now honored on the default `chain_merge` caller and presets
+  are no longer suppressed (M10); `epykit dmr` gained `--min-mean-qvalue`
+  matching `tl.dmr`'s region q-filter across chain_merge/sliding_window/tile
+  (D11); bare `epykit dmc --allow-n1` at n=1 resolves to the Fisher engine that
+  actually has the n=1 fallback (D12); the `epykit dmc` formula/contrast path
+  now forwards `--dispersion`/`--reference`/`--fdr-method` and `tl.dmc`'s
+  contrast path honors `fdr_method` (was hardcoded `fdr_bh`).
+- **Export streaming (M12).** `to_bedgraph`/`to_bigwig` stream the methylstore
+  one chromosome at a time instead of materializing the whole sample as
+  full-genome Python lists; peak memory is now O(largest chromosome).
+
 ### Changed
 
 - **`polars>=1.0` required (M-PKG1).** The declared floor was `>=0.20.0`, but
@@ -108,6 +162,13 @@ redesigned HTML report.
   raised to `>=0.60` (numpy-2 support).
 - **`uv.lock` is now committed (M-PKG4)** for reproducibility; documented
   `uv sync --frozen` and thread-pinning in `benchmark/README.md`.
+- **`epykit dmc` / `epykit dmr --method tile` default to `union` (D10/`--unite`).**
+  Bare CLI DMC previously intersected sites while bare `ep.tl.dmc` unioned them
+  (intersect only after an explicit `ep.pp.unite`). The CLI now defaults to
+  union to match the API; `--unite` forces intersect. The benchmark scripts set
+  intersect explicitly via the API, so published numbers are unaffected.
+  Bare `epykit convert` now merges CpG dyads by default, matching the API
+  `merge_strands=True` (D10).
 
 ### Documentation
 
@@ -124,6 +185,14 @@ redesigned HTML report.
   `lr` / `glm` / `welch_t` are not anti-conservative under the null; a new CI
   job runs the `slow` tier. Added coordinate-convention and CLI/API parity
   regression tests.
+- Overdispersed FPR coverage extended to `welch_t` and `glm` (D18): a fast
+  beta-binomial `welch_t` FPR test across φ∈{1.5,2,3,5} and a slow
+  store-backed glm/welch_t null at elevated `replicate_sd`. Both come out
+  not anti-conservative. Added CLI↔API parity regression tests for
+  `min_cpgs`, `min_mean_qvalue`, the `--unite` default, strand-free dyad
+  merging, the methylKit coordinate, the GLM `DF_PHI_FLOOR`, the `welch_t`
+  CI t-quantile, overlapping-BED region assignment, and per-chromosome
+  export streaming.
 
 ## [1.0.0] — 2026-06-02
 
