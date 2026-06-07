@@ -42,31 +42,53 @@ def _chromosome_sort_key(chrom: str) -> tuple[int, str | int]:
     return (2, stripped)
 
 
-def _load_sample_beta(md: MethylData, sample: str, value: ValueKind) -> pl.DataFrame:
-    """Read a single sample's per-CpG rows. Returns chrom, pos, value."""
+def _value_lf(lf: pl.LazyFrame, value: ValueKind) -> pl.LazyFrame:
+    """Attach the requested ``value`` column to a lazy frame of CpG rows."""
+    if value == "beta":
+        return lf.filter(pl.col("coverage") > 0).with_columns(
+            (pl.col("N_meth").cast(pl.Float64) / pl.col("coverage")).alias("value")
+        )
+    if value == "coverage":
+        return lf.with_columns(pl.col("coverage").cast(pl.Float64).alias("value"))
+    if value == "N_meth":
+        return lf.with_columns(pl.col("N_meth").cast(pl.Float64).alias("value"))
+    raise ValueError(
+        f"value must be one of 'beta', 'coverage', 'N_meth'; got {value!r}"
+    )
+
+
+def _validate_sample(md: MethylData, sample: str) -> None:
     if sample not in md.obs.get_column("sample_id").to_list():
         raise ValueError(
             f"Sample {sample!r} not in md.obs.sample_id. Known samples: "
             f"{md.obs.get_column('sample_id').to_list()}"
         )
 
-    pattern = f"{md.store}/sample={sample}/chrom=*/part-*.parquet"
-    lf = pl.scan_parquet(pattern).select(
-        ["chrom", "pos", "N_meth", "coverage"]
+
+def _iter_sample_chrom_value(md: MethylData, sample: str, value: ValueKind):
+    """Yield ``(chrom, DataFrame[pos, value])`` one chromosome at a time.
+
+    Streams the methylstore partition tree so peak memory stays
+    O(largest chromosome) rather than materialising the whole sample
+    (~22-28M CpGs) and then full-genome Python lists (M12). Chromosomes
+    are yielded in IGV/UCSC order.
+    """
+    _validate_sample(md, sample)
+    # ``value`` is validated up front so an unknown kind raises before any I/O.
+    _value_lf(pl.LazyFrame({"N_meth": [], "coverage": []}), value)
+    sample_dir = Path(md.store) / f"sample={sample}"
+    chrom_dirs = sorted(
+        sample_dir.glob("chrom=*"),
+        key=lambda d: _chromosome_sort_key(d.name.removeprefix("chrom=")),
     )
-    if value == "beta":
-        lf = lf.filter(pl.col("coverage") > 0).with_columns(
-            (pl.col("N_meth").cast(pl.Float64) / pl.col("coverage")).alias("value")
+    for chrom_dir in chrom_dirs:
+        chrom = chrom_dir.name.removeprefix("chrom=")
+        lf = pl.scan_parquet(str(chrom_dir / "part-*.parquet")).select(
+            ["pos", "N_meth", "coverage"]
         )
-    elif value == "coverage":
-        lf = lf.with_columns(pl.col("coverage").cast(pl.Float64).alias("value"))
-    elif value == "N_meth":
-        lf = lf.with_columns(pl.col("N_meth").cast(pl.Float64).alias("value"))
-    else:
-        raise ValueError(
-            f"value must be one of 'beta', 'coverage', 'N_meth'; got {value!r}"
-        )
-    return lf.select(["chrom", "pos", "value"]).collect().sort(["chrom", "pos"])
+        df = _value_lf(lf, value).select(["pos", "value"]).collect().sort("pos")
+        if len(df) > 0:
+            yield chrom, df
 
 
 def to_bedgraph(
@@ -97,23 +119,26 @@ def to_bedgraph(
     str
         The output path (absolute), for convenience.
     """
-    df = _load_sample_beta(md, sample, value)
     out = Path(output)
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    chroms = df["chrom"].to_list()
-    starts = df["pos"].to_list()
-    vals = df["value"].to_list()
+    n_rows = 0
     with out.open("w", encoding="utf-8") as f:
         f.write(
             f'track type=bedGraph name="{sample}_{value}" '
             f'description="{value} from epykit"\n'
         )
-        for c, s, v in zip(chroms, starts, vals):
-            if v is None:
-                continue
-            f.write(f"{c}\t{s}\t{s + 1}\t{v:.6g}\n")
-    logger.info("Wrote bedgraph: %s (%d rows)", out, len(chroms))
+        # Stream one chromosome at a time so we never hold the whole genome
+        # as Python lists (M12). Peak memory is O(largest chromosome).
+        for chrom, df in _iter_sample_chrom_value(md, sample, value):
+            starts = df["pos"].to_list()
+            vals = df["value"].to_list()
+            for s, v in zip(starts, vals):
+                if v is None:
+                    continue
+                f.write(f"{chrom}\t{s}\t{s + 1}\t{v:.6g}\n")
+                n_rows += 1
+    logger.info("Wrote bedgraph: %s (%d rows)", out, n_rows)
     return str(out.resolve())
 
 
@@ -164,29 +189,36 @@ def to_bigwig(
             "(no Windows wheel -- use to_bedgraph instead on Windows)."
         ) from exc
 
-    df = _load_sample_beta(md, sample, value)
-    if len(df) == 0:
-        raise ValueError(f"No data for sample {sample!r}")
-
+    _validate_sample(md, sample)
     if chrom_sizes is None:
         chrom_sizes = _infer_chrom_sizes(md)
+
+    # Header must list every chromosome up front, but we read CpG data one
+    # chromosome at a time so peak memory stays O(largest chromosome) (M12).
+    # Chrom names for the header come from the partition directory listing
+    # (no data scan); entries are streamed per chromosome below.
+    sample_dir = Path(md.store) / f"sample={sample}"
+    observed_chroms = sorted(
+        (d.name.removeprefix("chrom=") for d in sample_dir.glob("chrom=*")),
+        key=_chromosome_sort_key,
+    )
+    if not observed_chroms:
+        raise ValueError(f"No data for sample {sample!r}")
 
     out = Path(output)
     out.parent.mkdir(parents=True, exist_ok=True)
 
     bw = pyBigWig.open(str(out), "w")
     try:
-        observed_chroms = sorted(df["chrom"].unique().to_list(), key=_chromosome_sort_key)
         header = [(c, chrom_sizes[c]) for c in observed_chroms if c in chrom_sizes]
         if not header:
             raise ValueError(
                 "chrom_sizes does not cover any chromosome present in the sample"
             )
         bw.addHeader(header)
-        for c in observed_chroms:
+        for c, sub in _iter_sample_chrom_value(md, sample, value):
             if c not in chrom_sizes:
                 continue
-            sub = df.filter(pl.col("chrom") == c)
             starts = sub["pos"].cast(pl.Int64).to_list()
             ends = [s + 1 for s in starts]
             vals = [

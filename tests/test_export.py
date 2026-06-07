@@ -27,6 +27,49 @@ def test_to_bedgraph(synth_md_filtered, tmp_path):
         assert 0.0 <= f <= 1.0
 
 
+def test_to_bedgraph_streams_all_covered_sites_in_order(synth_md_filtered, tmp_path):
+    """M12: the per-chromosome streaming rewrite must emit exactly the
+    covered CpGs (coverage>0), once each, in karyotype + position order --
+    no sites dropped or duplicated by the refactor away from the
+    whole-genome materialisation."""
+    import polars as pl
+    from epykit.export import _chromosome_sort_key
+
+    md = synth_md_filtered
+    sample = md.obs.get_column("sample_id")[0]
+    out = tmp_path / "stream.bedgraph"
+    md.to_bedgraph(sample, str(out), value="beta")
+
+    data = [
+        ln.split("\t")
+        for ln in out.read_text(encoding="utf-8").splitlines()[1:]
+        if ln.strip()
+    ]
+    emitted = [(c, int(s)) for c, s, _e, _v in data]
+
+    # Ground truth: covered sites for this sample straight from the store.
+    expected = set(
+        map(
+            tuple,
+            pl.scan_parquet(f"{md.store}/sample={sample}/chrom=*/part-*.parquet")
+            .filter(pl.col("coverage") > 0)
+            .select(["chrom", "pos"])
+            .collect()
+            .iter_rows(),
+        )
+    )
+    assert set(emitted) == expected
+    assert len(emitted) == len(expected), "duplicate rows emitted"
+
+    # Rows are grouped by chromosome in karyotype order, ascending position.
+    chrom_order = [c for c, _ in emitted]
+    first_seen = list(dict.fromkeys(chrom_order))
+    assert first_seen == sorted(first_seen, key=_chromosome_sort_key)
+    for c in first_seen:
+        positions = [p for cc, p in emitted if cc == c]
+        assert positions == sorted(positions)
+
+
 def test_to_bedgraph_coverage(synth_md_filtered, tmp_path):
     import epykit as ep
 
