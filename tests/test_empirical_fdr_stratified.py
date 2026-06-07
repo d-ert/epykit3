@@ -4,8 +4,7 @@ each stratum's original treatment/control split. The pre-fix implementation
 shuffled in dict order then split globally, so a paired 1T+1C design sent
 ALL pairs' first elements to treatment every permutation."""
 import numpy as np
-import polars as pl
-import pytest
+
 from epykit.dmr import _stratified_permutation_assignment
 
 
