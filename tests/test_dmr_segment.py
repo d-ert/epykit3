@@ -36,6 +36,43 @@ def test_call_dmr_rule_segment_emits_finite_pvalues(synth_md_filtered):
     assert ((qvals >= 0) & (qvals <= 1)).all(), "q-values must lie in [0, 1]"
 
 
+def test_segment_uses_signed_stouffer_cancelling_mixed_directions():
+    """D1: the segment caller must combine per-CpG p-values with the SIGNED
+    Stouffer Z (shared with the tile/sliding-window callers), not an unsigned
+    two-sided combine. Unsigned addition of |z| makes a region's p shrink
+    toward 0 as it grows even when directions are mixed -- anti-conservative.
+    The signed combine cancels opposing directions."""
+    from scipy.stats import norm
+    from epykit.dmr import _stouffer_combine_signed
+
+    pvals = np.full(6, 1e-4)                       # all individually strong
+    mixed = np.array([0.3, 0.3, 0.3, -0.3, -0.3, -0.3])
+    coherent = np.full(6, 0.3)
+
+    # Reconstruct the OLD unsigned two-sided Stouffer that was removed.
+    z = norm.isf(pvals / 2.0)
+    p_unsigned = float(2.0 * norm.sf(abs(z.sum() / np.sqrt(6))))
+
+    p_signed_mixed = _stouffer_combine_signed(pvals, mixed)
+    p_signed_coherent = _stouffer_combine_signed(pvals, coherent)
+
+    # Unsigned: anti-conservatively tiny regardless of direction.
+    assert p_unsigned < 1e-6
+    # Signed: mixed directions cancel -> large p; coherent stays significant.
+    assert p_signed_mixed > 0.5
+    assert p_signed_coherent < 1e-6
+
+
+def test_dmr_segment_has_no_unsigned_stouffer_combine():
+    """The unsigned `_stouffer_combine` helper was removed in the D1 fix;
+    guard against it silently coming back."""
+    import epykit.dmr_segment as seg
+    assert not hasattr(seg, "_stouffer_combine"), (
+        "dmr_segment._stouffer_combine (unsigned) must stay removed; use the "
+        "shared _stouffer_combine_signed."
+    )
+
+
 def test_dmr_hmm_shim_warns_on_import_and_re_exports():
     """Old `epykit.dmr_hmm.call_dmr_hmm` import path must keep working
     with a DeprecationWarning, and must re-export the new function."""

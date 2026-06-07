@@ -15,10 +15,9 @@ import logging
 
 import numpy as np
 import polars as pl
-from scipy import stats as sp_stats
 
 from ._hmm import runs_of_state, segment
-from .dmr import _DMR_TILE_SCHEMA
+from .dmr import _DMR_TILE_SCHEMA, _stouffer_combine_signed
 
 logger = logging.getLogger(__name__)
 
@@ -26,17 +25,6 @@ logger = logging.getLogger(__name__)
 def _state_means_for_meth_diff(meth_diff: np.ndarray) -> np.ndarray:
     """Fixed 3-state targets {hypo, neutral, hyper} at -0.20 / 0.0 / +0.20."""
     return np.array([-0.20, 0.00, 0.20])
-
-
-def _stouffer_combine(pvals: np.ndarray) -> float:
-    """Two-sided Stouffer combination of per-CpG p-values (equal weights)."""
-    p = pvals[np.isfinite(pvals)]
-    if p.size == 0:
-        return float("nan")
-    p = np.clip(p, 1e-300, 1.0 - 1e-15)
-    z = sp_stats.norm.isf(p / 2.0)  # two-sided -> half-tail z
-    z_combined = z.sum() / np.sqrt(p.size)
-    return float(2.0 * sp_stats.norm.sf(abs(z_combined)))
 
 
 def _bh_per_chrom(pvals: np.ndarray, chroms: np.ndarray) -> np.ndarray:
@@ -132,8 +120,15 @@ def call_dmr_rule_segment(
                 mean_md = float(run_md[valid].mean())
                 if abs(mean_md) < min_abs_meth_diff:
                     continue
+                # Signed Stouffer combine (D1): the unsigned two-sided
+                # variant added |z| regardless of direction, so a region's
+                # combined p shrank toward 0 as it grew even when per-CpG
+                # effects were mixed -- anti-conservative. The signed combine
+                # (shared with the tile/sliding-window callers) cancels
+                # opposing directions so only directionally-coherent regions
+                # get small p-values.
                 seg_p = (
-                    _stouffer_combine(pvals_per_cpg[mask])
+                    _stouffer_combine_signed(pvals_per_cpg[mask], run_md)
                     if pvals_per_cpg is not None else float("nan")
                 )
                 out_rows.append({
