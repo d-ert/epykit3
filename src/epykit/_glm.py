@@ -1055,6 +1055,7 @@ def newcombe_diff_ci(
     """
     from scipy import stats as sp_stats
     z_norm = float(sp_stats.norm.isf(alpha / 2.0))
+    z_eff: np.ndarray | float
     if phi is None:
         z_eff = z_norm
     else:
