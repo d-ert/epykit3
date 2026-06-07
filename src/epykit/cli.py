@@ -171,13 +171,27 @@ def _cmd_sample_summary(args: argparse.Namespace):
 def _cli_n1_and_footgun_checks(args, unit: str = "sites") -> None:
     """Mirror tl.* guards on the CLI side."""
     treatment_samples, control_samples = args._samples  # set by caller
-    if min(len(treatment_samples), len(control_samples)) < 2 and not args.allow_n1:
+    n_min = min(len(treatment_samples), len(control_samples))
+    if n_min < 2 and not args.allow_n1:
         raise SystemExit(
             f"error: at least 2 replicates per group required "
             f"(treatment={len(treatment_samples)}, control={len(control_samples)}). "
             f"Pass --allow-n1 to opt into the Fisher fallback."
         )
-    if args.test == "fisher":
+    # D12: --allow-n1 advertises a pooled-Fisher fallback, but the default
+    # (and explicit) lr engine has no n=1 path, so the advertised fallback
+    # never fired -- the n=1 run silently used lr. When the user is on the
+    # lr/auto engine, resolve to fisher so the advertised behavior actually
+    # happens. An explicit non-lr engine choice (glm/welch_t) is respected.
+    if n_min < 2 and args.allow_n1 and getattr(args, "test", None) in (None, "lr", "auto"):
+        warnings.warn(
+            "n=1 per group with --allow-n1: resolving --test to 'fisher' "
+            "(pooled Fisher exact) -- the lr engine has no n=1 fallback. "
+            "Fisher is anti-conservative; do not trust borderline calls.",
+            UserWarning, stacklevel=2,
+        )
+        args.test = "fisher"
+    elif args.test == "fisher":
         warnings.warn(
             "test='fisher' is anti-conservative; prefer 'lr' at n >= 2.",
             UserWarning, stacklevel=2,
@@ -751,9 +765,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_dmc.add_argument(
         "--allow-n1", action="store_true", default=False,
         help=(
-            "Allow n<2 per group: fall back to Fisher exact on pooled reads. "
-            "Default is to refuse -- between-replicate variance is ignored "
-            "and p-values are anti-conservative under this fallback."
+            "Permit n=1 per group. The pooled Fisher exact engine is used "
+            "automatically in this case (it is anti-conservative -- do not "
+            "trust borderline calls). Default is to refuse, since "
+            "between-replicate variance is ignored under this fallback."
         ),
     )
     # Parity with ep.tl.dmc defaults. Historically the CLI inherited
@@ -873,9 +888,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_dmr.add_argument(
         "--allow-n1", action="store_true", default=False,
         help=(
-            "(tile only) Allow n<2 per group: fall back to Fisher exact on "
-            "pooled reads. Default is to refuse -- between-replicate variance "
-            "is ignored and p-values are anti-conservative."
+            "(tile only) Permit n=1 per group. The pooled Fisher exact engine "
+            "is used automatically in this case (it is anti-conservative -- do "
+            "not trust borderline calls). Default is to refuse, since "
+            "between-replicate variance is ignored under this fallback."
         ),
     )
 
