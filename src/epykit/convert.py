@@ -297,99 +297,101 @@ def _merge_cpg_pairs_by_position(df: pl.DataFrame) -> pl.DataFrame:
 
     import numpy as np
 
-    chrom_col   = df["chrom"].to_numpy()
-    pos_col     = df["pos"].to_numpy()
-    nm_col      = df["N_meth"].to_numpy()
-    nu_col      = df["N_unmeth"].to_numpy()
-    cov_col     = df["coverage"].to_numpy()
-    strand_col  = df["strand"].to_numpy()
-    context_col = df["context"].to_numpy()
-    sample_col  = df["sample"].to_numpy()
-
-    out_chrom:   list = []
-    out_pos:     list = []
-    out_strand:  list = []
-    out_context: list = []
-    out_nm:      list = []
-    out_nu:      list = []
-    out_cov:     list = []
-    out_sample:  list = []
-
-    n_paired_total   = 0
-    n_unpaired_total = 0
-
-    # Process per-chromosome so positions are only compared within a chrom.
-    unique_chroms, chrom_first_idx = np.unique(chrom_col, return_index=True)
     # Preserve original chromosome order (np.unique sorts lexicographically).
-    chrom_order = unique_chroms[np.argsort(chrom_first_idx)]
+    chrom_col = df["chrom"].to_numpy()
+    _, chrom_first_idx = np.unique(chrom_col, return_index=True)
+    chrom_order = chrom_col[np.sort(chrom_first_idx)]
+
+    pos_col = df["pos"].to_numpy()
+
+    n_paired_total = 0
+    per_chrom_frames: list[pl.DataFrame] = []
 
     for chrom in chrom_order:
+        # Slice out this chromosome's rows (preserving original order, then sort by pos).
         mask = chrom_col == chrom
-        idx  = np.where(mask)[0]
-        # Sort by position within chromosome.
+        idx = np.where(mask)[0]
         order = np.argsort(pos_col[idx], kind="stable")
-        idx   = idx[order]
+        idx = idx[order]
 
-        positions = pos_col[idx]
-        pos_set   = set(positions.tolist())
+        positions = pos_col[idx].astype(np.int64)
+        n = len(positions)
 
-        consumed = np.zeros(len(idx), dtype=bool)
-        # Map position -> local index in `idx` for fast partner lookup.
-        pos_to_local: dict[int, int] = {int(p): i for i, p in enumerate(positions)}
+        # --- Vectorized greedy run-length pairing ---
+        # Find where consecutive runs of adjacent positions start (diff != 1).
+        breaks = np.empty(n, dtype=bool)
+        breaks[0] = True
+        breaks[1:] = np.diff(positions) != 1  # True at the start of each new run
 
-        for i, p in enumerate(positions.tolist()):
-            if consumed[i]:
-                continue
-            p1 = p + 1
-            if p1 in pos_set:
-                j = pos_to_local[p1]
-                if not consumed[j]:
-                    # Pair (i, j)
-                    gi = idx[i]
-                    gj = idx[j]
-                    out_chrom.append(chrom)
-                    out_pos.append(p)
-                    out_strand.append("*")
-                    out_context.append(context_col[gi])
-                    out_nm.append(int(nm_col[gi]) + int(nm_col[gj]))
-                    out_nu.append(int(nu_col[gi]) + int(nu_col[gj]))
-                    out_cov.append(int(cov_col[gi]) + int(cov_col[gj]))
-                    out_sample.append(sample_col[gi])
-                    consumed[i] = True
-                    consumed[j] = True
-                    n_paired_total += 1
-                    continue
-            # Singleton — no ±1 neighbour (or neighbour already consumed).
-            gi = idx[i]
-            out_chrom.append(chrom)
-            out_pos.append(p)
-            out_strand.append(str(strand_col[gi]))
-            out_context.append(context_col[gi])
-            out_nm.append(int(nm_col[gi]))
-            out_nu.append(int(nu_col[gi]))
-            out_cov.append(int(cov_col[gi]))
-            out_sample.append(sample_col[gi])
-            n_unpaired_total += 1
+        # Assign a run ID to each position (0-based).
+        run_id = np.cumsum(breaks) - 1
 
-    logger.warning(
-        "convert: merge_strands=True but no reference_fasta given — "
-        "CpG dyads are merged by position (strand-free heuristic). "
-        "Paired %d dyads, left %d positions unpaired. "
-        "For guaranteed strand-aware merging pass reference_fasta=.",
-        n_paired_total,
-        n_unpaired_total,
-    )
+        # Index of the first position of each run in the local array.
+        run_start = np.flatnonzero(breaks)  # global-local idx of each run's start
 
-    return pl.DataFrame({
-        "chrom":    out_chrom,
-        "pos":      pl.Series(out_pos, dtype=pl.Int32),
-        "strand":   out_strand,
-        "context":  out_context,
-        "N_meth":   pl.Series(out_nm,  dtype=pl.Int32),
-        "N_unmeth": pl.Series(out_nu,  dtype=pl.Int32),
-        "coverage": pl.Series(out_cov, dtype=pl.Int32),
-        "sample":   out_sample,
-    })
+        # Position within the run (0, 1, 2, ...) for each element.
+        local = np.arange(n) - run_start[run_id]
+
+        # Length of the run each element belongs to.
+        run_len = np.diff(np.append(run_start, n))[run_id]
+
+        # Pair-start: even-indexed within its run AND the next element exists in the run.
+        is_pair_start = (local % 2 == 0) & (local + 1 < run_len)
+
+        # Build group key: fold each pair's second element back onto its pair-start's
+        # index so that both elements share the same group key (the lower position).
+        site_idx = np.arange(n)
+        ps = np.flatnonzero(is_pair_start)
+        site_idx[ps + 1] = ps  # partner's site_idx points to the pair-start
+
+        group_pos = positions[site_idx]  # lower pos of each pair (or pos itself for singletons)
+
+        n_paired_total += int(is_pair_start.sum())
+
+        # Attach the group key to the chromosome's slice of the original DataFrame.
+        chrom_df = df[idx.tolist()]
+        chrom_df = chrom_df.with_columns(
+            pl.Series("_group_pos", group_pos.astype(np.int32), dtype=pl.Int32)
+        )
+
+        merged = (
+            chrom_df
+            .group_by(["chrom", "_group_pos"], maintain_order=True)
+            .agg([
+                pl.sum("N_meth").alias("N_meth"),
+                pl.sum("N_unmeth").alias("N_unmeth"),
+                pl.sum("coverage").alias("coverage"),
+                pl.first("context").alias("context"),
+                pl.first("sample").alias("sample"),
+            ])
+            .rename({"_group_pos": "pos"})
+            .with_columns(
+                pl.lit("*").alias("strand"),
+                pl.col("pos").cast(pl.Int32),
+                pl.col("N_meth").cast(pl.Int32),
+                pl.col("N_unmeth").cast(pl.Int32),
+                pl.col("coverage").cast(pl.Int32),
+            )
+            # Restore canonical column order.
+            .select(["chrom", "pos", "strand", "context",
+                     "N_meth", "N_unmeth", "coverage", "sample"])
+            .sort("pos")
+        )
+        per_chrom_frames.append(merged)
+
+    result = pl.concat(per_chrom_frames)
+
+    # Only warn when at least one dyad was actually merged (no-op inputs are silent).
+    if n_paired_total > 0:
+        logger.warning(
+            "convert: merge_strands=True but no reference_fasta given — "
+            "CpG dyads are merged by position (strand-free heuristic). "
+            "Paired %d dyads. "
+            "For guaranteed strand-aware merging pass reference_fasta=.",
+            n_paired_total,
+        )
+
+    return result
 
 
 # Optional strand inference

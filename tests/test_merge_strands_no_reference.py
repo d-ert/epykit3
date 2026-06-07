@@ -18,11 +18,10 @@ Dyad pairing rule (strand-free):
 from __future__ import annotations
 
 import csv
-import gzip
+import logging
 from pathlib import Path
 
 import polars as pl
-import pytest
 
 import epykit as ep
 from epykit.convert import _merge_cpg_pairs_by_position, convert_sample
@@ -180,6 +179,40 @@ class TestMergeCpgPairsByPosition:
         df = self._make_df([])
         out = _merge_cpg_pairs_by_position(df)
         assert out.height == 0
+
+    def test_warning_fires_on_real_merge(self, caplog):
+        """A WARNING mentioning reference_fasta is emitted exactly once when dyads are merged."""
+        df = self._make_df([
+            ("chr1", 100, 8, 2, 10, "*", "CpG", "s1"),  # dyad pair-start
+            ("chr1", 101, 6, 4, 10, "*", "CpG", "s1"),  # dyad partner
+        ])
+        with caplog.at_level(logging.WARNING, logger="epykit.convert"):
+            _merge_cpg_pairs_by_position(df)
+        warning_records = [
+            r for r in caplog.records
+            if r.levelno == logging.WARNING and "reference_fasta" in r.message
+        ]
+        assert len(warning_records) == 1, (
+            f"Expected exactly 1 reference_fasta WARNING, got {len(warning_records)}: "
+            f"{[r.message for r in warning_records]}"
+        )
+
+    def test_no_warning_when_nothing_merged(self, caplog):
+        """No WARNING is emitted when all sites are singletons (no dyads merged)."""
+        df = self._make_df([
+            ("chr1", 100, 7, 3, 10, "*", "CpG", "s1"),  # isolated — no ±1 neighbour
+            ("chr1", 500, 4, 6, 10, "*", "CpG", "s1"),  # isolated — no ±1 neighbour
+        ])
+        with caplog.at_level(logging.WARNING, logger="epykit.convert"):
+            _merge_cpg_pairs_by_position(df)
+        warning_records = [
+            r for r in caplog.records
+            if r.levelno == logging.WARNING and "reference_fasta" in r.message
+        ]
+        assert len(warning_records) == 0, (
+            f"Expected no WARNING when nothing is merged, got: "
+            f"{[r.message for r in warning_records]}"
+        )
 
 
 # ---------------------------------------------------------------------------
