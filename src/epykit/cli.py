@@ -240,6 +240,9 @@ def _cmd_dmc(args: argparse.Namespace):
             covariates=covariates,
             min_samples_treatment=args.min_samples_treatment,
             min_samples_control=args.min_samples_control,
+            dispersion=args.dispersion,
+            reference=args.reference,
+            fdr_method=args.fdr_method,
         )
         key = md.uns.get("dmc", {}).get("last_key", "dmc_glm_contrast")
         results = md.varm.get(key)
