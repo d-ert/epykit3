@@ -110,6 +110,44 @@ def test_bootstrap_f1_ci_contains_point_estimate():
     assert lo < point_f1 < hi, f"CI [{lo:.4f}, {hi:.4f}] does not contain point {point_f1:.4f}"
 
 
+def test_bootstrap_f1_ci_dual_cutoff_brackets_dual_point():
+    """The headline DMC cutoff is q < threshold AND |meth_diff| >= delta.
+    Passing meth_diff/delta must (a) leave the q-only path unchanged when
+    delta=0 and (b) bracket the *dual-cutoff* point estimate, which differs
+    from the q-only one whenever the effect-size floor removes calls."""
+    from wilson_bootstrap_ci import bootstrap_f1_ci
+
+    rng = np.random.default_rng(3)
+    n = 2000
+    is_dmc = rng.random(n) < 0.2
+    qvalues = np.where(is_dmc, rng.beta(0.5, 5.0, n), rng.beta(5.0, 0.5, n))
+    # Effect sizes: true DMCs are large, but a chunk of significant noise sits
+    # just under the 0.25 floor so the dual cutoff prunes false positives.
+    meth_diff = np.where(is_dmc, rng.uniform(0.3, 0.9, n), rng.uniform(0.0, 0.2, n))
+
+    # (a) delta=0 reproduces the q-only path exactly (same seed).
+    lo0, hi0 = bootstrap_f1_ci(is_dmc=is_dmc, qvalues=qvalues, threshold=0.05,
+                               B=100, seed=3, meth_diff=meth_diff, delta=0.0)
+    lo_qonly, hi_qonly = bootstrap_f1_ci(is_dmc=is_dmc, qvalues=qvalues,
+                                         threshold=0.05, B=100, seed=3)
+    assert (lo0, hi0) == (lo_qonly, hi_qonly)
+
+    def _f1(pred):
+        tp = int((pred & is_dmc).sum()); fp = int((pred & ~is_dmc).sum())
+        fn = int((~pred & is_dmc).sum())
+        denom = 2 * tp + fp + fn
+        return 2 * tp / denom if denom else 0.0
+
+    # (b) dual cutoff brackets the dual-cutoff point estimate.
+    point_dual = _f1((qvalues < 0.05) & (np.abs(meth_diff) >= 0.25))
+    point_qonly = _f1(qvalues < 0.05)
+    lo, hi = bootstrap_f1_ci(is_dmc=is_dmc, qvalues=qvalues, threshold=0.05,
+                             B=200, seed=3, meth_diff=meth_diff, delta=0.25)
+    assert lo < point_dual < hi, f"dual CI [{lo:.4f}, {hi:.4f}] misses {point_dual:.4f}"
+    # The effect-size floor prunes false positives, so dual-cutoff F1 >= q-only.
+    assert point_dual >= point_qonly
+
+
 # --- helper for tests -------------------------------------------------------
 
 

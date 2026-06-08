@@ -195,7 +195,8 @@ rather than accuracy.
 | DSS | 2.12.0 (Study 1 baseline, transcribed from Piao 2021); **2.58.0** (Study 3 local re-run) | (Piao 2021 baseline) for Study 1; `DMLfit.multiFactor` + `DMLtest.multiFactor` + `callDMR` for Study 3 | 1, 3 |
 | RADMeth | (Piao 2021) | (Piao 2021 baseline) | 1 |
 | BiSeq | (Piao 2021) | (Piao 2021 baseline) | 1 |
-| BSmooth, metilene | (Piao 2021) | (Piao 2021 baseline, DMR only) | 1 |
+| BSmooth, metilene | (Piao 2021) | (Piao 2021 baseline, DMR only; BSmooth also in the §3.6 resource axis) | 1 (BSmooth also §3.6) |
+| dmrseq | 1.30.0 (φ-sweep host) | region caller; per-CpG uncalibrated, retained on the §3.6 resource axis only | §3.6 |
 | Fisher (pooled) | methylKit-style | (Piao 2021 baseline) | 1 |
 
 For Study 1, baseline TPR/FPR values are transcribed verbatim from Tables S1
@@ -204,6 +205,28 @@ against an independently hand-typed copy with **0 transcription errors**
 (verified by `scripts/audit_baselines.py`). DMR baselines are transcribed
 from Figures 3a, 3b, S5 (bar charts) with per-figure confidence labels in
 [data/study1/baseline_tables/PROVENANCE.md](../data/study1/baseline_tables/PROVENANCE.md).
+
+**Tool inclusion and exclusion.** Study 1 adopts the eight-tool panel of
+Piao et al. (2021) verbatim, so the comparison is against the published
+record rather than a panel we re-selected. The panel splits by what each
+tool natively reports. Six expose a *per-CpG* DMC test and so contribute
+(FPR, TPR) operating points to the per-CpG DMC tables (§3.1): methylKit,
+methylSig, DSS, RADMeth, BiSeq, and pooled Fisher. The remaining two —
+**BSmooth** and **metilene** — are region (DMR) callers; they appear only
+in the DMR-detection comparison (§3.1, DMR panel), not the per-CpG tables.
+Scoring a smoothing/region caller at single-CpG resolution yields an
+uncalibrated per-CpG operating point (realised FDR ≈ 0.6–0.7; §3.6), so a
+per-CpG TPR/FPR for it would not be a fair number. For the same reason
+**dmrseq** — a region caller not in Piao's published panel — has no Study 1
+row; it enters only in epykit's own overdispersion sweep (§3.6), where it
+and BSmooth are retained on the *resource* axis (wall-clock, peak RSS) but
+excluded from the per-CpG calibration comparison. **methylpy**
+[@Schultz2015], the closest Python prior (§1), is cited but not run: it
+provides a single permutation-based DMR procedure embedded in a
+read-processing pipeline rather than a per-CpG DMC engine comparable to the
+panel, has had no substantive release since 2018, and predates the
+scanpy/anndata data model epykit targets. It is therefore positioned as
+related work, not benchmarked as a competitor.
 
 For Studies 2 and 3, both methylKit and epykit were run on the same
 machine under the same harness; numbers are not taken from prior
@@ -445,20 +468,25 @@ with BH FDR — and on this data they agree on essentially every site. The
 significant) is consistent with rounding in methylKit's percent-scale
 `meth.diff` versus epykit's fractional internal representation.
 
-**Table 1.** Study 2 DMC × coverage, 3 vs 3 design.
+**Table 1.** Study 2 DMC × coverage, 3 vs 3 design. Parenthesised values are
+95 % CIs (PROTOCOL R2): Wilson on TPR/FPR (denominators n = 19,999 truth
+positives / 80,001 truth negatives); bootstrap percentile on F1/AUROC
+(B = 1,000 CpG resamples, seed 0). Source:
+[`scripts/promote_cis.py`](../scripts/promote_cis.py) →
+[`data/headline_cis.json`](../data/headline_cis.json).
 
-| Coverage | Tool / engine | TPR | FPR | F1 | AUROC |
+| Coverage | Tool / engine | TPR (95 % CI) | FPR (95 % CI) | F1 (95 % CI) | AUROC (95 % CI) |
 |---|---|---|---|---|---|
-| 5× | epykit / `lr` | 0.849 | 3.7 × 10⁻⁵ | 0.918 | 0.9990 |
-| 5× | methylKit / default | 0.849 | 3.7 × 10⁻⁵ | 0.918 | 0.9990 |
-| 10× | epykit / `lr` | 0.944 | 1.2 × 10⁻⁵ | 0.971 | 0.9999 |
-| 10× | methylKit / default | 0.944 | 1.2 × 10⁻⁵ | 0.971 | 0.9999 |
-| 15× | epykit / `lr` | 0.984 | 1.2 × 10⁻⁵ | 0.992 | 1.0000 |
-| 15× | methylKit / default | 0.984 | 1.2 × 10⁻⁵ | 0.992 | 1.0000 |
-| 20× | epykit / `lr` | 0.991 | 1.2 × 10⁻⁵ | 0.995 | 1.0000 |
-| 20× | methylKit / default | 0.991 | 1.2 × 10⁻⁵ | 0.995 | 1.0000 |
-| 25× | epykit / `lr` | 0.993 | 0.0      | 0.996 | 1.0000 |
-| 25× | methylKit / default | 0.993 | 0.0      | 0.997 | 1.0000 |
+| 5× | epykit / `lr` | 0.849 (0.844 – 0.854) | 3.7 × 10⁻⁵ (1.3 × 10⁻⁵ – 1.1 × 10⁻⁴) | 0.918 (0.915 – 0.921) | 0.9990 (0.9989 – 0.9991) |
+| 5× | methylKit / default | 0.849 (0.844 – 0.854) | 3.7 × 10⁻⁵ (1.3 × 10⁻⁵ – 1.1 × 10⁻⁴) | 0.918 (0.915 – 0.921) | 0.9990 (0.9989 – 0.9991) |
+| 10× | epykit / `lr` | 0.944 (0.940 – 0.947) | 1.2 × 10⁻⁵ (2.2 × 10⁻⁶ – 7.1 × 10⁻⁵) | 0.971 (0.969 – 0.973) | 0.9999 (0.9999 – 1.0000) |
+| 10× | methylKit / default | 0.944 (0.940 – 0.947) | 1.2 × 10⁻⁵ (2.2 × 10⁻⁶ – 7.1 × 10⁻⁵) | 0.971 (0.969 – 0.973) | 0.9999 (0.9999 – 1.0000) |
+| 15× | epykit / `lr` | 0.984 (0.983 – 0.986) | 1.2 × 10⁻⁵ (2.2 × 10⁻⁶ – 7.1 × 10⁻⁵) | 0.992 (0.991 – 0.993) | 1.0000 (1.0000 – 1.0000) |
+| 15× | methylKit / default | 0.984 (0.983 – 0.986) | 1.2 × 10⁻⁵ (2.2 × 10⁻⁶ – 7.1 × 10⁻⁵) | 0.992 (0.991 – 0.993) | 1.0000 (1.0000 – 1.0000) |
+| 20× | epykit / `lr` | 0.991 (0.989 – 0.992) | 1.2 × 10⁻⁵ (2.2 × 10⁻⁶ – 7.1 × 10⁻⁵) | 0.995 (0.995 – 0.996) | 1.0000 (1.0000 – 1.0000) |
+| 20× | methylKit / default | 0.991 (0.989 – 0.992) | 1.2 × 10⁻⁵ (2.2 × 10⁻⁶ – 7.1 × 10⁻⁵) | 0.995 (0.995 – 0.996) | 1.0000 (1.0000 – 1.0000) |
+| 25× | epykit / `lr` | 0.993 (0.992 – 0.994) | 0 (0 – 4.8 × 10⁻⁵) | 0.996 (0.996 – 0.997) | 1.0000 (1.0000 – 1.0000) |
+| 25× | methylKit / default | 0.993 (0.992 – 0.994) | 0 (0 – 4.8 × 10⁻⁵) | 0.997 (0.996 – 0.997) | 1.0000 (1.0000 – 1.0000) |
 
 ### 3.2.2 The n = 2 edge case
 
@@ -467,19 +495,21 @@ returns a degenerate value and the test loses power. epykit's `lr` with
 `allow_n1=True` ignores the dispersion term and falls back to a binomial
 GLM, which is identifiable at n = 1.
 
-**Table 2.** DMC × replicate count, fixed 10× coverage.
+**Table 2.** DMC × replicate count, fixed 10× coverage. CIs as in Table 1
+(Wilson on TPR/FPR; bootstrap B = 1,000 on F1/AUROC; source
+[`headline_cis.json`](../data/headline_cis.json)).
 
-| n_total | Tool / engine | TPR | FPR | F1 | AUROC | n_sig |
+| n_total | Tool / engine | TPR (95 % CI) | FPR (95 % CI) | F1 (95 % CI) | AUROC (95 % CI) | n_sig |
 |---|---|---|---|---|---|---|
-| 2 | epykit / `lr` | **0.564** | 1.2 × 10⁻⁵ | **0.721** | 0.9993 | 11,283 |
-| 2 | methylKit / default | 0.302 | 0.0 | 0.463 | 0.9994 | 6,030 |
-| 4 | epykit / `lr` | 0.880 | 1.2 × 10⁻⁵ | 0.936 | 0.9999 | 17,595 |
-| 4 | methylKit / default | 0.880 | 1.2 × 10⁻⁵ | 0.936 | 0.9999 | 17,595 |
-| 6 | epykit / `lr` | 0.952 | 1.2 × 10⁻⁵ | 0.975 | 1.0000 | 19,039 |
-| 6 | methylKit / default | 0.952 | 1.2 × 10⁻⁵ | 0.975 | 1.0000 | 19,039 |
-| 8 | epykit / `lr` | 0.979 | 2.5 × 10⁻⁵ | 0.989 | 1.0000 | 19,574 |
-| 10 | epykit / `lr` | 0.984 | 1.2 × 10⁻⁵ | 0.992 | 1.0000 | 19,678 |
-| 10 | methylKit / default | 0.984 | 1.2 × 10⁻⁵ | 0.992 | 1.0000 | 19,678 |
+| 2 | epykit / `lr` | **0.564 (0.557 – 0.571)** | 1.2 × 10⁻⁵ (2.2 × 10⁻⁶ – 7.1 × 10⁻⁵) | **0.721 (0.716 – 0.727)** | 0.9993 (0.9992 – 0.9994) | 11,283 |
+| 2 | methylKit / default | 0.302 (0.295 – 0.308) | 0 (0 – 4.8 × 10⁻⁵) | 0.463 (0.456 – 0.471) | 0.9994 (0.9992 – 0.9996) | 6,030 |
+| 4 | epykit / `lr` | 0.880 (0.875 – 0.884) | 1.2 × 10⁻⁵ (2.2 × 10⁻⁶ – 7.1 × 10⁻⁵) | 0.936 (0.933 – 0.939) | 0.9999 (0.9999 – 1.0000) | 17,595 |
+| 4 | methylKit / default | 0.880 (0.875 – 0.884) | 1.2 × 10⁻⁵ (2.2 × 10⁻⁶ – 7.1 × 10⁻⁵) | 0.936 (0.933 – 0.939) | 0.9999 (0.9999 – 1.0000) | 17,595 |
+| 6 | epykit / `lr` | 0.952 (0.949 – 0.955) | 1.2 × 10⁻⁵ (2.2 × 10⁻⁶ – 7.1 × 10⁻⁵) | 0.975 (0.974 – 0.977) | 1.0000 (1.0000 – 1.0000) | 19,039 |
+| 6 | methylKit / default | 0.952 (0.949 – 0.955) | 1.2 × 10⁻⁵ (2.2 × 10⁻⁶ – 7.1 × 10⁻⁵) | 0.975 (0.974 – 0.977) | 1.0000 (1.0000 – 1.0000) | 19,039 |
+| 8 | epykit / `lr` | 0.979 (0.977 – 0.981) | 2.5 × 10⁻⁵ (6.9 × 10⁻⁶ – 9.1 × 10⁻⁵) | 0.989 (0.988 – 0.990) | 1.0000 (1.0000 – 1.0000) | 19,574 |
+| 10 | epykit / `lr` | 0.984 (0.982 – 0.986) | 1.2 × 10⁻⁵ (2.2 × 10⁻⁶ – 7.1 × 10⁻⁵) | 0.992 (0.991 – 0.993) | 1.0000 (1.0000 – 1.0000) | 19,678 |
+| 10 | methylKit / default | 0.984 (0.982 – 0.986) | 1.2 × 10⁻⁵ (2.2 × 10⁻⁶ – 7.1 × 10⁻⁵) | 0.992 (0.991 – 0.993) | 1.0000 (1.0000 – 1.0000) | 19,678 |
 
 At n = 2, epykit recovers **~2× more true DMCs than methylKit** (0.564 vs
 0.302) at comparably negligible FPR (1.2 × 10⁻⁵ vs 0). From n = 4 upward the
@@ -494,17 +524,22 @@ fixed tiles. epykit's `chain_merge` returns ~37 variable-width regions
 (close to 1:1 with truth). Neither is more correct; they answer different
 questions (*how many tiles?* vs *how many regions?*).
 
-**Table 3.** DMR × coverage, 3 vs 3, ≥ 80 % overlap criterion.
+**Table 3.** DMR × coverage, 3 vs 3, ≥ 80 % overlap criterion. Parenthesised
+values are Wilson 95 % CIs (PROTOCOL R2): recall over the 35 reference DMRs
+(denominator = 35); precision over the caller's own call set (denominator =
+n_called). The 35-DMR truth set makes these intervals wide — promoting them is
+the honest representation of single-instance DMR-level uncertainty. Source:
+[`headline_cis.json`](../data/headline_cis.json).
 
-| Coverage | Tool / method | n_called | Recall | Precision |
+| Coverage | Tool / method | n_called | Recall (95 % CI) | Precision (95 % CI) |
 |---|---|---|---|---|
-| 5× | epykit / `chain_merge` | 42 | 0.971 | 0.857 |
-| 5× | epykit / `tile` | 35 | 0.857 | 0.971 |
-| 5× | methylKit / tile | 102 | 1.000 | 0.980 |
-| 10× | epykit / `chain_merge` | 37 | 1.000 | 1.000 |
-| 10× | methylKit / tile | 102 | 1.000 | 1.000 |
-| 25× | epykit / `chain_merge` | 37 | 1.000 | 1.000 |
-| 25× | methylKit / tile | 102 | 1.000 | 1.000 |
+| 5× | epykit / `chain_merge` | 42 | 0.971 (0.855 – 0.995) | 0.857 (0.722 – 0.933) |
+| 5× | epykit / `tile` | 35 | 0.857 (0.706 – 0.937) | 0.971 (0.855 – 0.995) |
+| 5× | methylKit / tile | 102 | 1.000 (0.901 – 1.000) | 0.980 (0.931 – 0.995) |
+| 10× | epykit / `chain_merge` | 37 | 1.000 (0.901 – 1.000) | 1.000 (0.906 – 1.000) |
+| 10× | methylKit / tile | 102 | 1.000 (0.901 – 1.000) | 1.000 (0.964 – 1.000) |
+| 25× | epykit / `chain_merge` | 37 | 1.000 (0.901 – 1.000) | 1.000 (0.906 – 1.000) |
+| 25× | methylKit / tile | 102 | 1.000 (0.901 – 1.000) | 1.000 (0.964 – 1.000) |
 
 ### 3.2.4 Performance
 
@@ -948,21 +983,24 @@ DMCs than another at equal stringency.
 **Only `lr` stays calibrated.** The tools diverge entirely on whether the
 nominal q < 0.05 cutoff means what it says (Table S-Phi, Figure 11 centre).
 
-**Table S-Phi.** Realised FDR at nominal q < 0.05 (median of 10 seeds,
-coverage 10, 3 vs 3). methylKit is shown in its overdispersion-aware `MN`
-mode — the like-for-like comparison to `lr`; the dispersion-blind default is
-worse (FDR up to 0.66) and is a secondary point, not a headline.
+**Table S-Phi.** Realised FDR at nominal q < 0.05, reported as median
+(IQR) across 10 seeds (coverage 10, 3 vs 3) — the across-seed
+variance measure used throughout §3.4 (PROTOCOL R2). methylKit is shown in
+its overdispersion-aware `MN` mode — the like-for-like comparison to `lr`;
+the dispersion-blind default is worse (FDR up to 0.66) and is a secondary
+point, not a headline.
 
 | φ (Pearson) | epykit `lr` | methylKit (MN) | DSS (no smooth) |
 |---:|---:|---:|---:|
-| 1.0 | 0.026 | 0.044 | 0.033 |
-| 1.45 | 0.028 | 0.102 | 0.087 |
-| 1.9 | 0.029 | 0.157 | 0.133 |
-| 2.8 | 0.027 | 0.229 | 0.197 |
-| 3.7 | 0.029 | 0.279 | 0.244 |
-| 5.0 | 0.021 | 0.300 | 0.282 |
+| 1.0 | 0.026 (0.025 – 0.027) | 0.044 (0.042 – 0.045) | 0.033 (0.033 – 0.035) |
+| 1.45 | 0.028 (0.027 – 0.029) | 0.102 (0.099 – 0.105) | 0.087 (0.083 – 0.089) |
+| 1.9 | 0.029 (0.028 – 0.030) | 0.157 (0.152 – 0.160) | 0.133 (0.131 – 0.135) |
+| 2.8 | 0.027 (0.026 – 0.029) | 0.229 (0.226 – 0.232) | 0.197 (0.196 – 0.199) |
+| 3.7 | 0.029 (0.029 – 0.031) | 0.279 (0.279 – 0.283) | 0.244 (0.240 – 0.247) |
+| 5.0 | 0.021 (0.020 – 0.022) | 0.300 (0.299 – 0.304) | 0.282 (0.279 – 0.286) |
 
-Source: [`eval_phi_sweep_iqr.parquet`](../data/study1b_simulator/eval_phi_sweep_iqr.parquet).
+Source: [`eval_phi_sweep_iqr.parquet`](../data/study1b_simulator/eval_phi_sweep_iqr.parquet)
+(`fdr_median` / `fdr_q1` / `fdr_q3`; n_seeds = 10 per cell).
 
 epykit `lr` stays at FDR ≈ 0.02–0.03 from φ = 1 to φ = 5; methylKit-MN controls
 FDR only at φ ≈ 1 and is already anti-conservative by φ ≈ 1.45 (FDR 0.10 — the

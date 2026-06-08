@@ -148,12 +148,23 @@ def bootstrap_f1_ci(
     B: int = 1000,
     seed: int = 0,
     confidence: float = 0.95,
+    meth_diff: np.ndarray | None = None,
+    delta: float = 0.0,
 ) -> tuple[float, float]:
-    """Bootstrap F1 CI at a fixed q-threshold, resampling CpGs with replacement."""
+    """Bootstrap F1 CI at a fixed q-threshold, resampling CpGs with replacement.
+
+    The headline DMC cutoff is ``q < threshold`` AND ``|meth_diff| >= delta``
+    (the fractional effect-size floor; ``delta = 0.25`` for the paper's
+    headline tables). Pass ``meth_diff`` and ``delta`` to reproduce that dual
+    cutoff so the F1 CI brackets the published point estimate; omit them for a
+    q-only call.
+    """
     rng = np.random.default_rng(seed)
     n = len(is_dmc)
     is_dmc = np.asarray(is_dmc, dtype=bool)
     pred = np.asarray(qvalues, dtype=np.float64) < threshold
+    if meth_diff is not None:
+        pred = pred & (np.abs(np.asarray(meth_diff, dtype=np.float64)) >= delta)
 
     boot = np.empty(B, dtype=np.float64)
     for b in range(B):
