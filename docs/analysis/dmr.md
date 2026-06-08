@@ -128,15 +128,51 @@ ep.tl.dmr(md, method="segment")
 
 ## Empirical FDR
 
-Permutation-based FDR is available for the `tile` method:
+The DMR-level `qvalue` / `combined_qvalue` are BH corrections of **asymptotic**
+region p-values. Adjacent WGBS CpGs are positively correlated and real coverage
+is overdispersed, so those q-values are anti-conservative — treat them as a
+*ranking* signal, not a calibrated region FDR. For trustworthy region-level
+inference, run permutation FDR (available for the `tile` method):
 
 ```python
-ep.tl.dmr(md, method="tile", empirical_fdr=True, n_perm=100)
+ep.tl.dmr(md, method="tile", empirical_fdr=True, n_perm=100, perm_seed=42)
+# md.uns["dmr"] gains empirical_pvalue / empirical_qvalue / empirical_fdr_set
 ```
 
-!!! note
-    Empirical FDR is not supported with covariate designs because label
-    shuffling invalidates the stratified design.
+This re-runs the tile caller on shuffled treatment/control labels and compares
+the observed "survivor" tiles against the permutation (decoy) survivors.
+**Threshold `empirical_qvalue`** (not `qvalue`) for FDR control.
+
+### `fdr_method` — how the empirical FDR is computed
+
+| `fdr_method` | construction | when to use |
+|--------------|--------------|-------------|
+| `"region"` (default) | **Count-ratio target-decoy FDR** (BSmooth / SAM): `empirical_qvalue` is the monotone suffix-min of `mean(#null survivors ≤ t) / (#observed survivors ≤ t)`. The same overdispersion inflates observed and decoy survivor counts, so it cancels in the ratio. | Recommended. Gives an interpretable per-region q plus a set-level FDR. |
+| `"max_t"` | **Westfall-Young min-P (FWER)**: fraction of permutations whose genome-wide minimum null p ≤ the observed p, BH-adjusted. | Only when you explicitly want family-wise control. Very conservative at genome scale (often collapses to ~1.0 under realistic dispersion). |
+
+The single **set-level FDR** — the expected fraction of called tiles explained
+by label noise — is returned as a constant `empirical_fdr_set` column and in
+`md.uns["dmr_params"]["empirical_fdr_set"]`.
+
+```python
+ep.tl.dmr(md, method="tile", empirical_fdr=True, n_perm=100)        # region (default)
+sig = md.uns["dmr"].filter(pl.col("empirical_qvalue") < 0.05)       # calibrated DMRs
+md.uns["dmr_params"]["empirical_fdr_set"]                           # e.g. 0.13
+```
+
+!!! warning "Small cohorts"
+    Permutation FDR needs enough distinct label assignments. At fewer than 4
+    samples per group epykit emits a `UserWarning`: only a handful of shuffles
+    exist and draws adjacent to the true split leak signal into the null, so the
+    empirical FDR is **conservative (biased high)** — read it as a floor. The
+    true split and its mirror swap are excluded from the null automatically.
+    For small cohorts, prefer the model-based `chain_merge` caller.
+
+!!! note "Other methods"
+    Empirical FDR is currently implemented for `method="tile"` only;
+    `chain_merge` / `sliding_window` / `segment` raise `NotImplementedError` on
+    `empirical_fdr=True`. It is also unsupported with covariate designs, because
+    label shuffling invalidates the stratified design.
 
 ## Output Columns
 

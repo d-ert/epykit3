@@ -38,6 +38,30 @@ redesigned HTML report.
 
 ### Fixed
 
+- **Tile DMR permutation FDR was an FWER statistic mislabeled as FDR.**
+  `tl.dmr(method="tile", empirical_fdr=True)` / `empirical_fdr_for_dmr`
+  computed a Westfall-Young max-T (each permutation's genome-wide *minimum*
+  null p) but labeled and BH-adjusted it as `empirical_qvalue`. On real
+  overdispersed WGBS this collapsed to a wall of `empirical_qvalue ~ 1.0`
+  ("0 significant DMRs") even when thousands of tiles were strongly
+  differential, because a label shuffle still manufactures a p ~ 1e-100 tile
+  somewhere in the genome. The default is now a **count-ratio target-decoy
+  FDR** (`fdr_method="region"`, the BSmooth / SAM construction):
+  `mean(#null survivors with p <= t) / (#observed survivors with p <= t)`,
+  monotone suffix-min — the dispersion inflation cancels in the ratio because
+  decoys inherit it too. The set-level FDR is recorded in
+  `md.uns["dmr_params"]["empirical_fdr_set"]` and a constant `empirical_fdr_set`
+  column. Self/mirror permutations (the true split and its swap) are excluded
+  from the null, and a `UserWarning` fires at <4 samples/group where
+  permutation inference is underpowered. On GSE263850 (3v3) the same run now
+  reports ~383 DMRs at q<0.05 (set-level FDR ~0.13) instead of 0. The previous
+  behaviour remains available via `fdr_method="max_t"`. **Migration:**
+  `empirical_qvalue` now carries the count-ratio FDR by default — pass
+  `fdr_method="max_t"` to restore the old min-P/FWER values. The other DMR
+  callers (chain_merge / sliding_window / segment) still raise
+  `NotImplementedError` on `empirical_fdr=True` (a shared follow-up will reuse
+  the same count-ratio core).
+
 - **Report "% significant" denominator (report redesign).** DMC summary
   statistics and the genome-wide figures (volcano / MA / Manhattan /
   p-value histogram) now use the full per-CpG result table rather than

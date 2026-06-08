@@ -80,8 +80,10 @@ controlled at your expected level before trusting the results.
 | `"sliding_window"` | Sliding window with signed Stouffer combining | |
 | `"hmm"` | HMM segmentation (`dmr_hmm.py`, `_hmm.py`) | |
 
-All four support optional permutation empirical FDR via
-`ep.tl.dmr(..., empirical_fdr=True, n_perm=N)`.
+Permutation empirical FDR (`ep.tl.dmr(..., empirical_fdr=True, n_perm=N)`) is
+implemented for `"tile"` only — `empirical_qvalue` defaults to a count-ratio
+target-decoy FDR (`fdr_method="region"`; `"max_t"` for FWER). The other callers
+raise `NotImplementedError` on `empirical_fdr=True` (shared follow-up planned).
 
 ## Where to look in the source tree
 

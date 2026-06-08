@@ -1245,6 +1245,7 @@ def dmr(
     perm_seed: int = 42,
     perm_n_jobs: int = 1,
     empirical_strata: str | None = None,
+    fdr_method: str = "region",
     *,
     backend: str = "sequential",
     n_workers: int | None = None,
@@ -1294,8 +1295,12 @@ def dmr(
     region-level inference pass ``empirical_fdr=True`` with ``method="tile"``,
     which re-runs the engine on shuffled labels and adds permutation
     ``empirical_pvalue`` / ``empirical_qvalue`` columns; threshold
-    ``empirical_qvalue`` instead of ``combined_qvalue`` for FDR control.
-    Every ``tl.dmr`` call logs a one-time INFO note about this caveat.
+    ``empirical_qvalue`` instead of ``combined_qvalue`` for FDR control. By
+    default (``fdr_method="region"``) ``empirical_qvalue`` is the count-ratio
+    target-decoy FDR (BSmooth/SAM) and the set-level FDR is recorded in
+    ``md.uns['dmr_params']['empirical_fdr_set']``; pass ``fdr_method="max_t"``
+    for the conservative Westfall-Young FWER alternative. Every ``tl.dmr``
+    call logs a one-time INFO note about this caveat.
 
     Parameters
     ----------
@@ -1474,6 +1479,7 @@ def dmr(
                     seed=perm_seed,
                     n_jobs=perm_n_jobs,
                     empirical_strata=strata_map,
+                    fdr_method=fdr_method,
                     tile_size_bp=tile_size_bp,
                     test=selected_test,
                     chromosomes=chromosomes,
@@ -1490,6 +1496,14 @@ def dmr(
                 )
 
         md.uns["dmr"] = dmr_df
+        # Lift the set-level count-ratio FDR scalar (region mode) into params.
+        # `v == v` is False for NaN (max_t mode / undefined) -> store None so the
+        # params dict stays JSON-clean on save.
+        _emp_set = None
+        if empirical_fdr and "empirical_fdr_set" in dmr_df.columns and len(dmr_df):
+            _v = dmr_df["empirical_fdr_set"][0]
+            if _v is not None and _v == _v:
+                _emp_set = float(_v)
         md.uns["dmr_params"] = {
             "method": "tile",
             "tile_size_bp": tile_size_bp,
@@ -1511,6 +1525,8 @@ def dmr(
             "empirical_fdr": empirical_fdr,
             "n_perm": n_perm if empirical_fdr else None,
             "perm_seed": perm_seed if empirical_fdr else None,
+            "fdr_method": fdr_method if empirical_fdr else None,
+            "empirical_fdr_set": _emp_set,
         }
         if tsv is not None:
             from .export import dmr_to_tsv

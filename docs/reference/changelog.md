@@ -4,6 +4,17 @@ The full version history is maintained in the project's
 [`CHANGELOG.md`](https://github.com/d-ert/epykit/blob/main/CHANGELOG.md)
 at the repository root.
 
+## Unreleased highlights
+
+- **Tile DMR permutation FDR is now a calibrated region FDR.**
+  `tl.dmr(method="tile", empirical_fdr=True)` previously reported a
+  Westfall-Young max-T (FWER) statistic mislabeled as `empirical_qvalue`,
+  which collapsed to ~1.0 ("0 significant DMRs") on overdispersed WGBS. The
+  default is now a **count-ratio target-decoy FDR** (`fdr_method="region"`,
+  BSmooth/SAM); the set-level FDR is in
+  `md.uns["dmr_params"]["empirical_fdr_set"]`. Pass `fdr_method="max_t"` for the
+  old FWER behaviour. See the [DMR guide](../analysis/dmr.md#empirical-fdr).
+
 ## 1.0.0 highlights (2026-06-02)
 
 1.0 is the SemVer-stable release. Three targeted breaking changes shipped at

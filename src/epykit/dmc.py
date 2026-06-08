@@ -3025,7 +3025,9 @@ def empirical_fdr_for_dmc(
     is NOT a pooled-null per-site FDR despite the function name.
     ``empirical_qvalue`` is a subsequent BH transform of those FWER p-values,
     provided for convenience. For a less conservative region-level empirical
-    FDR, prefer :func:`epykit.dmr.empirical_fdr_for_dmr` on DMRs.
+    FDR, prefer :func:`epykit.dmr.empirical_fdr_for_dmr` on DMRs, whose default
+    ``fdr_method="region"`` is a count-ratio target-decoy FDR (BSmooth/SAM)
+    rather than this min-P FWER bar.
 
     Parallels :func:`epykit.dmr.empirical_fdr_for_dmr`; same caveats apply:
 

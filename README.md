@@ -172,11 +172,13 @@ ep.tl.dmc(md, formula="~ age", contrast="age")
 
 ### 4. Permutation-based empirical FDR for DMRs
 
-Asymptotic q-values can be miscalibrated on small-n WGBS. For trustworthy DMR-level inference:
+Asymptotic region q-values are anti-conservative on overdispersed WGBS. For trustworthy DMR-level inference, `tile` DMRs support a permutation FDR — a **count-ratio target-decoy** estimate (BSmooth/SAM) that cancels the dispersion inflation by comparing observed survivor tiles against label-shuffled decoys:
 
 ```python
 ep.tl.dmr(md, method="tile", empirical_fdr=True, n_perm=100, perm_seed=42)
-# md.uns["dmr"] now carries empirical_pvalue / empirical_qvalue columns
+# md.uns["dmr"] gains empirical_pvalue / empirical_qvalue / empirical_fdr_set;
+# threshold empirical_qvalue (default fdr_method="region"; "max_t" = FWER).
+# Set-level FDR in md.uns["dmr_params"]["empirical_fdr_set"].
 ```
 
 ### 6. Clinical / cohort QC

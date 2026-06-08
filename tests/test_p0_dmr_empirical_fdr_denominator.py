@@ -1,6 +1,10 @@
-"""P0-2: empirical_fdr_for_dmr must use per-permutation tail counts, not
-pooled-null counts. We test the math via a small monkeypatch that fakes
-the permutation output -- the real call_dmr_tile_based is too heavy here."""
+"""max_t mode: empirical_fdr_for_dmr(fdr_method="max_t") must use
+per-permutation tail counts (Westfall-Young min-P / FWER), not pooled-null
+counts. These guard the opt-in ``max_t`` mode; the DEFAULT ``region`` mode
+deliberately uses the pooled count-ratio target-decoy FDR instead (see
+tests/test_region_count_ratio_fdr.py and test_dmr_region_fdr_mode.py).
+We test the math via a small monkeypatch that fakes the permutation output --
+the real call_dmr_tile_based is too heavy here."""
 from __future__ import annotations
 
 import numpy as np
@@ -61,6 +65,7 @@ def test_emp_p_uses_n_perm_denominator_not_pooled(monkeypatch):
         n_perm=5,
         seed=0,
         n_jobs=1,
+        fdr_method="max_t",
     )
     emp_p = out["empirical_pvalue"][0]
     # Every perm has ~2 null DMRs with p <= 0.02 (uniform draws of 100),
@@ -100,6 +105,7 @@ def test_emp_p_correct_on_pure_null():
         n_perm=n_perm,
         seed=0,
         n_jobs=1,
+        fdr_method="max_t",
     )
     emp_p = out["empirical_pvalue"][0]
     assert abs(emp_p - 1.0 / (n_perm + 1)) < 1e-6, (

@@ -28,6 +28,7 @@ import hashlib
 import logging
 import math
 import tempfile
+import warnings
 from pathlib import Path
 from typing import Iterator, Union
 
@@ -1482,6 +1483,113 @@ def _empirical_pvalues_from_null_pool(
     return (counts.astype(np.float64) + 1.0) / (float(n_perm_used) + 1.0)
 
 
+def _is_self_or_mirror_perm(
+    *,
+    perm_treatment: "list[str]",
+    observed_treatment: "list[str]",
+    observed_control: "list[str]",
+) -> bool:
+    """True if a permutation reproduces the observed contrast or its mirror.
+
+    A shuffle whose treatment set equals the observed treatment set (self) or
+    the observed control set (mirror swap) yields statistics identical to the
+    observed run -- for a two-sided test the mirror gives the same p-values.
+    Such draws are NOT samples from the label-permutation null and must be
+    excluded; including them biases the decoy survivor count toward the
+    observed and inflates the empirical FDR (acute at small n, where these
+    draws are non-negligibly likely).
+    """
+    perm_set = set(perm_treatment)
+    return perm_set == set(observed_treatment) or perm_set == set(observed_control)
+
+
+def _region_count_ratio_fdr(
+    *,
+    observed_pvalues: np.ndarray,
+    null_pools: "list[np.ndarray]",
+    n_perm_used: int,
+) -> "tuple[np.ndarray, np.ndarray, float]":
+    """Count-ratio (target-decoy) empirical FDR for region calls.
+
+    Caller-agnostic core: works for ANY DMR caller that emits a set of observed
+    survivor regions (each with a raw p-value) plus per-permutation null
+    survivor pools produced by the SAME calling+filtering pipeline. This is the
+    BSmooth (Hansen 2012) / SAM (Tusher 2001) region-level empirical FDR, and is
+    the estimator chain_merge / sliding_window / HMM will reuse once their
+    permutation harnesses land.
+
+    Over ``n_perm_used`` label shuffles, with observed survivors the "targets"
+    and permutation survivors the "decoys"::
+
+        R(t)   = #{observed survivors with p <= t}
+        V(t)   = (1 / n_perm_used) * #{pooled null survivors with p <= t}
+        fdr(t) = V(t) / R(t)
+
+    The per-region q-value is the monotone suffix-min of ``fdr(t)`` for
+    ``t >= p_j``, clipped to ``[0, 1]``. Because decoys inherit the same
+    overdispersion as the observed scan, the inflation that makes the asymptotic
+    per-region p-value anti-conservative cancels in the ratio.
+
+    Parameters
+    ----------
+    observed_pvalues
+        Raw per-region p-values of the observed survivors (any order; output is
+        returned in the same order).
+    null_pools
+        One array per *successful* permutation, holding that permutation's null
+        survivor p-values. Self/mirror permutations (those reproducing the
+        observed labelling) must be excluded by the caller. Empty-survivor
+        permutations may be passed as empty arrays -- they correctly contribute
+        0 to ``V`` and so must remain counted in ``n_perm_used``.
+    n_perm_used
+        Number of permutations reflected in ``null_pools`` (the divisor for
+        ``V`` and the set-level mean). ``<= 0`` yields NaN q-values.
+
+    Returns
+    -------
+    (empirical_pvalue, empirical_qvalue, fdr_set)
+        ``empirical_pvalue`` -- pooled-null tail fraction
+        ``#{null <= p_j} / N_null`` per observed region (the documented
+        "fraction of null DMRs <= observed" diagnostic).
+        ``empirical_qvalue`` -- per-region count-ratio q-value (the FDR
+        deliverable; threshold this).
+        ``fdr_set`` -- single set-level FDR ``min(mean(V)/R, 1)``; NaN if there
+        are no observed regions or no usable permutations.
+    """
+    observed_pvalues = np.asarray(observed_pvalues, dtype=np.float64)
+    R = observed_pvalues.size
+    if R == 0:
+        return (np.empty(0, dtype=np.float64), np.empty(0, dtype=np.float64), float("nan"))
+
+    if n_perm_used <= 0 or len(null_pools) == 0:
+        nan = np.full(R, np.nan, dtype=np.float64)
+        return (nan.copy(), nan.copy(), float("nan"))
+
+    null_sizes = np.array([np.asarray(p).size for p in null_pools], dtype=np.float64)
+    pooled_null = np.sort(
+        np.concatenate([np.asarray(p, dtype=np.float64).ravel() for p in null_pools])
+    ) if null_sizes.sum() > 0 else np.empty(0, dtype=np.float64)
+    N_null = pooled_null.size
+    fdr_set = float(min(null_sizes.mean() / R, 1.0))
+
+    # empirical_pvalue: pooled-null tail fraction per observed region.
+    if N_null == 0:
+        emp_p = np.zeros(R, dtype=np.float64)
+    else:
+        emp_p = np.searchsorted(pooled_null, observed_pvalues, side="right") / N_null
+
+    # count-ratio q over sorted observed thresholds, then map back to input order.
+    order = np.argsort(observed_pvalues, kind="mergesort")
+    t_sorted = observed_pvalues[order]
+    R_t = np.arange(1, R + 1, dtype=np.float64)
+    V_t = np.searchsorted(pooled_null, t_sorted, side="right") / float(n_perm_used)
+    fdr_t = np.clip(V_t / R_t, 0.0, 1.0)
+    q_sorted = np.minimum.accumulate(fdr_t[::-1])[::-1]  # monotone suffix-min
+    emp_q = np.empty(R, dtype=np.float64)
+    emp_q[order] = q_sorted
+    return (emp_p, emp_q, fdr_set)
+
+
 def _stratified_permutation_assignment(
     *,
     strata_map: dict[str, list[str]],
@@ -1525,15 +1633,31 @@ def empirical_fdr_for_dmr(
     empirical_strata: "dict[str, list[str]] | None" = None,
     merge_adjacent: bool = True,
     backend: str = "sequential",
+    fdr_method: str = "region",
     **dmr_kwargs,
 ) -> pl.DataFrame:
     """Empirical (permutation) FDR for tile-based DMRs.
 
     Re-runs ``call_dmr_tile_based`` ``n_perm`` times with treatment / control
-    labels shuffled. For each observed DMR, the empirical p-value is
-    estimated from the fraction of null DMRs (across all permutations) with
-    raw p-value <= observed. The result is BH-adjusted to
-    ``empirical_qvalue``.
+    labels shuffled and estimates a per-region empirical FDR from the
+    permutation null. Two constructions are available via ``fdr_method``:
+
+    - ``"region"`` (default) -- **count-ratio target-decoy FDR** (BSmooth /
+      SAM). ``empirical_qvalue`` is the monotone suffix-min of
+      ``(mean #null survivors with p<=t) / (#observed survivors with p<=t)``.
+      Because the decoys inherit the same overdispersion as the observed scan,
+      the inflation that makes the asymptotic per-tile p anti-conservative
+      cancels in the ratio. Self/mirror permutations (those reproducing the
+      observed contrast) are excluded from the null. The single set-level FDR
+      ``mean(#null survivors)/#observed`` is returned in the constant
+      ``empirical_fdr_set`` column. This is the recommended, interpretable
+      default and what the ``empirical_fdr_for_dmc`` docstring refers users to.
+    - ``"max_t"`` -- **Westfall-Young min-P (FWER)**: ``empirical_pvalue`` is
+      the fraction of permutations whose genome-wide minimum null p is
+      ``<=`` the observed p, BH-adjusted to ``empirical_qvalue``. This controls
+      the family-wise error rate and is **very conservative at genome scale**
+      (collapses to ~1.0 under realistic dispersion); retained for callers who
+      explicitly want FWER control. ``empirical_fdr_set`` is NaN in this mode.
 
     Parameters
     ----------
@@ -1564,6 +1688,9 @@ def empirical_fdr_for_dmr(
         Forwarded to each per-permutation ``call_dmr_tile_based`` call.
         Must match the observed run for the same reason as
         ``merge_adjacent``.
+    fdr_method : {"region", "max_t"}
+        ``"region"`` (default) = count-ratio target-decoy FDR; ``"max_t"`` =
+        Westfall-Young FWER min-P. See the summary above.
     **dmr_kwargs
         Forwarded to ``call_dmr_tile_based`` for each permutation; should
         match the observed run's settings (tile_size_bp, test, alpha,
@@ -1572,16 +1699,22 @@ def empirical_fdr_for_dmr(
     Returns
     -------
     pl.DataFrame
-        ``observed_dmr`` with added columns ``empirical_pvalue`` and
-        ``empirical_qvalue``. The full null pool (per-DMR raw pvalues from
-        every permutation) is cached on ``observed_dmr.attrs`` only if the
-        caller upstream wires it -- this function just returns the
-        annotated table.
+        ``observed_dmr`` with added columns ``empirical_pvalue``,
+        ``empirical_qvalue`` and the constant ``empirical_fdr_set`` (the
+        set-level count-ratio FDR in ``"region"`` mode; NaN in ``"max_t"``).
     """
+    if fdr_method not in ("region", "max_t"):
+        raise ValueError(
+            f"fdr_method must be 'region' (count-ratio target-decoy FDR, the "
+            f"default) or 'max_t' (Westfall-Young FWER min-P); got "
+            f"{fdr_method!r}."
+        )
+
     if len(observed_dmr) == 0:
         return observed_dmr.with_columns([
             pl.lit(None, dtype=pl.Float64).alias("empirical_pvalue"),
             pl.lit(None, dtype=pl.Float64).alias("empirical_qvalue"),
+            pl.lit(None, dtype=pl.Float64).alias("empirical_fdr_set"),
         ])
 
     n_treat = len(samples_treatment)
@@ -1593,11 +1726,24 @@ def empirical_fdr_for_dmr(
             "tl.dmc(test='fisher')."
         )
 
-    pool = list(samples_treatment) + list(samples_control)
-    rng = np.random.default_rng(seed)  # noqa: F841  (kept for reproducibility docs)
+    if fdr_method == "region" and min(n_treat, n_ctrl) < 4:
+        warnings.warn(
+            f"empirical_fdr_for_dmr: permutation FDR at n={min(n_treat, n_ctrl)} "
+            f"per group is underpowered -- only a handful of distinct label "
+            f"assignments exist and draws adjacent to the true split leak signal "
+            f"into the null, so the empirical FDR is conservative (biased high). "
+            f"Treat the result as a floor; for small cohorts prefer the "
+            f"model-based chain_merge caller.",
+            UserWarning,
+            stacklevel=2,
+        )
 
-    def _run_one_perm(perm_idx: int) -> np.ndarray:
-        # Local RNG so parallel workers stay deterministic.
+    pool = list(samples_treatment) + list(samples_control)
+
+    def _run_one_perm(perm_idx: int) -> "tuple[bool, np.ndarray | None]":
+        # Returns (is_self_or_mirror, null_pvalues). null_pvalues is None on
+        # engine failure (excluded everywhere) and an empty array on a clean
+        # zero-survivor run (counted as a 0 contribution in region mode).
         local_rng = np.random.default_rng(seed + perm_idx + 1)
         if empirical_strata is not None:
             perm_treat, perm_ctrl = _stratified_permutation_assignment(
@@ -1611,15 +1757,21 @@ def empirical_fdr_for_dmr(
             local_rng.shuffle(shuffled)
             perm_treat = shuffled[:n_treat]
             perm_ctrl = shuffled[n_treat:]
+        is_self = _is_self_or_mirror_perm(
+            perm_treatment=perm_treat,
+            observed_treatment=samples_treatment,
+            observed_control=samples_control,
+        )
         # Force test='lr' or whatever observed used; do not run annotation.
         kwargs = dict(dmr_kwargs)
         kwargs.pop("samples_case", None)
         kwargs.pop("min_samples_case", None)
         # Defensive: if a caller accidentally also threads merge_adjacent /
-        # backend through **dmr_kwargs, prefer the explicit named params
-        # below so we never double-pass.
+        # backend / fdr_method through **dmr_kwargs, prefer the explicit named
+        # params below so we never double-pass or leak into the tile caller.
         kwargs.pop("merge_adjacent", None)
         kwargs.pop("backend", None)
+        kwargs.pop("fdr_method", None)
         try:
             null_df = call_dmr_tile_based(
                 methylstore_path=methylstore_path,
@@ -1631,83 +1783,96 @@ def empirical_fdr_for_dmr(
             )
         except Exception as exc:
             logger.warning("permutation %d failed: %s", perm_idx, exc)
-            return np.array([], dtype=np.float64)
+            return (is_self, None)
         if "pvalue" not in null_df.columns or len(null_df) == 0:
-            return np.array([], dtype=np.float64)
-        return null_df.get_column("pvalue").drop_nulls().to_numpy()
+            return (is_self, np.array([], dtype=np.float64))
+        return (is_self, null_df.get_column("pvalue").drop_nulls().to_numpy())
 
-    null_pvals_list: list[np.ndarray]
+    results: "list[tuple[bool, np.ndarray | None]]"
     if n_jobs == 1:
-        null_pvals_list = [_run_one_perm(i) for i in range(n_perm)]
+        results = [_run_one_perm(i) for i in range(n_perm)]
     else:
         try:
             from joblib import Parallel, delayed
-            null_pvals_list = Parallel(n_jobs=n_jobs)(
+            results = Parallel(n_jobs=n_jobs)(
                 delayed(_run_one_perm)(i) for i in range(n_perm)
             )
         except ImportError:
             logger.warning("joblib not installed; falling back to serial execution.")
-            null_pvals_list = [_run_one_perm(i) for i in range(n_perm)]
+            results = [_run_one_perm(i) for i in range(n_perm)]
 
-    # Failed permutations (engine exception, zero null DMRs) MUST be
-    # excluded from the empirical-p denominator. Pre-fix code divided by
-    # n_perm + 1 regardless, biasing emp_p downward by the failure rate.
-    # See docs/review/2026-06-07-epykit-codebase-audit.md (m-perm-1).
-    n_perm_used = sum(1 for arr in null_pvals_list if arr.size > 0)
-    n_perm_failed = n_perm - n_perm_used
-    if n_perm_failed > 0:
-        logger.info(
-            "empirical_fdr_for_dmr: %d/%d permutations produced zero null "
-            "DMRs; denominator uses n_perm_used=%d.",
-            n_perm_failed, n_perm, n_perm_used,
-        )
-    if n_perm_used == 0:
-        logger.warning(
-            "All %d permutations produced zero null DMRs. Empirical "
-            "p-values default to 1.0 (most conservative).",
-            n_perm,
-        )
-
-    # Per-permutation tail count (max-T style):
-    # For each observed DMR with p = p_obs, count the number of *successful*
-    # permutations that produced at least one null DMR with p <= p_obs.
-    # Denominator is n_perm_used + 1 (not n_perm + 1, not |pooled null| + 1)
-    # so the empirical-p floor is 1 / (n_perm_used + 1), independent of how
-    # many DMRs each permutation emitted but honest about how many perms
-    # actually contributed a null. This is the standard region-statistic
-    # FDR; pooling p-values across perms would inflate the denominator and
-    # anti-conservatively shrink emp_p.
     obs_p = observed_dmr.get_column("pvalue").to_numpy()
     obs_finite_mask = np.isfinite(obs_p)
     obs_safe = np.where(obs_finite_mask, obs_p, 1.0)
 
-    # min_null_p_per_perm collects one value per *successful* permutation:
-    # the min p across that perm's null DMRs. Failed perms are dropped.
-    # The number of successful perms with at least one null <= p_obs is then
-    # sum(min_null_p_per_perm <= p_obs).
-    min_null_p_per_perm = np.array(
-        [float(arr.min()) for arr in null_pvals_list if arr.size > 0],
-        dtype=np.float64,
-    )
-    emp_p = _empirical_pvalues_from_null_pool(
-        observed_pvalues=obs_safe,
-        null_pvalues_pool=min_null_p_per_perm,
-        n_perm_used=n_perm_used,
-    )
-    emp_p = np.clip(emp_p, 0.0, 1.0)
-    emp_p = np.where(obs_finite_mask, emp_p, np.nan)
-
-    # BH-adjust to empirical q-value
-    from statsmodels.stats.multitest import multipletests
-    finite = np.isfinite(emp_p)
-    emp_q = np.full_like(emp_p, np.nan, dtype=np.float64)
-    if finite.any():
-        _, q_finite, _, _ = multipletests(emp_p[finite], method="fdr_bh")
-        emp_q[finite] = q_finite
+    if fdr_method == "region":
+        # Count-ratio target-decoy FDR. Null pools = every non-self permutation
+        # that ran (empty arrays included -- a clean zero-survivor shuffle is
+        # evidence of low noise and contributes 0 to V, so it stays counted).
+        n_self = sum(1 for is_self, _ in results if is_self)
+        n_failed = sum(1 for is_self, arr in results if (not is_self) and arr is None)
+        null_pools = [arr for is_self, arr in results if (not is_self) and arr is not None]
+        n_perm_used = len(null_pools)
+        if n_self or n_failed:
+            logger.info(
+                "empirical_fdr_for_dmr[region]: excluded %d self/mirror + %d "
+                "failed permutations; n_perm_used=%d.",
+                n_self, n_failed, n_perm_used,
+            )
+        if n_perm_used == 0:
+            logger.warning(
+                "All %d permutations were self/mirror or failed; region "
+                "empirical FDR is undefined (NaN).", n_perm,
+            )
+        emp_p, emp_q, fdr_set = _region_count_ratio_fdr(
+            observed_pvalues=obs_safe,
+            null_pools=null_pools,
+            n_perm_used=n_perm_used,
+        )
+        emp_p = np.where(obs_finite_mask, emp_p, np.nan)
+        emp_q = np.where(obs_finite_mask, emp_q, np.nan)
+        logger.info("empirical_fdr_for_dmr[region]: set-level FDR=%.4f", fdr_set)
+    else:
+        # Westfall-Young min-P (FWER). Preserved for explicit opt-in. Failed
+        # perms (None) and zero-survivor perms are excluded from the
+        # min-P denominator; self/mirror are NOT special-cased here (FWER bar).
+        usable = [arr for _, arr in results if arr is not None]
+        n_perm_used = sum(1 for arr in usable if arr.size > 0)
+        n_perm_failed = n_perm - n_perm_used
+        if n_perm_failed > 0:
+            logger.info(
+                "empirical_fdr_for_dmr[max_t]: %d/%d permutations produced zero "
+                "usable null DMRs; denominator uses n_perm_used=%d.",
+                n_perm_failed, n_perm, n_perm_used,
+            )
+        if n_perm_used == 0:
+            logger.warning(
+                "All %d permutations produced zero null DMRs. Empirical "
+                "p-values default to 1.0 (most conservative).", n_perm,
+            )
+        min_null_p_per_perm = np.array(
+            [float(arr.min()) for arr in usable if arr.size > 0],
+            dtype=np.float64,
+        )
+        emp_p = _empirical_pvalues_from_null_pool(
+            observed_pvalues=obs_safe,
+            null_pvalues_pool=min_null_p_per_perm,
+            n_perm_used=n_perm_used,
+        )
+        emp_p = np.clip(emp_p, 0.0, 1.0)
+        emp_p = np.where(obs_finite_mask, emp_p, np.nan)
+        from statsmodels.stats.multitest import multipletests
+        finite = np.isfinite(emp_p)
+        emp_q = np.full_like(emp_p, np.nan, dtype=np.float64)
+        if finite.any():
+            _, q_finite, _, _ = multipletests(emp_p[finite], method="fdr_bh")
+            emp_q[finite] = q_finite
+        fdr_set = float("nan")
 
     return observed_dmr.with_columns([
         pl.Series("empirical_pvalue", emp_p),
         pl.Series("empirical_qvalue", emp_q),
+        pl.lit(fdr_set, dtype=pl.Float64).alias("empirical_fdr_set"),
     ])
 
 
