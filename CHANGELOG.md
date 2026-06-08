@@ -12,6 +12,18 @@ redesigned HTML report.
 
 ### Added
 
+- **Permutation empirical FDR for `chain_merge` DMRs.**
+  `tl.dmr(method="chain_merge", empirical_fdr=True)` now produces calibrated
+  `empirical_pvalue` / `empirical_qvalue` / `empirical_fdr_set` via the same
+  count-ratio target-decoy core as the tile path (`empirical_fdr_for_chain_merge`
+  / the shared `_aggregate_region_perm_results`). Each permutation recomputes the
+  full per-CpG DMC under shuffled labels, chain-merges, and re-applies the region
+  q-filter, so a whole-genome run is **expensive (hours)** — a `UserWarning`
+  fires on every call; restrict with `chromosomes=` or raise `perm_n_jobs`.
+  Supports simple two-group DMC tests (`lr`/`welch_t`/`fisher`); glm/contrast and
+  the CLI `--empirical-fdr` for chain_merge remain follow-ups.
+  `sliding_window` / `segment` still raise `NotImplementedError`.
+
 - **Redesigned HTML report — MultiQC-style dashboard.** `md.report()` /
   `epykit report` now render a fixed-sidebar dashboard (numbered table of
   contents with per-section status dots + scroll-spy, light/dark toggle)

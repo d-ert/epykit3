@@ -1,9 +1,11 @@
 """M2: empirical_fdr=True was silently a no-op for chain_merge (the
-default), sliding_window, and segment. The calibration-warning note was
-also suppressed in those branches, leaving users with no signal that
-combined_qvalue is anti-conservative. Batch-1 contract: empirical_fdr=True
-must produce columns (tile) OR raise NotImplementedError (others); never
-silently no-op."""
+default), sliding_window, and segment. Contract: empirical_fdr=True must
+produce columns OR raise NotImplementedError; never silently no-op.
+
+As of the count-ratio follow-up, the API (tl.dmr) supports empirical_fdr for
+both ``tile`` and ``chain_merge``; only ``sliding_window`` / ``segment`` still
+raise. The CLI (``_cmd_dmr``) still gates everything but ``tile`` (CLI wiring
+for chain_merge is a deferred follow-up)."""
 from __future__ import annotations
 
 import pytest
@@ -21,7 +23,7 @@ def md_with_dmc(synth_md_filtered):
     return md
 
 
-@pytest.mark.parametrize("method", ["chain_merge", "sliding_window", "segment"])
+@pytest.mark.parametrize("method", ["sliding_window", "segment"])
 def test_non_tile_empirical_fdr_raises_notimplemented(md_with_dmc, method):
     with pytest.raises(NotImplementedError, match="empirical_fdr.*tile"):
         ep.tl.dmr(md_with_dmc, method=method, empirical_fdr=True, n_perm=10)
@@ -32,6 +34,24 @@ def test_tile_empirical_fdr_still_works(md_with_dmc):
     dmr = md_with_dmc.uns["dmr"]
     assert "empirical_pvalue" in dmr.columns
     assert "empirical_qvalue" in dmr.columns
+
+
+@pytest.mark.slow
+def test_chain_merge_empirical_fdr_end_to_end(md_with_dmc):
+    """API supports empirical_fdr for chain_merge: each shuffle recomputes the
+    DMC then chain-merges. Real end-to-end on the synth bundle (n_perm small).
+    dmr_params records the run regardless of how many DMRs survive; when DMRs
+    exist the count-ratio columns are present."""
+    ep.tl.dmr(md_with_dmc, method="chain_merge", empirical_fdr=True,
+              n_perm=3, perm_seed=0)
+    params = md_with_dmc.uns["dmr_params"]
+    assert params["method"] == "chain_merge"
+    assert params["empirical_fdr"] is True
+    assert params["fdr_method"] == "region"
+    dmr = md_with_dmc.uns["dmr"]
+    if dmr.height > 0:
+        assert "empirical_qvalue" in dmr.columns
+        assert "empirical_fdr_set" in dmr.columns
 
 
 @pytest.mark.parametrize("method", ["chain_merge", "sliding_window", "segment"])

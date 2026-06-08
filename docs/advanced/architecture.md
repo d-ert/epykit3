@@ -81,9 +81,11 @@ controlled at your expected level before trusting the results.
 | `"hmm"` | HMM segmentation (`dmr_hmm.py`, `_hmm.py`) | |
 
 Permutation empirical FDR (`ep.tl.dmr(..., empirical_fdr=True, n_perm=N)`) is
-implemented for `"tile"` only — `empirical_qvalue` defaults to a count-ratio
-target-decoy FDR (`fdr_method="region"`; `"max_t"` for FWER). The other callers
-raise `NotImplementedError` on `empirical_fdr=True` (shared follow-up planned).
+implemented for `"tile"` and `"chain_merge"` — `empirical_qvalue` defaults to a
+count-ratio target-decoy FDR (`fdr_method="region"`; `"max_t"` for FWER) via the
+shared `_region_count_ratio_fdr` / `_aggregate_region_perm_results` core.
+`chain_merge` recomputes the per-CpG DMC per shuffle (expensive — hours at genome
+scale). `"sliding_window"` / `"segment"` still raise `NotImplementedError`.
 
 ## Where to look in the source tree
 

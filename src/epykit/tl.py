@@ -1366,14 +1366,12 @@ def dmr(
     # it were FDR-controlled. Per-method permutation harnesses for the other
     # callers are deferred to a Batch-4 follow-up (each caller's region
     # definition needs its own shuffle scheme).
-    if empirical_fdr and method != "tile":
+    if empirical_fdr and method not in ("tile", "chain_merge"):
         raise NotImplementedError(
-            f"empirical_fdr=True is currently implemented only for "
-            f"method='tile'. Got method={method!r}. Use method='tile' or "
-            f"omit empirical_fdr=True. (Follow-up: implement permutation "
-            f"FDR for chain_merge/sliding_window/segment -- tracked in "
-            f"docs/superpowers/plans/2026-06-07-epykit-audit-fixes.md "
-            f"Batch-4 follow-up.)"
+            f"empirical_fdr=True is implemented for method='tile' and "
+            f"method='chain_merge'. Got method={method!r}. Use one of those or "
+            f"omit empirical_fdr=True. (Follow-up: permutation FDR for "
+            f"sliding_window / segment.)"
         )
     # Asymptotic DMR q-values are a ranking signal, not a calibrated
     # region-level FDR under CpG spatial correlation (M5). Point users at
@@ -1668,6 +1666,67 @@ def dmr(
         # Shared with the CLI via apply_region_qfilter (default candidate cols).
         dmr_df = apply_region_qfilter(dmr_df, min_mean_qvalue)
 
+        cm_emp_set = None
+        if empirical_fdr and len(dmr_df) > 0:
+            # Permutation FDR: re-run DMC (shuffled labels) -> chain_merge ->
+            # same q-filter per shuffle, then count-ratio FDR vs the decoys.
+            # Each shuffle recomputes the full per-CpG DMC -- expensive.
+            from .dmr import empirical_fdr_for_chain_merge
+            dmc_meta = md.uns.get("dmc", {})
+            dmc_test = dmc_meta.get("test_used") or dmc_meta.get("test_requested")
+            if dmc_test not in ("lr", "welch_t", "fisher"):
+                raise NotImplementedError(
+                    f"chain_merge empirical_fdr supports simple two-group DMC "
+                    f"tests (lr / welch_t / fisher); the DMC on md used "
+                    f"test={dmc_test!r}. glm / contrast / covariate permutation "
+                    f"is a further follow-up -- omit empirical_fdr or recompute "
+                    f"DMC with a pooled two-group test."
+                )
+            cm_strata_map: dict[str, list[str]] | None = None
+            if empirical_strata is not None and empirical_strata in md.obs.columns:
+                all_samples = list(md.treatment_ids) + list(md.control_ids)
+                for row in md.obs.filter(
+                    pl.col("sample_id").is_in(all_samples)
+                ).iter_rows(named=True):
+                    cm_strata_map = cm_strata_map or {}
+                    cm_strata_map.setdefault(row[empirical_strata], []).append(
+                        row["sample_id"]
+                    )
+            dmr_df = empirical_fdr_for_chain_merge(
+                methylstore_path=md.store,
+                samples_treatment=md.treatment_ids,
+                samples_control=md.control_ids,
+                observed_dmr=dmr_df,
+                dmc_kwargs={
+                    "test": dmc_test,
+                    "unite": dmc_meta.get("unite", True),
+                    "min_samples_treatment": dmc_meta.get("min_samples_treatment", 0),
+                    "min_samples_control": dmc_meta.get("min_samples_control", 0),
+                    "dispersion": dmc_meta.get("dispersion", "site"),
+                    "reference": dmc_meta.get("reference", "adaptive"),
+                },
+                chain_merge_kwargs={
+                    "preset": preset,
+                    "alpha": alpha,
+                    "min_abs_meth_diff": min_abs_meth_diff,
+                    "dis_merge_bp": dis_merge_bp,
+                    "min_cpgs": cm_min_cpgs,
+                    "pct_sig": pct_sig,
+                    "minlen_bp": minlen_bp,
+                    "use_q_for_sig": use_q_for_sig,
+                },
+                min_mean_qvalue=min_mean_qvalue,
+                n_perm=n_perm,
+                seed=perm_seed,
+                n_jobs=perm_n_jobs,
+                empirical_strata=cm_strata_map,
+                chromosomes=chromosomes,
+                fdr_method=fdr_method,
+            )
+            _v = dmr_df["empirical_fdr_set"][0] if "empirical_fdr_set" in dmr_df.columns else None
+            if _v is not None and _v == _v:
+                cm_emp_set = float(_v)
+
         md.uns["dmr"] = dmr_df
         md.uns["dmr_params"] = {
             "method": "chain_merge",
@@ -1679,6 +1738,11 @@ def dmr(
             "minlen_bp": minlen_bp,
             "use_q_for_sig": use_q_for_sig,
             "min_mean_qvalue": min_mean_qvalue,
+            "empirical_fdr": empirical_fdr,
+            "n_perm": n_perm if empirical_fdr else None,
+            "perm_seed": perm_seed if empirical_fdr else None,
+            "fdr_method": fdr_method if empirical_fdr else None,
+            "empirical_fdr_set": cm_emp_set,
         }
         if tsv is not None:
             from .export import dmr_to_tsv

@@ -1,8 +1,11 @@
 # Region-level empirical FDR for tile DMRs — design note
 
-**Status:** IMPLEMENTED for `method="tile"` (2026-06-08). chain_merge /
-sliding_window / HMM still raise `NotImplementedError` and will reuse the shared
-helper in a follow-up.
+**Status:** IMPLEMENTED for `method="tile"` and `method="chain_merge"`
+(2026-06-08). `sliding_window` / `segment` still raise `NotImplementedError`; the
+CLI is tile-only. chain_merge reuses the shared count-ratio core via
+`empirical_fdr_for_chain_merge` (recomputes the per-CpG DMC per shuffle —
+expensive; simple two-group tests only). The region/max_t dispatch is now the
+shared `_aggregate_region_perm_results`, used by both callers.
 
 **Changes landed**
 - `dmr.py`: `_region_count_ratio_fdr()` (shared, caller-agnostic core),

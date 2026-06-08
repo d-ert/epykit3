@@ -168,11 +168,22 @@ md.uns["dmr_params"]["empirical_fdr_set"]                           # e.g. 0.13
     true split and its mirror swap are excluded from the null automatically.
     For small cohorts, prefer the model-based `chain_merge` caller.
 
-!!! note "Other methods"
-    Empirical FDR is currently implemented for `method="tile"` only;
-    `chain_merge` / `sliding_window` / `segment` raise `NotImplementedError` on
-    `empirical_fdr=True`. It is also unsupported with covariate designs, because
-    label shuffling invalidates the stratified design.
+### chain_merge empirical FDR
+
+`method="chain_merge"` also supports `empirical_fdr=True` (same `fdr_method`
+options and `empirical_fdr_set`). Each shuffle **recomputes the full per-CpG
+DMC** under the permuted labels, chain-merges, and applies the same q-filter —
+so a whole-genome 100-permutation run can take **hours**. Restrict with
+`chromosomes=` (the observed DMC must cover the same set) or raise `perm_n_jobs`.
+It requires a simple two-group DMC (`test="lr"/"welch_t"/"fisher"`); glm /
+contrast / covariate DMCs are not yet supported.
+
+!!! note "Coverage"
+    `empirical_fdr=True` is implemented in the API (`tl.dmr`) for `method="tile"`
+    and `method="chain_merge"`; `sliding_window` / `segment` raise
+    `NotImplementedError`. The CLI (`epykit dmr --empirical-fdr`) is tile-only for
+    now. Covariate / design DMCs are unsupported (label shuffling invalidates the
+    design).
 
 ## Output Columns
 
