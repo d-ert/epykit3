@@ -146,6 +146,7 @@ def _cmd_convert(args: argparse.Namespace):
         reference_fasta=args.reference_fasta,
         merge_strands=merge_strands,  # CLI flag is --merge-cpg; param is merge_strands
         format=args.format,
+        canonical_only=getattr(args, "canonical_only", False),
     )
 
 
@@ -282,6 +283,7 @@ def _cmd_dmc(args: argparse.Namespace):
         min_samples_control=args.min_samples_control,
         dispersion=args.dispersion,
         reference=args.reference,
+        canonical_only=not getattr(args, "all_contigs", False),
         return_store=True,
     )
     dmc_store = dmc.apply_multiple_testing_correction(dmc_store, method=args.fdr_method)
@@ -397,6 +399,7 @@ def _cmd_dmr(args: argparse.Namespace):
             samples_control=control_samples,
             tile_size_bp=args.tile_size_bp,
             test=args.test,
+            canonical_only=not getattr(args, "all_contigs", False),
             min_cpgs_per_tile=args.min_cpgs_per_tile,
             alpha=args.alpha,
             min_abs_meth_diff=args.min_abs_meth_diff,
@@ -711,6 +714,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-merge-cpg", dest="merge_cpg", action="store_false",
         help="Disable CpG-dyad merging; keep per-strand records.",
     )
+    p_conv.add_argument(
+        "--canonical-only", dest="canonical_only", action="store_true", default=False,
+        help=(
+            "Write only canonical chromosomes (chr1-22 / X / Y / M) to the "
+            "store, dropping unplaced/alt scaffolds at ingestion. Default "
+            "keeps all contigs."
+        ),
+    )
     p_conv.set_defaults(merge_cpg=None, func=_cmd_convert)
 
     # filter
@@ -849,6 +860,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_dmc.add_argument(
         "--csv-full", dest="csv_full", action="store_true", default=False,
         help=argparse.SUPPRESS,
+    )
+    p_dmc.add_argument(
+        "--all-contigs", dest="all_contigs", action="store_true", default=False,
+        help=(
+            "Test all detected contigs, including unplaced/alt scaffolds "
+            "(*_random, chrUn_*, GL*). Default restricts to canonical "
+            "chromosomes (chr1-22 / X / Y / M)."
+        ),
     )
     p_dmc.set_defaults(func=_cmd_dmc)
 
@@ -990,6 +1009,14 @@ def build_parser() -> argparse.ArgumentParser:
         help=argparse.SUPPRESS,
     )
     p_dmr.add_argument("--csv", dest="csv_path", default=None, help=argparse.SUPPRESS)
+    p_dmr.add_argument(
+        "--all-contigs", dest="all_contigs", action="store_true", default=False,
+        help=(
+            "method=tile only: test all detected contigs, including unplaced/"
+            "alt scaffolds. Default restricts to canonical chromosomes. Other "
+            "methods inherit the chromosome set from the DMC table."
+        ),
+    )
     p_dmr.set_defaults(func=_cmd_dmr)
 
     # annotate

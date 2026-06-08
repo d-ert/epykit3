@@ -23,6 +23,14 @@ dmrs = md.uns["dmr"]
 print(f"Found {len(dmrs)} DMRs")
 ```
 
+!!! note "Canonical chromosomes by default"
+    Like `tl.dmc`, the **tile** method tests only canonical chromosomes
+    (chr1–22 / X / Y / M) by default and skips unplaced/alt contigs; pass
+    `canonical_only=False` (or `epykit dmr --all-contigs`) to include them, or
+    an explicit `chromosomes=` list. The `chain_merge`, `sliding_window`, and
+    `segment` methods consume the DMC table, so they inherit whatever
+    chromosome set the upstream `tl.dmc` used.
+
 ## Methods
 
 ### chain_merge (default)

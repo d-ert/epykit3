@@ -31,6 +31,7 @@ chrom    start    end    methylation_percent    count_methylated    count_unmeth
 | `assembly` | `str` | required | Genome assembly name (e.g. `"hg38"`, `"mm10"`) |
 | `store_dir` | `str` | `"methylstore"` | Directory where the partitioned Parquet store will be written |
 | `context` | `str` | `"CpG"` | Cytosine context to retain (`"CpG"`, `"CHG"`, or `"CHH"`) |
+| `canonical_only` | `bool` | `False` | Drop unplaced/alt contigs (`*_random`, `chrUn_*`, `GL*`) at ingestion, keeping only canonical chromosomes (chr1–22 / X / Y / M) in the store. Off by default — and even when off, scaffolds are excluded from `tl.dmc` / `tl.dmr` by *their* `canonical_only=True` default, so this is only needed when you want a smaller store or canonical QC/smoothing too. Same parameter on `read_methyldackel` / `read_combined_strand_bed`. |
 
 ## Usage
 

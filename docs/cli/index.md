@@ -73,6 +73,7 @@ epykit convert \
 | `--format {bismark,methyldackel}` | Input format |
 | `--samplesheet PATH` | CSV with columns: `sample_id`, `file`, `treatment` |
 | `--methylstore PATH` | Output Parquet store directory |
+| `--canonical-only` | Write only canonical chromosomes (chr1–22 / X / Y / M) to the store, dropping unplaced/alt scaffolds at ingestion. Off by default (all contigs kept). |
 
 ---
 
@@ -124,6 +125,7 @@ epykit dmc \
 | `--formula TEXT` | Model formula (e.g., `"~ treatment"`, `"~ treatment + age"`) |
 | `--contrast COL TREAT CTRL` | Contrast specification: column name, treatment level, control level |
 | `--allow-n1` | Permit n=1 per group (falls back to Fisher exact on pooled reads). Off by default -- p-values become anti-conservative. |
+| `--all-contigs` | Test every detected contig, including unplaced/alt scaffolds (`*_random`, `chrUn_*`, `GL*`). Default restricts to canonical chromosomes (chr1–22 / X / Y / M). |
 | `--no-csv` / `--csv PATH` / `--csv-alpha 0.05` / `--csv-full` | TSV auto-emit controls (see [Sibling TSV auto-emit](#sibling-tsv-auto-emit)). |
 
 ---
@@ -166,6 +168,7 @@ epykit dmr \
 | `--use-q-for-sig` | (`chain_merge`) Gate significance on q-value rather than p-value. |
 | `--tile-size-bp INT` | (`tile`) Tile width. Default 1000. |
 | `--min-cpgs-per-tile INT` | (`tile`) Minimum CpGs per tile per sample. Default 5. |
+| `--all-contigs` | (`tile`) Test every detected contig, including unplaced/alt scaffolds. Default restricts to canonical chromosomes (chr1–22 / X / Y / M). Non-tile methods inherit the chromosome set from the DMC table. |
 | `--test {lr,glm,welch_t,fisher}` | (`tile`) Statistical test applied to tile-level counts. Default `lr`. |
 | `--empirical-fdr` | (`tile`) Permutation-based empirical FDR. |
 | `--n-perm INT` | (`tile`) Number of permutations. Default 100. |

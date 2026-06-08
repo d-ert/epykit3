@@ -68,6 +68,17 @@ gene model intervals:
 | `3UTR` | 3' untranslated region |
 | `intergenic` | Not overlapping any gene model |
 
+!!! tip "Scaffolds and the chromosome-naming warning"
+    Annotation labels any site that doesn't overlap a gene-model feature as
+    `intergenic` (and `open_sea` for CpG-island context) — including sites on
+    unplaced/alt contigs absent from the reference GTF. Because `tl.dmc` /
+    `tl.dmr` now default to **canonical chromosomes only**, far fewer scaffold
+    sites reach annotation, so the *"only N% of site chromosomes are present in
+    the gene model"* warning is largely avoided upstream. If you deliberately
+    analyse scaffolds (`canonical_only=False`), expect them to fall into
+    `intergenic` / `open_sea` unless your GTF carries those contigs under the
+    same naming convention.
+
 ### Gene Type Filter
 
 Restrict the gene catalog to specific biotypes before annotation:

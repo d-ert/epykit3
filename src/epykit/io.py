@@ -95,6 +95,7 @@ def _read_methylation_samplesheet(
     context: str,
     reference_fasta: str | None,
     coordinate_base: str = "auto",
+    canonical_only: bool = False,
 ) -> MethylData:
     """Backend shared by ``read_bismark`` and ``read_methyldackel``."""
     obs_rows, files = _build_obs_from_samplesheet(
@@ -113,6 +114,7 @@ def _read_methylation_samplesheet(
             reference_fasta=reference_fasta,
             format=source_format,
             coordinate_base=coordinate_base,
+            canonical_only=canonical_only,
         )
         status = "converted" if converted else "cached"
         logger.info("  %s: %s", sample_id, status)
@@ -151,6 +153,7 @@ def read_bismark(
     reference_fasta: str | None = None,
     groups: list[str] | None = None,
     coordinate_base: str = "auto",
+    canonical_only: bool = False,
 ) -> MethylData:
     """Read a samplesheet of Bismark ``.cov[.gz]`` files into a MethylData.
 
@@ -190,6 +193,7 @@ def read_bismark(
         samplesheet,
         pipeline="bismark",
         source_format="bismark",
+        canonical_only=canonical_only,
         treatment_group=treatment_group,
         control_group=control_group,
         groups=groups,
@@ -211,6 +215,7 @@ def read_methyldackel(
     reference_fasta: str | None = None,
     groups: list[str] | None = None,
     coordinate_base: str = "auto",
+    canonical_only: bool = False,
 ) -> MethylData:
     """Read a samplesheet of MethylDackel ``.bedGraph[.gz]`` files into a
     MethylData.
@@ -227,6 +232,7 @@ def read_methyldackel(
         samplesheet,
         pipeline="methyldackel",
         source_format="methyldackel",
+        canonical_only=canonical_only,
         treatment_group=treatment_group,
         control_group=control_group,
         groups=groups,
@@ -247,6 +253,7 @@ def read_combined_strand_bed(
     context: str = "CpG",
     reference_fasta: str | None = None,
     groups: list[str] | None = None,
+    canonical_only: bool = False,
 ) -> MethylData:
     """Read a samplesheet of 12-column strand-collapsed methylation BEDs.
 
@@ -276,6 +283,7 @@ def read_combined_strand_bed(
         samplesheet,
         pipeline="combined_strand_bed",
         source_format="combined_strand_bed",
+        canonical_only=canonical_only,
         treatment_group=treatment_group,
         control_group=control_group,
         groups=groups,

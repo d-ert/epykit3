@@ -611,10 +611,10 @@ def compute_manhattan_data(
             mask[keep] = True
             dmc_sorted = dmc_sorted.filter(pl.Series(mask))
     chroms = dmc_sorted["chrom"].unique().to_list()
-    canonical = (
-        [f"chr{i}" for i in range(1, 23)]
-        + [f"chr{c}" for c in ("X", "Y", "M")]
-    )
+    # Single source of truth for the canonical set (shared with the DMC/DMR
+    # canonical_only filter); UCSC order gives a stable genome-wide axis.
+    from .._chroms import CANONICAL_CHROMS_UCSC
+    canonical = list(CANONICAL_CHROMS_UCSC)
     # Drop unplaced/alt/random contigs (chrUn_*, *_random, *_alt) by default --
     # they clutter the genome-wide axis with dozens of tiny blocks.
     extra = [] if canonical_only else [c for c in chroms if c not in canonical]

@@ -400,6 +400,7 @@ def dmc(
     md: MethylData,
     test: str = "auto",
     chromosomes: list[str] | None = None,
+    canonical_only: bool = True,
     min_samples_treatment: int | None = None,
     min_samples_control: int = 0,
     dispersion: str = "eb",
@@ -572,6 +573,12 @@ def dmc(
         :func:`_score_finalize` in ``dmc.py`` for the math.
     chromosomes : list[str], optional
         Restrict to a subset of chromosomes. Auto-detected when None.
+    canonical_only : bool, default True
+        When ``chromosomes`` is auto-detected (None), restrict to canonical
+        chromosomes (chr1-22 / X / Y / M, UCSC or Ensembl naming), dropping
+        unplaced/alt contigs (``*_random``, ``chrUn_*``, ``GL*``). No effect
+        when ``chromosomes`` is given explicitly. Pass False to test all
+        detected contigs.
     min_samples_treatment, min_samples_control : int
         per-site minimum number of samples with non-zero coverage in
         each group. Sites that fail are NaN'd out before FDR correction.
@@ -636,6 +643,7 @@ def dmc(
             md, test=test, formula=formula, contrast=contrast,
             covariates=covariates, treatment_col=treatment_col,
             chromosomes=chromosomes,
+            canonical_only=canonical_only,
             min_samples_treatment=min_samples_treatment,
             min_samples_control=min_samples_control,
             dispersion=dispersion, reference=reference,
@@ -884,6 +892,7 @@ def dmc(
             smoothing_span_bp=smoothing_span_bp,
             sep_fallback=sep_fallback,
             sep_threshold=sep_threshold,
+            canonical_only=canonical_only,
         )
         dmc_store = apply_multiple_testing_correction(dmc_store, method=fdr_method)
 
@@ -937,6 +946,7 @@ def dmc(
                 n_jobs=perm_n_jobs,
                 test=selected_test,
                 chromosomes=chromosomes,
+                canonical_only=canonical_only,
                 unite=unite,
                 min_samples_treatment=min_samples_treatment,
                 min_samples_control=min_samples_control,
@@ -1077,6 +1087,7 @@ def _run_dmc_contrast(
     covariates: list[str] | None,
     treatment_col: str,
     chromosomes: list[str] | None,
+    canonical_only: bool = True,
     min_samples_treatment: int,
     min_samples_control: int,
     dispersion: str,
@@ -1166,6 +1177,7 @@ def _run_dmc_contrast(
         samples_control=samples_control_local,
         test="glm_contrast",
         chromosomes=chromosomes,
+        canonical_only=canonical_only,
         unite=unite,
         min_samples_treatment=min_samples_treatment,
         min_samples_control=min_samples_control,
@@ -1215,6 +1227,7 @@ def dmr(
     min_cpgs_per_tile: int = 5,
     test: str = "auto",
     chromosomes: list[str] | None = None,
+    canonical_only: bool = True,
     min_samples_treatment: int | None = None,
     min_samples_control: int = 0,
     dispersion: str = "site",
@@ -1330,6 +1343,13 @@ def dmr(
         ``"auto"`` resolves the same way as in :func:`dmc`.
     chromosomes : list[str], optional
         Restrict tile-method processing to these chromosomes.
+    canonical_only : bool, default True
+        ``method="tile"`` only: when ``chromosomes`` is None, restrict to
+        canonical chromosomes (chr1-22 / X / Y / M), dropping unplaced/alt
+        contigs. The chain_merge / sliding_window / segment methods inherit
+        their chromosome set from the DMC table, so they honour whatever
+        ``canonical_only`` was used in the upstream ``tl.dmc``. Pass False to
+        include all detected contigs.
     min_samples_treatment, min_samples_control : int
         Per-tile sample-count guard for tile-method.
     window_bp, step_bp, min_sites_significant : int
@@ -1421,6 +1441,7 @@ def dmr(
             tile_size_bp=tile_size_bp,
             test=selected_test,
             chromosomes=chromosomes,
+            canonical_only=canonical_only,
             min_cpgs_per_tile=min_cpgs_per_tile,
             alpha=alpha,
             min_abs_meth_diff=min_abs_meth_diff,

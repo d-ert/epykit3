@@ -1198,6 +1198,7 @@ def call_dmr_tile_based(
     tile_size_bp: int = 1000,
     test: str = "lr",
     chromosomes: list[str] | None = None,
+    canonical_only: bool = True,
     min_cpgs_per_tile: int = 5,
     alpha: float = 0.05,
     min_abs_meth_diff: float = 0.1,
@@ -1250,6 +1251,10 @@ def call_dmr_tile_based(
         when tile-level pooled counts are available.
     chromosomes : list[str], optional
         Chromosomes to process. Auto-detected when None.
+    canonical_only : bool, default True
+        When ``chromosomes`` is auto-detected (None), restrict to canonical
+        chromosomes (chr1-22 / X / Y / M), dropping unplaced/alt contigs. No
+        effect when ``chromosomes`` is given explicitly.
     min_cpgs_per_tile : int
         Skip tiles with fewer than this many CpGs (per sample) during the
         per-sample aggregation step. Default 5 to reduce noise at sparse
@@ -1294,6 +1299,9 @@ def call_dmr_tile_based(
             for s in store.glob("sample=*")
             for d in s.glob("chrom=*")
         })
+        if canonical_only:
+            from ._chroms import filter_canonical_logged
+            chromosomes = filter_canonical_logged(chromosomes, context="dmr/tile")
 
     if not chromosomes:
         return pl.DataFrame(schema=_DMR_TILE_SCHEMA)

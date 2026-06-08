@@ -52,6 +52,31 @@ Output is tab-delimited by default; a `.csv` suffix switches to commas. See
 [Tabular Exports](../export/tables.md) for the full reference. (The older
 `csv=` argument still works but is deprecated in favour of `tsv=`.)
 
+## Chromosome selection
+
+By default `tl.dmc` tests only **canonical chromosomes** — chr1–22, X, Y, M
+(both UCSC `chr1` and Ensembl `1` naming) — and skips unplaced / alternate
+contigs (`*_random`, `chrUn_*`, `GL*`, …). These scaffolds have poor WGBS
+mappability and mostly inflate the multiple-testing burden, so dropping them is
+the right default for human / mouse cohorts.
+
+```python
+ep.tl.dmc(md)                                # canonical only (default)
+ep.tl.dmc(md, canonical_only=False)          # test every detected contig
+ep.tl.dmc(md, chromosomes=["chr1", "chr2"])  # explicit list (overrides filter)
+```
+
+A one-line INFO log names the dropped contigs on each run. The filter applies
+only when `chromosomes` is left `None` — an explicit list is always honoured
+verbatim. **Non-mammalian assemblies** (roman-numeral or named chromosomes) are
+not recognised as canonical; pass `canonical_only=False` for those. On the CLI,
+`epykit dmc --all-contigs` disables the filter.
+
+To drop scaffolds once at ingestion instead (so QC, smoothing, DVC, DMC, and DMR
+are all canonical), pass `canonical_only=True` to `read_bismark` /
+`read_methyldackel` / `read_combined_strand_bed`, or run
+`epykit convert --canonical-only`.
+
 ## Test Backends
 
 epykit ships 4 statistical backends for DMC calling (plus an `auto` dispatcher).

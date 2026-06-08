@@ -12,6 +12,32 @@ redesigned HTML report.
 
 ### Added
 
+- **Canonical-chromosome filtering for DMC/DMR (new default).** `tl.dmc` /
+  `tl.dmr(method="tile")` and the engines (`process_chromosomes_dmc`,
+  `call_dmr_tile_based`) now restrict auto-detected chromosomes to the canonical
+  set — chr1-22 / X / Y / M under both UCSC (`chr1`) and Ensembl (`1`) naming —
+  via a new `canonical_only=True` parameter, dropping unplaced/alt contigs
+  (`*_random`, `chrUn_*`, `GL*`) that have poor WGBS mappability, inflate the
+  multiple-testing burden, and pollute the intergenic/open_sea annotation
+  bucket. **This changes default output**: `tl.dmc(md)` / `tl.dmr(md)` return
+  fewer calls than before (scaffold calls removed); the API stays
+  backward-compatible (only new keyword args added). Escape hatches:
+  `canonical_only=False`, the CLI `--all-contigs` flag (`epykit dmc` / `dmr`),
+  or an explicit `chromosomes=` list (always honoured verbatim). chain_merge /
+  sliding_window / segment DMRs inherit the canonical set from the upstream DMC
+  table. A one-line INFO audit log names the dropped contigs on every filtered
+  run. The shared definition lives in `epykit._chroms` (also used by the
+  plotters). **Mammalian assumption**: the canonical set is numeric naming
+  (human/mouse); non-mammalian assemblies must pass `canonical_only=False`.
+
+- **Opt-in canonical filtering at ingestion (`canonical_only=False` default).**
+  `read_bismark` / `read_methyldackel` / `read_combined_strand_bed` (and
+  `convert_sample` / CLI `epykit convert --canonical-only`) accept
+  `canonical_only=True` to drop non-canonical contigs at conversion time, so the
+  methylstore — and every downstream step (QC, smoothing, DVC, DMC, DMR) — is
+  canonical. The per-sample conversion cache keys on the flag so a changed value
+  correctly invalidates a prior conversion.
+
 - **Permutation empirical FDR for `chain_merge` DMRs.**
   `tl.dmr(method="chain_merge", empirical_fdr=True)` now produces calibrated
   `empirical_pvalue` / `empirical_qvalue` / `empirical_fdr_set` via the same

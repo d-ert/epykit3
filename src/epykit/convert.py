@@ -102,6 +102,7 @@ class _SampleManifest:
     format: str = "bismark"
     coordinate_base: str = "auto"            # requested convention
     resolved_coordinate_base: str = "zero_based"  # convention actually applied
+    canonical_only: bool = False             # canonical-chrom filter at convert
 
 
 _file_signature = _cache.file_signature
@@ -126,6 +127,7 @@ def _manifest_payload(manifest: _SampleManifest) -> dict[str, object]:
         "format": manifest.format,
         "coordinate_base": manifest.coordinate_base,
         "resolved_coordinate_base": manifest.resolved_coordinate_base,
+        "canonical_only": manifest.canonical_only,
     }
 
 
@@ -133,6 +135,7 @@ def _can_reuse_sample(
     input_path: Path, sample_dir: Path, row_group_size: int,
     format: str = "bismark",
     coordinate_base: str = "auto",
+    canonical_only: bool = False,
 ) -> bool:
     manifest = _load_json(_manifest_path(sample_dir))
     if not manifest:
@@ -142,6 +145,10 @@ def _can_reuse_sample(
     if manifest.get("manifest_version") != _MANIFEST_VERSION:
         return False
     if manifest.get("coordinate_base", "auto") != coordinate_base:
+        return False
+    # A store converted with a different canonical_only setting must not be
+    # reused -- it has a different chromosome set written to disk.
+    if manifest.get("canonical_only", False) != canonical_only:
         return False
     if manifest.get("source") != _file_signature(input_path):
         return False
@@ -544,6 +551,7 @@ def convert_sample(
     merge_strands: bool = True,
     format: str = "bismark",
     coordinate_base: str = "auto",
+    canonical_only: bool = False,
 ) -> str:
     """Convert a Bismark .cov or MethylDackel .bedGraph file into a
     partitioned Parquet store.
@@ -687,10 +695,16 @@ def convert_sample(
     # Write one Parquet file per chromosome. partition_by is a single
     # hash-partition pass; the prior unique()+filter() loop scanned the
     # frame once per chromosome.
+    if canonical_only:
+        from ._chroms import is_canonical_chrom
     for key, sub in df.partition_by(
         "chrom", as_dict=True, maintain_order=False
     ).items():
         chrom = key[0] if isinstance(key, tuple) else key
+        # Opt-in ingestion filter: never write unplaced/alt contigs to the
+        # store, so QC / smoothing / DMC / DMR are all canonical downstream.
+        if canonical_only and not is_canonical_chrom(chrom):
+            continue
         part_dir = out / f"sample={sample_name}" / f"chrom={chrom}"
         part_dir.mkdir(parents=True, exist_ok=True)
         sub.write_parquet(
@@ -711,6 +725,7 @@ def ensure_converted_sample(
     reference_fasta: str | None = None,
     format: str = "bismark",
     coordinate_base: str = "auto",
+    canonical_only: bool = False,
 ) -> bool:
     """Convert a sample unless a valid on-disk conversion already exists.
 
@@ -724,7 +739,7 @@ def ensure_converted_sample(
     final_sample_dir = _sample_dir(output_root, sample_name)
     if _can_reuse_sample(
         source_path, final_sample_dir, row_group_size, format=format,
-        coordinate_base=coordinate_base,
+        coordinate_base=coordinate_base, canonical_only=canonical_only,
     ):
         return False
 
@@ -742,6 +757,7 @@ def ensure_converted_sample(
             reference_fasta=reference_fasta,
             format=format,
             coordinate_base=coordinate_base,
+            canonical_only=canonical_only,
         )
         temp_sample_dir = _sample_dir(temp_root, sample_name)
         chroms = _expected_chrom_dirs(temp_sample_dir)
@@ -753,6 +769,7 @@ def ensure_converted_sample(
             format=format,
             coordinate_base=coordinate_base,
             resolved_coordinate_base=resolved_base,
+            canonical_only=canonical_only,
         )
         _write_json(_manifest_path(temp_sample_dir), _manifest_payload(manifest))
         _promote_sample_dir(temp_sample_dir, final_sample_dir)

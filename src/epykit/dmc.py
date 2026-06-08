@@ -2021,6 +2021,7 @@ def process_chromosomes_dmc(
     smoothing_span_bp: int = ...,
     sep_fallback: bool = ...,
     sep_threshold: float = ...,
+    canonical_only: bool = ...,
 ) -> DMCStore: ...
 
 
@@ -2053,6 +2054,7 @@ def process_chromosomes_dmc(
     smoothing_span_bp: int = ...,
     sep_fallback: bool = ...,
     sep_threshold: float = ...,
+    canonical_only: bool = ...,
 ) -> pl.DataFrame: ...
 
 
@@ -2084,6 +2086,7 @@ def process_chromosomes_dmc(
     smoothing_span_bp: int = 500,
     sep_fallback: bool = False,
     sep_threshold: float = 0.9,
+    canonical_only: bool = True,
 ) -> Union[pl.DataFrame, DMCStore]:
     """Process differential methylation for all chromosomes.
 
@@ -2107,6 +2110,12 @@ def process_chromosomes_dmc(
                                    replicates (anti-conservative; warns).
     chromosomes : list[str], optional
         Chromosomes to process. Auto-detected when None.
+    canonical_only : bool, default True
+        When ``chromosomes`` is auto-detected (None), restrict testing to
+        canonical chromosomes -- chr1-22 / X / Y / M under UCSC or Ensembl
+        naming -- dropping unplaced/alt contigs (``*_random``, ``chrUn_*``,
+        ``GL*``). No effect when ``chromosomes`` is passed explicitly. Pass
+        False to test every detected contig. See :mod:`epykit._chroms`.
     unite : bool
         If True (default), test only CpG sites covered in every sample
         (intersection / inner join).
@@ -2186,6 +2195,9 @@ def process_chromosomes_dmc(
     if chromosomes is None:
         chromosomes = _detect_chromosomes(store)
         logger.info("Auto-detected %d chromosomes", len(chromosomes))
+        if canonical_only:
+            from ._chroms import filter_canonical_logged
+            chromosomes = filter_canonical_logged(chromosomes, context="dmc")
 
     logger.info(
         "DMC: %d case / %d control, test=%s, unite=%s, "
