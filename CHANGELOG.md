@@ -35,6 +35,17 @@ redesigned HTML report.
   (`templates/report.js`) — no new runtime dependencies (still `jinja2` +
   `plotly`). Every section degrades gracefully when its upstream step has not
   been run.
+- **Region-level (DMR) annotation charts.** `ep.tl.annotate()` now applies the
+  **same** annotation columns to the DMR region table (`md.uns["dmr"]`) as to
+  the per-CpG tables — gene features *and* CpG-island context (previously the
+  DMR table received gene features only). `ep.pl.genomic_context_bar()` and
+  `ep.pl.cpg_island_pie()` gained a `level="dmc"` (default) / `level="dmr"`
+  argument to count the per-CpG table (`md.dmc`, density-weighted) or the
+  per-region table (`md.uns["dmr"]`, the field-standard "fraction of DMRs per
+  feature"). The HTML report's **Annotation** section now shows both the
+  per-region (DMR) and per-cytosine (DMC) views of each pie side by side, each
+  rendering only when its table is present. (`ep.pl.plot_annotation_counts()`
+  was already `level`-aware, defaulting to `"dmr"`.)
 
 ### Fixed
 

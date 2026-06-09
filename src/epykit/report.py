@@ -908,8 +908,14 @@ def generate_report(
     ma_plot = render(_safe(ma_plot_plotly, md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc_full, max_points=dmc_max_points)) if dmc_stats.get("available") else None
     manhattan_plot = render(_safe(manhattan_plotly, md, alpha=alpha, dmc=dmc_full, max_points=dmc_max_points)) if dmc_stats.get("available") else None
     dmr_size_hist = render(_safe(dmr_size_hist_plotly, md)) if dmr_stats.get("available") else None
-    feature_pie = render(_safe(feature_pie_plotly, md))
-    cpg_pie = render(_safe(cpg_island_pie_plotly, md))
+    # Annotation pies at BOTH levels. Per-CpG (DMC) answers "where do
+    # differential cytosines fall?" (density-weighted); per-region (DMR) gives
+    # the field-standard "what fraction of DMRs hit each feature?". Each returns
+    # None when its table/column is absent, so missing levels just don't render.
+    feature_pie = render(_safe(feature_pie_plotly, md, level="dmc"))
+    cpg_pie = render(_safe(cpg_island_pie_plotly, md, level="dmc"))
+    feature_pie_dmr = render(_safe(feature_pie_plotly, md, level="dmr"))
+    cpg_pie_dmr = render(_safe(cpg_island_pie_plotly, md, level="dmr"))
     feature_stacked = render(_safe(feature_direction_stacked_plotly, md))
     metaplot = render(_safe(tss_metaplot_plotly, md, gtf_path, max_genes=metaplot_max_genes)) if gtf_path else None
     pca_plot = render(_safe(pca_plotly, md, n_sites=pca_n_sites))
@@ -931,7 +937,7 @@ def generate_report(
         {"id": "dmr", "num": "05", "label": "Diff. regions (DMR)",
          "status": st(dmr_stats.get("available", False))},
         {"id": "annot", "num": "06", "label": "Annotation",
-         "status": st(bool(feature_pie or cpg_pie))},
+         "status": st(bool(feature_pie or cpg_pie or feature_pie_dmr or cpg_pie_dmr))},
         {"id": "metaplot", "num": "07", "label": "TSS metaplot",
          "status": st(bool(metaplot))},
         {"id": "pca", "num": "08", "label": "Sample similarity",
@@ -1031,6 +1037,8 @@ def generate_report(
         # Annotation
         "feature_pie": feature_pie,
         "cpg_pie": cpg_pie,
+        "feature_pie_dmr": feature_pie_dmr,
+        "cpg_pie_dmr": cpg_pie_dmr,
         "feature_stacked": feature_stacked,
         # Metaplot / PCA
         "metaplot": metaplot,

@@ -48,7 +48,7 @@ object. Sections that lack data are omitted silently.
 | **PCA** | `pp.set_unite_type()` | PCA scatter colored by sample groups |
 | **DMC Results** | `ep.tl.dmc()` | Volcano plot, Manhattan plot, top DMC table |
 | **DMR Results** | `ep.tl.dmr()` | DMR summary table, region-level statistics |
-| **Annotation** | `ep.tl.annotate()` | Feature distribution (promoter, exon, intron, etc.), CpG island context |
+| **Annotation** | `ep.tl.annotate()` | Gene-feature distribution (promoter, exon, intron, etc.) and CpG-island context, each shown at **two levels** side by side: per-region (DMR — fraction of regions per feature, when `ep.tl.dmr()` has run) and per-cytosine (DMC — differential-CpG density). Plus a hyper/hypo-by-feature directional bar. |
 
 ---
 

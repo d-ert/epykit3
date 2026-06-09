@@ -2183,19 +2183,29 @@ def annotate(
         # Store as separate key so full DMC results are preserved
         md.varm[f"{key}_annotated"] = ann
 
-    if "dmr" in md.uns and isinstance(md.uns["dmr"], pl.DataFrame) and feature_source_present:
-        annotation_path = gtf if gtf is not None else refgene
-        forwarded_source = "gtf" if gtf is not None else "refgene"
-        af_kwargs = dict(
-            source=forwarded_source,
-            promoter_upstream_bp=promoter_upstream_bp,
-            promoter_downstream_bp=promoter_downstream_bp,
-            multi_annotation=multi_annotation,
-            gene_type_filter=gene_type_filter,
-        )
-        if features is not None:
-            af_kwargs["features"] = features
-        md.uns["dmr"] = annotate_features(md.uns["dmr"], annotation_path, **af_kwargs)
+    # DMR region table: annotate with the SAME feature + CpG-island context as
+    # the per-CpG loop above, so region-level (per-DMR) annotation charts have
+    # data. Mirror the DMC path -- gene features when a gene source is given,
+    # CpG-island context when a CpG-island BED is given; the two are
+    # independent (annotate_cpg_islands accepts region tables via start/end).
+    dmr_tbl = md.uns.get("dmr")
+    if isinstance(dmr_tbl, pl.DataFrame) and not dmr_tbl.is_empty():
+        if feature_source_present:
+            annotation_path = gtf if gtf is not None else refgene
+            forwarded_source = "gtf" if gtf is not None else "refgene"
+            af_kwargs = dict(
+                source=forwarded_source,
+                promoter_upstream_bp=promoter_upstream_bp,
+                promoter_downstream_bp=promoter_downstream_bp,
+                multi_annotation=multi_annotation,
+                gene_type_filter=gene_type_filter,
+            )
+            if features is not None:
+                af_kwargs["features"] = features
+            dmr_tbl = annotate_features(dmr_tbl, annotation_path, **af_kwargs)
+        if cpg_islands:
+            dmr_tbl = annotate_cpg_islands(dmr_tbl, cpg_island_bed=cpg_islands)
+        md.uns["dmr"] = dmr_tbl
 
     md.uns["annotation"] = {
         "gtf": gtf,

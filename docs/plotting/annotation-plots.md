@@ -2,7 +2,8 @@
 
 Four annotatr-style visualization functions for exploring the relationship
 between methylation data and genomic annotations. All four require that
-`tl.annotate()` has been run first to assign feature annotations to CpG sites.
+`tl.annotate()` has been run first to assign feature annotations to CpG sites
+and regions.
 
 ```python
 import epykit as ep
@@ -14,13 +15,34 @@ ep.tl.annotate(md, gtf="reference/gencode.gtf")
 
 ## Annotation Counts
 
-`ep.pl.plot_annotation_counts()` displays a bar chart of the number of CpG
-sites (or DMCs) falling into each annotation category. Categories include
-promoter, 5' UTR, exon, intron, 3' UTR, intergenic, and others depending on
-the annotation source.
+`ep.pl.plot_annotation_counts()` displays a bar (or pie) chart of the number
+of regions or CpG sites falling into each annotation category. Categories
+include promoter, 5' UTR, exon, intron, 3' UTR, intergenic, and others
+depending on the annotation source. This is epykit's annotatr-style
+`plot_annotation` equivalent and the fullest of the level-aware annotation
+charts (the lighter `genomic_context_bar` / `cpg_island_pie` twins live in
+[Genomic Context Plots](genomic.md)).
 
 ```python
 ep.pl.plot_annotation_counts(md, save="annotation_counts.png")
+```
+
+`level` selects which annotated table to count — and unlike the
+`genomic_context_bar` twin, it defaults to **`"dmr"`** (the field-standard
+"fraction of DMRs per feature"):
+
+- `level="dmr"` (default) counts the per-region table on `md.uns["dmr"]`.
+- `level="dmc"` counts the per-CpG annotated table on `md.dmc` (density-weighted).
+
+```python
+# Per-region (default): one count per DMR
+ep.pl.plot_annotation_counts(md, level="dmr", save="dmr_features.png")
+
+# Per-cytosine: weight by differential-CpG density, as a pie
+ep.pl.plot_annotation_counts(md, level="dmc", kind="pie", save="dmc_features_pie.png")
+
+# Count the multi-annotation explode (each region once per overlapping class)
+ep.pl.plot_annotation_counts(md, annot_col="all_overlapping_features", save="coannot.png")
 ```
 
 ### Parameters
@@ -28,8 +50,12 @@ ep.pl.plot_annotation_counts(md, save="annotation_counts.png")
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `md` | `MethylData` | *required* | Data with annotations from `tl.annotate()` |
+| `level` | `str` | `"dmr"` | `"dmr"` (per-region, `md.uns["dmr"]`) or `"dmc"` (per-CpG, `md.dmc`) |
+| `annot_col` | `str` | `"feature_type"` | Annotation column to count; pass `"all_overlapping_features"` for the multi-annotation explode |
+| `kind` | `str` | `"bar"` | `"bar"` (absolute counts) or `"pie"` (proportions; best with ≤8 classes) |
+| `autopct` | `str` | `"%1.1f%%"` | Pie-only slice-percentage format; `None` hides labels |
 | `ax` | `Axes` | `None` | Axes to draw on |
-| `figsize` | `tuple` | `(10, 6)` | Figure size |
+| `figsize` | `tuple` | `None` | Figure size; defaults to `(7, 4)` for bars, `(6, 5)` for pies |
 | `save` | `str` | `None` | Filename to save the figure |
 
 ### Example

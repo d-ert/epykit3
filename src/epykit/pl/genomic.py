@@ -5,7 +5,7 @@ from typing import Optional, Sequence
 import numpy as np
 import polars as pl
 
-from ._compute import compute_annotation_counts
+from ._compute import _resolve_annotated_table, compute_annotation_counts
 from ._utils import _get_ax, _save_fig
 from ..methyldata import MethylData
 
@@ -25,17 +25,30 @@ def _chrom_sort_key(name: str) -> tuple:
     return (1, raw)
 
 
-def genomic_context_bar(md: MethylData, ax=None, figsize=(7, 4), save: str | None = None):
-    dmc = md.dmc
-    if dmc is None or "feature_type" not in dmc.columns:
-        raise ValueError("No feature annotations found. Run ep.tl.annotate(md, gtf=...) first.")
+def genomic_context_bar(md: MethylData, ax=None, figsize=(7, 4), save: str | None = None,
+                        *, level: str = "dmc"):
+    """Bar chart of ``feature_type`` counts on the annotated DMC or DMR table.
 
-    counts = compute_annotation_counts(dmc, annot_col="feature_type")
+    ``level="dmc"`` (default) reads the per-CpG annotated table on ``md.dmc``
+    -- "where do differential cytosines fall?" (weighted by CpG density).
+    ``level="dmr"`` reads the per-region table on ``md.uns['dmr']`` -- the
+    field-standard "fraction of DMRs per feature". (For a level-aware pie/bar
+    with co-annotation support, :func:`epykit.pl.plot_annotation_counts` is the
+    fuller API; this is the lightweight twin.)
+    """
+    df = _resolve_annotated_table(md, level)
+    if "feature_type" not in df.columns:
+        raise ValueError(
+            f"No feature annotations on the {level.upper()} table. "
+            "Run ep.tl.annotate(md, gtf=...) first."
+        )
+
+    counts = compute_annotation_counts(df, annot_col="feature_type")
     fig, ax = _get_ax(ax, figsize)
     ax.bar(counts["feature_type"].to_list(), counts["count"].to_list())
     ax.set_xlabel("Feature type")
-    ax.set_ylabel("Count")
-    ax.set_title("Genomic context")
+    ax.set_ylabel(f"# {level.upper()}s")
+    ax.set_title(f"Genomic context ({level.upper()})")
     ax.tick_params(axis="x", rotation=45)
 
     if save:
@@ -43,15 +56,23 @@ def genomic_context_bar(md: MethylData, ax=None, figsize=(7, 4), save: str | Non
     return fig, ax
 
 
-def cpg_island_pie(md: MethylData, ax=None, figsize=(5, 5), save: str | None = None):
-    dmc = md.dmc
-    if dmc is None or "cpg_context" not in dmc.columns:
-        raise ValueError("No CpG-island annotations found. Run ep.tl.annotate(md, cpg_islands=...) first.")
+def cpg_island_pie(md: MethylData, ax=None, figsize=(5, 5), save: str | None = None,
+                   *, level: str = "dmc"):
+    """Pie chart of ``cpg_context`` on the annotated DMC or DMR table.
 
-    counts = compute_annotation_counts(dmc, annot_col="cpg_context")
+    See :func:`genomic_context_bar` for the ``level`` semantics.
+    """
+    df = _resolve_annotated_table(md, level)
+    if "cpg_context" not in df.columns:
+        raise ValueError(
+            f"No CpG-island annotations on the {level.upper()} table. "
+            "Run ep.tl.annotate(md, cpg_islands=...) first."
+        )
+
+    counts = compute_annotation_counts(df, annot_col="cpg_context")
     fig, ax = _get_ax(ax, figsize)
     ax.pie(counts["count"].to_list(), labels=counts["cpg_context"].to_list(), autopct="%1.1f%%")
-    ax.set_title("CpG island context")
+    ax.set_title(f"CpG island context ({level.upper()})")
 
     if save:
         _save_fig(md, fig, save)

@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Optional
 
 import numpy as np
+import polars as pl
 
 from .._style import PALETTE
 from ._compute import (
@@ -207,34 +208,76 @@ def pca_plotly(md: MethylData, *, n_sites: int = 10_000):
     return fig
 
 
-def feature_pie_plotly(md: MethylData):
-    """Pie chart of feature_type distribution on the annotated DMC table."""
-    go = _require_plotly()
-    dmc = md.dmc
-    if dmc is None or "feature_type" not in dmc.columns:
+# Human-readable suffix per annotation level, so a standalone figure stays
+# self-describing even outside the report's surrounding captions.
+_LEVEL_LABEL = {"dmc": "per-CpG (DMC)", "dmr": "per-region (DMR)"}
+
+
+def _annot_level_table(md: MethylData, level: str):
+    """Resolve the annotated table for an annotation pie, or ``None``.
+
+    ``level="dmc"`` -> the (annotated) per-CpG table on ``md.dmc``;
+    ``level="dmr"`` -> the per-region table on ``md.uns['dmr']``. Returns
+    ``None`` (rather than raising) when the table is absent, so the report
+    renders its graceful skip-state instead of erroring.
+    """
+    lvl = level.lower()
+    if lvl == "dmc":
+        return md.dmc
+    if lvl == "dmr":
+        dmr = md.uns.get("dmr")
+        if isinstance(dmr, pl.DataFrame) and not dmr.is_empty():
+            return dmr
         return None
-    counts = compute_annotation_counts(dmc, annot_col="feature_type")
+    raise ValueError(f"level must be 'dmc' or 'dmr', got {level!r}")
+
+
+def feature_pie_plotly(md: MethylData, *, level: str = "dmc"):
+    """Pie of gene-feature distribution on the annotated DMC or DMR table.
+
+    ``level="dmc"`` (default) weights by differential-CpG density -- "where do
+    differential cytosines fall?". ``level="dmr"`` gives the region-level
+    fraction -- "what fraction of DMRs hit promoters?" (the field-standard
+    ChIPseeker / DSS / dmrseq view). Returns ``None`` when the chosen table or
+    its ``feature_type`` column is absent.
+    """
+    go = _require_plotly()
+    tbl = _annot_level_table(md, level)
+    if tbl is None or "feature_type" not in tbl.columns:
+        return None
+    counts = compute_annotation_counts(tbl, annot_col="feature_type")
     fig = go.Figure(data=[go.Pie(
         labels=counts["feature_type"].to_list(),
         values=counts["count"].to_list(),
         hole=0.35,
     )])
-    fig.update_layout(title="Genomic context (feature_type)", template="simple_white", height=360)
+    fig.update_layout(
+        title=f"Gene features · {_LEVEL_LABEL.get(level.lower(), level)}",
+        template="simple_white", height=360,
+    )
     return fig
 
 
-def cpg_island_pie_plotly(md: MethylData):
+def cpg_island_pie_plotly(md: MethylData, *, level: str = "dmc"):
+    """Pie of CpG-island context on the annotated DMC or DMR table.
+
+    See :func:`feature_pie_plotly` for the ``level`` semantics. Returns
+    ``None`` when the chosen table or its ``cpg_context`` column is absent.
+    """
     go = _require_plotly()
-    dmc = md.dmc
-    if dmc is None or "cpg_context" not in dmc.columns:
+    tbl = _annot_level_table(md, level)
+    if tbl is None or "cpg_context" not in tbl.columns:
         return None
-    counts = compute_annotation_counts(dmc, annot_col="cpg_context")
+    counts = compute_annotation_counts(tbl, annot_col="cpg_context")
     fig = go.Figure(data=[go.Pie(
         labels=counts["cpg_context"].to_list(),
         values=counts["count"].to_list(),
         hole=0.35,
     )])
-    fig.update_layout(title="CpG-island context", template="simple_white", height=360)
+    fig.update_layout(
+        title=f"CpG-island context · {_LEVEL_LABEL.get(level.lower(), level)}",
+        template="simple_white", height=360,
+    )
     return fig
 
 

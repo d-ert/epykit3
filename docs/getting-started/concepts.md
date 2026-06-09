@@ -154,8 +154,8 @@ extra parameters) and returns a matplotlib `Figure` or `Axes`.
 | `ep.pl.dmr_boxplot(md)` | Per-region boxplots of methylation by group |
 | `ep.pl.dmr_violin(md)` | Violin plots of DMR-level effect sizes |
 | `ep.pl.dmr_heatmap(md)` | Heatmap of DMR methylation across samples |
-| `ep.pl.genomic_context_bar(md)` | Stacked bar chart of genomic feature distribution |
-| `ep.pl.cpg_island_pie(md)` | Pie chart of CpG island context |
+| `ep.pl.genomic_context_bar(md)` | Bar chart of genomic feature distribution (`level="dmc"` or `"dmr"`) |
+| `ep.pl.cpg_island_pie(md)` | Pie chart of CpG island context (`level="dmc"` or `"dmr"`) |
 | `ep.pl.figure_grid(...)` | Layout composer for multi-panel figures |
 
 ### `ep.query.*` -- Random-access queries

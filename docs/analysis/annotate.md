@@ -140,7 +140,14 @@ ep.tl.annotate(md, gtf="gencode.v44.gtf.gz", alpha=0.01)
 
 - **DMC annotations** are stored as `md.varm["dmc_<test>_annotated"]`. The
   original DMC table at `md.varm["dmc_<test>"]` is preserved unchanged.
-- **DMR annotations** are applied in-place to `md.uns["dmr"]`.
+- **DMR annotations** are applied in-place to `md.uns["dmr"]`. The DMR region
+  table receives the **same** annotation columns as the per-CpG tables: gene
+  features (when `gtf=` / `refgene=` is given) **and** CpG-island context
+  (when `cpg_islands=` is given). Both are computed per region from its
+  `start`/`end` span, so region-level annotation plots
+  (`ep.pl.genomic_context_bar(md, level="dmr")`,
+  `ep.pl.cpg_island_pie(md, level="dmr")`,
+  `ep.pl.plot_annotation_counts(md, level="dmr")`) have data to draw.
 - **Annotation metadata** is stored at `md.uns["annotation"]`.
 
 ## Parameters

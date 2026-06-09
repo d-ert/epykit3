@@ -179,15 +179,25 @@
 {# ---------- 06 ANNOTATION ---------- #}
 <section id="annot">
   <div class="sec-head"><span class="n">06</span><h2>Genomic annotation</h2>
-    {% if feature_pie or cpg_pie %}<span class="pill ok">annotated</span>{% else %}<span class="pill skip">not run</span>{% endif %}
+    {% if feature_pie or cpg_pie or feature_pie_dmr or cpg_pie_dmr %}<span class="pill ok">annotated</span>{% else %}<span class="pill skip">not run</span>{% endif %}
   </div>
-  {% if feature_pie or cpg_pie %}
-    <p class="sec-sub">Distribution of differential cytosines across gene features and CpG-island context.</p>
+  {% if feature_pie or cpg_pie or feature_pie_dmr or cpg_pie_dmr %}
+    <p class="sec-sub">Two complementary views. <b>Per-region (DMR)</b> is the fraction of differential <em>regions</em> falling in each class — the commonly reported, ChIPseeker/DSS-style distribution. <b>Per-cytosine (DMC)</b> is the same split weighted by differential-CpG density (it answers "where do differential cytosines fall?", which CpG-rich features dominate).</p>
+    {% if feature_pie or feature_pie_dmr %}
+    <h3 class="subhead">Gene feature distribution</h3>
     <div class="grid2">
-      {% if feature_pie %}<div class="plot-card">{{ feature_pie | safe }}<div class="cap"><b>Gene feature</b> distribution.</div></div>{% endif %}
-      {% if cpg_pie %}<div class="plot-card">{{ cpg_pie | safe }}<div class="cap"><b>CpG-island context</b>.</div></div>{% endif %}
+      {% if feature_pie_dmr %}<div class="plot-card">{{ feature_pie_dmr | safe }}<div class="cap"><b>Per-region (DMR)</b> — fraction of DMRs per gene feature.</div></div>{% endif %}
+      {% if feature_pie %}<div class="plot-card">{{ feature_pie | safe }}<div class="cap"><b>Per-cytosine (DMC)</b> — differential-CpG density per gene feature.</div></div>{% endif %}
     </div>
-    {% if feature_stacked %}<div class="plot-card">{{ feature_stacked | safe }}<div class="cap"><b>Hyper vs hypo by feature</b> — directional bias per genomic context.</div></div>{% endif %}
+    {% endif %}
+    {% if cpg_pie or cpg_pie_dmr %}
+    <h3 class="subhead">CpG-island context</h3>
+    <div class="grid2">
+      {% if cpg_pie_dmr %}<div class="plot-card">{{ cpg_pie_dmr | safe }}<div class="cap"><b>Per-region (DMR)</b> — fraction of DMRs by island context.</div></div>{% endif %}
+      {% if cpg_pie %}<div class="plot-card">{{ cpg_pie | safe }}<div class="cap"><b>Per-cytosine (DMC)</b> — differential-CpG density by island context.</div></div>{% endif %}
+    </div>
+    {% endif %}
+    {% if feature_stacked %}<div class="plot-card">{{ feature_stacked | safe }}<div class="cap"><b>Hyper vs hypo by feature</b> — directional bias per genomic context (per-cytosine).</div></div>{% endif %}
   {% else %}
     <div class="skipped">No annotations — run <code>ep.tl.annotate(md, gtf=..., cpg_islands=...)</code>.</div>
   {% endif %}
