@@ -244,6 +244,7 @@ def _cmd_dmc(args: argparse.Namespace):
             dispersion=args.dispersion,
             reference=args.reference,
             fdr_method=args.fdr_method,
+            smoothing=args.smoothing,
         )
         key = md.uns.get("dmc", {}).get("last_key", "dmc_glm_contrast")
         results = md.varm.get(key)
@@ -282,6 +283,7 @@ def _cmd_dmc(args: argparse.Namespace):
         min_samples_control=args.min_samples_control,
         dispersion=args.dispersion,
         reference=args.reference,
+        smoothing=args.smoothing,
         return_store=True,
     )
     dmc_store = dmc.apply_multiple_testing_correction(dmc_store, method=args.fdr_method)
@@ -813,8 +815,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Reference distribution for the lr statistic (default: adaptive).",
     )
     p_dmc.add_argument(
-        "--fdr-method", dest="fdr_method", default="fdr_bh",
-        help="Multiple-testing correction method (default: fdr_bh).",
+        "--fdr-method", dest="fdr_method", default="fdr_tsbh",
+        help="Multiple-testing correction method (default: fdr_tsbh).",
+    )
+    p_dmc.add_argument(
+        "--smoothing", dest="smoothing", action="store_true", default=True,
+        help="Enable DSS-style count smoothing for lr DMC calling (default).",
+    )
+    p_dmc.add_argument(
+        "--no-smoothing", dest="smoothing", action="store_false",
+        help="Disable DSS-style count smoothing for lr DMC calling.",
     )
     p_dmc.add_argument(
         "--no-tsv", action="store_true", dest="no_tsv", default=False,

@@ -426,10 +426,10 @@ def dmc(
     # so peak memory stays O(largest chromosome) end-to-end.
     materialize: bool = True,
     use_smoothed: bool = False,
-    smoothing: bool = False,
+    smoothing: bool = True,
     smoothing_span_bp: int = 500,
     # FDR procedure (since 0.7.1) ----------------------------------------
-    fdr_method: str = "fdr_bh",
+    fdr_method: str = "fdr_tsbh",
     # Neighbour-aware p-value combining (since 0.7.1) --------------------
     neighbour_combine: bool = False,
     neighbour_bp: int = 500,
@@ -762,6 +762,8 @@ def dmc(
                 "min_samples_control": min_samples_control,
                 "dispersion": dispersion,
                 "reference": reference,
+                "smoothing": bool(smoothing),
+                "smoothing_span_bp": int(smoothing_span_bp) if smoothing else None,
                 "empirical_fdr": empirical_fdr,
                 "n_perm": n_perm if empirical_fdr else None,
                 "perm_seed": perm_seed if empirical_fdr else None,
@@ -799,6 +801,8 @@ def dmc(
                         "min_samples_control": min_samples_control,
                         "dispersion": dispersion,
                         "reference": reference,
+                        "smoothing": bool(smoothing),
+                        "smoothing_span_bp": int(smoothing_span_bp) if smoothing else None,
                         "empirical_fdr": empirical_fdr,
                         "n_perm": n_perm if empirical_fdr else None,
                         "perm_seed": perm_seed if empirical_fdr else None,
@@ -1081,7 +1085,7 @@ def _run_dmc_contrast(
     min_samples_control: int,
     dispersion: str,
     reference: str,
-    fdr_method: str = "fdr_bh",
+    fdr_method: str = "fdr_tsbh",
     reference_level: str | None = None,
 ) -> None:
     """Internal: multi-group / continuous-covariate primary-effect DMC.
@@ -1317,7 +1321,8 @@ def dmr(
           signal; keeps the 10% per-CpG effect-size floor. Recommended
           starting point for general WGBS analyses.
         * ``"permissive"`` -- recall-oriented (alpha=1e-4,
-          dis_merge_bp=200, min_abs_meth_diff=0.05). Expect lower PPV.
+          dis_merge_bp=1000, min_abs_meth_diff=0.05, pct_sig=0.4).
+          Expect lower PPV.
     tile_size_bp, min_cpgs_per_tile : int
         Tile-method options. Default ``tile_size_bp=1000``.
     test : str
@@ -1332,8 +1337,8 @@ def dmr(
     min_cpgs : int or None
         Minimum CpGs per DMR. ``None`` (the default) resolves per method:
         ``5`` for ``sliding_window`` / ``segment``; for ``chain_merge``
-        it defers to the active ``preset``'s value, or ``5`` when no
-        preset is given (preserving the documented chain_merge default).
+        it defers to the active ``preset``'s value, or ``3`` when no
+        preset is given (matching the DSS-style chain_merge engine default).
         An explicit integer always wins and overrides a preset.
     alpha : float
         q-value threshold for "significant" at the DMC / tile level

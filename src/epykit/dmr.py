@@ -669,25 +669,29 @@ DMR_PRESETS: dict[str, dict] = {
     # than false positives. Expect noticeably lower PPV.
     "permissive": dict(
         alpha=1e-4, min_abs_meth_diff=0.05, dis_merge_bp=1000,
-        min_cpgs=3, pct_sig=0.5, minlen_bp=50,
+        min_cpgs=3, pct_sig=0.4, minlen_bp=50,
     ),
 }
 
 
 _DMR_DEFAULT_MIN_CPGS = 5
-"""Default min CpGs/DMR for the CLI and tl.dmr layers (matches the
-benchmark paper's chain_merge default). NOTE: this intentionally differs
-from call_dmr_chain_merge's own bare default of 3 (the DSS engine default
-for direct engine callers). The high-level layers default to 5; direct
-engine callers default to 3. Do not 'reconcile' these without re-running
-the chain_merge benchmark -- the paper's numbers depend on the 5."""
+"""Default min CpGs/DMR for non-chain high-level DMR layers."""
+
+
+_DMR_DEFAULT_CHAIN_MERGE_MIN_CPGS = 3
+"""Default min CpGs/DMR for high-level chain_merge calls.
+
+Matches call_dmr_chain_merge's DSS-style direct-engine default so
+ep.tl.dmr(method="chain_merge") and the CLI no longer drop short but
+coherent 3-CpG regions."""
 
 
 def resolve_layer_min_cpgs(min_cpgs: int | None, preset: str | None) -> int:
     """Resolve the effective min_cpgs for the CLI / tl.dmr layer.
 
     Precedence: an explicit ``min_cpgs`` wins; else a preset's bundled
-    ``min_cpgs``; else ``_DMR_DEFAULT_MIN_CPGS`` (5). Validates ``preset``
+    ``min_cpgs``; else ``_DMR_DEFAULT_CHAIN_MERGE_MIN_CPGS`` (3).
+    Validates ``preset``
     with the same message ``call_dmr_chain_merge`` uses, so an invalid
     preset raises a friendly ValueError rather than a bare KeyError.
     """
@@ -699,7 +703,7 @@ def resolve_layer_min_cpgs(min_cpgs: int | None, preset: str | None) -> int:
                 f"Unknown preset {preset!r}. Choose from {list(DMR_PRESETS)}."
             )
         return DMR_PRESETS[preset]["min_cpgs"]
-    return _DMR_DEFAULT_MIN_CPGS
+    return _DMR_DEFAULT_CHAIN_MERGE_MIN_CPGS
 
 
 def apply_region_qfilter(
