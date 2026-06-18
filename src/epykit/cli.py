@@ -815,12 +815,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Reference distribution for the lr statistic (default: adaptive).",
     )
     p_dmc.add_argument(
-        "--fdr-method", dest="fdr_method", default="fdr_tsbh",
-        help="Multiple-testing correction method (default: fdr_tsbh).",
+        "--fdr-method", dest="fdr_method", default="fdr_bh",
+        help="Multiple-testing correction method (default: fdr_bh).",
     )
     p_dmc.add_argument(
-        "--smoothing", dest="smoothing", action="store_true", default=True,
-        help="Enable DSS-style count smoothing for lr DMC calling (default).",
+        "--smoothing", dest="smoothing", action="store_true", default=False,
+        help="Enable DSS-style count smoothing for lr DMC calling.",
     )
     p_dmc.add_argument(
         "--no-smoothing", dest="smoothing", action="store_false",

@@ -426,10 +426,10 @@ def dmc(
     # so peak memory stays O(largest chromosome) end-to-end.
     materialize: bool = True,
     use_smoothed: bool = False,
-    smoothing: bool = True,
+    smoothing: bool = False,
     smoothing_span_bp: int = 500,
     # FDR procedure (since 0.7.1) ----------------------------------------
-    fdr_method: str = "fdr_tsbh",
+    fdr_method: str = "fdr_bh",
     # Neighbour-aware p-value combining (since 0.7.1) --------------------
     neighbour_combine: bool = False,
     neighbour_bp: int = 500,
@@ -1085,7 +1085,7 @@ def _run_dmc_contrast(
     min_samples_control: int,
     dispersion: str,
     reference: str,
-    fdr_method: str = "fdr_tsbh",
+    fdr_method: str = "fdr_bh",
     reference_level: str | None = None,
 ) -> None:
     """Internal: multi-group / continuous-covariate primary-effect DMC.
