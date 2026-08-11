@@ -891,7 +891,10 @@ def call_dmr_chain_merge(
     dmr_cache_path: Path | None = None
     if isinstance(dmc_results, DMCStore) and dmc_results.manifest.get("input_sig"):
         available_cols = _dmc_store_columns(dmc_results)
-        sig_col = "qvalue" if (use_q_for_sig and "qvalue" in available_cols) else "pvalue"
+        if use_q_for_sig:
+            sig_col = "qvalue_combined" if "qvalue_combined" in available_cols else ("qvalue" if "qvalue" in available_cols else "pvalue")
+        else:
+            sig_col = "pvalue_combined" if "pvalue_combined" in available_cols else "pvalue"
         key = _dmr_chain_merge_cache_key(
             dmc_results,
             alpha=alpha,
@@ -917,14 +920,20 @@ def call_dmr_chain_merge(
         missing = required - available_cols
         if missing:
             raise ValueError(f"DMC results missing required columns: {missing}")
-        sig_col = "qvalue" if (use_q_for_sig and "qvalue" in available_cols) else "pvalue"
+        if use_q_for_sig:
+            sig_col = "qvalue_combined" if "qvalue_combined" in available_cols else ("qvalue" if "qvalue" in available_cols else "pvalue")
+        else:
+            sig_col = "pvalue_combined" if "pvalue_combined" in available_cols else "pvalue"
         chrom_iter = _iter_dmc_store_chroms(dmc_results, sig_col)
     else:
         required = {"chrom", "pos", "meth_diff", "pvalue"}
         missing = required - set(dmc_results.columns)
         if missing:
             raise ValueError(f"DMC results missing required columns: {missing}")
-        sig_col = "qvalue" if (use_q_for_sig and "qvalue" in dmc_results.columns) else "pvalue"
+        if use_q_for_sig:
+            sig_col = "qvalue_combined" if "qvalue_combined" in dmc_results.columns else ("qvalue" if "qvalue" in dmc_results.columns else "pvalue")
+        else:
+            sig_col = "pvalue_combined" if "pvalue_combined" in dmc_results.columns else "pvalue"
         chrom_iter = _iter_dataframe_chroms(dmc_results, sig_col)
 
     logger.info(

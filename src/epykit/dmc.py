@@ -2557,16 +2557,52 @@ def combine_neighbour_pvalues(
         sign = np.sign(diffs)
         sign[sign == 0] = 1.0  # zero meth_diff: still combine, treat as +
         z = sign * abs_z
-        # Untested sites (NaN p) keep z = NaN so the window mask below
-        # (~np.isnan(slice_z)) excludes them from both the Stouffer sum AND
-        # the neighbour count. The old `z = where(isnan(p), 0.0, z)` line
-        # set them to 0, which passed the mask -> untested CpGs were counted
-        # as contributing neighbours (strictly conservative power loss + a
-        # wrong `_n_neighbours` audit count) (D9).
+
+        # --- Brown's Method: Empirical Correlation Kernel ---
+        # Stouffer's assumes independence (Var(sum Z) = N). CpGs are correlated.
+        # We estimate the spatial correlation rho(d) from null sites (|z| < 2.0).
+        null_mask = (~np.isnan(z)) & (np.abs(z) < 2.0)
+        
+        bin_size = 50
+        n_bins = (neighbour_bp // bin_size) + 1
+        cov_sums = np.zeros(n_bins, dtype=np.float64)
+        cov_counts = np.zeros(n_bins, dtype=np.float64)
+        
+        # Max lag to check (100 lags is typically enough to cover neighbour_bp)
+        max_lag = min(100, n - 1)
+        for lag in range(1, max_lag + 1):
+            valid = null_mask[:-lag] & null_mask[lag:]
+            if not np.any(valid): 
+                continue
+            
+            dist = positions[lag:] - positions[:-lag]
+            dist_mask = valid & (dist <= neighbour_bp)
+            if not np.any(dist_mask): 
+                continue
+            
+            d_valid = dist[dist_mask]
+            b = d_valid // bin_size
+            
+            z1 = z[:-lag][dist_mask]
+            z2 = z[lag:][dist_mask]
+            
+            np.add.at(cov_sums, b, z1 * z2)
+            np.add.at(cov_counts, b, 1)
+
+        with np.errstate(invalid='ignore', divide='ignore'):
+            rho_bins = np.where(cov_counts > 50, cov_sums / cov_counts, 0.0)
+            
+        # Ensure monotonic non-increasing and non-negative correlation
+        rho_bins = np.maximum(rho_bins, 0.0)
+        rho_bins[0] = 1.0
+        for b in range(1, n_bins):
+            rho_bins[b] = min(rho_bins[b], rho_bins[b-1])
+        # ----------------------------------------------------
 
         # Two-pointer sliding window: for each i, advance left/right to
         # the bounds [pos_i - W, pos_i + W]. O(n_sites) per chromosome.
         z_sum = np.zeros(n, dtype=np.float64)
+        z_var = np.ones(n, dtype=np.float64)
         n_in = np.zeros(n, dtype=np.int64)
         n_agree = np.zeros(n, dtype=np.int64)
         lo = 0
@@ -2584,24 +2620,35 @@ def combine_neighbour_pvalues(
                 z_sum[i] = z[i]
                 n_in[i] = 1
                 n_agree[i] = 1
+                z_var[i] = 1.0
             else:
                 slice_z = z[lo:hi]
                 slice_sign = sign[lo:hi]
+                slice_pos = positions[lo:hi]
                 mask = ~np.isnan(slice_z) & np.isfinite(slice_z)
                 n_eff = int(mask.sum())
                 if n_eff == 0:
                     z_sum[i] = 0.0
                     n_in[i] = 0
                     n_agree[i] = 0
+                    z_var[i] = 1.0
                 else:
-                    z_sum[i] = slice_z[mask].sum()
+                    valid_z = slice_z[mask]
+                    valid_pos = slice_pos[mask]
+                    z_sum[i] = valid_z.sum()
                     n_in[i] = n_eff
                     # Count how many neighbours share the focal site's
                     # effect direction (used by the sign-agreement guard).
                     focal_sign = sign[i]
                     n_agree[i] = int(np.sum((slice_sign[mask] == focal_sign)))
+
+                    # Brown's method variance of the sum: Var = sum(rho)
+                    diffs = np.abs(valid_pos[:, None] - valid_pos[None, :])
+                    bin_idx = np.clip(diffs // bin_size, 0, n_bins - 1)
+                    z_var[i] = rho_bins[bin_idx].sum()
+
         with np.errstate(invalid="ignore", divide="ignore"):
-            z_combined = np.where(n_in > 0, z_sum / np.sqrt(n_in), 0.0)
+            z_combined = np.where(n_in > 0, z_sum / np.sqrt(z_var), 0.0)
         p_combined = 2.0 * _norm.sf(np.abs(z_combined))
 
         # Sign-agreement guard: drop combined p-values where the focal
