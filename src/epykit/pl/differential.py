@@ -28,8 +28,12 @@ def volcano(
 
     fig, ax = _get_ax(ax, figsize)
     ax.scatter(diff[ns], y[ns], s=4, color=PALETTE["neutral"], alpha=0.4, rasterized=True)
-    ax.scatter(diff[data.hypo], y[data.hypo], s=4, color=PALETTE["hypo"], alpha=0.7, rasterized=True)
-    ax.scatter(diff[data.hyper], y[data.hyper], s=4, color=PALETTE["hyper"], alpha=0.7, rasterized=True)
+    ax.scatter(
+        diff[data.hypo], y[data.hypo], s=4, color=PALETTE["hypo"], alpha=0.7, rasterized=True
+    )
+    ax.scatter(
+        diff[data.hyper], y[data.hyper], s=4, color=PALETTE["hyper"], alpha=0.7, rasterized=True
+    )
 
     ax.axhline(-np.log10(alpha), color="grey", lw=0.8, ls="--")
     ax.axvline(min_abs_diff, color="grey", lw=0.8, ls="--")
@@ -60,9 +64,30 @@ def ma_plot(
     ns = ~data.sig
 
     fig, ax = _get_ax(ax, figsize)
-    ax.scatter(data.mean_beta[ns], data.meth_diff[ns], s=4, color=PALETTE["neutral"], alpha=0.4, rasterized=True)
-    ax.scatter(data.mean_beta[data.hypo], data.meth_diff[data.hypo], s=4, color=PALETTE["hypo"], alpha=0.7, rasterized=True)
-    ax.scatter(data.mean_beta[data.hyper], data.meth_diff[data.hyper], s=4, color=PALETTE["hyper"], alpha=0.7, rasterized=True)
+    ax.scatter(
+        data.mean_beta[ns],
+        data.meth_diff[ns],
+        s=4,
+        color=PALETTE["neutral"],
+        alpha=0.4,
+        rasterized=True,
+    )
+    ax.scatter(
+        data.mean_beta[data.hypo],
+        data.meth_diff[data.hypo],
+        s=4,
+        color=PALETTE["hypo"],
+        alpha=0.7,
+        rasterized=True,
+    )
+    ax.scatter(
+        data.mean_beta[data.hyper],
+        data.meth_diff[data.hyper],
+        s=4,
+        color=PALETTE["hyper"],
+        alpha=0.7,
+        rasterized=True,
+    )
 
     ax.axhline(0, color="black", lw=1)
     ax.axhline(min_abs_diff, color="grey", lw=0.8, ls="--", alpha=0.5)

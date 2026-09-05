@@ -36,12 +36,12 @@ logger = logging.getLogger(__name__)
 
 _PMD_SCHEMA = {
     "sample_id": pl.Utf8,
-    "chrom":     pl.Utf8,
-    "start":     pl.Int32,
-    "end":       pl.Int32,
+    "chrom": pl.Utf8,
+    "start": pl.Int32,
+    "end": pl.Int32,
     "length_bp": pl.Int32,
     "mean_beta": pl.Float32,
-    "n_cpgs":    pl.Int32,
+    "n_cpgs": pl.Int32,
 }
 
 
@@ -113,10 +113,16 @@ def call_pmd_one_sample(
         beta = np.where(cov > 0, n_meth / np.maximum(cov, 1.0), np.nan)
 
         beta_smooth = _gaussian_smooth_beta(
-            positions.astype(np.float64), beta, cov, bandwidth_bp=bandwidth_bp,
+            positions.astype(np.float64),
+            beta,
+            cov,
+            bandwidth_bp=bandwidth_bp,
         )
         viterbi = segment(
-            beta_smooth, n_states=2, state_means=state_means, self_loop=self_loop,
+            beta_smooth,
+            n_states=2,
+            state_means=state_means,
+            self_loop=self_loop,
         )
         # State 0 is the PMD (low beta) state.
         runs = runs_of_state(viterbi, target_state=0, positions=positions)
@@ -135,14 +141,16 @@ def call_pmd_one_sample(
             if valid.sum() == 0:
                 continue
             mean_beta = float(np.average(sel[valid], weights=np.maximum(sel_cov[valid], 1.0)))
-            rows.append({
-                "chrom": chrom,
-                "start": int(run_start),
-                "end": int(run_end),
-                "length_bp": int(length_bp),
-                "mean_beta": float(mean_beta),
-                "n_cpgs": int(run_len_sites),
-            })
+            rows.append(
+                {
+                    "chrom": chrom,
+                    "start": int(run_start),
+                    "end": int(run_end),
+                    "length_bp": int(length_bp),
+                    "mean_beta": float(mean_beta),
+                    "n_cpgs": int(run_len_sites),
+                }
+            )
         if not rows:
             return None
         return pl.DataFrame(
@@ -152,8 +160,11 @@ def call_pmd_one_sample(
 
     parts: list[pl.DataFrame] = []
     for chrom, chrom_result in run_chrom_pipeline(
-        chromosomes, _pmd_chrom_handler,
-        backend=backend, n_workers=n_workers, label=f"PMD[{sample}]",
+        chromosomes,
+        _pmd_chrom_handler,
+        backend=backend,
+        n_workers=n_workers,
+        label=f"PMD[{sample}]",
     ):
         parts.append(chrom_result)
     if not parts:
@@ -183,12 +194,14 @@ def pmd(
     parts: list[pl.DataFrame] = []
     for sample in samples:
         df = call_pmd_one_sample(
-            md.store, sample,
+            md.store,
+            sample,
             chromosomes=chromosomes,
             bandwidth_bp=bandwidth_bp,
             beta_threshold=beta_threshold,
             min_pmd_bp=min_pmd_bp,
-            backend=backend, n_workers=n_workers,
+            backend=backend,
+            n_workers=n_workers,
         )
         if df.height > 0:
             df = df.with_columns(pl.lit(sample).alias("sample_id"))

@@ -40,8 +40,11 @@ def pca(
     fig, ax = _get_ax(ax, figsize)
     unique_groups = sorted(set(res.groups), key=lambda g: (g is None, str(g)))
     palette_cycle = [
-        PALETTE.get("control"), PALETTE.get("treatment"),
-        PALETTE.get("hyper"), PALETTE.get("hypo"), PALETTE.get("neutral"),
+        PALETTE.get("control"),
+        PALETTE.get("treatment"),
+        PALETTE.get("hyper"),
+        PALETTE.get("hypo"),
+        PALETTE.get("neutral"),
     ]
     for i, g in enumerate(unique_groups):
         mask = np.array([gg == g for gg in res.groups])
@@ -49,14 +52,16 @@ def pca(
             continue
         color = palette_cycle[i % len(palette_cycle)] or PALETTE.get("neutral")
         ax.scatter(
-            res.coords[mask, 0], res.coords[mask, 1],
-            s=100, alpha=0.6, label=str(g), color=color,
+            res.coords[mask, 0],
+            res.coords[mask, 1],
+            s=100,
+            alpha=0.6,
+            label=str(g),
+            color=color,
         )
     ax.set_xlabel(f"PC1 ({res.explained_var[0]:.1%})")
     ax.set_ylabel(f"PC2 ({res.explained_var[1]:.1%})")
-    ax.set_title(
-        f"PCA of methylation profiles  |  n_sites={res.n_sites_used:,}"
-    )
+    ax.set_title(f"PCA of methylation profiles  |  n_sites={res.n_sites_used:,}")
     if res.group_col and res.group_col != "all":
         ax.legend(title=res.group_col)
     ax.grid(True, alpha=0.3)

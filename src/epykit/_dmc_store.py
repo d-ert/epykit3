@@ -216,9 +216,7 @@ def has_qvalue(store_or_df: DMCStore | pl.DataFrame) -> bool:
     """Return True if ``store_or_df`` carries a ``qvalue`` column."""
     if isinstance(store_or_df, DMCStore):
         for entry in store_or_df.manifest.get("chroms", []):
-            schema = pl.read_parquet_schema(
-                str(store_or_df.path / _chrom_filename(entry["name"]))
-            )
+            schema = pl.read_parquet_schema(str(store_or_df.path / _chrom_filename(entry["name"])))
             return "qvalue" in schema
         return False
     return "qvalue" in store_or_df.columns

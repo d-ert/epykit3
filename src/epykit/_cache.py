@@ -104,6 +104,7 @@ def manifest_read(analysis_root: Path | str) -> dict[str, Any]:
     mp = pipeline_manifest_path(analysis_root)
     if not mp.exists():
         from epykit import __version__  # local to avoid circular import at import time
+
         return {"epykit_version": __version__, "stages": []}
     with mp.open() as handle:
         return json.load(handle)
@@ -204,8 +205,7 @@ def upstream_sample_signature(input_sample_dir: Path) -> dict[str, Any]:
         "chroms": chroms,
         "parts": {
             chrom: [
-                file_signature(p)
-                for p in sorted((input_sample_dir / chrom).glob("part-*.parquet"))
+                file_signature(p) for p in sorted((input_sample_dir / chrom).glob("part-*.parquet"))
             ]
             for chrom in chroms
         },

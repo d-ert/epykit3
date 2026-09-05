@@ -94,7 +94,9 @@ def _write_table_local(df, path: str) -> str:
 def _add_min_samples_args(p: argparse.ArgumentParser, scope_help_prefix: str = "") -> None:
     """Register ``--min-samples-treatment`` and ``--min-samples-control``."""
     p.add_argument(
-        "--min-samples-treatment", type=int, default=0,
+        "--min-samples-treatment",
+        type=int,
+        default=0,
         dest="min_samples_treatment",
         help=(
             f"{scope_help_prefix}Per-site minimum number of treatment samples "
@@ -103,10 +105,12 @@ def _add_min_samples_args(p: argparse.ArgumentParser, scope_help_prefix: str = "
         ),
     )
     p.add_argument(
-        "--min-samples-control", type=int, default=0,
+        "--min-samples-control",
+        type=int,
+        default=0,
         dest="min_samples_control",
         help=f"{scope_help_prefix}Per-site minimum number of control samples "
-             f"with non-zero coverage.",
+        f"with non-zero coverage.",
     )
 
 
@@ -117,12 +121,12 @@ def _read_samplesheet_groups(samplesheet: str, treatment_group: str, control_gro
         reader = csv.DictReader(f)
         samples_by_group: dict[str, list[str]] = {}
         for row in reader:
-            group     = row["group"]
+            group = row["group"]
             sample_id = row["sample_id"]
             samples_by_group.setdefault(group, []).append(sample_id)
 
     treatment_samples = samples_by_group.get(treatment_group)
-    control_samples   = samples_by_group.get(control_group)
+    control_samples = samples_by_group.get(control_group)
 
     if not treatment_samples:
         raise ValueError(f"No samples found for group '{treatment_group}'")
@@ -192,13 +196,15 @@ def _cli_n1_and_footgun_checks(args, unit: str = "sites") -> None:
             "n=1 per group with --allow-n1: resolving --test to 'fisher' "
             "(pooled Fisher exact) -- the lr engine has no n=1 fallback. "
             "Fisher is anti-conservative; do not trust borderline calls.",
-            UserWarning, stacklevel=2,
+            UserWarning,
+            stacklevel=2,
         )
         args.test = "fisher"
     elif args.test == "fisher":
         warnings.warn(
             "test='fisher' is anti-conservative; prefer 'lr' at n >= 2.",
-            UserWarning, stacklevel=2,
+            UserWarning,
+            stacklevel=2,
         )
     if (not args.unite) and args.min_samples_treatment == 0 and args.min_samples_control == 0:
         warnings.warn(
@@ -206,7 +212,8 @@ def _cli_n1_and_footgun_checks(args, unit: str = "sites") -> None:
             f"covered in only one sample per group. Recommended: "
             f"--min-samples-treatment 2 --min-samples-control 2, or pass "
             f"--unite to restrict to sites covered in all samples.",
-            UserWarning, stacklevel=2,
+            UserWarning,
+            stacklevel=2,
         )
 
 
@@ -220,12 +227,11 @@ def _cmd_dmc(args: argparse.Namespace):
     if args.formula is not None or args.contrast is not None:
         from . import read_bismark
         from . import tl as _tl
-        covariates = (
-            [c.strip() for c in args.covariates.split(",")]
-            if args.covariates else None
-        )
+
+        covariates = [c.strip() for c in args.covariates.split(",")] if args.covariates else None
         # All groups from the samplesheet
         import csv
+
         with open(args.samplesheet) as fh:
             groups = sorted({row["group"] for row in csv.DictReader(fh)})
         md = read_bismark(
@@ -301,6 +307,7 @@ def _cmd_dmc(args: argparse.Namespace):
 
         from .export import dmc_to_tsv
         from .methyldata import MethylData
+
         # Build a transient MethylData carrying just the dmc result so the
         # writer can re-use the same delegation path the API uses.
         obs = pl.DataFrame({"sample_id": treatment_samples + control_samples})
@@ -308,9 +315,7 @@ def _cmd_dmc(args: argparse.Namespace):
         md_tmp.varm["dmc_lr"] = results
         md_tmp.uns["dmc"] = {"last_key": "dmc_lr"}
 
-        sig_path = tsv_path or _auto_tsv_path(
-            args.output, suffix=".significant"
-        )
+        sig_path = tsv_path or _auto_tsv_path(args.output, suffix=".significant")
         dmc_to_tsv(md_tmp, sig_path, alpha=tsv_alpha)
         print(f"  Significant TSV:    {sig_path}")
         if tsv_full:
@@ -373,9 +378,7 @@ def _cmd_dmr(args: argparse.Namespace):
         # branch exactly via the shared apply_region_qfilter helper. Pre-fix
         # the CLI skipped this, so CLI chain_merge output was less filtered
         # than the API (D11).
-        dmr_results = apply_region_qfilter(
-            dmr_results, getattr(args, "min_mean_qvalue", None)
-        )
+        dmr_results = apply_region_qfilter(dmr_results, getattr(args, "min_mean_qvalue", None))
     elif args.method == "tile":
         # --- tile-based path. Needs methylstore + samplesheet. ---
         if not args.methylstore or not args.samplesheet:
@@ -422,6 +425,7 @@ def _cmd_dmr(args: argparse.Namespace):
         )
         if getattr(args, "empirical_fdr", False) and len(dmr_results) > 0:
             from .dmr import empirical_fdr_for_dmr
+
             dmr_results = empirical_fdr_for_dmr(
                 methylstore_path=args.methylstore,
                 samples_treatment=treatment_samples,
@@ -443,6 +447,7 @@ def _cmd_dmr(args: argparse.Namespace):
         if not args.dmc_results:
             raise ValueError("method=segment requires --dmc-results.")
         from .dmr_segment import call_dmr_rule_segment
+
         dmc_results = pl.read_parquet(args.dmc_results)
         dmr_results = call_dmr_rule_segment(
             dmc_results,
@@ -468,16 +473,14 @@ def _cmd_dmr(args: argparse.Namespace):
         # Same region-level q-value post-filter as tl.dmr's sliding_window
         # branch, via the shared apply_region_qfilter helper (BH-corrected
         # combined_qvalue, falling back to combined_pvalue).
-        dmr_results = apply_region_qfilter(
-            dmr_results, getattr(args, "min_mean_qvalue", None)
-        )
+        dmr_results = apply_region_qfilter(dmr_results, getattr(args, "min_mean_qvalue", None))
 
     dmr_results.write_parquet(args.output)
     print(f"DMR results written to {args.output}")
     print(f"Total DMRs called: {len(dmr_results):,}")
     if len(dmr_results) > 0 and "dmr_type" in dmr_results.columns:
         n_hyper = int((dmr_results["dmr_type"] == "hyper").sum())
-        n_hypo  = int((dmr_results["dmr_type"] == "hypo").sum())
+        n_hypo = int((dmr_results["dmr_type"] == "hypo").sum())
         n_mixed = int((dmr_results["dmr_type"] == "mixed").sum())
         print(f"  Hyper: {n_hyper:,}  Hypo: {n_hypo:,}  Mixed: {n_mixed:,}")
         print(dmr_results.head(10))
@@ -486,6 +489,7 @@ def _cmd_dmr(args: argparse.Namespace):
     if not tsv_suppressed and len(dmr_results) > 0:
         from .export import dmr_to_tsv
         from .methyldata import MethylData
+
         md_tmp = MethylData(obs=pl.DataFrame({"sample_id": []}), store="")
         md_tmp.uns["dmr"] = dmr_results
         tsv_path = tsv_path_opt or _auto_tsv_path(args.output)
@@ -501,6 +505,7 @@ def _cmd_annotate(args: argparse.Namespace):
 
     if args.gtf:
         from .annotate import annotate_features
+
         sites = annotate_features(
             sites,
             args.gtf,
@@ -512,6 +517,7 @@ def _cmd_annotate(args: argparse.Namespace):
 
     if args.cpg_islands:
         from .annotate import annotate_cpg_islands
+
         sites = annotate_cpg_islands(sites, cpg_island_bed=args.cpg_islands)
         print("CpG island annotation complete.")
 
@@ -584,6 +590,7 @@ def _cmd_smooth(args: argparse.Namespace):
 def _cmd_report(args: argparse.Namespace):
     """Handler for 'report' subcommand."""
     from .methyldata import MethylData
+
     md = MethylData.load(args.md)
     kwargs: dict = {
         "alpha": args.alpha,
@@ -602,9 +609,11 @@ def _cmd_aggregate_regions(args: argparse.Namespace):
     """Handler for 'aggregate-regions' subcommand."""
     from . import pp as pp_mod
     from .methyldata import MethylData
+
     md = MethylData.load(args.md)
     pp_mod.aggregate_regions(
-        md, args.bed,
+        md,
+        args.bed,
         region_id_col=args.region_id_col,
         output_store=args.output_store,
         min_cpgs_per_region=args.min_cpgs_per_region,
@@ -617,6 +626,7 @@ def _cmd_export(args: argparse.Namespace):
     """Handler for 'export' subcommand."""
     from .export import dmcs_to_bed, dmrs_to_bed, to_bedgraph, to_bigwig
     from .methyldata import MethylData
+
     md = MethylData.load(args.md)
     fmt = args.export_cmd
     if fmt == "bedgraph":
@@ -624,8 +634,9 @@ def _cmd_export(args: argparse.Namespace):
     elif fmt == "bigwig":
         to_bigwig(md, args.sample, args.output, value=args.value)
     elif fmt == "dmcs-bed":
-        dmcs_to_bed(md, args.output, alpha=args.alpha,
-                    min_abs_diff=args.min_abs_diff, test=args.test)
+        dmcs_to_bed(
+            md, args.output, alpha=args.alpha, min_abs_diff=args.min_abs_diff, test=args.test
+        )
     elif fmt == "dmrs-bed":
         dmrs_to_bed(md, args.output)
     else:
@@ -670,16 +681,22 @@ def build_parser() -> argparse.ArgumentParser:
     """
     from . import __version__
 
-    ap  = argparse.ArgumentParser(
-        prog="epykit", description="Methylation Parquet store tools"
+    ap = argparse.ArgumentParser(prog="epykit", description="Methylation Parquet store tools")
+    ap.add_argument(
+        "--version",
+        action="version",
+        version=f"epykit {__version__}",
     )
     ap.add_argument(
-        "--version", action="version", version=f"epykit {__version__}",
+        "-v", "--verbose", action="count", default=0, help="Increase logging verbosity (-v: DEBUG)"
     )
-    ap.add_argument("-v", "--verbose", action="count", default=0,
-                    help="Increase logging verbosity (-v: DEBUG)")
-    ap.add_argument("-q", "--quiet", action="count", default=0,
-                    help="Decrease logging verbosity (-q: WARNING and above)")
+    ap.add_argument(
+        "-q",
+        "--quiet",
+        action="count",
+        default=0,
+        help="Decrease logging verbosity (-q: WARNING and above)",
+    )
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     # convert
@@ -687,11 +704,13 @@ def build_parser() -> argparse.ArgumentParser:
         "convert",
         help="Convert a Bismark .cov or MethylDackel .bedGraph file to Parquet",
     )
-    p_conv.add_argument("--input",        required=True)
-    p_conv.add_argument("--sample-id",    required=True)
-    p_conv.add_argument("--output-dir",   required=True)
+    p_conv.add_argument("--input", required=True)
+    p_conv.add_argument("--sample-id", required=True)
+    p_conv.add_argument("--output-dir", required=True)
     p_conv.add_argument(
-        "--format", choices=["bismark", "methyldackel"], default="bismark",
+        "--format",
+        choices=["bismark", "methyldackel"],
+        default="bismark",
         help=(
             "Source file format. 'bismark' (default) for .cov[.gz] files "
             "produced by bismark_methylation_extractor / bismark2bedGraph. "
@@ -701,11 +720,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_conv.add_argument(
-        "--context", choices=["CpG", "CHG", "CHH"], default="CpG",
+        "--context",
+        choices=["CpG", "CHG", "CHH"],
+        default="CpG",
     )
     p_conv.add_argument("--reference-fasta")
     p_conv.add_argument(
-        "--merge-cpg", dest="merge_cpg", action="store_true",
+        "--merge-cpg",
+        dest="merge_cpg",
+        action="store_true",
         help=(
             "Merge symmetric CpG dyads (+/- strand) into one record. This is "
             "the default (matching the Python API merge_strands=True); the flag "
@@ -713,16 +736,18 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_conv.add_argument(
-        "--no-merge-cpg", dest="merge_cpg", action="store_false",
+        "--no-merge-cpg",
+        dest="merge_cpg",
+        action="store_false",
         help="Disable CpG-dyad merging; keep per-strand records.",
     )
     p_conv.set_defaults(merge_cpg=None, func=_cmd_convert)
 
     # filter
     p_filt = sub.add_parser("filter", help="Filter low-coverage CpGs")
-    p_filt.add_argument("--methylstore",           required=True)
-    p_filt.add_argument("--output-dir",            required=True)
-    p_filt.add_argument("--min-coverage",          type=int,   default=10)
+    p_filt.add_argument("--methylstore", required=True)
+    p_filt.add_argument("--output-dir", required=True)
+    p_filt.add_argument("--min-coverage", type=int, default=10)
     p_filt.add_argument("--max-coverage-quantile", type=float, default=0.999)
     p_filt.add_argument("--blacklist-bed")
     p_filt.add_argument("--sample")
@@ -731,22 +756,23 @@ def build_parser() -> argparse.ArgumentParser:
     # summary
     p_sum = sub.add_parser("summary", help="Per-sample summary statistics")
     p_sum.add_argument("--methylstore", required=True)
-    p_sum.add_argument("--sample",      required=True)
+    p_sum.add_argument("--sample", required=True)
     p_sum.add_argument("--output")
     p_sum.set_defaults(func=_cmd_sample_summary)
 
     # dmc
     p_dmc = sub.add_parser("dmc", help="Differential methylation calling (per-CpG)")
-    p_dmc.add_argument("--methylstore",      required=True)
-    p_dmc.add_argument("--samplesheet",      required=True,
-                       help="CSV: sample_id, group, path")
-    p_dmc.add_argument("--treatment-group",  required=True)
-    p_dmc.add_argument("--control-group",    required=True)
-    p_dmc.add_argument("--output",           required=True)
+    p_dmc.add_argument("--methylstore", required=True)
+    p_dmc.add_argument("--samplesheet", required=True, help="CSV: sample_id, group, path")
+    p_dmc.add_argument("--treatment-group", required=True)
+    p_dmc.add_argument("--control-group", required=True)
+    p_dmc.add_argument("--output", required=True)
     p_dmc.add_argument(
         "--test",
         choices=[
-            "lr", "glm", "welch_t",
+            "lr",
+            "glm",
+            "welch_t",
             "fisher",
         ],
         default="lr",
@@ -763,14 +789,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_dmc.add_argument(
-        "--formula", default=None,
+        "--formula",
+        default=None,
         help=(
             "patsy formula on md.obs columns (e.g. '~ group'). "
             "Triggers the GLM-contrast path; pair with --contrast."
         ),
     )
     p_dmc.add_argument(
-        "--contrast", default=None,
+        "--contrast",
+        default=None,
         help=(
             "contrast specification. Either a single column "
             "name (continuous covariate primary effect), a factor name "
@@ -779,7 +807,8 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_dmc.add_argument(
-        "--covariates", default=None,
+        "--covariates",
+        default=None,
         help="Comma-separated list of nuisance covariate columns on md.obs.",
     )
     # Unite mode. Default is union (sites in at least one sample), matching
@@ -787,17 +816,25 @@ def build_parser() -> argparse.ArgumentParser:
     # to sites covered in ALL samples (intersect). --no-unite is kept as an
     # explicit, backward-compatible way to request the default (union).
     p_dmc.add_argument(
-        "--unite", action="store_true", dest="unite", default=False,
+        "--unite",
+        action="store_true",
+        dest="unite",
+        default=False,
         help="Intersect: restrict to sites covered in ALL samples "
-             "(default: union -- sites in at least one sample, matching ep.tl.dmc).",
+        "(default: union -- sites in at least one sample, matching ep.tl.dmc).",
     )
     p_dmc.add_argument(
-        "--no-unite", action="store_false", dest="unite", default=False,
+        "--no-unite",
+        action="store_false",
+        dest="unite",
+        default=False,
         help="Union: include sites covered in at least one sample (the default).",
     )
     _add_min_samples_args(p_dmc)
     p_dmc.add_argument(
-        "--allow-n1", action="store_true", default=False,
+        "--allow-n1",
+        action="store_true",
+        default=False,
         help=(
             "Permit n=1 per group. The pooled Fisher exact engine is used "
             "automatically in this case (it is anti-conservative -- do not "
@@ -810,56 +847,83 @@ def build_parser() -> argparse.ArgumentParser:
     # API used "eb", so identical input produced different q-values. The
     # CLI now defaults to the same values tl.dmc uses (M-PKG2).
     p_dmc.add_argument(
-        "--dispersion", choices=["site", "eb", "shrink", "chrom"], default="eb",
+        "--dispersion",
+        choices=["site", "eb", "shrink", "chrom"],
+        default="eb",
         help="Dispersion estimator for lr/glm (default: eb, matching ep.tl.dmc).",
     )
     p_dmc.add_argument(
-        "--reference", choices=["adaptive", "F", "chi2"], default="adaptive",
+        "--reference",
+        choices=["adaptive", "F", "chi2"],
+        default="adaptive",
         help="Reference distribution for the lr statistic (default: adaptive).",
     )
     p_dmc.add_argument(
-        "--fdr-method", dest="fdr_method", default="fdr_bh",
+        "--fdr-method",
+        dest="fdr_method",
+        default="fdr_bh",
         help="Multiple-testing correction method (default: fdr_bh).",
     )
     p_dmc.add_argument(
-        "--no-tsv", action="store_true", dest="no_tsv", default=False,
+        "--no-tsv",
+        action="store_true",
+        dest="no_tsv",
+        default=False,
         help="Suppress the sibling .significant.tsv auto-emit.",
     )
     p_dmc.add_argument(
-        "--tsv", dest="tsv_path", default=None,
+        "--tsv",
+        dest="tsv_path",
+        default=None,
         help=(
             "Override sibling table path. Suffix .csv selects comma "
             "delimiter; otherwise tab. Implies the file is written."
         ),
     )
     p_dmc.add_argument(
-        "--tsv-alpha", dest="tsv_alpha", type=float, default=0.05,
+        "--tsv-alpha",
+        dest="tsv_alpha",
+        type=float,
+        default=0.05,
         help="qvalue threshold for the significant-only table. Default 0.05.",
     )
     p_dmc.add_argument(
-        "--tsv-full", dest="tsv_full", action="store_true", default=False,
+        "--tsv-full",
+        dest="tsv_full",
+        action="store_true",
+        default=False,
         help="Also write the full (unfiltered) table next to the parquet.",
     )
     # Deprecated csv* aliases (epykit writes TSV by default) -- still honoured,
     # but emit a deprecation warning. Hidden from --help to steer users to --tsv*.
     p_dmc.add_argument(
-        "--no-csv", action="store_true", dest="no_csv", default=False,
+        "--no-csv",
+        action="store_true",
+        dest="no_csv",
+        default=False,
         help=argparse.SUPPRESS,
     )
     p_dmc.add_argument("--csv", dest="csv_path", default=None, help=argparse.SUPPRESS)
     p_dmc.add_argument(
-        "--csv-alpha", dest="csv_alpha", type=float, default=0.05,
+        "--csv-alpha",
+        dest="csv_alpha",
+        type=float,
+        default=0.05,
         help=argparse.SUPPRESS,
     )
     p_dmc.add_argument(
-        "--csv-full", dest="csv_full", action="store_true", default=False,
+        "--csv-full",
+        dest="csv_full",
+        action="store_true",
+        default=False,
         help=argparse.SUPPRESS,
     )
     p_dmc.set_defaults(func=_cmd_dmc)
 
     # dmr
     p_dmr = sub.add_parser(
-        "dmr", help="DMR calling (chain-merge, tile, segment, or sliding-window)")
+        "dmr", help="DMR calling (chain-merge, tile, segment, or sliding-window)"
+    )
     p_dmr.add_argument(
         "--method",
         choices=["chain_merge", "tile", "sliding_window", "segment"],
@@ -880,55 +944,72 @@ def build_parser() -> argparse.ArgumentParser:
     p_dmr.add_argument("--output", required=True)
 
     # Tile-method options
-    p_dmr.add_argument("--methylstore",
-                       help="(tile only) Path to filtered Parquet methylstore.")
-    p_dmr.add_argument("--samplesheet",
-                       help="(tile only) CSV: sample_id, group, path.")
-    p_dmr.add_argument("--treatment-group",
-                       help="(tile only) Group label for treatment samples.")
-    p_dmr.add_argument("--control-group",
-                       help="(tile only) Group label for control samples.")
-    p_dmr.add_argument("--tile-size-bp",       type=int,   default=1000,
-                       help="(tile only) Tile width in bp. Default 1000.")
-    p_dmr.add_argument("--min-cpgs-per-tile",  type=int,   default=5,
-                       help="(tile only) Minimum CpGs per tile per sample.")
+    p_dmr.add_argument("--methylstore", help="(tile only) Path to filtered Parquet methylstore.")
+    p_dmr.add_argument("--samplesheet", help="(tile only) CSV: sample_id, group, path.")
+    p_dmr.add_argument("--treatment-group", help="(tile only) Group label for treatment samples.")
+    p_dmr.add_argument("--control-group", help="(tile only) Group label for control samples.")
+    p_dmr.add_argument(
+        "--tile-size-bp", type=int, default=1000, help="(tile only) Tile width in bp. Default 1000."
+    )
+    p_dmr.add_argument(
+        "--min-cpgs-per-tile",
+        type=int,
+        default=5,
+        help="(tile only) Minimum CpGs per tile per sample.",
+    )
     p_dmr.add_argument(
         "--test",
         choices=[
-            "lr", "glm", "welch_t",
+            "lr",
+            "glm",
+            "welch_t",
             "fisher",
         ],
         default="lr",
         help="(tile only) Statistical test applied to tile-level counts. "
-             "Default 'lr': quasi-binomial LR with McCullagh-Nelder dispersion.",
+        "Default 'lr': quasi-binomial LR with McCullagh-Nelder dispersion.",
     )
     p_dmr.add_argument(
-        "--empirical-fdr", action="store_true", default=False,
+        "--empirical-fdr",
+        action="store_true",
+        default=False,
         help="(tile only) permutation-based empirical FDR.",
     )
     p_dmr.add_argument(
-        "--n-perm", type=int, default=100,
+        "--n-perm",
+        type=int,
+        default=100,
         help="(tile only) Number of permutations when --empirical-fdr is set.",
     )
     p_dmr.add_argument(
-        "--perm-seed", type=int, default=42,
+        "--perm-seed",
+        type=int,
+        default=42,
         help="(tile only) Seed for permutation RNG.",
     )
     # Default is union, matching ep.tl.dmr (no pp.unite step). --unite forces
     # intersect (tiles covered in ALL samples); --no-unite explicitly selects
     # the default union, kept for backward compatibility.
     p_dmr.add_argument(
-        "--unite", action="store_true", dest="unite", default=False,
+        "--unite",
+        action="store_true",
+        dest="unite",
+        default=False,
         help="(tile only) Intersect: restrict to tiles covered in ALL samples "
-             "(default: union, matching ep.tl.dmr).",
+        "(default: union, matching ep.tl.dmr).",
     )
     p_dmr.add_argument(
-        "--no-unite", action="store_false", dest="unite", default=False,
+        "--no-unite",
+        action="store_false",
+        dest="unite",
+        default=False,
         help="(tile only) Union: test tiles covered in at least one sample (the default).",
     )
     _add_min_samples_args(p_dmr, scope_help_prefix="(tile only) ")
     p_dmr.add_argument(
-        "--allow-n1", action="store_true", default=False,
+        "--allow-n1",
+        action="store_true",
+        default=False,
         help=(
             "(tile only) Permit n=1 per group. The pooled Fisher exact engine "
             "is used automatically in this case (it is anti-conservative -- do "
@@ -938,72 +1019,98 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     # Sliding-window-method options
-    p_dmr.add_argument("--dmc-results",
-                       help="(chain_merge, sliding_window, segment) "
-                            "Parquet file from 'epykit dmc'")
-    p_dmr.add_argument("--window-bp",            type=int,   default=500)
-    p_dmr.add_argument("--step-bp",              type=int,   default=250)
     p_dmr.add_argument(
-        "--min-cpgs", type=int, default=None,
-        help="Minimum CpGs per DMR. Default when unset: the active --preset's "
-             "value if a preset is given, otherwise 5 (chain_merge, "
-             "sliding_window, and segment all share this default).",
+        "--dmc-results",
+        help="(chain_merge, sliding_window, segment) Parquet file from 'epykit dmc'",
     )
-    p_dmr.add_argument("--min-sites-significant",type=int,   default=3)
+    p_dmr.add_argument("--window-bp", type=int, default=500)
+    p_dmr.add_argument("--step-bp", type=int, default=250)
+    p_dmr.add_argument(
+        "--min-cpgs",
+        type=int,
+        default=None,
+        help="Minimum CpGs per DMR. Default when unset: the active --preset's "
+        "value if a preset is given, otherwise 5 (chain_merge, "
+        "sliding_window, and segment all share this default).",
+    )
+    p_dmr.add_argument("--min-sites-significant", type=int, default=3)
 
     # Chain-merge-method options (DSS callDMR semantics). Knob defaults match
     # call_dmr_chain_merge's signature so --preset bundles apply unless a knob
     # is overridden explicitly. min_cpgs comes from the preset / engine default.
     p_dmr.add_argument(
-        "--preset", choices=["strict", "default", "permissive"], default=None,
+        "--preset",
+        choices=["strict", "default", "permissive"],
+        default=None,
         help="(chain_merge only) Parameter bundle from DMR_PRESETS. Explicit "
-             "knob flags override the bundled value.",
+        "knob flags override the bundled value.",
     )
-    p_dmr.add_argument("--dis-merge-bp",  type=int,   default=500,
-                       help="(chain_merge only) Max bp gap between consecutive "
-                            "significant CpGs in a chain. Highest-leverage knob.")
-    p_dmr.add_argument("--pct-sig",       type=float, default=0.5,
-                       help="(chain_merge only) Min fraction of CpGs in a span "
-                            "that must be significant.")
-    p_dmr.add_argument("--minlen-bp",     type=int,   default=50,
-                       help="(chain_merge only) Min DMR span length in bp.")
-    p_dmr.add_argument("--use-q-for-sig", action="store_true", default=False,
-                       help="(chain_merge only) Gate significance on qvalue "
-                            "instead of pvalue when a qvalue column is present.")
+    p_dmr.add_argument(
+        "--dis-merge-bp",
+        type=int,
+        default=500,
+        help="(chain_merge only) Max bp gap between consecutive "
+        "significant CpGs in a chain. Highest-leverage knob.",
+    )
+    p_dmr.add_argument(
+        "--pct-sig",
+        type=float,
+        default=0.5,
+        help="(chain_merge only) Min fraction of CpGs in a span that must be significant.",
+    )
+    p_dmr.add_argument(
+        "--minlen-bp", type=int, default=50, help="(chain_merge only) Min DMR span length in bp."
+    )
+    p_dmr.add_argument(
+        "--use-q-for-sig",
+        action="store_true",
+        default=False,
+        help="(chain_merge only) Gate significance on qvalue "
+        "instead of pvalue when a qvalue column is present.",
+    )
 
     # Shared filters
-    p_dmr.add_argument("--alpha",                type=float, default=0.05)
-    p_dmr.add_argument("--min-abs-meth-diff",    type=float, default=0.1)
+    p_dmr.add_argument("--alpha", type=float, default=0.05)
+    p_dmr.add_argument("--min-abs-meth-diff", type=float, default=0.1)
     p_dmr.add_argument(
-        "--min-mean-qvalue", type=float, default=0.05,
+        "--min-mean-qvalue",
+        type=float,
+        default=0.05,
         help="(chain_merge, sliding_window, tile) Region-level q-value cutoff "
-             "applied as a post-filter, matching ep.tl.dmr (default 0.05). "
-             "The filter is strict (q < cutoff), so set to a value above 1.0 "
-             "(e.g. 1.1) to disable -- 1.0 still drops regions with q == 1.0.",
+        "applied as a post-filter, matching ep.tl.dmr (default 0.05). "
+        "The filter is strict (q < cutoff), so set to a value above 1.0 "
+        "(e.g. 1.1) to disable -- 1.0 still drops regions with q == 1.0.",
     )
     p_dmr.add_argument(
-        "--no-tsv", action="store_true", dest="no_tsv", default=False,
+        "--no-tsv",
+        action="store_true",
+        dest="no_tsv",
+        default=False,
         help="Suppress the sibling .tsv auto-emit.",
     )
     p_dmr.add_argument(
-        "--tsv", dest="tsv_path", default=None,
+        "--tsv",
+        dest="tsv_path",
+        default=None,
         help="Override sibling table path. .csv suffix -> comma delim.",
     )
     # Deprecated csv* aliases (see dmc) -- honoured but warn; hidden from --help.
     p_dmr.add_argument(
-        "--no-csv", action="store_true", dest="no_csv", default=False,
+        "--no-csv",
+        action="store_true",
+        dest="no_csv",
+        default=False,
         help=argparse.SUPPRESS,
     )
     p_dmr.add_argument("--csv", dest="csv_path", default=None, help=argparse.SUPPRESS)
     p_dmr.set_defaults(func=_cmd_dmr)
 
     # annotate
-    p_ann = sub.add_parser(
-        "annotate", help="Annotate DMC/DMR results with genomic features"
+    p_ann = sub.add_parser("annotate", help="Annotate DMC/DMR results with genomic features")
+    p_ann.add_argument(
+        "--input", required=True, help="Parquet file from 'epykit dmc' or 'epykit dmr'"
     )
-    p_ann.add_argument("--input",   required=True,
-                       help="Parquet file from 'epykit dmc' or 'epykit dmr'")
-    p_ann.add_argument("--output",  required=True)
+    p_ann.add_argument("--output", required=True)
     p_ann.add_argument(
         "--gtf",
         help="Ensembl/UCSC GTF/GFF3 for gene feature annotation",
@@ -1012,19 +1119,27 @@ def build_parser() -> argparse.ArgumentParser:
         "--cpg-islands",
         help="UCSC CpGIsland BED file for CpG context annotation",
     )
-    p_ann.add_argument("--promoter-upstream-bp",   type=int, default=2000)
+    p_ann.add_argument("--promoter-upstream-bp", type=int, default=2000)
     p_ann.add_argument("--promoter-downstream-bp", type=int, default=200)
     p_ann.add_argument(
-        "--no-tsv", action="store_true", dest="no_tsv", default=False,
+        "--no-tsv",
+        action="store_true",
+        dest="no_tsv",
+        default=False,
         help="Suppress the sibling .tsv auto-emit.",
     )
     p_ann.add_argument(
-        "--tsv", dest="tsv_path", default=None,
+        "--tsv",
+        dest="tsv_path",
+        default=None,
         help="Override sibling table path. .csv suffix -> comma delim.",
     )
     # Deprecated csv* aliases (see dmc) -- honoured but warn; hidden from --help.
     p_ann.add_argument(
-        "--no-csv", action="store_true", dest="no_csv", default=False,
+        "--no-csv",
+        action="store_true",
+        dest="no_csv",
+        default=False,
         help=argparse.SUPPRESS,
     )
     p_ann.add_argument("--csv", dest="csv_path", default=None, help=argparse.SUPPRESS)
@@ -1034,7 +1149,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_qc = sub.add_parser("qc-report", help="QC and coverage uniformity report")
     p_qc.add_argument("--methylstore", required=True)
     p_qc.add_argument(
-        "--samples", required=True,
+        "--samples",
+        required=True,
         help="Comma-separated list of sample IDs",
     )
     p_qc.add_argument(
@@ -1042,12 +1158,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory for Parquet QC output files (optional)",
     )
     p_qc.add_argument(
-        "--no-tsv", action="store_true", dest="no_tsv", default=False,
+        "--no-tsv",
+        action="store_true",
+        dest="no_tsv",
+        default=False,
         help="Suppress the sibling .tsv auto-emit alongside the parquets.",
     )
     # Deprecated csv alias (see dmc) -- honoured but warn; hidden from --help.
     p_qc.add_argument(
-        "--no-csv", action="store_true", dest="no_csv", default=False,
+        "--no-csv",
+        action="store_true",
+        dest="no_csv",
+        default=False,
         help=argparse.SUPPRESS,
     )
     p_qc.set_defaults(func=_cmd_qc_report)
@@ -1064,13 +1186,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_sm.add_argument("--methylstore", required=True)
     p_sm.add_argument(
-        "--samples", required=True,
+        "--samples",
+        required=True,
         help="Comma-separated list of sample IDs",
     )
-    p_sm.add_argument("--output",    required=True,
-                      help="Output directory for smoothed beta chunks")
-    p_sm.add_argument("--bandwidth", type=int, default=1000,
-                      help="Smoothing bandwidth in bp (default 1000)")
+    p_sm.add_argument("--output", required=True, help="Output directory for smoothed beta chunks")
+    p_sm.add_argument(
+        "--bandwidth", type=int, default=1000, help="Smoothing bandwidth in bp (default 1000)"
+    )
     p_sm.set_defaults(func=_cmd_smooth)
 
     # report
@@ -1078,21 +1201,27 @@ def build_parser() -> argparse.ArgumentParser:
         "report",
         help="Render an interactive HTML report from a saved MethylData",
     )
-    p_rep.add_argument("--md", required=True,
-                       help="Path to a directory previously written with md.save(...)")
+    p_rep.add_argument(
+        "--md", required=True, help="Path to a directory previously written with md.save(...)"
+    )
     p_rep.add_argument("--output", required=True, help="Output HTML file")
     p_rep.add_argument("--title", default=None)
-    p_rep.add_argument("--gtf", default=None,
-                       help="Optional GTF for a TSS metaplot section")
+    p_rep.add_argument("--gtf", default=None, help="Optional GTF for a TSS metaplot section")
     p_rep.add_argument("--alpha", type=float, default=0.05)
-    p_rep.add_argument("--min-abs-diff", dest="min_abs_diff",
-                       type=float, default=0.1)
-    p_rep.add_argument("--self-contained", dest="self_contained",
-                       action="store_true", default=True,
-                       help="Embed Plotly inline so the HTML works offline (default)")
-    p_rep.add_argument("--no-self-contained", dest="self_contained",
-                       action="store_false",
-                       help="Load Plotly from a CDN (smaller file, needs internet)")
+    p_rep.add_argument("--min-abs-diff", dest="min_abs_diff", type=float, default=0.1)
+    p_rep.add_argument(
+        "--self-contained",
+        dest="self_contained",
+        action="store_true",
+        default=True,
+        help="Embed Plotly inline so the HTML works offline (default)",
+    )
+    p_rep.add_argument(
+        "--no-self-contained",
+        dest="self_contained",
+        action="store_false",
+        help="Load Plotly from a CDN (smaller file, needs internet)",
+    )
     p_rep.set_defaults(func=_cmd_report)
 
     # aggregate-regions
@@ -1100,13 +1229,16 @@ def build_parser() -> argparse.ArgumentParser:
         "aggregate-regions",
         help="Aggregate CpG counts to user-supplied BED regions",
     )
-    p_agg.add_argument("--md", required=True,
-                       help="Path to a directory previously written with md.save(...)")
+    p_agg.add_argument(
+        "--md", required=True, help="Path to a directory previously written with md.save(...)"
+    )
     p_agg.add_argument("--bed", required=True, help="BED file of regions to aggregate to")
-    p_agg.add_argument("--output-store", default=None,
-                       help="Override output Parquet store path")
-    p_agg.add_argument("--region-id-col", default=None,
-                       help="BED column name to use as region_id (default: 'name' or chrom:start-end)")
+    p_agg.add_argument("--output-store", default=None, help="Override output Parquet store path")
+    p_agg.add_argument(
+        "--region-id-col",
+        default=None,
+        help="BED column name to use as region_id (default: 'name' or chrom:start-end)",
+    )
     p_agg.add_argument("--min-cpgs-per-region", type=int, default=1)
     p_agg.set_defaults(func=_cmd_aggregate_regions)
 
@@ -1121,8 +1253,7 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--md", required=True)
         sp.add_argument("--sample", required=True)
         sp.add_argument("--output", required=True)
-        sp.add_argument("--value", default="beta",
-                        choices=["beta", "coverage", "N_meth"])
+        sp.add_argument("--value", default="beta", choices=["beta", "coverage", "N_meth"])
         sp.set_defaults(func=_cmd_export)
     sp_d = exp_sub.add_parser("dmcs-bed", help="DMCs -> 6-column BED")
     sp_d.add_argument("--md", required=True)

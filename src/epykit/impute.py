@@ -210,8 +210,10 @@ def impute_knn_anndata(
         sorted_cols = cols[order]
         sub_beta = beta[:, sorted_cols]
         imputed = impute_knn_beta(
-            sub_positions[order], sub_beta,
-            k=k, max_distance_bp=max_distance_bp,
+            sub_positions[order],
+            sub_beta,
+            k=k,
+            max_distance_bp=max_distance_bp,
         )
         beta[:, sorted_cols] = imputed
 

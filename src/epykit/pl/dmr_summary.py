@@ -20,14 +20,13 @@ from ._utils import _save_fig
 def _resolve_dmr(md: MethylData) -> pl.DataFrame:
     dmr = md.uns.get("dmr")
     if not isinstance(dmr, pl.DataFrame) or dmr.is_empty():
-        raise ValueError(
-            "md.uns['dmr'] is empty. Run ep.tl.dmr(md) first."
-        )
+        raise ValueError("md.uns['dmr'] is empty. Run ep.tl.dmr(md) first.")
     return dmr
 
 
-def _group_label(md: MethylData, *, case_label: str | None,
-                 control_label: str | None) -> tuple[str, str]:
+def _group_label(
+    md: MethylData, *, case_label: str | None, control_label: str | None
+) -> tuple[str, str]:
     """Pick human-readable labels for the case/control violins/columns."""
     if control_label and case_label:
         return control_label, case_label
@@ -36,12 +35,18 @@ def _group_label(md: MethylData, *, case_label: str | None,
         if len(groups) == 2:
             # md.control_ids / treatment_ids come from samplesheet groups;
             # fall back to alphabetical otherwise.
-            ctrl = md.obs.filter(
-                pl.col("sample_id").is_in(md.control_ids)
-            ).get_column("group").unique().to_list()
-            case = md.obs.filter(
-                pl.col("sample_id").is_in(md.treatment_ids)
-            ).get_column("group").unique().to_list()
+            ctrl = (
+                md.obs.filter(pl.col("sample_id").is_in(md.control_ids))
+                .get_column("group")
+                .unique()
+                .to_list()
+            )
+            case = (
+                md.obs.filter(pl.col("sample_id").is_in(md.treatment_ids))
+                .get_column("group")
+                .unique()
+                .to_list()
+            )
             return (
                 control_label or (ctrl[0] if ctrl else groups[0]),
                 case_label or (case[0] if case else groups[1]),
@@ -104,12 +109,12 @@ def dmr_violin(
             "epykit's tl.dmr produces them by default."
         )
     ctrl_lbl, case_lbl = _group_label(
-        md, case_label=case_label, control_label=control_label,
+        md,
+        case_label=case_label,
+        control_label=control_label,
     )
 
-    categories = (
-        dmr.get_column(split).unique().to_list()
-    )
+    categories = dmr.get_column(split).unique().to_list()
     # Hyper first, then hypo, then anything else alphabetical -- matches the
     # typical figure ordering.
     rank = {"hyper": 0, "hypo": 1}
@@ -135,16 +140,19 @@ def dmr_violin(
         ctrl = ctrl[np.isfinite(ctrl)]
         case = case[np.isfinite(case)]
         if ctrl.size == 0 and case.size == 0:
-            ax.text(0.5, 0.5, "(no data)", ha="center", va="center",
-                    transform=ax.transAxes)
+            ax.text(0.5, 0.5, "(no data)", ha="center", va="center", transform=ax.transAxes)
             ax.axis("off")
             continue
 
         positions = [1, 2]
         data = [ctrl, case]
         parts = ax.violinplot(
-            data, positions=positions, showmeans=False,
-            showmedians=False, showextrema=False, widths=0.8,
+            data,
+            positions=positions,
+            showmeans=False,
+            showmedians=False,
+            showextrema=False,
+            widths=0.8,
         )
         for body, fill in zip(parts["bodies"], [color_ctrl, color_case]):
             body.set_facecolor(fill)
@@ -154,7 +162,10 @@ def dmr_violin(
 
         if show_box:
             ax.boxplot(
-                data, positions=positions, widths=0.18, showfliers=False,
+                data,
+                positions=positions,
+                widths=0.18,
+                showfliers=False,
                 patch_artist=True,
                 medianprops=dict(color="black", linewidth=1.4),
                 boxprops=dict(facecolor="white", edgecolor="black", linewidth=0.8),
@@ -258,9 +269,7 @@ def dmr_heatmap(
     from matplotlib import gridspec
 
     dmr = _resolve_dmr(md)
-    rank = by if by in dmr.columns else (
-        "pvalue" if "pvalue" in dmr.columns else dmr.columns[0]
-    )
+    rank = by if by in dmr.columns else ("pvalue" if "pvalue" in dmr.columns else dmr.columns[0])
     n = min(int(n_top), len(dmr))
     top = dmr.sort(rank).head(n)
 
@@ -284,6 +293,7 @@ def dmr_heatmap(
     row_order = np.arange(matrix.shape[0])
     if cluster_rows and valid_row_mask.sum() > 2:
         from scipy.cluster.hierarchy import leaves_list, linkage
+
         # Cluster valid rows; keep NaN rows at the bottom in their existing
         # order so the dendrogram doesn't choke.
         valid_rows = np.where(valid_row_mask)[0]
@@ -298,15 +308,20 @@ def dmr_heatmap(
     # Four columns -- the colorbar gets its own axis on the far right so it
     # never collides with the gene-label column.
     if figsize is None:
-        figsize = (1.6 + 0.45 * len(samples_ordered) + (1.8 if label_genes else 0.4),
-                   1.8 + 0.025 * matrix_ord.shape[0])
+        figsize = (
+            1.6 + 0.45 * len(samples_ordered) + (1.8 if label_genes else 0.4),
+            1.8 + 0.025 * matrix_ord.shape[0],
+        )
         figsize = (min(figsize[0], 17), min(max(figsize[1], 4.5), 14))
     fig = plt.figure(figsize=figsize)
     gs = gridspec.GridSpec(
-        2, 4, figure=fig,
+        2,
+        4,
+        figure=fig,
         width_ratios=[0.7, 4.0, (1.4 if label_genes else 0.05), 0.15],
         height_ratios=[0.35, 8.0],
-        hspace=0.06, wspace=0.05,
+        hspace=0.06,
+        wspace=0.05,
     )
     ax_group = fig.add_subplot(gs[0, 1])
     ax_dend = fig.add_subplot(gs[1, 0])
@@ -317,9 +332,14 @@ def dmr_heatmap(
     # Dendrogram
     if cluster_rows and valid_row_mask.sum() > 2:
         from scipy.cluster.hierarchy import dendrogram
+
         dendrogram(
-            Z, orientation="left", ax=ax_dend, no_labels=True,
-            color_threshold=0, above_threshold_color="black",
+            Z,
+            orientation="left",
+            ax=ax_dend,
+            no_labels=True,
+            color_threshold=0,
+            above_threshold_color="black",
         )
         ax_dend.invert_yaxis()  # match imshow row order
     ax_dend.set_xticks([])
@@ -329,7 +349,11 @@ def dmr_heatmap(
 
     # Heatmap
     im = ax_heat.imshow(
-        matrix_ord, aspect="auto", cmap=cmap, vmin=vmin, vmax=vmax,
+        matrix_ord,
+        aspect="auto",
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
         interpolation="nearest",
     )
     ax_heat.set_xticks(np.arange(len(samples_ordered)))
@@ -352,12 +376,19 @@ def dmr_heatmap(
             if j == len(groups_ordered) or groups_ordered[j] != groups_ordered[i0]:
                 mid = (i0 + j - 1) / 2.0
                 ax_group.plot(
-                    [i0 - 0.4, j - 1 + 0.4], [0.5, 0.5],
-                    color="black", lw=1.4,
+                    [i0 - 0.4, j - 1 + 0.4],
+                    [0.5, 0.5],
+                    color="black",
+                    lw=1.4,
                 )
                 ax_group.text(
-                    mid, 0.7, str(groups_ordered[i0]),
-                    ha="center", va="bottom", fontsize=10, fontweight="bold",
+                    mid,
+                    0.7,
+                    str(groups_ordered[i0]),
+                    ha="center",
+                    va="bottom",
+                    fontsize=10,
+                    fontweight="bold",
                 )
                 i0 = j
     else:
@@ -367,8 +398,10 @@ def dmr_heatmap(
     if label_genes:
         n_labels = 20 if label_genes is True else int(label_genes)
         gene_col = (
-            "gene_name" if "gene_name" in top.columns
-            else "gene_id" if "gene_id" in top.columns
+            "gene_name"
+            if "gene_name" in top.columns
+            else "gene_id"
+            if "gene_id" in top.columns
             else None
         )
         if gene_col is None or n_labels <= 0:
@@ -376,15 +409,20 @@ def dmr_heatmap(
         else:
             # Pick by largest |meth_diff| (or any signed effect col).
             score_col = (
-                "meth_diff" if "meth_diff" in top.columns
-                else "mean_meth_diff" if "mean_meth_diff" in top.columns
+                "meth_diff"
+                if "meth_diff" in top.columns
+                else "mean_meth_diff"
+                if "mean_meth_diff" in top.columns
                 else None
             )
             if score_col:
-                abs_diff = np.abs(np.fromiter(
-                    (r.get(score_col) or 0.0 for r in rows_meta_ord),
-                    count=len(rows_meta_ord), dtype=np.float64,
-                ))
+                abs_diff = np.abs(
+                    np.fromiter(
+                        (r.get(score_col) or 0.0 for r in rows_meta_ord),
+                        count=len(rows_meta_ord),
+                        dtype=np.float64,
+                    )
+                )
             else:
                 abs_diff = np.arange(len(rows_meta_ord))[::-1]
             keep_idx = np.argsort(-abs_diff)[:n_labels]
@@ -426,13 +464,18 @@ def dmr_heatmap(
                     continue
                 ax_lbl.annotate(
                     str(g),
-                    xy=(0.0, row_idx),       # row in the heatmap
-                    xytext=(0.22, dy),       # spread-out label position
-                    fontsize=7, va="center", ha="left",
+                    xy=(0.0, row_idx),  # row in the heatmap
+                    xytext=(0.22, dy),  # spread-out label position
+                    fontsize=7,
+                    va="center",
+                    ha="left",
                     fontstyle="italic",
                     arrowprops=dict(
                         arrowstyle="-",
-                        color="grey", lw=0.4, shrinkA=0, shrinkB=2,
+                        color="grey",
+                        lw=0.4,
+                        shrinkA=0,
+                        shrinkB=2,
                         connectionstyle="arc3,rad=0.0",
                     ),
                 )
@@ -446,8 +489,11 @@ def dmr_heatmap(
     if save:
         _save_fig(md, fig, save)
     return fig, {
-        "heatmap": ax_heat, "dendrogram": ax_dend,
-        "group_bracket": ax_group, "labels": ax_lbl, "colorbar": ax_cbar,
+        "heatmap": ax_heat,
+        "dendrogram": ax_dend,
+        "group_bracket": ax_group,
+        "labels": ax_lbl,
+        "colorbar": ax_cbar,
     }
 
 

@@ -34,19 +34,22 @@ def coverage_histogram(
     return fig, ax
 
 
-def methylation_heatmap(md: MethylData, n_top: int = 1000, ax=None, figsize=(8, 6), save: str | None = None):
+def methylation_heatmap(
+    md: MethylData, n_top: int = 1000, ax=None, figsize=(8, 6), save: str | None = None
+):
     try:
         import seaborn as sns
     except ImportError as exc:
-        raise ImportError("seaborn is required for heatmaps. Install with: pip install seaborn") from exc
+        raise ImportError(
+            "seaborn is required for heatmaps. Install with: pip install seaborn"
+        ) from exc
 
     dmc = md.dmc
     if dmc is None:
         raise ValueError("No DMC results available. Run ep.tl.dmc(md) first.")
 
     top = (
-        dmc
-        .filter(pl.col("meth_diff").is_not_null())
+        dmc.filter(pl.col("meth_diff").is_not_null())
         .with_columns(pl.col("meth_diff").abs().alias("abs_diff"))
         .sort("abs_diff", descending=True)
         .head(n_top)
@@ -76,7 +79,7 @@ def methylation_heatmap(md: MethylData, n_top: int = 1000, ax=None, figsize=(8, 
                 .then(pl.col("N_meth") / pl.col("coverage"))
                 .otherwise(None)
                 .alias("beta"),
-                pl.lit(sample).alias("sample")
+                pl.lit(sample).alias("sample"),
             )
             site_dfs.append(sample_df)
 
@@ -85,7 +88,9 @@ def methylation_heatmap(md: MethylData, n_top: int = 1000, ax=None, figsize=(8, 
 
     site_df = pl.concat(site_dfs)
 
-    pivot = site_df.pivot(values="beta", index=["chrom", "pos"], on="sample", aggregate_function="mean")
+    pivot = site_df.pivot(
+        values="beta", index=["chrom", "pos"], on="sample", aggregate_function="mean"
+    )
     for sample in samples:
         if sample not in pivot.columns:
             pivot = pivot.with_columns(pl.lit(None).alias(sample))
@@ -152,15 +157,14 @@ def mbias_plot(
 
     fig, ax = _get_ax(ax, figsize)
     samples = sorted(mbias_data.keys())
-    palette = (
-        list(PALETTE.values()) if isinstance(PALETTE, dict) else list(PALETTE)
-    )
+    palette = list(PALETTE.values()) if isinstance(PALETTE, dict) else list(PALETTE)
 
     drawn = 0
     for i, sample in enumerate(samples):
         entry = mbias_data[sample]
         if not isinstance(entry, pl.DataFrame):
             from ..nfcore_qc import parse_bismark_mbias
+
             entry = parse_bismark_mbias(entry)
         sub = entry.filter(pl.col("context") == context)
         if sub.is_empty():
@@ -175,7 +179,9 @@ def mbias_plot(
                 ssub.get_column("position").to_numpy(),
                 ssub.get_column("percent").to_numpy(),
                 label=f"{sample} {read}",
-                color=colour, linestyle=ls, linewidth=1.2,
+                color=colour,
+                linestyle=ls,
+                linewidth=1.2,
             )
             drawn += 1
 

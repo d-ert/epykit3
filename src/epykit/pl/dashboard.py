@@ -17,8 +17,14 @@ from ._utils import _save_fig
 
 def _empty_panel(ax, label: str) -> None:
     ax.text(
-        0.5, 0.5, label, ha="center", va="center",
-        transform=ax.transAxes, fontsize=9, color="gray",
+        0.5,
+        0.5,
+        label,
+        ha="center",
+        va="center",
+        transform=ax.transAxes,
+        fontsize=9,
+        color="gray",
     )
     ax.set_xticks([])
     ax.set_yticks([])
@@ -45,9 +51,7 @@ def qc_dashboard(
     obs = md.obs
     samples = obs.get_column("sample_id").to_list()
     groups = (
-        obs.get_column("group").to_list()
-        if "group" in obs.columns
-        else ["sample"] * len(samples)
+        obs.get_column("group").to_list() if "group" in obs.columns else ["sample"] * len(samples)
     )
 
     # Panel 1: bisulfite conversion rate (if available)
@@ -81,8 +85,11 @@ def qc_dashboard(
     if "global_methylation" in obs.columns:
         vals = obs.get_column("global_methylation").to_numpy()
         colors = [
-            (PALETTE.get("treatment", "#c45") if g == "treatment"
-             else PALETTE.get("control", "#456"))
+            (
+                PALETTE.get("treatment", "#c45")
+                if g == "treatment"
+                else PALETTE.get("control", "#456")
+            )
             for g in groups
         ]
         ax3.bar(range(len(samples)), vals, color=colors)
@@ -97,10 +104,9 @@ def qc_dashboard(
     ax4 = fig.add_subplot(gs[1, :2])
     corr_df = md.uns.get("qc_sample_correlation")
     if isinstance(corr_df, pl.DataFrame) and len(corr_df) > 0:
-        s_all = sorted(set(
-            corr_df.get_column("sample_a").to_list()
-            + corr_df.get_column("sample_b").to_list()
-        ))
+        s_all = sorted(
+            set(corr_df.get_column("sample_a").to_list() + corr_df.get_column("sample_b").to_list())
+        )
         n = len(s_all)
         idx = {s: i for i, s in enumerate(s_all)}
         mat = np.full((n, n), np.nan, dtype=np.float64)
@@ -124,15 +130,15 @@ def qc_dashboard(
             range(len(sex_df)),
             sex_df.get_column("mean_chrx_beta").to_numpy(),
             c=[
-                "tab:blue" if s == "male" else "tab:red"
-                if s == "female" else "gray"
+                "tab:blue" if s == "male" else "tab:red" if s == "female" else "gray"
                 for s in sex_df.get_column("inferred_sex").to_list()
             ],
         )
         ax5.set_xticks(range(len(sex_df)))
         ax5.set_xticklabels(
             sex_df.get_column("sample_id").to_list(),
-            rotation=90, fontsize=7,
+            rotation=90,
+            fontsize=7,
         )
         ax5.set_ylabel("Mean beta (chrX)")
         ax5.set_title("Sex check")
@@ -178,13 +184,17 @@ def qc_dashboard(
         top = obs.sort("contamination_score", descending=True).head(3)
         notes.append("highest contamination_score:")
         for row in top.iter_rows(named=True):
-            notes.append(
-                f"  {row['sample_id']}: {row['contamination_score']:.2f}"
-            )
+            notes.append(f"  {row['sample_id']}: {row['contamination_score']:.2f}")
     ax7.axis("off")
     ax7.text(
-        0.0, 1.0, "\n".join(notes), ha="left", va="top",
-        family="monospace", fontsize=9, transform=ax7.transAxes,
+        0.0,
+        1.0,
+        "\n".join(notes),
+        ha="left",
+        va="top",
+        family="monospace",
+        fontsize=9,
+        transform=ax7.transAxes,
     )
 
     fig.suptitle("epykit QC dashboard", fontsize=12, y=0.995)

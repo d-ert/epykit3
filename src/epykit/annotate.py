@@ -59,13 +59,13 @@ _FEATURE_PRIORITY: dict[str, int] = {
     # so existing tests and downstream consumers don't shift; the
     # fine-grained HOMER additions (5UTR / 3UTR / TTS / noncoding) slot in
     # between them.
-    "promoter":   0,
-    "5UTR":       1,
-    "3UTR":       2,
-    "TTS":        3,
-    "exon":       4,
-    "intron":     5,
-    "noncoding":  6,
+    "promoter": 0,
+    "5UTR": 1,
+    "3UTR": 2,
+    "TTS": 3,
+    "exon": 4,
+    "intron": 5,
+    "noncoding": 6,
     "intergenic": 7,
 }
 
@@ -73,7 +73,13 @@ _FEATURE_PRIORITY: dict[str, int] = {
 # to reproduce a HOMER-style 8-category breakdown
 # (matches the typical methylation-paper pie chart).
 HOMER_FEATURES: tuple[str, ...] = (
-    "promoter", "5UTR", "exon", "intron", "3UTR", "TTS", "noncoding",
+    "promoter",
+    "5UTR",
+    "exon",
+    "intron",
+    "3UTR",
+    "TTS",
+    "noncoding",
 )
 
 _FEAT_COLS = ["Chromosome", "Start", "End", "Strand", "Feature", "gene_id", "gene_name"]
@@ -174,33 +180,39 @@ def _sites_to_df(sites: pl.DataFrame) -> pd.DataFrame:
     shared with the GTF-derived feature DataFrames downstream.
     """
     import pandas as pd
+
     if "start" in sites.columns and "end" in sites.columns:
-        return pd.DataFrame({
-            "Chromosome": sites["chrom"].to_list(),
-            "Start":      sites["start"].to_list(),
-            "End":        sites["end"].to_list(),
-        })
+        return pd.DataFrame(
+            {
+                "Chromosome": sites["chrom"].to_list(),
+                "Start": sites["start"].to_list(),
+                "End": sites["end"].to_list(),
+            }
+        )
     pos = sites["pos"].to_list()
-    return pd.DataFrame({
-        "Chromosome": sites["chrom"].to_list(),
-        "Start":      pos,
-        "End":        [p + 1 for p in pos],
-    })
+    return pd.DataFrame(
+        {
+            "Chromosome": sites["chrom"].to_list(),
+            "Start": pos,
+            "End": [p + 1 for p in pos],
+        }
+    )
 
 
 def _build_promoter_df(genes_pd, upstream_bp: int, downstream_bp: int) -> pd.DataFrame:
     import pandas as pd
-    plus  = genes_pd[genes_pd["Strand"] == "+"].copy()
+
+    plus = genes_pd[genes_pd["Strand"] == "+"].copy()
     minus = genes_pd[genes_pd["Strand"] == "-"].copy()
-    plus["End"]    = plus["Start"] + downstream_bp
-    plus["Start"]  = (plus["Start"] - upstream_bp).clip(lower=0)
+    plus["End"] = plus["Start"] + downstream_bp
+    plus["Start"] = (plus["Start"] - upstream_bp).clip(lower=0)
     # Genes are 0-based half-open [Start, End). The minus-strand TSS is the
     # gene's highest-coordinate transcribed base = End - 1 (NOT End, which is
     # one past the gene), mirroring the plus-strand anchor on Start. Using End
     # made the promoter window and TSS distances 1 bp asymmetric vs + strand.
-    tss_minus      = minus["End"] - 1
+    tss_minus = minus["End"] - 1
     minus["Start"] = (tss_minus - downstream_bp).clip(lower=0)
-    minus["End"]   = tss_minus + upstream_bp
+    minus["End"] = tss_minus + upstream_bp
     combined = pd.concat([plus, minus], ignore_index=True)
     combined["Feature"] = "promoter"
     return combined
@@ -208,17 +220,17 @@ def _build_promoter_df(genes_pd, upstream_bp: int, downstream_bp: int) -> pd.Dat
 
 def _build_intron_df(exons_pd, genes_pd) -> pd.DataFrame:
     import pandas as pd
+
     if len(exons_pd) == 0 or len(genes_pd) == 0:
         return pd.DataFrame(columns=_FEAT_COLS)
     gene_meta = (
-        genes_pd
-        .drop_duplicates("gene_id")
+        genes_pd.drop_duplicates("gene_id")
         .set_index("gene_id")[["Chromosome", "Start", "End", "Strand", "gene_name"]]
         .rename(columns={"Chromosome": "_g_chrom", "Start": "_g_start", "End": "_g_end"})
     )
     ex = exons_pd[["gene_id", "Start", "End"]].join(gene_meta, on="gene_id", how="inner").copy()
     ex["Start"] = ex[["Start", "_g_start"]].max(axis=1).astype(np.int64)
-    ex["End"]   = ex[["End",   "_g_end"]  ].min(axis=1).astype(np.int64)
+    ex["End"] = ex[["End", "_g_end"]].min(axis=1).astype(np.int64)
     ex = ex[ex["Start"] < ex["End"]].copy()
     if len(ex) == 0:
         return pd.DataFrame(columns=_FEAT_COLS)
@@ -237,10 +249,10 @@ def _build_intron_df(exons_pd, genes_pd) -> pd.DataFrame:
     if len(introns) == 0:
         return pd.DataFrame(columns=_FEAT_COLS)
     introns["_intron_end"] = introns["Start"]
-    introns["Start"]       = introns["_prev_end"]
-    introns["End"]         = introns["_intron_end"]
-    introns["Feature"]     = "intron"
-    introns                = introns.rename(columns={"_g_chrom": "Chromosome"})
+    introns["Start"] = introns["_prev_end"]
+    introns["End"] = introns["_intron_end"]
+    introns["Feature"] = "intron"
+    introns = introns.rename(columns={"_g_chrom": "Chromosome"})
     return introns[_FEAT_COLS].reset_index(drop=True)
 
 
@@ -302,12 +314,17 @@ def _parse_gtf_utrs(gtf_path: str) -> pd.DataFrame:
                     attrs[m.group(1)] = m.group(2)
                 gene_id = attrs.get("gene_id", "")
                 gene_name = attrs.get("gene_name", gene_id)
-                rows.append({
-                    "Chromosome": chrom, "Start": start, "End": end,
-                    "Strand": strand, "gene_id": gene_id,
-                    "gene_name": gene_name,
-                    "Feature": "5UTR" if feature == "five_prime_utr" else "3UTR",
-                })
+                rows.append(
+                    {
+                        "Chromosome": chrom,
+                        "Start": start,
+                        "End": end,
+                        "Strand": strand,
+                        "gene_id": gene_id,
+                        "gene_name": gene_name,
+                        "Feature": "5UTR" if feature == "five_prime_utr" else "3UTR",
+                    }
+                )
     except Exception:
         # Keep the UTR rows parsed before the failing line rather than
         # discarding all of them (M8): one malformed line should not silently
@@ -315,7 +332,9 @@ def _parse_gtf_utrs(gtf_path: str) -> pd.DataFrame:
         logger.warning(
             "UTR parse error in %s after %d UTR row(s); keeping those and "
             "treating the remainder as no-UTR (affected sites fall through to "
-            "exon/intron).", gtf_path, len(rows),
+            "exon/intron).",
+            gtf_path,
+            len(rows),
         )
 
     cols = ["Chromosome", "Start", "End", "Strand", "gene_id", "gene_name", "Feature"]
@@ -336,19 +355,20 @@ def _build_tts_df(
     3' end. HOMER's defaults are ``-100/+1000`` around the TES.
     """
     import pandas as pd
+
     if len(genes_pd) == 0:
         return pd.DataFrame(columns=_FEAT_COLS)
-    plus  = genes_pd[genes_pd["Strand"] == "+"].copy()
+    plus = genes_pd[genes_pd["Strand"] == "+"].copy()
     minus = genes_pd[genes_pd["Strand"] == "-"].copy()
     # + strand: TES = End-1 (the last transcribed base; End is one past it in
     # the 0-based half-open [Start, End)) -> window [TES-upstream, TES+downstream)
     tts_plus = plus["End"] - 1
     plus["Start"] = (tts_plus - upstream_bp).clip(lower=0)
-    plus["End"]   = tts_plus + downstream_bp
+    plus["End"] = tts_plus + downstream_bp
     # - strand: TES = Start -> window [Start-downstream, Start+upstream)
     tts_minus = minus["Start"].copy()
     minus["Start"] = (tts_minus - downstream_bp).clip(lower=0)
-    minus["End"]   = tts_minus + upstream_bp
+    minus["End"] = tts_minus + upstream_bp
     combined = pd.concat([plus, minus], ignore_index=True)
     combined["Feature"] = "TTS"
     if "gene_name" not in combined.columns:
@@ -365,6 +385,7 @@ def _build_noncoding_df(genes_pd):
     column, returns an empty frame so the priority chain falls through.
     """
     import pandas as pd
+
     if len(genes_pd) == 0 or "gene_type" not in genes_pd.columns:
         return pd.DataFrame(columns=_FEAT_COLS)
     nc = genes_pd[genes_pd["gene_type"].fillna("") != "protein_coding"].copy()
@@ -379,6 +400,7 @@ def _build_noncoding_df(genes_pd):
 def _build_utr_df_from_gtf_utrs(utr_pd, side: str):
     """Filter the cached GTF-derived UTR frame to one side (5UTR / 3UTR)."""
     import pandas as pd
+
     if len(utr_pd) == 0:
         return pd.DataFrame(columns=_FEAT_COLS)
     sub = utr_pd[utr_pd["Feature"] == side].copy()
@@ -397,6 +419,7 @@ def _build_utr_df_from_refgene(genes_pd, exons_pd, side: str):
     who need UTR resolution should annotate with a GTF.
     """
     import pandas as pd
+
     return pd.DataFrame(columns=_FEAT_COLS)
 
 
@@ -418,45 +441,49 @@ def _parse_gtf_streaming(gtf_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     exon_rows: list[dict] = []
     attr_re = re.compile(r'(\w+)\s+"([^"]+)"')
 
-    is_gzip = gtf_path.endswith('.gz')
+    is_gzip = gtf_path.endswith(".gz")
     open_fn = gzip.open if is_gzip else open
 
     lines_read = 0
     try:
-        with open_fn(gtf_path, 'rt') as f:
+        with open_fn(gtf_path, "rt") as f:
             for line in f:
                 lines_read += 1
-                if line.startswith('#') or not line.strip():
+                if line.startswith("#") or not line.strip():
                     continue
-                parts = line.rstrip('\n').split('\t')
+                parts = line.rstrip("\n").split("\t")
                 if len(parts) < 9:
                     continue
-                chrom   = parts[0]
+                chrom = parts[0]
                 feature = parts[2]
-                if feature not in ('gene', 'exon'):
+                if feature not in ("gene", "exon"):
                     continue
                 # GTF 1-based closed -> 0-based half-open: subtract
                 # 1 from start; end already correct.
-                start  = int(parts[3]) - 1
-                end    = int(parts[4])
+                start = int(parts[3]) - 1
+                end = int(parts[4])
                 strand = parts[6]
-                attrs  = {}
+                attrs = {}
                 for m in attr_re.finditer(parts[8]):
                     attrs[m.group(1)] = m.group(2)
-                gene_id   = attrs.get('gene_id', '')
-                gene_name = attrs.get('gene_name', attrs.get('gene_id', ''))
+                gene_id = attrs.get("gene_id", "")
+                gene_name = attrs.get("gene_name", attrs.get("gene_id", ""))
                 # GENCODE uses ``gene_type``; Ensembl uses ``gene_biotype``.
                 # Accept either so the same parser handles both vendor GTFs.
                 # Defaults to "" for files that omit it entirely (the
                 # gene_type_filter path treats "" as "unknown" -> excluded
                 # when a filter is in effect, included when no filter).
-                gene_type = attrs.get('gene_type', attrs.get('gene_biotype', ''))
+                gene_type = attrs.get("gene_type", attrs.get("gene_biotype", ""))
                 row = {
-                    'Chromosome': chrom, 'Start': start, 'End': end,
-                    'Strand': strand, 'gene_id': gene_id, 'gene_name': gene_name,
-                    'gene_type': gene_type,
+                    "Chromosome": chrom,
+                    "Start": start,
+                    "End": end,
+                    "Strand": strand,
+                    "gene_id": gene_id,
+                    "gene_name": gene_name,
+                    "gene_type": gene_type,
                 }
-                if feature == 'gene':
+                if feature == "gene":
                     gene_rows.append(row)
                 else:
                     exon_rows.append(row)
@@ -467,7 +494,7 @@ def _parse_gtf_streaming(gtf_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     _log(f"  GTF streaming complete: {lines_read:,} lines read")
     _log(f"  Extracted {len(gene_rows):,} gene rows, {len(exon_rows):,} exon rows")
 
-    _empty_cols = ['Chromosome', 'Start', 'End', 'Strand', 'gene_id', 'gene_name', 'gene_type']
+    _empty_cols = ["Chromosome", "Start", "End", "Strand", "gene_id", "gene_name", "gene_type"]
     genes_pd = pd.DataFrame(gene_rows) if gene_rows else pd.DataFrame(columns=_empty_cols)
     exons_pd = pd.DataFrame(exon_rows) if exon_rows else pd.DataFrame(columns=_empty_cols)
 
@@ -505,27 +532,27 @@ def _parse_refgene_streaming(refgene_path: str) -> tuple[pd.DataFrame, pd.DataFr
 
     gene_rows: list[dict] = []
     exon_rows: list[dict] = []
-    is_gzip = refgene_path.endswith('.gz')
+    is_gzip = refgene_path.endswith(".gz")
     open_fn = gzip.open if is_gzip else open
 
     lines_read = 0
     try:
-        with open_fn(refgene_path, 'rt') as f:
+        with open_fn(refgene_path, "rt") as f:
             for line in f:
                 lines_read += 1
-                if not line.strip() or line.startswith('#'):
+                if not line.strip() or line.startswith("#"):
                     continue
-                parts = line.rstrip('\n').split('\t')
+                parts = line.rstrip("\n").split("\t")
                 if len(parts) < 13:
                     continue
-                acc      = parts[1]
-                chrom    = parts[2]
-                strand   = parts[3]
-                tx_start = int(parts[4])   # refGene is already 0-based half-open
-                tx_end   = int(parts[5])
-                ex_starts = [int(x) for x in parts[9].rstrip(',').split(',') if x]
-                ex_ends   = [int(x) for x in parts[10].rstrip(',').split(',') if x]
-                symbol   = parts[12]
+                acc = parts[1]
+                chrom = parts[2]
+                strand = parts[3]
+                tx_start = int(parts[4])  # refGene is already 0-based half-open
+                tx_end = int(parts[5])
+                ex_starts = [int(x) for x in parts[9].rstrip(",").split(",") if x]
+                ex_ends = [int(x) for x in parts[10].rstrip(",").split(",") if x]
+                symbol = parts[12]
                 gene_type = "protein_coding" if acc.startswith("NM_") else "non-coding"
 
                 # One genes_pd row per transcript: TSS = txStart on + strand,
@@ -533,17 +560,29 @@ def _parse_refgene_streaming(refgene_path: str) -> tuple[pd.DataFrame, pd.DataFr
                 # become multiple entries, which is correct: a gene's
                 # alternative TSSs are real biology and the nearest-TSS
                 # rule should consider each one.
-                gene_rows.append({
-                    'Chromosome': chrom, 'Start': tx_start, 'End': tx_end,
-                    'Strand': strand, 'gene_id': acc, 'gene_name': symbol,
-                    'gene_type': gene_type,
-                })
+                gene_rows.append(
+                    {
+                        "Chromosome": chrom,
+                        "Start": tx_start,
+                        "End": tx_end,
+                        "Strand": strand,
+                        "gene_id": acc,
+                        "gene_name": symbol,
+                        "gene_type": gene_type,
+                    }
+                )
                 for es, ee in zip(ex_starts, ex_ends):
-                    exon_rows.append({
-                        'Chromosome': chrom, 'Start': es, 'End': ee,
-                        'Strand': strand, 'gene_id': acc, 'gene_name': symbol,
-                        'gene_type': gene_type,
-                    })
+                    exon_rows.append(
+                        {
+                            "Chromosome": chrom,
+                            "Start": es,
+                            "End": ee,
+                            "Strand": strand,
+                            "gene_id": acc,
+                            "gene_name": symbol,
+                            "gene_type": gene_type,
+                        }
+                    )
     except Exception as e:
         _log(f"  ERROR parsing refGene (read {lines_read:,} lines): {e}")
         raise
@@ -551,7 +590,7 @@ def _parse_refgene_streaming(refgene_path: str) -> tuple[pd.DataFrame, pd.DataFr
     _log(f"  refGene streaming complete: {lines_read:,} transcripts read")
     _log(f"  Extracted {len(gene_rows):,} gene rows, {len(exon_rows):,} exon rows")
 
-    _empty_cols = ['Chromosome', 'Start', 'End', 'Strand', 'gene_id', 'gene_name', 'gene_type']
+    _empty_cols = ["Chromosome", "Start", "End", "Strand", "gene_id", "gene_name", "gene_type"]
     genes_pd = pd.DataFrame(gene_rows) if gene_rows else pd.DataFrame(columns=_empty_cols)
     exons_pd = pd.DataFrame(exon_rows) if exon_rows else pd.DataFrame(columns=_empty_cols)
 
@@ -568,15 +607,17 @@ def _pick_best_overlap(joined_df) -> pd.DataFrame:
     # whose promoter windows cover one site), break ties by gene id so the
     # chosen gene_id/gene_name is stable across runs and pandas versions. A
     # bare sort_values uses an unstable quicksort -> arbitrary pick (M-ANN2).
-    gene_col = "gene_id_b" if "gene_id_b" in df.columns else (
-        "gene_id" if "gene_id" in df.columns else None
+    gene_col = (
+        "gene_id_b"
+        if "gene_id_b" in df.columns
+        else ("gene_id" if "gene_id" in df.columns else None)
     )
     sort_keys = ["_priority"] + ([gene_col] if gene_col else [])
     return (
         df.sort_values(sort_keys, kind="mergesort")
-          .groupby("_row_idx", as_index=False)
-          .first()
-          .drop(columns=["_priority"])
+        .groupby("_row_idx", as_index=False)
+        .first()
+        .drop(columns=["_priority"])
     )
 
 
@@ -599,18 +640,20 @@ def _annotate_chromosome_chunk(
 
     COLS = ("Chromosome", "Start", "End")
 
-    chunk_n   = len(chrom_sites)
+    chunk_n = len(chrom_sites)
     orig_idxs = chrom_sites["_orig_idx"].to_numpy()
 
-    result = pd.DataFrame({
-        "_orig_idx":    orig_idxs,
-        "gene_id":      np.full(chunk_n, "", dtype=object),
-        "gene_name":    np.full(chunk_n, "", dtype=object),
-        "feature_type": np.full(chunk_n, "intergenic", dtype=object),
-    })
+    result = pd.DataFrame(
+        {
+            "_orig_idx": orig_idxs,
+            "gene_id": np.full(chunk_n, "", dtype=object),
+            "gene_name": np.full(chunk_n, "", dtype=object),
+            "feature_type": np.full(chunk_n, "intergenic", dtype=object),
+        }
+    )
     if multi_annotation:
         # Default empty lists for sites with no feature overlaps.
-        result["all_genes"]    = [[] for _ in range(chunk_n)]
+        result["all_genes"] = [[] for _ in range(chunk_n)]
         result["all_features"] = [[] for _ in range(chunk_n)]
 
     if chrom_features_df.empty:
@@ -622,12 +665,13 @@ def _annotate_chromosome_chunk(
     try:
         sites_pd = _sites_to_df(chrom_sites)
         sites_pd["_row_idx"] = np.arange(chunk_n, dtype=np.int32)
-        _log(f"  {chrom}: sites DataFrame built in {time.time()-t0:.1f}s")
+        _log(f"  {chrom}: sites DataFrame built in {time.time() - t0:.1f}s")
     except Exception:
         logger.warning(
             "%s: annotation failed building the sites frame -> this whole "
             "chromosome is labelled all-intergenic:\n%s",
-            chrom, traceback.format_exc(),
+            chrom,
+            traceback.format_exc(),
         )
         return result
 
@@ -638,18 +682,20 @@ def _annotate_chromosome_chunk(
     t0 = time.time()
     try:
         joined = bioframe.overlap(
-            sites_pd, feat_df,
+            sites_pd,
+            feat_df,
             how="left",
-            cols1=COLS, cols2=COLS,
+            cols1=COLS,
+            cols2=COLS,
             suffixes=("", "_b"),
         )
         join_rows = len(joined)
-        _log(f"  {chrom}: overlap done in {time.time()-t0:.1f}s  -> {join_rows:,} rows")
+        _log(f"  {chrom}: overlap done in {time.time() - t0:.1f}s  -> {join_rows:,} rows")
     except Exception:
         logger.warning(
-            "%s: bioframe overlap failed -> this whole chromosome is labelled "
-            "all-intergenic:\n%s",
-            chrom, traceback.format_exc(),
+            "%s: bioframe overlap failed -> this whole chromosome is labelled all-intergenic:\n%s",
+            chrom,
+            traceback.format_exc(),
         )
         return result
 
@@ -671,8 +717,8 @@ def _annotate_chromosome_chunk(
         # left-join's no-match rows are filtered out so a no-overlap site
         # stays with the empty-list defaults seeded above.
         if multi_annotation:
-            feat_col_j = "Feature_b"   if "Feature_b"   in joined_df.columns else "Feature"
-            gnm_col_j  = "gene_name_b" if "gene_name_b" in joined_df.columns else "gene_name"
+            feat_col_j = "Feature_b" if "Feature_b" in joined_df.columns else "Feature"
+            gnm_col_j = "gene_name_b" if "gene_name_b" in joined_df.columns else "gene_name"
             valid = (
                 joined_df[gnm_col_j].notna()
                 & (joined_df[gnm_col_j].astype(str) != "")
@@ -680,16 +726,14 @@ def _annotate_chromosome_chunk(
             )
             if valid.any():
                 multi = joined_df.loc[valid, ["_row_idx", gnm_col_j, feat_col_j]].copy()
-                multi[gnm_col_j]  = multi[gnm_col_j].astype(str)
+                multi[gnm_col_j] = multi[gnm_col_j].astype(str)
                 multi[feat_col_j] = multi[feat_col_j].astype(str)
                 # Sorted unique per row -- stable, dedup'd, deterministic output
-                gene_lists = (
-                    multi.groupby("_row_idx", sort=False)[gnm_col_j]
-                         .apply(lambda s: sorted(set(s)))
+                gene_lists = multi.groupby("_row_idx", sort=False)[gnm_col_j].apply(
+                    lambda s: sorted(set(s))
                 )
-                feat_lists = (
-                    multi.groupby("_row_idx", sort=False)[feat_col_j]
-                         .apply(lambda s: sorted(set(s)))
+                feat_lists = multi.groupby("_row_idx", sort=False)[feat_col_j].apply(
+                    lambda s: sorted(set(s))
                 )
                 for row_idx, glist in gene_lists.items():
                     result.at[int(row_idx), "all_genes"] = glist
@@ -702,26 +746,32 @@ def _annotate_chromosome_chunk(
         del joined_df
         gc.collect()
 
-        feat_col = "Feature_b"   if "Feature_b"   in best.columns else "Feature"
-        gid_col  = "gene_id_b"   if "gene_id_b"   in best.columns else "gene_id"
-        gnm_col  = "gene_name_b" if "gene_name_b" in best.columns else "gene_name"
-        best_slim = (
-            best[["_row_idx", gid_col, gnm_col, feat_col]]
-            .rename(columns={
-                gid_col:  "gene_id",
-                gnm_col:  "gene_name",
+        feat_col = "Feature_b" if "Feature_b" in best.columns else "Feature"
+        gid_col = "gene_id_b" if "gene_id_b" in best.columns else "gene_id"
+        gnm_col = "gene_name_b" if "gene_name_b" in best.columns else "gene_name"
+        best_slim = best[["_row_idx", gid_col, gnm_col, feat_col]].rename(
+            columns={
+                gid_col: "gene_id",
+                gnm_col: "gene_name",
                 feat_col: "feature_type",
-            })
+            }
         )
         del best
 
-        local_df = (
-            pd.DataFrame({"_row_idx": np.arange(chunk_n, dtype=np.int32)})
-            .merge(best_slim, on="_row_idx", how="left")
+        local_df = pd.DataFrame({"_row_idx": np.arange(chunk_n, dtype=np.int32)}).merge(
+            best_slim, on="_row_idx", how="left"
         )
-        result["gene_id"]      = local_df["gene_id"].fillna("").astype(str).replace("-1", "").to_numpy()
-        result["gene_name"]    = local_df["gene_name"].fillna("").astype(str).replace("-1", "").to_numpy()
-        result["feature_type"] = local_df["feature_type"].fillna("intergenic").astype(str).replace("-1", "intergenic").to_numpy()
+        result["gene_id"] = local_df["gene_id"].fillna("").astype(str).replace("-1", "").to_numpy()
+        result["gene_name"] = (
+            local_df["gene_name"].fillna("").astype(str).replace("-1", "").to_numpy()
+        )
+        result["feature_type"] = (
+            local_df["feature_type"]
+            .fillna("intergenic")
+            .astype(str)
+            .replace("-1", "intergenic")
+            .to_numpy()
+        )
 
         n_annotated = int((result["gene_id"] != "").sum())
         _log(f"  {chrom}: {n_annotated:,}/{chunk_n:,} sites annotated")
@@ -731,13 +781,15 @@ def _annotate_chromosome_chunk(
             "%s: post-join annotation assembly failed -> this chromosome's "
             "single-best annotation is unreliable (left as seeded intergenic); "
             "investigate before trusting its feature distribution:\n%s",
-            chrom, traceback.format_exc(),
+            chrom,
+            traceback.format_exc(),
         )
 
     return result
 
 
 # Public API
+
 
 def _build_features_index(
     annotation_path: str,
@@ -776,10 +828,7 @@ def _build_features_index(
     import pandas as pd
 
     feature_key = tuple(sorted(set(features)))
-    gtf_key = (
-        tuple(sorted(set(gene_type_filter)))
-        if gene_type_filter is not None else None
-    )
+    gtf_key = tuple(sorted(set(gene_type_filter))) if gene_type_filter is not None else None
     cache_key = (
         str(Path(annotation_path).resolve()),
         source,
@@ -812,7 +861,7 @@ def _build_features_index(
             genes_pd, exons_pd = _parse_gtf_streaming(annotation_path)
         else:
             genes_pd, exons_pd = _parse_refgene_streaming(annotation_path)
-        _log(f"  parsed in {time.time()-t0:.1f}s")
+        _log(f"  parsed in {time.time() - t0:.1f}s")
         _log(f"  {_df_info('genes_pd', genes_pd)}")
         _log(f"  {_df_info('exons_pd (raw)', exons_pd)}")
         gc.collect()
@@ -828,7 +877,8 @@ def _build_features_index(
     if "gene_name" not in exons_pd.columns:
         exons_pd = exons_pd.merge(
             genes_pd[["gene_id", "gene_name"]].drop_duplicates(),
-            on="gene_id", how="left",
+            on="gene_id",
+            how="left",
         )
 
     # Apply gene_type filter (if requested). Drops both gene rows and any
@@ -838,15 +888,19 @@ def _build_features_index(
         allow = set(gene_type_filter)
         n_before = len(genes_pd)
         if "gene_type" not in genes_pd.columns:
-            _log(f"  WARNING: gene_type_filter={allow} requested but source "
-                 f"didn't expose gene_type; falling through (no filter applied)")
+            _log(
+                f"  WARNING: gene_type_filter={allow} requested but source "
+                f"didn't expose gene_type; falling through (no filter applied)"
+            )
         else:
             kept_gene_ids = set(genes_pd.loc[genes_pd["gene_type"].isin(allow), "gene_id"])
             genes_pd = genes_pd[genes_pd["gene_id"].isin(kept_gene_ids)].reset_index(drop=True)
             if "gene_id" in exons_pd.columns:
                 exons_pd = exons_pd[exons_pd["gene_id"].isin(kept_gene_ids)].reset_index(drop=True)
-            _log(f"  gene_type filter {allow}: {n_before:,} -> {len(genes_pd):,} genes "
-                 f"({len(genes_pd)/max(n_before,1):.1%} retained)")
+            _log(
+                f"  gene_type filter {allow}: {n_before:,} -> {len(genes_pd):,} genes "
+                f"({len(genes_pd) / max(n_before, 1):.1%} retained)"
+            )
 
     # ------------------------------------------------------------------
     # Step 2: Deduplicate exons
@@ -862,7 +916,9 @@ def _build_features_index(
             .reset_index(drop=True)
         )
         gc.collect()
-        _log(f"  exons: {n_before:,} -> {len(exons_pd):,} (removed {n_before - len(exons_pd):,} duplicates)")
+        _log(
+            f"  exons: {n_before:,} -> {len(exons_pd):,} (removed {n_before - len(exons_pd):,} duplicates)"
+        )
     else:
         _log("  WARNING: expected exon columns not all present; skipping dedup.")
 
@@ -875,7 +931,7 @@ def _build_features_index(
     if "promoter" in features:
         t0 = time.time()
         prom_df = _build_promoter_df(genes_pd, promoter_upstream_bp, promoter_downstream_bp)
-        _log(f"  {_df_info('promoters', prom_df)}  ({time.time()-t0:.1f}s)")
+        _log(f"  {_df_info('promoters', prom_df)}  ({time.time() - t0:.1f}s)")
         feature_dfs.append(prom_df[_FEAT_COLS])
 
     if "exon" in features and len(exons_pd) > 0:
@@ -889,7 +945,7 @@ def _build_features_index(
         _log("  building introns (vectorised) ...")
         try:
             intron_df = _build_intron_df(exons_pd, genes_pd)
-            _log(f"  {_df_info('introns', intron_df)}  ({time.time()-t0:.1f}s)")
+            _log(f"  {_df_info('introns', intron_df)}  ({time.time() - t0:.1f}s)")
             if len(intron_df) > 0:
                 feature_dfs.append(intron_df[_FEAT_COLS])
         except Exception:
@@ -916,9 +972,11 @@ def _build_features_index(
                 if len(u3) > 0:
                     feature_dfs.append(u3[_FEAT_COLS])
         else:
-            _log("  WARNING: 5UTR/3UTR requested but source is refGene; "
-                 "refGene's CDS coordinates aren't carried through the parser. "
-                 "Use a GTF source for UTR-level resolution.")
+            _log(
+                "  WARNING: 5UTR/3UTR requested but source is refGene; "
+                "refGene's CDS coordinates aren't carried through the parser. "
+                "Use a GTF source for UTR-level resolution."
+            )
 
     if "TTS" in features and len(genes_pd) > 0:
         tts_df = _build_tts_df(genes_pd)
@@ -935,12 +993,11 @@ def _build_features_index(
     if feature_dfs:
         t0 = time.time()
         all_features_df = (
-            pd.concat(feature_dfs, ignore_index=True)
-            [_FEAT_COLS]
+            pd.concat(feature_dfs, ignore_index=True)[_FEAT_COLS]
             .drop_duplicates()
             .reset_index(drop=True)
         )
-        _log(f"  {_df_info('all_features_df', all_features_df)}  ({time.time()-t0:.1f}s)")
+        _log(f"  {_df_info('all_features_df', all_features_df)}  ({time.time() - t0:.1f}s)")
     else:
         logger.warning(
             "No feature intervals were built from the annotation source -> "
@@ -971,9 +1028,8 @@ def _build_features_index(
     # used in Step 8 for TSS-distance + sign).
     # ------------------------------------------------------------------
     _log("Step 5/8: building TSS map (per-gene_id) and per-chrom TSS arrays ...")
-    _g = (
-        genes_pd[["gene_id", "Chromosome", "Start", "End", "Strand", "gene_name"]]
-        .drop_duplicates("gene_id")
+    _g = genes_pd[["gene_id", "Chromosome", "Start", "End", "Strand", "gene_name"]].drop_duplicates(
+        "gene_id"
     )
     # 0-based half-open [Start, End): + strand TSS = Start (first base);
     # - strand TSS = End - 1 (the highest-coordinate transcribed base, NOT
@@ -1007,8 +1063,10 @@ def _build_features_index(
             grp["gene_name"].to_numpy(dtype=object),
             grp["Strand"].to_numpy(dtype=object),
         )
-    _log(f"  TSS map built: {len(tss_series):,} genes; "
-         f"per-chrom TSS arrays across {len(tss_by_chrom)} chromosomes")
+    _log(
+        f"  TSS map built: {len(tss_series):,} genes; "
+        f"per-chrom TSS arrays across {len(tss_by_chrom)} chromosomes"
+    )
     del _g, _g_tss, genes_pd, exons_pd
     gc.collect()
 
@@ -1070,7 +1128,9 @@ def _check_chrom_name_overlap(site_chroms, feature_chroms, *, kind: str) -> None
             "Only %.0f%% of site chromosomes are present in the %s; sites on "
             "%s (and possibly others) will be annotated as intergenic/open_sea. "
             "Possible chromosome-naming mismatch.",
-            100 * covered, kind, sorted(site_set - feat_set)[:5],
+            100 * covered,
+            kind,
+            sorted(site_set - feat_set)[:5],
         )
 
 
@@ -1080,7 +1140,13 @@ def annotate_features(
     *,
     source: str = "auto",
     features: list[str] | tuple[str, ...] = (
-        "promoter", "5UTR", "exon", "intron", "3UTR", "TTS", "noncoding",
+        "promoter",
+        "5UTR",
+        "exon",
+        "intron",
+        "3UTR",
+        "TTS",
+        "noncoding",
     ),
     promoter_upstream_bp: int = 2000,
     promoter_downstream_bp: int = 200,
@@ -1157,9 +1223,7 @@ def annotate_features(
     if source == "auto":
         source = _detect_annotation_source(annotation)
     elif source not in ("gtf", "refgene"):
-        raise ValueError(
-            f"source must be 'auto', 'gtf', or 'refgene'; got {source!r}"
-        )
+        raise ValueError(f"source must be 'auto', 'gtf', or 'refgene'; got {source!r}")
 
     # Normalize gene_type_filter to tuple or None
     if isinstance(gene_type_filter, str):
@@ -1209,14 +1273,10 @@ def annotate_features(
     # Step 6: Tag sites with original row index
     # ------------------------------------------------------------------
     _log("Step 6/8: tagging sites with original row index ...")
-    sites_with_idx = sites.with_columns(
-        pl.Series("_orig_idx", np.arange(n, dtype=np.int32))
-    )
+    sites_with_idx = sites.with_columns(pl.Series("_orig_idx", np.arange(n, dtype=np.int32)))
     chromosomes = sorted(sites["chrom"].unique().to_list())
     _log(f"  {n:,} sites across {len(chromosomes)} chromosomes: {chromosomes}")
-    _check_chrom_name_overlap(
-        chromosomes, features_by_chrom.keys(), kind="gene-model annotation"
-    )
+    _check_chrom_name_overlap(chromosomes, features_by_chrom.keys(), kind="gene-model annotation")
 
     # ------------------------------------------------------------------
     # Step 7: Per-chromosome annotation loop
@@ -1225,12 +1285,13 @@ def annotate_features(
     annot_parts: list[pd.DataFrame] = []
 
     for i, chrom in enumerate(chromosomes, 1):
-        chrom_sites    = sites_with_idx.filter(pl.col("chrom") == chrom)
-        chunk_n        = len(chrom_sites)
+        chrom_sites = sites_with_idx.filter(pl.col("chrom") == chrom)
+        chunk_n = len(chrom_sites)
         chrom_features = features_by_chrom.get(chrom, pd.DataFrame(columns=_FEAT_COLS))
 
-        _log(f"[{i}/{len(chromosomes)}] {chrom}: {chunk_n:,} sites, "
-             f"{len(chrom_features):,} features")
+        _log(
+            f"[{i}/{len(chromosomes)}] {chrom}: {chunk_n:,} sites, {len(chrom_features):,} features"
+        )
 
         if chunk_n == 0:
             _log(f"  {chrom}: 0 sites, skipping")
@@ -1239,25 +1300,30 @@ def annotate_features(
         t0 = time.time()
         try:
             part = _annotate_chromosome_chunk(
-                chrom, chrom_sites, chrom_features,
+                chrom,
+                chrom_sites,
+                chrom_features,
                 multi_annotation=multi_annotation,
             )
             annot_parts.append(part)
-            _log(f"  {chrom}: done in {time.time()-t0:.1f}s")
+            _log(f"  {chrom}: done in {time.time() - t0:.1f}s")
         except Exception:
             logger.warning(
                 "%s: unhandled error annotating this chromosome -> it is "
                 "labelled all-intergenic:\n%s",
-                chrom, traceback.format_exc(),
+                chrom,
+                traceback.format_exc(),
             )
-            part = pd.DataFrame({
-                "_orig_idx":    chrom_sites["_orig_idx"].to_numpy(),
-                "gene_id":      np.full(chunk_n, "", dtype=object),
-                "gene_name":    np.full(chunk_n, "", dtype=object),
-                "feature_type": np.full(chunk_n, "intergenic", dtype=object),
-            })
+            part = pd.DataFrame(
+                {
+                    "_orig_idx": chrom_sites["_orig_idx"].to_numpy(),
+                    "gene_id": np.full(chunk_n, "", dtype=object),
+                    "gene_name": np.full(chunk_n, "", dtype=object),
+                    "feature_type": np.full(chunk_n, "intergenic", dtype=object),
+                }
+            )
             if multi_annotation:
-                part["all_genes"]    = [[] for _ in range(chunk_n)]
+                part["all_genes"] = [[] for _ in range(chunk_n)]
                 part["all_features"] = [[] for _ in range(chunk_n)]
             annot_parts.append(part)
 
@@ -1279,46 +1345,44 @@ def annotate_features(
             "labelled intergenic. Check the annotation source and chromosome "
             "naming (chr1 vs 1)."
         )
-        annot_all = pd.DataFrame({
-            "_orig_idx":    np.arange(n, dtype=np.int32),
-            "gene_id":      np.full(n, "", dtype=object),
-            "gene_name":    np.full(n, "", dtype=object),
-            "feature_type": np.full(n, "intergenic", dtype=object),
-        })
+        annot_all = pd.DataFrame(
+            {
+                "_orig_idx": np.arange(n, dtype=np.int32),
+                "gene_id": np.full(n, "", dtype=object),
+                "gene_name": np.full(n, "", dtype=object),
+                "feature_type": np.full(n, "intergenic", dtype=object),
+            }
+        )
         if multi_annotation:
-            annot_all["all_genes"]    = [[] for _ in range(n)]
+            annot_all["all_genes"] = [[] for _ in range(n)]
             annot_all["all_features"] = [[] for _ in range(n)]
 
     _log(f"  {_df_info('annot_all (reassembled)', annot_all)}")
 
-    gene_ids      = annot_all["gene_id"].to_numpy(dtype=object)
-    gene_names    = annot_all["gene_name"].to_numpy(dtype=object)
+    gene_ids = annot_all["gene_id"].to_numpy(dtype=object)
+    gene_names = annot_all["gene_name"].to_numpy(dtype=object)
     feature_types = annot_all["feature_type"].to_numpy(dtype=object)
 
     n_annotated = int((gene_ids != "").sum())
-    ft_counts   = {k: int((feature_types == k).sum()) for k in _FEATURE_PRIORITY}
+    ft_counts = {k: int((feature_types == k).sum()) for k in _FEATURE_PRIORITY}
     ft_counts["intergenic"] = int((feature_types == "intergenic").sum())
     _log(f"  annotation summary: {n_annotated:,}/{n:,} sites have a gene  | {ft_counts}")
 
     if "pos" in sites.columns:
         site_mids = sites["pos"].to_numpy().astype(np.float64)
     else:
-        site_mids = (
-            (sites["start"].to_numpy() + sites["end"].to_numpy()) / 2.0
-        ).astype(np.float64)
+        site_mids = ((sites["start"].to_numpy() + sites["end"].to_numpy()) / 2.0).astype(np.float64)
 
     tss_positions = (
-        pd.Series(gene_ids.tolist())
-        .map(tss_series)
-        .to_numpy(dtype=np.float64, na_value=np.nan)
+        pd.Series(gene_ids.tolist()).map(tss_series).to_numpy(dtype=np.float64, na_value=np.nan)
     )
 
     # TSS distance: positive = downstream. On - strand, TSS sits at End-1 and
     # a higher genomic coordinate is upstream, so flip the sign. ``strand_lut``
     # came from the cached feature index, so this is O(1) on a rerun.
-    strand_arr  = pd.Series(gene_ids.tolist()).map(strand_lut).to_numpy(dtype=object)
+    strand_arr = pd.Series(gene_ids.tolist()).map(strand_lut).to_numpy(dtype=object)
     strand_sign = np.where(strand_arr == "-", -1.0, 1.0).astype(np.float64)
-    dist_to_tss              = (strand_sign * (site_mids - tss_positions)).astype(np.float32)
+    dist_to_tss = (strand_sign * (site_mids - tss_positions)).astype(np.float32)
     dist_to_tss[gene_ids == ""] = np.nan
 
     # ------------------------------------------------------------------
@@ -1330,8 +1394,8 @@ def annotate_features(
         _log("Step 8b/8: computing nearest-TSS (annotatr/HOMER-style) ...")
         site_chroms = sites["chrom"].to_list()
         # Reuse site_mids computed just above
-        nearest_genes    = np.full(n, "", dtype=object)
-        nearest_dist     = np.full(n, np.iinfo(np.int32).min, dtype=np.int64)
+        nearest_genes = np.full(n, "", dtype=object)
+        nearest_dist = np.full(n, np.iinfo(np.int32).min, dtype=np.int64)
         for i in range(n):
             chrom = site_chroms[i]
             entry = tss_by_chrom.get(chrom)
@@ -1343,43 +1407,52 @@ def annotate_features(
             # |center - tss|. Handles both edges via list indexing guards.
             idx = int(np.searchsorted(sorted_pos, center, side="left"))
             cand_idxs = []
-            if idx > 0: cand_idxs.append(idx - 1)
-            if idx < len(sorted_pos): cand_idxs.append(idx)
+            if idx > 0:
+                cand_idxs.append(idx - 1)
+            if idx < len(sorted_pos):
+                cand_idxs.append(idx)
             if not cand_idxs:
                 continue
             best_i = min(cand_idxs, key=lambda k: abs(int(sorted_pos[k]) - center))
             sign = -1 if sorted_strands[best_i] == "-" else 1
             nearest_genes[i] = str(sorted_names[best_i])
-            nearest_dist[i]  = sign * (center - int(sorted_pos[best_i]))
+            nearest_dist[i] = sign * (center - int(sorted_pos[best_i]))
 
         # Clip to int32 range to keep the polars dtype small; sentinel for
         # chroms missing from the GTF is "" gene + NaN distance.
         sentinel_min = np.iinfo(np.int32).min
         missing = nearest_dist == sentinel_min
-        nearest_dist_clip = np.clip(nearest_dist, np.iinfo(np.int32).min + 1,
-                                    np.iinfo(np.int32).max).astype(np.int32)
+        nearest_dist_clip = np.clip(
+            nearest_dist, np.iinfo(np.int32).min + 1, np.iinfo(np.int32).max
+        ).astype(np.int32)
         # Polars Int32 doesn't carry NaN -- encode "no TSS found" as int32.min
         nearest_dist_clip[missing] = np.iinfo(np.int32).min
 
         multi_columns = [
-            pl.Series("nearest_tss_gene",     nearest_genes.tolist(), dtype=pl.Utf8),
-            pl.Series("nearest_tss_distance", nearest_dist_clip,       dtype=pl.Int32),
-            pl.Series("all_overlapping_genes",
-                      annot_all["all_genes"].tolist(),    dtype=pl.List(pl.Utf8)),
-            pl.Series("all_overlapping_features",
-                      annot_all["all_features"].tolist(), dtype=pl.List(pl.Utf8)),
+            pl.Series("nearest_tss_gene", nearest_genes.tolist(), dtype=pl.Utf8),
+            pl.Series("nearest_tss_distance", nearest_dist_clip, dtype=pl.Int32),
+            pl.Series(
+                "all_overlapping_genes", annot_all["all_genes"].tolist(), dtype=pl.List(pl.Utf8)
+            ),
+            pl.Series(
+                "all_overlapping_features",
+                annot_all["all_features"].tolist(),
+                dtype=pl.List(pl.Utf8),
+            ),
         ]
 
-    _log(f"annotate_features DONE  total elapsed {time.time()-t_total:.1f}s")
+    _log(f"annotate_features DONE  total elapsed {time.time() - t_total:.1f}s")
     _log("=" * 60)
 
-    return sites.with_columns([
-        pl.Series("gene_id",         gene_ids.tolist(),      dtype=pl.Utf8),
-        pl.Series("gene_name",       gene_names.tolist(),    dtype=pl.Utf8),
-        pl.Series("feature_type",    feature_types.tolist(), dtype=pl.Utf8),
-        pl.Series("distance_to_tss", dist_to_tss,            dtype=pl.Float32),
-        *multi_columns,
-    ])
+    return sites.with_columns(
+        [
+            pl.Series("gene_id", gene_ids.tolist(), dtype=pl.Utf8),
+            pl.Series("gene_name", gene_names.tolist(), dtype=pl.Utf8),
+            pl.Series("feature_type", feature_types.tolist(), dtype=pl.Utf8),
+            pl.Series("distance_to_tss", dist_to_tss, dtype=pl.Float32),
+            *multi_columns,
+        ]
+    )
 
 
 def annotate_cpg_islands(
@@ -1411,20 +1484,16 @@ def annotate_cpg_islands(
     _log("Step 1/3: loading BED ...")
     try:
         t0 = time.time()
-        islands_df = bioframe.read_table(
-            cpg_island_bed, schema="bed3", usecols=[0, 1, 2]
-        ).rename(
+        islands_df = bioframe.read_table(cpg_island_bed, schema="bed3", usecols=[0, 1, 2]).rename(
             columns={"chrom": "Chromosome", "start": "Start", "end": "End"}
         )
-        _log(f"  BED loaded in {time.time()-t0:.1f}s: {len(islands_df):,} islands")
+        _log(f"  BED loaded in {time.time() - t0:.1f}s: {len(islands_df):,} islands")
     except Exception:
         _log(f"FATAL: error loading BED:\n{traceback.format_exc()}")
         raise
 
     if len(islands_df) == 0:
-        logger.warning(
-            "CpG-island BED is empty -> EVERY site labelled open_sea."
-        )
+        logger.warning("CpG-island BED is empty -> EVERY site labelled open_sea.")
         return sites.with_columns(pl.lit("open_sea").alias("cpg_context"))
 
     _check_chrom_name_overlap(
@@ -1438,17 +1507,17 @@ def annotate_cpg_islands(
 
     def _flanks(df: pd.DataFrame, inner: int, outer: int, label: str) -> pd.DataFrame:
         up = df[["Chromosome", "Start", "End"]].copy()
-        up["End"]   = (up["Start"] - inner).clip(lower=0)
+        up["End"] = (up["Start"] - inner).clip(lower=0)
         up["Start"] = (up["Start"] - outer).clip(lower=0)
-        up["_ctx"]  = label
+        up["_ctx"] = label
         dn = df[["Chromosome", "Start", "End"]].copy()
         dn["Start"] = dn["End"] + inner
-        dn["End"]   = dn["End"] + outer
-        dn["_ctx"]  = label
+        dn["End"] = dn["End"] + outer
+        dn["_ctx"] = label
         return pd.concat([up, dn], ignore_index=True)
 
-    shore_df           = _flanks(islands_df, 0,          SHORE_DIST, "shore")
-    shelf_df           = _flanks(islands_df, SHORE_DIST, SHELF_DIST, "shelf")
+    shore_df = _flanks(islands_df, 0, SHORE_DIST, "shore")
+    shelf_df = _flanks(islands_df, SHORE_DIST, SHELF_DIST, "shelf")
     islands_df["_ctx"] = "island"
     _log(f"  flanks built: {len(shore_df):,} shore intervals, {len(shelf_df):,} shelf intervals")
 
@@ -1465,20 +1534,22 @@ def annotate_cpg_islands(
 
     _log("Step 3/3: overlapping shelf / shore / island ...")
     for ctx_df, ctx_label in [
-        (shelf_df,                                           "shelf"),
-        (shore_df,                                           "shore"),
+        (shelf_df, "shelf"),
+        (shore_df, "shore"),
         (islands_df[["Chromosome", "Start", "End", "_ctx"]], "island"),
     ]:
         t0 = time.time()
         try:
             overlap = bioframe.overlap(
-                sites_pr_df, ctx_df,
+                sites_pr_df,
+                ctx_df,
                 how="inner",
-                cols1=COLS, cols2=COLS,
+                cols1=COLS,
+                cols2=COLS,
                 suffixes=("", "_b"),
             )
-            n_hits  = len(overlap)
-            _log(f"  {ctx_label}: {n_hits:,} hits in {time.time()-t0:.1f}s")
+            n_hits = len(overlap)
+            _log(f"  {ctx_label}: {n_hits:,} hits in {time.time() - t0:.1f}s")
             if n_hits == 0:
                 continue
             hit_idxs = overlap["_row_idx"].drop_duplicates().to_numpy(dtype=np.int32)
@@ -1487,15 +1558,15 @@ def annotate_cpg_islands(
             logger.warning(
                 "CpG-island %s overlap failed -> affected sites keep a weaker "
                 "/ open_sea context:\n%s",
-                ctx_label, traceback.format_exc(),
+                ctx_label,
+                traceback.format_exc(),
             )
 
-    counts = {lbl: int((cpg_context == lbl).sum())
-              for lbl in ["island", "shore", "shelf", "open_sea"]}
+    counts = {
+        lbl: int((cpg_context == lbl).sum()) for lbl in ["island", "shore", "shelf", "open_sea"]
+    }
     _log(f"  context summary: {counts}")
-    _log(f"annotate_cpg_islands DONE  total elapsed {time.time()-t_total:.1f}s")
+    _log(f"annotate_cpg_islands DONE  total elapsed {time.time() - t_total:.1f}s")
     _log("=" * 60)
 
-    return sites.with_columns(
-        pl.Series("cpg_context", list(cpg_context), dtype=pl.Utf8)
-    )
+    return sites.with_columns(pl.Series("cpg_context", list(cpg_context), dtype=pl.Utf8))

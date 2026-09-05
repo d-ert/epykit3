@@ -36,9 +36,7 @@ def _save_fig(
     ``md.uns["figures"]`` so the report can find it later.
     """
     if format not in _VALID_FORMATS:
-        raise ValueError(
-            f"format must be one of {_VALID_FORMATS}; got {format!r}"
-        )
+        raise ValueError(f"format must be one of {_VALID_FORMATS}; got {format!r}")
     out = Path(out_dir or "figures")
     formats: tuple[str, ...] = ("png", "pdf") if format == "both" else (format,)
 
@@ -55,6 +53,7 @@ def _save_fig(
         written.append(str(path))
 
     import matplotlib.pyplot as plt
+
     plt.close(fig)
     return written[0] if len(written) == 1 else written
 
@@ -67,6 +66,7 @@ def build_sample_site_matrix(md, n_sites: int = 10_000) -> tuple[np.ndarray, lis
     third value so existing code keeps working.
     """
     from ._compute import compute_sample_site_matrix
+
     matrix, samples, _n = compute_sample_site_matrix(md, n_sites=n_sites)
     return matrix, samples
 

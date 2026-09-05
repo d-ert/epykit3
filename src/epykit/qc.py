@@ -24,8 +24,8 @@ import polars as pl
 logger = logging.getLogger(__name__)
 
 # Thresholds used by coverage_uniformity for flagging
-_MIN_GENOME_COVERAGE_FRACTION = 0.80   # 80 % of CpGs at >=1x
-_CONVERSION_WARNING_THRESHOLD  = 0.005  # 0.5 % CHH methylation
+_MIN_GENOME_COVERAGE_FRACTION = 0.80  # 80 % of CpGs at >=1x
+_CONVERSION_WARNING_THRESHOLD = 0.005  # 0.5 % CHH methylation
 
 # chromosome aliases used by qc.sex_check. Both UCSC ("chrX")
 # and Ensembl ("X") naming conventions are accepted.
@@ -33,6 +33,7 @@ _X_CHROM_NAMES: tuple[str, ...] = ("chrX", "X")
 
 
 # Public API
+
 
 def bisulfite_conversion_rate(
     methylstore_path: str,
@@ -91,9 +92,7 @@ def bisulfite_conversion_rate(
     sample_dir = chh_store / f"sample={sample}"
 
     if not sample_dir.exists():
-        raise ValueError(
-            f"CHH store does not contain sample '{sample}': {sample_dir}"
-        )
+        raise ValueError(f"CHH store does not contain sample '{sample}': {sample_dir}")
 
     # Honour the documented contract: verify the sample exists in the CpG
     # methylstore the rate is reported alongside (warn rather than fail, since
@@ -104,14 +103,13 @@ def bisulfite_conversion_rate(
             logger.warning(
                 "bisulfite_conversion_rate: sample '%s' not found in the CpG "
                 "methylstore %s; reporting the CHH-derived rate anyway.",
-                sample, methylstore_path,
+                sample,
+                methylstore_path,
             )
 
     parts = list(sample_dir.rglob("part-*.parquet"))
     if not parts:
-        raise ValueError(
-            f"No Parquet files found for sample '{sample}' in {chh_store}"
-        )
+        raise ValueError(f"No Parquet files found for sample '{sample}' in {chh_store}")
 
     # Load only the count columns; ignore chrom partition.
     lf = pl.scan_parquet(str(sample_dir / "**" / "part-*.parquet"))
@@ -120,13 +118,15 @@ def bisulfite_conversion_rate(
     # 1 - mean(CpG beta) ~= 0.2 as a bogus "conversion rate".
     if "context" in lf.collect_schema().names():
         lf = lf.filter(pl.col("context") == "CHH")
-    agg = lf.select([
-        pl.sum("N_meth").alias("total_meth"),
-        pl.sum("coverage").alias("total_cov"),
-    ]).collect()
+    agg = lf.select(
+        [
+            pl.sum("N_meth").alias("total_meth"),
+            pl.sum("coverage").alias("total_cov"),
+        ]
+    ).collect()
 
     total_meth = int(agg["total_meth"][0] or 0)
-    total_cov  = int(agg["total_cov"][0] or 0)
+    total_cov = int(agg["total_cov"][0] or 0)
 
     if total_cov == 0:
         raise ValueError(
@@ -136,7 +136,7 @@ def bisulfite_conversion_rate(
         )
 
     mean_chh_methylation = total_meth / total_cov
-    conversion_rate      = 1.0 - mean_chh_methylation
+    conversion_rate = 1.0 - mean_chh_methylation
 
     if mean_chh_methylation > _CONVERSION_WARNING_THRESHOLD:
         logger.warning(
@@ -149,7 +149,8 @@ def bisulfite_conversion_rate(
     else:
         logger.info(
             "Sample '%s': conversion rate = %.4f %%",
-            sample, conversion_rate * 100,
+            sample,
+            conversion_rate * 100,
         )
 
     return float(conversion_rate)
@@ -202,23 +203,25 @@ def global_methylation_report(
 
         if has_context:
             agg = (
-                lf
-                .group_by("context")
-                .agg([
-                    pl.len().alias("n_sites"),
-                    pl.sum("N_meth").alias("total_meth"),
-                    pl.sum("coverage").alias("total_cov"),
-                ])
+                lf.group_by("context")
+                .agg(
+                    [
+                        pl.len().alias("n_sites"),
+                        pl.sum("N_meth").alias("total_meth"),
+                        pl.sum("coverage").alias("total_cov"),
+                    ]
+                )
                 .collect()
             )
         else:
             agg = (
-                lf
-                .select([
-                    pl.len().alias("n_sites"),
-                    pl.sum("N_meth").alias("total_meth"),
-                    pl.sum("coverage").alias("total_cov"),
-                ])
+                lf.select(
+                    [
+                        pl.len().alias("n_sites"),
+                        pl.sum("N_meth").alias("total_meth"),
+                        pl.sum("coverage").alias("total_cov"),
+                    ]
+                )
                 .collect()
                 .with_columns(pl.lit("CpG").alias("context"))
             )
@@ -227,24 +230,29 @@ def global_methylation_report(
             ctx = row.get("context", "CpG")
             if contexts and ctx not in contexts:
                 continue
-            total_cov  = row["total_cov"]
+            total_cov = row["total_cov"]
             total_meth = row["total_meth"]
-            rows.append({
-                "sample":             sample,
-                "context":            ctx,
-                "n_sites":            row["n_sites"],
-                "global_methylation": (total_meth / total_cov)
-                                       if total_cov > 0 else float("nan"),
-            })
+            rows.append(
+                {
+                    "sample": sample,
+                    "context": ctx,
+                    "n_sites": row["n_sites"],
+                    "global_methylation": (total_meth / total_cov)
+                    if total_cov > 0
+                    else float("nan"),
+                }
+            )
 
     if not rows:
-        return pl.DataFrame({
-            "sample":             pl.Series([], dtype=pl.Utf8),
-            "context":            pl.Series([], dtype=pl.Utf8),
-            "n_sites":            pl.Series([], dtype=pl.Int64),
-            "global_methylation": pl.Series([], dtype=pl.Float64),
-            "is_outlier":         pl.Series([], dtype=pl.Boolean),
-        })
+        return pl.DataFrame(
+            {
+                "sample": pl.Series([], dtype=pl.Utf8),
+                "context": pl.Series([], dtype=pl.Utf8),
+                "n_sites": pl.Series([], dtype=pl.Int64),
+                "global_methylation": pl.Series([], dtype=pl.Float64),
+                "is_outlier": pl.Series([], dtype=pl.Boolean),
+            }
+        )
 
     result = pl.DataFrame(rows)
 
@@ -253,16 +261,14 @@ def global_methylation_report(
 
     for ctx in result["context"].unique().to_list():
         ctx_mask = (result["context"] == ctx).to_numpy()
-        meth_vals = result.filter(pl.col("context") == ctx)[
-            "global_methylation"
-        ].to_numpy()
+        meth_vals = result.filter(pl.col("context") == ctx)["global_methylation"].to_numpy()
         valid = ~np.isnan(meth_vals)
 
         if valid.sum() < 3:
             continue
 
         median = float(np.median(meth_vals[valid]))
-        mad    = float(np.median(np.abs(meth_vals[valid] - median)))
+        mad = float(np.median(np.abs(meth_vals[valid] - median)))
 
         if mad == 0:
             continue
@@ -276,12 +282,13 @@ def global_methylation_report(
             logger.warning(
                 "global_methylation_report: %d outlier sample(s) detected "
                 "in context %s (MAD threshold 3sigma)",
-                n_outliers, ctx,
+                n_outliers,
+                ctx,
             )
 
-    return result.with_columns(
-        pl.Series("is_outlier", outlier_flags, dtype=pl.Boolean)
-    ).sort(["context", "sample"])
+    return result.with_columns(pl.Series("is_outlier", outlier_flags, dtype=pl.Boolean)).sort(
+        ["context", "sample"]
+    )
 
 
 def coverage_uniformity(
@@ -317,13 +324,11 @@ def coverage_uniformity(
     if thresholds is None:
         thresholds = [1, 5, 10]
 
-    store      = Path(methylstore_path)
+    store = Path(methylstore_path)
     sample_dir = store / f"sample={sample}"
 
     if not sample_dir.exists():
-        raise ValueError(
-            f"Sample '{sample}' not found in methylstore: {sample_dir}"
-        )
+        raise ValueError(f"Sample '{sample}' not found in methylstore: {sample_dir}")
 
     chrom_rows: list[dict] = []
 
@@ -333,37 +338,36 @@ def coverage_uniformity(
         if not parts:
             continue
 
-        cov_series = pl.concat([
-            pl.read_parquet(str(p), columns=["coverage"])["coverage"]
-            for p in parts
-        ])
+        cov_series = pl.concat(
+            [pl.read_parquet(str(p), columns=["coverage"])["coverage"] for p in parts]
+        )
 
-        n       = len(cov_series)
+        n = len(cov_series)
         cov_arr = cov_series.to_numpy()
         row: dict = {
-            "sample":        sample,
-            "chrom":         chrom,
-            "n_sites":       n,
+            "sample": sample,
+            "chrom": chrom,
+            "n_sites": n,
             "mean_coverage": float(cov_arr.mean()) if n > 0 else float("nan"),
         }
 
         for t in thresholds:
-            key      = f"frac_ge_{t}x"
+            key = f"frac_ge_{t}x"
             row[key] = float((cov_arr >= t).sum() / n) if n > 0 else float("nan")
 
         frac_1x = row.get("frac_ge_1x", float("nan"))
-        row["low_coverage_flag"] = (
-            (not np.isnan(frac_1x))
-            and (frac_1x < _MIN_GENOME_COVERAGE_FRACTION)
+        row["low_coverage_flag"] = (not np.isnan(frac_1x)) and (
+            frac_1x < _MIN_GENOME_COVERAGE_FRACTION
         )
 
         chrom_rows.append(row)
 
         if row["low_coverage_flag"]:
             logger.warning(
-                "Sample '%s', %s: only %.1f %% of sites covered at >=1x "
-                "(threshold: %.0f %%)",
-                sample, chrom, frac_1x * 100,
+                "Sample '%s', %s: only %.1f %% of sites covered at >=1x (threshold: %.0f %%)",
+                sample,
+                chrom,
+                frac_1x * 100,
                 _MIN_GENOME_COVERAGE_FRACTION * 100,
             )
 
@@ -371,44 +375,50 @@ def coverage_uniformity(
         raise ValueError(f"No chromosome data found for sample '{sample}'")
 
     # --- Genome-wide aggregate row ---
-    total_n       = sum(r["n_sites"] for r in chrom_rows)
+    total_n = sum(r["n_sites"] for r in chrom_rows)
     genome_row: dict = {
-        "sample":        sample,
-        "chrom":         "genome",
-        "n_sites":       total_n,
+        "sample": sample,
+        "chrom": "genome",
+        "n_sites": total_n,
         # Site-weighted (consistent with the frac_ge_Tx aggregates below):
         # an unweighted mean of per-chromosome means lets a tiny
         # high-coverage contig skew the genome figure.
         "mean_coverage": float(
-            sum(r["mean_coverage"] * r["n_sites"] for r in chrom_rows
-                if not np.isnan(r["mean_coverage"]))
+            sum(
+                r["mean_coverage"] * r["n_sites"]
+                for r in chrom_rows
+                if not np.isnan(r["mean_coverage"])
+            )
             / total_n
-        ) if total_n > 0 else float("nan"),
+        )
+        if total_n > 0
+        else float("nan"),
     }
     for t in thresholds:
         key = f"frac_ge_{t}x"
-        values = [r[key] * r["n_sites"] for r in chrom_rows
-                  if key in r and not np.isnan(r[key])]
+        values = [r[key] * r["n_sites"] for r in chrom_rows if key in r and not np.isnan(r[key])]
         genome_row[key] = (sum(values) / total_n) if total_n > 0 else float("nan")
 
     frac_1x_genome = genome_row.get("frac_ge_1x", float("nan"))
-    genome_row["low_coverage_flag"] = (
-        (not np.isnan(frac_1x_genome))
-        and (frac_1x_genome < _MIN_GENOME_COVERAGE_FRACTION)
+    genome_row["low_coverage_flag"] = (not np.isnan(frac_1x_genome)) and (
+        frac_1x_genome < _MIN_GENOME_COVERAGE_FRACTION
     )
     chrom_rows.append(genome_row)
 
     # Build schema dynamically based on requested thresholds
     schema_extras: dict = {f"frac_ge_{t}x": pl.Float64 for t in thresholds}
-    result = pl.DataFrame(chrom_rows).cast({
-        "n_sites": pl.Int64,
-        **schema_extras,
-    })
+    result = pl.DataFrame(chrom_rows).cast(
+        {
+            "n_sites": pl.Int64,
+            **schema_extras,
+        }
+    )
 
     return result.sort(["chrom"])
 
 
 # Clinical / cohort QC pack
+
 
 def _resolve_x_chrom_dir(store: Path, sample: str) -> Path | None:
     """Find the X-chromosome partition for a sample under any naming."""
@@ -458,6 +468,7 @@ def _classify_sex_from_values(
         _use_cluster = True
         try:
             import diptest  # optional extra
+
             dip_stat, dip_p = diptest.diptest(np.asarray(values, dtype=float))
             if dip_p > dip_p_threshold:
                 warnings.warn(
@@ -481,10 +492,7 @@ def _classify_sex_from_values(
     else:
         cut = fixed_threshold  # single sample: fixed fallback
 
-    return {
-        sid: ("male" if v < cut else "female")
-        for sid, v in zip(sample_ids, values)
-    }
+    return {sid: ("male" if v < cut else "female") for sid, v in zip(sample_ids, values)}
 
 
 def sex_check(
@@ -526,24 +534,28 @@ def sex_check(
     for sample in samples:
         x_dir = _resolve_x_chrom_dir(store, sample)
         if x_dir is None:
-            records.append({
-                "sample_id": sample,
-                "mean_chrx_beta": float("nan"),
-                "inferred_sex": None,
-                "expected_sex": (expected_sex or {}).get(sample),
-                "mismatch": False,
-            })
+            records.append(
+                {
+                    "sample_id": sample,
+                    "mean_chrx_beta": float("nan"),
+                    "inferred_sex": None,
+                    "expected_sex": (expected_sex or {}).get(sample),
+                    "mismatch": False,
+                }
+            )
             continue
         try:
             part = next(x_dir.glob("part-*.parquet"))
         except StopIteration:
-            records.append({
-                "sample_id": sample,
-                "mean_chrx_beta": float("nan"),
-                "inferred_sex": None,
-                "expected_sex": (expected_sex or {}).get(sample),
-                "mismatch": False,
-            })
+            records.append(
+                {
+                    "sample_id": sample,
+                    "mean_chrx_beta": float("nan"),
+                    "inferred_sex": None,
+                    "expected_sex": (expected_sex or {}).get(sample),
+                    "mismatch": False,
+                }
+            )
             continue
         df = pl.read_parquet(str(part), columns=["N_meth", "coverage"]).filter(
             pl.col("coverage") >= min_coverage
@@ -552,15 +564,17 @@ def sex_check(
             mean_beta = float("nan")
         else:
             tot_meth = int(df.get_column("N_meth").sum())
-            tot_cov  = int(df.get_column("coverage").sum())
+            tot_cov = int(df.get_column("coverage").sum())
             mean_beta = tot_meth / max(tot_cov, 1)
-        records.append({
-            "sample_id": sample,
-            "mean_chrx_beta": float(mean_beta),
-            "inferred_sex": None,
-            "expected_sex": (expected_sex or {}).get(sample),
-            "mismatch": False,
-        })
+        records.append(
+            {
+                "sample_id": sample,
+                "mean_chrx_beta": float(mean_beta),
+                "inferred_sex": None,
+                "expected_sex": (expected_sex or {}).get(sample),
+                "mismatch": False,
+            }
+        )
 
     # KMeans-2 classification on the available mean_chrx_beta values.
     values = np.array(
@@ -574,8 +588,7 @@ def sex_check(
         r["inferred_sex"] = sex_map.get(r["sample_id"])
         exp = r.get("expected_sex")
         r["mismatch"] = bool(
-            exp is not None and r["inferred_sex"] is not None
-            and r["inferred_sex"] != exp
+            exp is not None and r["inferred_sex"] is not None and r["inferred_sex"] != exp
         )
 
     return pl.DataFrame(records)
@@ -703,9 +716,9 @@ def sample_correlation(
             if not part.exists():
                 per_sample_dfs = []
                 break
-            d = pl.read_parquet(
-                str(part), columns=["pos", "N_meth", "coverage"]
-            ).filter(pl.col("coverage") >= min_coverage)
+            d = pl.read_parquet(str(part), columns=["pos", "N_meth", "coverage"]).filter(
+                pl.col("coverage") >= min_coverage
+            )
             d = d.with_columns(
                 (pl.col("N_meth") / pl.col("coverage")).alias(f"beta_{s}"),
             ).select(["pos", f"beta_{s}"])
@@ -721,15 +734,17 @@ def sample_correlation(
             beta_chunks[s].append(joined.get_column(f"beta_{s}").to_numpy())
 
     if not any(beta_chunks.values()):
-        return pl.DataFrame({
-            "sample_a": [],
-            "sample_b": [],
-            "correlation": [],
-        })
+        return pl.DataFrame(
+            {
+                "sample_a": [],
+                "sample_b": [],
+                "correlation": [],
+            }
+        )
 
-    beta_matrix = np.column_stack([
-        np.concatenate(beta_chunks[s]) for s in samples
-    ])  # shape (n_sites_intersection, n_samples)
+    beta_matrix = np.column_stack(
+        [np.concatenate(beta_chunks[s]) for s in samples]
+    )  # shape (n_sites_intersection, n_samples)
     del beta_chunks
 
     n_total = beta_matrix.shape[0]
@@ -742,11 +757,13 @@ def sample_correlation(
         logger.info(
             "sample_correlation: using a random %s-CpG panel of %s "
             "intersected CpGs (max_sites; seed=0) to bound memory.",
-            f"{max_sites:,}", f"{n_total:,}",
+            f"{max_sites:,}",
+            f"{n_total:,}",
         )
 
     if method == "spearman":
         from scipy import stats as sp_stats
+
         corr = sp_stats.spearmanr(beta_matrix).statistic
         # spearmanr returns either a scalar (n=2) or a matrix.
         if np.ndim(corr) == 0:
@@ -757,11 +774,13 @@ def sample_correlation(
     rows = []
     for i, sa in enumerate(samples):
         for j, sb in enumerate(samples):
-            rows.append({
-                "sample_a": sa,
-                "sample_b": sb,
-                "correlation": float(corr[i, j]),
-            })
+            rows.append(
+                {
+                    "sample_a": sa,
+                    "sample_b": sb,
+                    "correlation": float(corr[i, j]),
+                }
+            )
     return pl.DataFrame(rows)
 
 
@@ -836,15 +855,15 @@ def power(
     float (power) or int (n_per_group), depending on which knob was set.
     """
     from scipy import stats as sp_stats
+
     if (n_per_group is None) == (power is None):
         raise ValueError("Pass exactly one of n_per_group, power.")
     if coverage <= 0:
         raise ValueError(f"coverage must be > 0, got {coverage}")
     eff_alpha = alpha / n_tests if n_tests else alpha
-    sd_single = float(np.sqrt(
-        dispersion * baseline_beta * (1.0 - baseline_beta) / coverage
-        + replicate_sd ** 2
-    ))
+    sd_single = float(
+        np.sqrt(dispersion * baseline_beta * (1.0 - baseline_beta) / coverage + replicate_sd**2)
+    )
     d = abs(meth_diff) / max(sd_single, 1e-12)  # Cohen's d (per-replicate)
 
     def _power_at_n(n: int) -> float:
@@ -872,4 +891,5 @@ def power(
 def report_multiqc(md, output_dir: str) -> str:
     """Re-export of the MultiQC writer; defined in multiqc_export.py."""
     from .multiqc_export import report_multiqc as _impl
+
     return _impl(md, output_dir)

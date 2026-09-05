@@ -29,21 +29,16 @@ def _dmr_to_key_set(df: pl.DataFrame, key_cols: tuple[str, ...]) -> set[tuple]:
     missing = [c for c in key_cols if c not in df.columns]
     if missing:
         raise ValueError(
-            f"DMR table missing key columns {missing}; "
-            f"available: {sorted(df.columns)[:15]}..."
+            f"DMR table missing key columns {missing}; available: {sorted(df.columns)[:15]}..."
         )
     return set(
-        tuple(row[c] for c in key_cols)
-        for row in df.select(list(key_cols)).iter_rows(named=True)
+        tuple(row[c] for c in key_cols) for row in df.select(list(key_cols)).iter_rows(named=True)
     )
 
 
 def _powerset_nonempty(items: Iterable[str]) -> list[tuple[str, ...]]:
     items = list(items)
-    return [
-        combo for r in range(1, len(items) + 1)
-        for combo in combinations(items, r)
-    ]
+    return [combo for r in range(1, len(items) + 1) for combo in combinations(items, r)]
 
 
 def dmr_overlap(
@@ -106,15 +101,27 @@ def dmr_overlap(
 
     if len(labels) == 2:
         return _venn2(
-            labels, set_keys, ax=ax, figsize=figsize, save=save, md=md,
+            labels,
+            set_keys,
+            ax=ax,
+            figsize=figsize,
+            save=save,
+            md=md,
         )
     return _upset(
-        labels, set_keys, min_size=min_size, sort_by=sort_by,
-        ax=ax, figsize=figsize, save=save, md=md,
+        labels,
+        set_keys,
+        min_size=min_size,
+        sort_by=sort_by,
+        ax=ax,
+        figsize=figsize,
+        save=save,
+        md=md,
     )
 
 
 # 2-set Venn (no external dep)
+
 
 def _venn2(labels, set_keys, *, ax, figsize, save, md):
     a, b = labels
@@ -126,6 +133,7 @@ def _venn2(labels, set_keys, *, ax, figsize, save, md):
     fig, ax = _get_ax(ax, figsize)
     # Two circles, fixed radii, fixed centres.
     from matplotlib.patches import Circle
+
     r = 1.0
     cx_a, cx_b = -0.7, 0.7
     ax.add_patch(Circle((cx_a, 0), r, alpha=0.4, color="tab:blue", label=a))
@@ -148,14 +156,20 @@ def _venn2(labels, set_keys, *, ax, figsize, save, md):
 
 # UpSet for 3+ sets
 
+
 def _upset(labels, set_keys, *, min_size, sort_by, ax, figsize, save, md) -> Any:
     if ax is not None:
         # An UpSet needs three coupled axes; if the caller passed `ax`
         # we honour it for the bar chart only and skip the matrix /
         # totals to stay composable.
         return _upset_single_ax(
-            labels, set_keys, min_size=min_size, sort_by=sort_by,
-            ax=ax, save=save, md=md,
+            labels,
+            set_keys,
+            min_size=min_size,
+            sort_by=sort_by,
+            ax=ax,
+            save=save,
+            md=md,
         )
 
     import matplotlib.pyplot as plt
@@ -166,16 +180,17 @@ def _upset(labels, set_keys, *, min_size, sort_by, ax, figsize, save, md) -> Any
     combo_sizes: dict[tuple[str, ...], int] = {}
     for combo in combos:
         inside = set.intersection(*(set_keys[lbl] for lbl in combo))
-        outside = set.union(*(set_keys[lbl] for lbl in labels if lbl not in combo)) \
-            if len(combo) < len(labels) else set()
+        outside = (
+            set.union(*(set_keys[lbl] for lbl in labels if lbl not in combo))
+            if len(combo) < len(labels)
+            else set()
+        )
         size = len(inside - outside)
         if size >= min_size:
             combo_sizes[combo] = size
 
     if not combo_sizes:
-        raise ValueError(
-            f"No intersection has >={min_size} elements; nothing to plot."
-        )
+        raise ValueError(f"No intersection has >={min_size} elements; nothing to plot.")
 
     if sort_by == "size":
         ordered = sorted(combo_sizes.items(), key=lambda kv: -kv[1])
@@ -186,10 +201,13 @@ def _upset(labels, set_keys, *, min_size, sort_by, ax, figsize, save, md) -> Any
 
     fig = plt.figure(figsize=figsize)
     gs = GridSpec(
-        2, 2, figure=fig,
+        2,
+        2,
+        figure=fig,
         width_ratios=[len(ordered), max(1.5, len(labels) * 0.6)],
         height_ratios=[3, max(1.0, len(labels) * 0.4)],
-        hspace=0.05, wspace=0.05,
+        hspace=0.05,
+        wspace=0.05,
     )
     ax_bar = fig.add_subplot(gs[0, 0])
     ax_mat = fig.add_subplot(gs[1, 0], sharex=ax_bar)
@@ -230,8 +248,11 @@ def _upset(labels, set_keys, *, min_size, sort_by, ax, figsize, save, md) -> Any
     # Totals on the right.
     totals = [len(set_keys[lbl]) for lbl in labels]
     ax_tot.barh(
-        np.arange(len(labels)), totals,
-        color="tab:gray", edgecolor="black", linewidth=0.5,
+        np.arange(len(labels)),
+        totals,
+        color="tab:gray",
+        edgecolor="black",
+        linewidth=0.5,
     )
     ax_tot.invert_xaxis()
     ax_tot.tick_params(axis="y", which="both", left=False, labelleft=False)
@@ -254,8 +275,11 @@ def _upset_single_ax(labels, set_keys, *, min_size, sort_by, ax, save, md):
     combo_sizes = {}
     for combo in combos:
         inside = set.intersection(*(set_keys[lbl] for lbl in combo))
-        outside = set.union(*(set_keys[lbl] for lbl in labels if lbl not in combo)) \
-            if len(combo) < len(labels) else set()
+        outside = (
+            set.union(*(set_keys[lbl] for lbl in labels if lbl not in combo))
+            if len(combo) < len(labels)
+            else set()
+        )
         size = len(inside - outside)
         if size >= min_size:
             combo_sizes[combo] = size
@@ -270,7 +294,10 @@ def _upset_single_ax(labels, set_keys, *, min_size, sort_by, ax, save, md):
     ax.bar(xs, sizes, color="tab:blue", edgecolor="black", linewidth=0.5)
     ax.set_xticks(xs)
     ax.set_xticklabels(
-        [" & ".join(c) for c, _ in ordered], rotation=45, ha="right", fontsize=8,
+        [" & ".join(c) for c, _ in ordered],
+        rotation=45,
+        ha="right",
+        fontsize=8,
     )
     ax.set_ylabel("Intersection size")
     ax.set_title("DMR overlap")

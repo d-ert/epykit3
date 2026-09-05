@@ -83,10 +83,7 @@ def _bernoulli_emission_logprob(
     obs = np.clip(observations, 0.0, 1.0)
     sm = np.clip(state_means, state_clip, 1.0 - state_clip)
     # log(p^y * (1-p)^(1-y))
-    logp = (
-        obs[:, None] * np.log(sm[None, :])
-        + (1.0 - obs)[:, None] * np.log(1.0 - sm[None, :])
-    )
+    logp = obs[:, None] * np.log(sm[None, :]) + (1.0 - obs)[:, None] * np.log(1.0 - sm[None, :])
     # NaN observations -> uniform.
     nan_mask = ~np.isfinite(observations)
     if nan_mask.any():
@@ -109,8 +106,7 @@ def _build_transition(
         priors = np.asarray(transition_priors, dtype=np.float64)
         if priors.shape != (n_states, n_states):
             raise ValueError(
-                f"transition_priors must be shape ({n_states}, {n_states}); "
-                f"got {priors.shape}"
+                f"transition_priors must be shape ({n_states}, {n_states}); got {priors.shape}"
             )
         # Row-normalise defensively.
         return priors / priors.sum(axis=1, keepdims=True)
@@ -201,8 +197,7 @@ def segment(
     state_means = np.asarray(state_means, dtype=np.float64)
     if len(state_means) != n_states:
         raise ValueError(
-            f"state_means must have length n_states={n_states}; "
-            f"got {len(state_means)}"
+            f"state_means must have length n_states={n_states}; got {len(state_means)}"
         )
 
     A = _build_transition(n_states, transition_priors, self_loop)
@@ -213,9 +208,7 @@ def segment(
     elif emission == "gaussian":
         logB = _gaussian_emission_logprob(obs, state_means, state_sd=emission_sd)
     else:
-        raise ValueError(
-            f"emission must be 'bernoulli' (default) or 'gaussian'; got {emission!r}"
-        )
+        raise ValueError(f"emission must be 'bernoulli' (default) or 'gaussian'; got {emission!r}")
 
     # ---- Forward (log space) ----
     log_alpha = np.full((n_sites, n_states), _LOG_EPS, dtype=np.float64)
@@ -223,7 +216,8 @@ def segment(
     for t in range(1, n_sites):
         # log_alpha[t, j] = logB[t,j] + logsumexp_i(log_alpha[t-1,i] + logA[i,j])
         log_alpha[t] = logB[t] + _logsumexp(
-            log_alpha[t - 1, :, None] + logA, axis=0,
+            log_alpha[t - 1, :, None] + logA,
+            axis=0,
         )
 
     # ---- Backward (log space) ----
@@ -231,7 +225,8 @@ def segment(
     log_beta[-1] = 0.0
     for t in range(n_sites - 2, -1, -1):
         log_beta[t] = _logsumexp(
-            logA + logB[t + 1, None, :] + log_beta[t + 1, None, :], axis=1,
+            logA + logB[t + 1, None, :] + log_beta[t + 1, None, :],
+            axis=1,
         )
 
     log_post = log_alpha + log_beta

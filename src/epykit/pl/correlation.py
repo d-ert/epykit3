@@ -32,14 +32,14 @@ def sample_correlation(
         corr_df = md.uns["qc_sample_correlation"]
     else:
         from ..qc import sample_correlation as _samp_corr
+
         samples = md.obs.get_column("sample_id").to_list()
         corr_df = _samp_corr(md.store, samples, method=method)
         md.uns["qc_sample_correlation"] = corr_df
 
-    samples = sorted(set(
-        corr_df.get_column("sample_a").to_list()
-        + corr_df.get_column("sample_b").to_list()
-    ))
+    samples = sorted(
+        set(corr_df.get_column("sample_a").to_list() + corr_df.get_column("sample_b").to_list())
+    )
     n = len(samples)
     if n == 0:
         raise ValueError("Empty correlation table")
@@ -54,6 +54,7 @@ def sample_correlation(
     if cluster and n >= 3:
         from scipy.cluster import hierarchy
         from scipy.spatial.distance import squareform
+
         # Convert correlation to distance (1 - r). Fill NaN with mean.
         dist = 1.0 - np.nan_to_num(mat, nan=float(np.nanmean(mat)))
         np.fill_diagonal(dist, 0.0)

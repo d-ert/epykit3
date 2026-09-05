@@ -57,13 +57,20 @@ def _dmr_sliding_cache_key(
     """
     base_sig = store.manifest.get("input_sig", "")
     h = hashlib.sha256()
-    h.update(b"|base="); h.update(base_sig.encode())
-    h.update(b"|win=");  h.update(str(int(window_bp)).encode())
-    h.update(b"|mincp="); h.update(str(int(min_cpgs)).encode())
-    h.update(b"|minsig="); h.update(str(int(min_sites_significant)).encode())
-    h.update(b"|alpha=");   h.update(f"{float(alpha):.10g}".encode())
-    h.update(b"|delta=");   h.update(f"{float(min_abs_meth_diff):.10g}".encode())
-    h.update(b"|pcol=");    h.update(p_col.encode())
+    h.update(b"|base=")
+    h.update(base_sig.encode())
+    h.update(b"|win=")
+    h.update(str(int(window_bp)).encode())
+    h.update(b"|mincp=")
+    h.update(str(int(min_cpgs)).encode())
+    h.update(b"|minsig=")
+    h.update(str(int(min_sites_significant)).encode())
+    h.update(b"|alpha=")
+    h.update(f"{float(alpha):.10g}".encode())
+    h.update(b"|delta=")
+    h.update(f"{float(min_abs_meth_diff):.10g}".encode())
+    h.update(b"|pcol=")
+    h.update(p_col.encode())
     return h.hexdigest()
 
 
@@ -83,50 +90,59 @@ def _dmr_chain_merge_cache_key(
     """
     base_sig = store.manifest.get("input_sig", "")
     h = hashlib.sha256()
-    h.update(b"|base=");    h.update(base_sig.encode())
-    h.update(b"|alpha=");   h.update(f"{float(alpha):.10g}".encode())
-    h.update(b"|delta=");   h.update(f"{float(min_abs_meth_diff):.10g}".encode())
-    h.update(b"|dismerge="); h.update(str(int(dis_merge_bp)).encode())
-    h.update(b"|mincp=");   h.update(str(int(min_cpgs)).encode())
-    h.update(b"|pctsig=");  h.update(f"{float(pct_sig):.10g}".encode())
-    h.update(b"|minlen=");  h.update(str(int(minlen_bp)).encode())
-    h.update(b"|pcol=");    h.update(p_col.encode())
+    h.update(b"|base=")
+    h.update(base_sig.encode())
+    h.update(b"|alpha=")
+    h.update(f"{float(alpha):.10g}".encode())
+    h.update(b"|delta=")
+    h.update(f"{float(min_abs_meth_diff):.10g}".encode())
+    h.update(b"|dismerge=")
+    h.update(str(int(dis_merge_bp)).encode())
+    h.update(b"|mincp=")
+    h.update(str(int(min_cpgs)).encode())
+    h.update(b"|pctsig=")
+    h.update(f"{float(pct_sig):.10g}".encode())
+    h.update(b"|minlen=")
+    h.update(str(int(minlen_bp)).encode())
+    h.update(b"|pcol=")
+    h.update(p_col.encode())
     return h.hexdigest()
 
+
 _DMR_EMPTY_SCHEMA = {
-    "chrom":            pl.Utf8,
-    "start":            pl.Int32,
-    "end":              pl.Int32,
-    "n_cpgs":           pl.Int32,
-    "n_significant":    pl.Int32,
-    "mean_meth_diff":   pl.Float32,
-    "combined_pvalue":  pl.Float64,
-    "combined_qvalue":  pl.Float64,
-    "dmr_type":         pl.Utf8,
+    "chrom": pl.Utf8,
+    "start": pl.Int32,
+    "end": pl.Int32,
+    "n_cpgs": pl.Int32,
+    "n_significant": pl.Int32,
+    "mean_meth_diff": pl.Float32,
+    "combined_pvalue": pl.Float64,
+    "combined_qvalue": pl.Float64,
+    "dmr_type": pl.Utf8,
 }
 
 _DMR_TILE_SCHEMA = {
-    "chrom":            pl.Utf8,
-    "start":            pl.Int32,
-    "end":              pl.Int32,
-    "n_cpgs":           pl.Int32,
-    "n_case":           pl.Int32,
-    "n_control":        pl.Int32,
-    "mean_beta_case":   pl.Float32,
+    "chrom": pl.Utf8,
+    "start": pl.Int32,
+    "end": pl.Int32,
+    "n_cpgs": pl.Int32,
+    "n_case": pl.Int32,
+    "n_control": pl.Int32,
+    "mean_beta_case": pl.Float32,
     "mean_beta_control": pl.Float32,
-    "meth_diff":        pl.Float32,
-    "log2_odds_ratio":  pl.Float64,
-    "pvalue":           pl.Float64,
-    "qvalue":           pl.Float64,
-    "dmr_type":         pl.Utf8,
+    "meth_diff": pl.Float32,
+    "log2_odds_ratio": pl.Float64,
+    "pvalue": pl.Float64,
+    "qvalue": pl.Float64,
+    "dmr_type": pl.Utf8,
 }
 
 _SMOOTH_EMPTY_SCHEMA = {
-    "chrom":        pl.Utf8,
-    "pos":          pl.Int32,
-    "sample":       pl.Utf8,
-    "beta_raw":     pl.Float32,
-    "beta_smooth":  pl.Float32,
+    "chrom": pl.Utf8,
+    "pos": pl.Int32,
+    "sample": pl.Utf8,
+    "beta_raw": pl.Float32,
+    "beta_smooth": pl.Float32,
 }
 
 # cap merged DMR size to prevent biologically implausible mega-DMRs.
@@ -139,6 +155,7 @@ _MIXED_DIRECTION_THRESHOLD: float = 0.6
 
 
 # Internal helpers -- DMC input streaming for sliding-window DMR
+
 
 def _dmc_store_columns(store: DMCStore) -> set[str]:
     """Return the column set present in the store's per-chrom parquets.
@@ -184,6 +201,7 @@ def _iter_dataframe_chroms(
 
 
 # Internal helpers -- p-value combination
+
 
 def _stouffer_combine_signed(
     pvals: np.ndarray,
@@ -232,17 +250,14 @@ def _stouffer_combine_signed(
     float
         Two-sided combined p-value.
     """
-    pvals      = np.asarray(pvals,      dtype=np.float64)
+    pvals = np.asarray(pvals, dtype=np.float64)
     meth_diffs = np.asarray(meth_diffs, dtype=np.float64)
 
-    valid = (
-        ~np.isnan(pvals) & (pvals > 0.0) & (pvals <= 1.0)
-        & ~np.isnan(meth_diffs)
-    )
+    valid = ~np.isnan(pvals) & (pvals > 0.0) & (pvals <= 1.0) & ~np.isnan(meth_diffs)
     if not np.any(valid):
         return float("nan")
 
-    p_valid    = np.clip(pvals[valid], np.finfo(float).tiny, 1.0 - 1e-15)
+    p_valid = np.clip(pvals[valid], np.finfo(float).tiny, 1.0 - 1e-15)
     diff_valid = meth_diffs[valid]
 
     # Magnitude Z from two-sided p-value: |z| = Phi^-^1(1 - p/2)
@@ -334,8 +349,8 @@ def _recompute_dmr_stats(
         return None
 
     # Use searchsorted for O(log n) slice instead of boolean mask
-    lo = int(np.searchsorted(positions, start,  side="left"))
-    hi = int(np.searchsorted(positions, end,    side="left"))
+    lo = int(np.searchsorted(positions, start, side="left"))
+    hi = int(np.searchsorted(positions, end, side="left"))
 
     n_cpgs = hi - lo
     if n_cpgs < min_cpgs:
@@ -357,7 +372,7 @@ def _recompute_dmr_stats(
         return None
 
     n_hyper = int((valid_diffs > 0).sum())
-    n_hypo  = int((valid_diffs < 0).sum())
+    n_hypo = int((valid_diffs < 0).sum())
 
     # signed Stouffer's Z. Sign comes from per-CpG meth_diff so the
     # combined statistic naturally cancels mixed-direction windows.
@@ -366,21 +381,22 @@ def _recompute_dmr_stats(
         return None
 
     mean_diff = float(np.nanmean(window_diffs))
-    dmr_type  = _classify_direction(mean_diff, n_hyper, n_hypo)
+    dmr_type = _classify_direction(mean_diff, n_hyper, n_hypo)
 
     return {
-        "chrom":           chrom,
-        "start":           start,
-        "end":             end,
-        "n_cpgs":          n_cpgs,
-        "n_significant":   n_sig,
-        "mean_meth_diff":  float(np.float32(mean_diff)),
+        "chrom": chrom,
+        "start": start,
+        "end": end,
+        "n_cpgs": n_cpgs,
+        "n_significant": n_sig,
+        "mean_meth_diff": float(np.float32(mean_diff)),
         "combined_pvalue": float(combined_p),
-        "dmr_type":        dmr_type,
+        "dmr_type": dmr_type,
     }
 
 
 # Public API -- sliding-window DMR calling (works from a DMC table)
+
 
 def call_dmr_sliding_window(
     dmc_results: pl.DataFrame | DMCStore | str | Path,
@@ -456,9 +472,7 @@ def call_dmr_sliding_window(
         dmc_results = DMCStore.open(dmc_results)
 
     if step_bp > window_bp:
-        raise ValueError(
-            f"step_bp ({step_bp}) must be <= window_bp ({window_bp})"
-        )
+        raise ValueError(f"step_bp ({step_bp}) must be <= window_bp ({window_bp})")
 
     # DMR cache: when the input is a DMCStore with a known input_sig,
     # the entire sliding-window output is a pure function of that sig
@@ -468,29 +482,35 @@ def call_dmr_sliding_window(
         available_cols = _dmc_store_columns(dmc_results)
         p_col_for_key = "qvalue" if "qvalue" in available_cols else "pvalue"
         key = _dmr_sliding_cache_key(
-            dmc_results, window_bp, min_cpgs, min_sites_significant,
-            alpha, min_abs_meth_diff, p_col_for_key,
+            dmc_results,
+            window_bp,
+            min_cpgs,
+            min_sites_significant,
+            alpha,
+            min_abs_meth_diff,
+            p_col_for_key,
         )
         dmr_cache_path = dmc_results.path / f".dmr_sliding_{key[:16]}.parquet"
         if dmr_cache_path.exists():
             cached = pl.read_parquet(str(dmr_cache_path))
             logger.info(
                 "DMR sliding-window cache hit at %s (%d DMR(s)); skipping recompute.",
-                dmr_cache_path.name, len(cached),
+                dmr_cache_path.name,
+                len(cached),
             )
             return cached
 
     if isinstance(dmc_results, DMCStore):
         available_cols = _dmc_store_columns(dmc_results)
         required = {"chrom", "pos", "meth_diff", "pvalue"}
-        missing  = required - available_cols
+        missing = required - available_cols
         if missing:
             raise ValueError(f"DMC results missing required columns: {missing}")
         p_col = "qvalue" if "qvalue" in available_cols else "pvalue"
         chrom_iter = _iter_dmc_store_chroms(dmc_results, p_col)
     else:
         required = {"chrom", "pos", "meth_diff", "pvalue"}
-        missing  = required - set(dmc_results.columns)
+        missing = required - set(dmc_results.columns)
         if missing:
             raise ValueError(f"DMC results missing required columns: {missing}")
         p_col = "qvalue" if "qvalue" in dmc_results.columns else "pvalue"
@@ -499,8 +519,13 @@ def call_dmr_sliding_window(
     logger.info(
         "call_dmr_sliding_window: window=%d bp, step=%d bp, "
         "min_cpgs=%d, min_sig=%d, alpha=%.3f, min_|Deltabeta|=%.2f, p_col=%s",
-        window_bp, step_bp, min_cpgs, min_sites_significant,
-        alpha, min_abs_meth_diff, p_col,
+        window_bp,
+        step_bp,
+        min_cpgs,
+        min_sites_significant,
+        alpha,
+        min_abs_meth_diff,
+        p_col,
     )
 
     all_records: list[dict] = []
@@ -509,15 +534,15 @@ def call_dmr_sliding_window(
         if len(chrom_df) == 0:
             continue
 
-        positions  = chrom_df["pos"].to_numpy()
+        positions = chrom_df["pos"].to_numpy()
         meth_diffs = chrom_df["meth_diff"].to_numpy(allow_copy=True).astype(np.float32)
         # The significance gate uses the FDR-controlled column (qvalue if
         # present); the Stouffer combine MUST use the raw per-CpG p-values,
         # which are ~U(0,1) under the null. q-values are not uniform, so
         # combining them does not yield a valid p-value (M-DMR1). chain-merge
         # already keeps these two roles separate; sliding-window now matches.
-        sig_vals   = chrom_df[p_col].to_numpy(allow_copy=True).astype(np.float64)
-        raw_pvals  = chrom_df["pvalue"].to_numpy(allow_copy=True).astype(np.float64)
+        sig_vals = chrom_df[p_col].to_numpy(allow_copy=True).astype(np.float64)
+        raw_pvals = chrom_df["pvalue"].to_numpy(allow_copy=True).astype(np.float64)
 
         is_sig = (
             (~np.isnan(sig_vals))
@@ -582,9 +607,15 @@ def call_dmr_sliding_window(
 
         for start, end in merged_spans:
             rec = _recompute_dmr_stats(
-                chrom, start, end,
-                positions, meth_diffs, raw_pvals, is_sig,
-                min_cpgs, min_sites_significant,
+                chrom,
+                start,
+                end,
+                positions,
+                meth_diffs,
+                raw_pvals,
+                is_sig,
+                min_cpgs,
+                min_sites_significant,
                 cum_sig=cum_sig,
             )
             if rec is not None:
@@ -593,7 +624,9 @@ def call_dmr_sliding_window(
 
         logger.info(
             "  %s: %d candidate span(s) -> %d DMR(s)",
-            chrom, len(merged_spans), chrom_dmrs,
+            chrom,
+            len(merged_spans),
+            chrom_dmrs,
         )
         # Free per-chrom buffers before next iteration. Critical when
         # streaming from a DMCStore on a 22M-site genome: without this
@@ -611,13 +644,15 @@ def call_dmr_sliding_window(
 
     dmr_df = (
         pl.DataFrame(all_records)
-        .with_columns([
-            pl.col("start").cast(pl.Int32),
-            pl.col("end").cast(pl.Int32),
-            pl.col("n_cpgs").cast(pl.Int32),
-            pl.col("n_significant").cast(pl.Int32),
-            pl.col("mean_meth_diff").cast(pl.Float32),
-        ])
+        .with_columns(
+            [
+                pl.col("start").cast(pl.Int32),
+                pl.col("end").cast(pl.Int32),
+                pl.col("n_cpgs").cast(pl.Int32),
+                pl.col("n_significant").cast(pl.Int32),
+                pl.col("mean_meth_diff").cast(pl.Float32),
+            ]
+        )
         .sort(["chrom", "start"])
     )
 
@@ -635,7 +670,8 @@ def call_dmr_sliding_window(
     if dmr_cache_path is not None:
         dmr_df.write_parquet(str(dmr_cache_path))
         logger.info(
-            "DMR sliding-window result cached at %s", dmr_cache_path.name,
+            "DMR sliding-window result cached at %s",
+            dmr_cache_path.name,
         )
     return dmr_df
 
@@ -648,8 +684,12 @@ DMR_PRESETS: dict[str, dict] = {
     # tolerate false positives (e.g. follow-up validation experiments).
     # Higher alpha bar, larger effect-size floor, more CpGs required.
     "strict": dict(
-        alpha=1e-6, min_abs_meth_diff=0.20, dis_merge_bp=250,
-        min_cpgs=5, pct_sig=0.5, minlen_bp=100,
+        alpha=1e-6,
+        min_abs_meth_diff=0.20,
+        dis_merge_bp=250,
+        min_cpgs=5,
+        pct_sig=0.5,
+        minlen_bp=100,
     ),
     # "default": balanced preset for general WGBS analyses. alpha=1e-4 is
     # one order looser than DSS callDMR's default (1e-5) -- empirically
@@ -660,16 +700,24 @@ DMR_PRESETS: dict[str, dict] = {
     # validation-ready DMRs (DSS-strict alpha) or 'permissive' for
     # exploratory / recall-oriented analyses.
     "default": dict(
-        alpha=1e-4, min_abs_meth_diff=0.10, dis_merge_bp=500,
-        min_cpgs=3, pct_sig=0.5, minlen_bp=50,
+        alpha=1e-4,
+        min_abs_meth_diff=0.10,
+        dis_merge_bp=500,
+        min_cpgs=3,
+        pct_sig=0.5,
+        minlen_bp=50,
     ),
     # "permissive": recall-oriented. Loosens alpha and the gap rule, drops
     # the effect-size floor halfway. Useful for exploratory analyses, gene-
     # set enrichment, or comparisons where false negatives are costlier
     # than false positives. Expect noticeably lower PPV.
     "permissive": dict(
-        alpha=1e-4, min_abs_meth_diff=0.05, dis_merge_bp=1000,
-        min_cpgs=3, pct_sig=0.5, minlen_bp=50,
+        alpha=1e-4,
+        min_abs_meth_diff=0.05,
+        dis_merge_bp=1000,
+        min_cpgs=3,
+        pct_sig=0.5,
+        minlen_bp=50,
     ),
 }
 
@@ -695,9 +743,7 @@ def resolve_layer_min_cpgs(min_cpgs: int | None, preset: str | None) -> int:
         return min_cpgs
     if preset is not None:
         if preset not in DMR_PRESETS:
-            raise ValueError(
-                f"Unknown preset {preset!r}. Choose from {list(DMR_PRESETS)}."
-            )
+            raise ValueError(f"Unknown preset {preset!r}. Choose from {list(DMR_PRESETS)}.")
         return DMR_PRESETS[preset]["min_cpgs"]
     return _DMR_DEFAULT_MIN_CPGS
 
@@ -864,21 +910,28 @@ def call_dmr_chain_merge(
     # preset value if a preset is active, else 3; any int overrides).
     if preset is not None:
         if preset not in DMR_PRESETS:
-            raise ValueError(
-                f"Unknown preset {preset!r}. Choose from {list(DMR_PRESETS)}."
-            )
+            raise ValueError(f"Unknown preset {preset!r}. Choose from {list(DMR_PRESETS)}.")
         bundle = DMR_PRESETS[preset]
         # Default sentinels match the signature defaults above.
         _SIG_DEFAULTS = dict(
-            alpha=0.05, min_abs_meth_diff=0.1, dis_merge_bp=500,
-            pct_sig=0.5, minlen_bp=50,
+            alpha=0.05,
+            min_abs_meth_diff=0.1,
+            dis_merge_bp=500,
+            pct_sig=0.5,
+            minlen_bp=50,
         )
-        if alpha == _SIG_DEFAULTS["alpha"]:                       alpha = bundle["alpha"]
-        if min_abs_meth_diff == _SIG_DEFAULTS["min_abs_meth_diff"]: min_abs_meth_diff = bundle["min_abs_meth_diff"]
-        if dis_merge_bp == _SIG_DEFAULTS["dis_merge_bp"]:         dis_merge_bp = bundle["dis_merge_bp"]
-        if min_cpgs is None:                                     min_cpgs = bundle["min_cpgs"]
-        if pct_sig == _SIG_DEFAULTS["pct_sig"]:                   pct_sig = bundle["pct_sig"]
-        if minlen_bp == _SIG_DEFAULTS["minlen_bp"]:               minlen_bp = bundle["minlen_bp"]
+        if alpha == _SIG_DEFAULTS["alpha"]:
+            alpha = bundle["alpha"]
+        if min_abs_meth_diff == _SIG_DEFAULTS["min_abs_meth_diff"]:
+            min_abs_meth_diff = bundle["min_abs_meth_diff"]
+        if dis_merge_bp == _SIG_DEFAULTS["dis_merge_bp"]:
+            dis_merge_bp = bundle["dis_merge_bp"]
+        if min_cpgs is None:
+            min_cpgs = bundle["min_cpgs"]
+        if pct_sig == _SIG_DEFAULTS["pct_sig"]:
+            pct_sig = bundle["pct_sig"]
+        if minlen_bp == _SIG_DEFAULTS["minlen_bp"]:
+            minlen_bp = bundle["minlen_bp"]
     # No preset (or preset bundle lacked min_cpgs): fall back to the DSS
     # engine default. After this point min_cpgs is always a concrete int,
     # so the cache key and the per-chain filter see a resolved value.
@@ -907,7 +960,8 @@ def call_dmr_chain_merge(
             cached = pl.read_parquet(str(dmr_cache_path))
             logger.info(
                 "DMR chain-merge cache hit at %s (%d DMR(s)); skipping recompute.",
-                dmr_cache_path.name, len(cached),
+                dmr_cache_path.name,
+                len(cached),
             )
             return cached
 
@@ -930,8 +984,13 @@ def call_dmr_chain_merge(
     logger.info(
         "call_dmr_chain_merge: alpha=%.3g, min_|Deltabeta|=%.2f, dis_merge=%d bp, "
         "min_cpgs=%d, pct_sig=%.2f, minlen=%d bp, sig_col=%s",
-        alpha, min_abs_meth_diff, dis_merge_bp,
-        min_cpgs, pct_sig, minlen_bp, sig_col,
+        alpha,
+        min_abs_meth_diff,
+        dis_merge_bp,
+        min_cpgs,
+        pct_sig,
+        minlen_bp,
+        sig_col,
     )
 
     all_records: list[dict] = []
@@ -940,7 +999,7 @@ def call_dmr_chain_merge(
         if len(chrom_df) == 0:
             continue
 
-        positions  = chrom_df["pos"].to_numpy()
+        positions = chrom_df["pos"].to_numpy()
         meth_diffs = chrom_df["meth_diff"].to_numpy(allow_copy=True).astype(np.float32)
         # pvals is always the raw pvalue column (used by Stouffer's Z).
         pvals = chrom_df["pvalue"].to_numpy(allow_copy=True).astype(np.float64)
@@ -978,7 +1037,7 @@ def call_dmr_chain_merge(
         chrom_dmrs = 0
         for lo, hi in zip(chain_lo, chain_hi):
             i_first = int(sig_idx[lo])
-            i_last  = int(sig_idx[hi])
+            i_last = int(sig_idx[hi])
             start_pos = int(positions[i_first])
             # End is exclusive in epykit's schema; +1 to include i_last.
             end_pos = int(positions[i_last]) + 1
@@ -1002,30 +1061,35 @@ def call_dmr_chain_merge(
             if len(valid_diffs) == 0:
                 continue
             n_hyper = int((valid_diffs > 0).sum())
-            n_hypo  = int((valid_diffs < 0).sum())
+            n_hypo = int((valid_diffs < 0).sum())
 
             combined_p = _stouffer_combine_signed(span_pvals, span_diffs)
             if np.isnan(combined_p):
                 continue
 
             mean_diff = float(np.nanmean(span_diffs))
-            dmr_type  = _classify_direction(mean_diff, n_hyper, n_hypo)
+            dmr_type = _classify_direction(mean_diff, n_hyper, n_hypo)
 
-            all_records.append({
-                "chrom":           chrom,
-                "start":           start_pos,
-                "end":             end_pos,
-                "n_cpgs":          n_cpgs_span,
-                "n_significant":   n_sig_span,
-                "mean_meth_diff":  float(np.float32(mean_diff)),
-                "combined_pvalue": float(combined_p),
-                "dmr_type":        dmr_type,
-            })
+            all_records.append(
+                {
+                    "chrom": chrom,
+                    "start": start_pos,
+                    "end": end_pos,
+                    "n_cpgs": n_cpgs_span,
+                    "n_significant": n_sig_span,
+                    "mean_meth_diff": float(np.float32(mean_diff)),
+                    "combined_pvalue": float(combined_p),
+                    "dmr_type": dmr_type,
+                }
+            )
             chrom_dmrs += 1
 
         logger.info(
             "  %s: %d sig CpG(s) -> %d chain(s) -> %d DMR(s)",
-            chrom, int(sig_idx.size), len(chain_lo), chrom_dmrs,
+            chrom,
+            int(sig_idx.size),
+            len(chain_lo),
+            chrom_dmrs,
         )
         del chrom_df, positions, meth_diffs, pvals, sig_vals
         del is_sig, is_sig_int, sig_idx, sig_pos, cum_sig
@@ -1040,13 +1104,15 @@ def call_dmr_chain_merge(
 
     dmr_df = (
         pl.DataFrame(all_records)
-        .with_columns([
-            pl.col("start").cast(pl.Int32),
-            pl.col("end").cast(pl.Int32),
-            pl.col("n_cpgs").cast(pl.Int32),
-            pl.col("n_significant").cast(pl.Int32),
-            pl.col("mean_meth_diff").cast(pl.Float32),
-        ])
+        .with_columns(
+            [
+                pl.col("start").cast(pl.Int32),
+                pl.col("end").cast(pl.Int32),
+                pl.col("n_cpgs").cast(pl.Int32),
+                pl.col("n_significant").cast(pl.Int32),
+                pl.col("mean_meth_diff").cast(pl.Float32),
+            ]
+        )
         .sort(["chrom", "start"])
     )
 
@@ -1063,12 +1129,14 @@ def call_dmr_chain_merge(
     if dmr_cache_path is not None:
         dmr_df.write_parquet(str(dmr_cache_path))
         logger.info(
-            "DMR chain-merge result cached at %s", dmr_cache_path.name,
+            "DMR chain-merge result cached at %s",
+            dmr_cache_path.name,
         )
     return dmr_df
 
 
 # Public API -- tile-based DMR calling
+
 
 def _aggregate_sample_to_tiles(
     src_part_file: Path,
@@ -1092,24 +1160,31 @@ def _aggregate_sample_to_tiles(
     tiled = (
         df.with_columns(tile_col.cast(pl.Int32).alias("tile_start"))
         .group_by("tile_start")
-        .agg([
-            pl.sum("N_meth").alias("N_meth"),
-            pl.sum("coverage").alias("coverage"),
-            pl.len().alias("n_cpgs"),
-            # Preserve a strand value: first non-"*" if available, else "*"
-            (
-                pl.when(pl.col("strand") != "*").then(pl.col("strand")).otherwise(None)
-                .drop_nulls().first()
-            ).alias("strand_real")
-            if "strand" in df.columns
-            else pl.lit("*").alias("strand_real"),
-        ])
-        .with_columns([
-            pl.lit(chrom).alias("chrom"),
-            pl.col("tile_start").alias("pos"),
-            pl.col("strand_real").fill_null("*").alias("strand"),
-            (pl.col("coverage") - pl.col("N_meth")).alias("N_unmeth"),
-        ])
+        .agg(
+            [
+                pl.sum("N_meth").alias("N_meth"),
+                pl.sum("coverage").alias("coverage"),
+                pl.len().alias("n_cpgs"),
+                # Preserve a strand value: first non-"*" if available, else "*"
+                (
+                    pl.when(pl.col("strand") != "*")
+                    .then(pl.col("strand"))
+                    .otherwise(None)
+                    .drop_nulls()
+                    .first()
+                ).alias("strand_real")
+                if "strand" in df.columns
+                else pl.lit("*").alias("strand_real"),
+            ]
+        )
+        .with_columns(
+            [
+                pl.lit(chrom).alias("chrom"),
+                pl.col("tile_start").alias("pos"),
+                pl.col("strand_real").fill_null("*").alias("strand"),
+                (pl.col("coverage") - pl.col("N_meth")).alias("N_unmeth"),
+            ]
+        )
         .drop("tile_start", "strand_real")
         .sort("pos")
     )
@@ -1159,8 +1234,7 @@ def _merge_adjacent_tiles(dmr_df: pl.DataFrame) -> pl.DataFrame:
             prev_n = current["_count"]
             current["end"] = row["end"]
             current["n_cpgs"] = current["n_cpgs"] + row["n_cpgs"]
-            for col in ("meth_diff", "log2_odds_ratio",
-                        "mean_beta_case", "mean_beta_control"):
+            for col in ("meth_diff", "log2_odds_ratio", "mean_beta_case", "mean_beta_control"):
                 if col in current and current[col] is not None and row.get(col) is not None:
                     current[col] = (current[col] * prev_n + row[col]) / (prev_n + 1)
             for col in ("n_case", "n_control"):
@@ -1186,6 +1260,7 @@ def _merge_adjacent_tiles(dmr_df: pl.DataFrame) -> pl.DataFrame:
 
     result = pl.DataFrame(merged, schema=dmr_df.schema)
     from .dmc import apply_multiple_testing_correction
+
     result = apply_multiple_testing_correction(result, method="fdr_bh")
     return result.sort(["chrom", "start"])
 
@@ -1284,15 +1359,17 @@ def call_dmr_tile_based(
     samples_case = samples_treatment
     min_samples_case = min_samples_treatment
 
-    store       = Path(methylstore_path)
+    store = Path(methylstore_path)
     all_samples = samples_case + samples_control
 
     if chromosomes is None:
-        chromosomes = sorted({
-            d.name.removeprefix("chrom=")
-            for s in store.glob("sample=*")
-            for d in s.glob("chrom=*")
-        })
+        chromosomes = sorted(
+            {
+                d.name.removeprefix("chrom=")
+                for s in store.glob("sample=*")
+                for d in s.glob("chrom=*")
+            }
+        )
 
     if not chromosomes:
         return pl.DataFrame(schema=_DMR_TILE_SCHEMA)
@@ -1300,8 +1377,14 @@ def call_dmr_tile_based(
     logger.info(
         "call_dmr_tile_based: tile=%d bp, test=%s, n_case=%d, n_control=%d, "
         "min_cpgs/tile=%d, alpha=%.3f, min_|Deltabeta|=%.2f, unite=%s",
-        tile_size_bp, test, len(samples_case), len(samples_control),
-        min_cpgs_per_tile, alpha, min_abs_meth_diff, unite,
+        tile_size_bp,
+        test,
+        len(samples_case),
+        len(samples_control),
+        min_cpgs_per_tile,
+        alpha,
+        min_abs_meth_diff,
+        unite,
     )
 
     with tempfile.TemporaryDirectory(prefix="epykit_tile_") as tmpdir:
@@ -1335,9 +1418,9 @@ def call_dmr_tile_based(
                 out_dir = tile_store / f"sample={sample}" / f"chrom={chrom}"
                 out_dir.mkdir(parents=True, exist_ok=True)
                 (
-                    tiled
-                    .select(["chrom", "pos", "strand", "N_meth", "N_unmeth", "coverage"])
-                    .write_parquet(str(out_dir / "part-0.parquet"))
+                    tiled.select(
+                        ["chrom", "pos", "strand", "N_meth", "N_unmeth", "coverage"]
+                    ).write_parquet(str(out_dir / "part-0.parquet"))
                 )
 
         # ----- Phase 2: run DMC on the tiled store -----
@@ -1371,10 +1454,7 @@ def call_dmr_tile_based(
 
     # ----- Phase 4: filter and reshape -----
     # Attach n_cpgs from the per-sample aggregation.
-    n_cpgs_rows = [
-        {"chrom": c, "pos": p, "n_cpgs": n}
-        for (c, p), n in tile_n_cpgs.items()
-    ]
+    n_cpgs_rows = [{"chrom": c, "pos": p, "n_cpgs": n} for (c, p), n in tile_n_cpgs.items()]
     n_cpgs_df = pl.DataFrame(
         n_cpgs_rows,
         schema={"chrom": pl.Utf8, "pos": pl.Int32, "n_cpgs": pl.Int32},
@@ -1390,35 +1470,41 @@ def call_dmr_tile_based(
         else "log2_odds_ratio_pooled"
     )
     if _log2_src in tile_dmc.columns:
-        tile_dmc = tile_dmc.with_columns(
-            pl.col(_log2_src).alias("log2_odds_ratio")
-        )
+        tile_dmc = tile_dmc.with_columns(pl.col(_log2_src).alias("log2_odds_ratio"))
 
     dmr_df = (
-        tile_dmc
-        .join(n_cpgs_df, on=["chrom", "pos"], how="left")
+        tile_dmc.join(n_cpgs_df, on=["chrom", "pos"], how="left")
         .with_columns(pl.col("n_cpgs").fill_null(0))
         .filter(
             (pl.col("qvalue") < alpha)
             & (pl.col("meth_diff").abs() >= min_abs_meth_diff)
             & (~pl.col("pvalue").is_nan())
         )
-        .with_columns([
-            pl.col("pos").alias("start"),
-            (pl.col("pos") + tile_size_bp).cast(pl.Int32).alias("end"),
-            pl.when(pl.col("meth_diff") > 0)
-              .then(pl.lit("hyper"))
-              .otherwise(pl.lit("hypo"))
-              .alias("dmr_type"),
-        ])
+        .with_columns(
+            [
+                pl.col("pos").alias("start"),
+                (pl.col("pos") + tile_size_bp).cast(pl.Int32).alias("end"),
+                pl.when(pl.col("meth_diff") > 0)
+                .then(pl.lit("hyper"))
+                .otherwise(pl.lit("hypo"))
+                .alias("dmr_type"),
+            ]
+        )
     )
 
     out_cols = [
-        "chrom", "start", "end", "n_cpgs",
-        "n_case", "n_control",
-        "mean_beta_case", "mean_beta_control",
-        "meth_diff", "log2_odds_ratio",
-        "pvalue", "qvalue",
+        "chrom",
+        "start",
+        "end",
+        "n_cpgs",
+        "n_case",
+        "n_control",
+        "mean_beta_case",
+        "mean_beta_control",
+        "meth_diff",
+        "log2_odds_ratio",
+        "pvalue",
+        "qvalue",
         "dmr_type",
     ]
     # GLM path adds adjusted log-odds effect size for the treatment coefficient.
@@ -1430,14 +1516,16 @@ def call_dmr_tile_based(
     if merge_adjacent:
         dmr_df = _merge_adjacent_tiles(dmr_df)
 
-    logger.info("Tile-based DMR: %s tiles -> %s significant DMRs",
-                f"{len(tile_dmc):,}", f"{len(dmr_df):,}")
+    logger.info(
+        "Tile-based DMR: %s tiles -> %s significant DMRs", f"{len(tile_dmc):,}", f"{len(dmr_df):,}"
+    )
 
     gc.collect()
     return dmr_df
 
 
 # Permutation-based empirical FDR
+
 
 def _empirical_pvalues_from_null_pool(
     *,
@@ -1579,10 +1667,12 @@ def empirical_fdr_for_dmr(
         annotated table.
     """
     if len(observed_dmr) == 0:
-        return observed_dmr.with_columns([
-            pl.lit(None, dtype=pl.Float64).alias("empirical_pvalue"),
-            pl.lit(None, dtype=pl.Float64).alias("empirical_qvalue"),
-        ])
+        return observed_dmr.with_columns(
+            [
+                pl.lit(None, dtype=pl.Float64).alias("empirical_pvalue"),
+                pl.lit(None, dtype=pl.Float64).alias("empirical_qvalue"),
+            ]
+        )
 
     n_treat = len(samples_treatment)
     n_ctrl = len(samples_control)
@@ -1642,6 +1732,7 @@ def empirical_fdr_for_dmr(
     else:
         try:
             from joblib import Parallel, delayed
+
             null_pvals_list = Parallel(n_jobs=n_jobs)(
                 delayed(_run_one_perm)(i) for i in range(n_perm)
             )
@@ -1659,7 +1750,9 @@ def empirical_fdr_for_dmr(
         logger.info(
             "empirical_fdr_for_dmr: %d/%d permutations produced zero null "
             "DMRs; denominator uses n_perm_used=%d.",
-            n_perm_failed, n_perm, n_perm_used,
+            n_perm_failed,
+            n_perm,
+            n_perm_used,
         )
     if n_perm_used == 0:
         logger.warning(
@@ -1699,16 +1792,19 @@ def empirical_fdr_for_dmr(
 
     # BH-adjust to empirical q-value
     from statsmodels.stats.multitest import multipletests
+
     finite = np.isfinite(emp_p)
     emp_q = np.full_like(emp_p, np.nan, dtype=np.float64)
     if finite.any():
         _, q_finite, _, _ = multipletests(emp_p[finite], method="fdr_bh")
         emp_q[finite] = q_finite
 
-    return observed_dmr.with_columns([
-        pl.Series("empirical_pvalue", emp_p),
-        pl.Series("empirical_qvalue", emp_q),
-    ])
+    return observed_dmr.with_columns(
+        [
+            pl.Series("empirical_pvalue", emp_p),
+            pl.Series("empirical_qvalue", emp_q),
+        ]
+    )
 
 
 # BSmooth-style local-polynomial smoother (spec-faithful)
@@ -1730,12 +1826,12 @@ def _bsmooth_make_njit():
         njit = None
 
     def _bsmooth_one_chrom(
-        positions: np.ndarray,    # (n,) float64, sorted ascending
-        n_meth:    np.ndarray,    # (n,) float64
-        coverage:  np.ndarray,    # (n,) float64
-        ns:        int,
-        h_min:     float,
-        degree:    int,
+        positions: np.ndarray,  # (n,) float64, sorted ascending
+        n_meth: np.ndarray,  # (n,) float64
+        coverage: np.ndarray,  # (n,) float64
+        ns: int,
+        h_min: float,
+        degree: int,
         min_cpgs_for_smooth: int,
     ) -> np.ndarray:
         """Local-polynomial smoother -- one chromosome, one sample.
@@ -1798,7 +1894,7 @@ def _bsmooth_make_njit():
             s2 = 0.0
             s3 = 0.0
             s4 = 0.0
-            t0 = 0.0   # X' W y
+            t0 = 0.0  # X' W y
             t1 = 0.0
             t2 = 0.0
             n_valid = 0
@@ -1834,19 +1930,11 @@ def _bsmooth_make_njit():
 
             # ---- 4. Solve WLS for the intercept only (we don't need slope/curvature)
             if degree == 2:
-                det = (
-                    s0 * (s2 * s4 - s3 * s3)
-                    - s1 * (s1 * s4 - s3 * s2)
-                    + s2 * (s1 * s3 - s2 * s2)
-                )
+                det = s0 * (s2 * s4 - s3 * s3) - s1 * (s1 * s4 - s3 * s2) + s2 * (s1 * s3 - s2 * s2)
                 if det == 0.0 or not np.isfinite(det):
-                    out[i] = t0 / s0   # singular -> weighted mean fallback
+                    out[i] = t0 / s0  # singular -> weighted mean fallback
                     continue
-                num = (
-                    t0 * (s2 * s4 - s3 * s3)
-                    - s1 * (t1 * s4 - s3 * t2)
-                    + s2 * (t1 * s3 - s2 * t2)
-                )
+                num = t0 * (s2 * s4 - s3 * s3) - s1 * (t1 * s4 - s3 * t2) + s2 * (t1 * s3 - s2 * t2)
                 intercept = num / det
             else:  # degree == 1
                 det = s0 * s2 - s1 * s1
@@ -1955,10 +2043,9 @@ def smooth_methylation_bsmooth(
             if not parts:
                 continue
 
-            df = pl.concat([
-                pl.read_parquet(str(p), columns=["pos", "N_meth", "coverage"])
-                for p in parts
-            ]).sort("pos")
+            df = pl.concat(
+                [pl.read_parquet(str(p), columns=["pos", "N_meth", "coverage"]) for p in parts]
+            ).sort("pos")
             n = df.height
             if n == 0:
                 continue
@@ -1970,28 +2057,39 @@ def smooth_methylation_bsmooth(
             beta_raw = np.where(cov > 0, meth / np.maximum(cov, 1.0), np.nan)
             if n < min_cpgs_for_smooth:
                 logger.debug(
-                    "  %s / %s: only %d sites; skipping bsmooth", sample, chrom, n,
+                    "  %s / %s: only %d sites; skipping bsmooth",
+                    sample,
+                    chrom,
+                    n,
                 )
                 beta_smooth = beta_raw.copy()
             else:
                 beta_smooth = smoother(
-                    pos, meth, cov,
-                    int(ns), float(h_bp), int(degree), int(min_cpgs_for_smooth),
+                    pos,
+                    meth,
+                    cov,
+                    int(ns),
+                    float(h_bp),
+                    int(degree),
+                    int(min_cpgs_for_smooth),
                 )
 
-            chunk = pl.DataFrame({
-                "chrom":       pl.Series([chrom] * n, dtype=pl.Utf8),
-                "pos":         df["pos"],
-                "sample":      pl.Series([sample] * n, dtype=pl.Utf8),
-                "beta_raw":    pl.Series(beta_raw.astype(np.float32)),
-                "beta_smooth": pl.Series(beta_smooth.astype(np.float32)),
-            })
+            chunk = pl.DataFrame(
+                {
+                    "chrom": pl.Series([chrom] * n, dtype=pl.Utf8),
+                    "pos": df["pos"],
+                    "sample": pl.Series([sample] * n, dtype=pl.Utf8),
+                    "beta_raw": pl.Series(beta_raw.astype(np.float32)),
+                    "beta_smooth": pl.Series(beta_smooth.astype(np.float32)),
+                }
+            )
 
             if out_root is not None:
                 part_dir = out_root / f"sample={sample}" / f"chrom={chrom}"
                 part_dir.mkdir(parents=True, exist_ok=True)
                 chunk.write_parquet(
-                    str(part_dir / "part-0.parquet"), compression="zstd",
+                    str(part_dir / "part-0.parquet"),
+                    compression="zstd",
                 )
             else:
                 records.append(chunk)
@@ -2005,6 +2103,7 @@ def smooth_methylation_bsmooth(
 
 
 # Public API -- fast Gaussian smoothing (replaces statsmodels LOESS)
+
 
 def smooth_methylation_gaussian(
     methylstore_path: str,
@@ -2031,11 +2130,10 @@ def smooth_methylation_gaussian(
         from scipy.ndimage import gaussian_filter1d
     except ImportError as exc:
         raise ImportError(
-            "scipy is required for Gaussian smoothing. "
-            "Install with: pip install scipy"
+            "scipy is required for Gaussian smoothing. Install with: pip install scipy"
         ) from exc
 
-    store   = Path(methylstore_path)
+    store = Path(methylstore_path)
     records: list[pl.DataFrame] = []
 
     # Determine grid resolution once (same for all samples/chroms)
@@ -2056,31 +2154,29 @@ def smooth_methylation_gaussian(
             if not parts:
                 continue
 
-            df = pl.concat([
-                pl.read_parquet(str(p), columns=["pos", "N_meth", "coverage"])
-                for p in parts
-            ]).sort("pos")
+            df = pl.concat(
+                [pl.read_parquet(str(p), columns=["pos", "N_meth", "coverage"]) for p in parts]
+            ).sort("pos")
 
-            pos  = df["pos"].to_numpy().astype(np.float64)
+            pos = df["pos"].to_numpy().astype(np.float64)
             meth = df["N_meth"].to_numpy().astype(np.float64)
-            cov  = df["coverage"].to_numpy().astype(np.float64)
+            cov = df["coverage"].to_numpy().astype(np.float64)
 
             with np.errstate(invalid="ignore", divide="ignore"):
                 beta_raw = np.where(cov > 0, meth / cov, np.nan).astype(np.float32)
 
             beta_smooth = beta_raw.copy()
-            valid       = ~np.isnan(beta_raw)
-            n_valid     = int(valid.sum())
+            valid = ~np.isnan(beta_raw)
+            n_valid = int(valid.sum())
 
             if n_valid >= 4:
-                pos_valid   = pos[valid]
-                beta_valid  = beta_raw[valid].astype(np.float64)
+                pos_valid = pos[valid]
+                beta_valid = beta_raw[valid].astype(np.float64)
 
                 # Build a regular grid spanning the valid positions.
-                grid_start  = int(pos_valid[0])
-                grid_end    = int(pos_valid[-1]) + _grid_res
-                grid_pos    = np.arange(grid_start, grid_end, _grid_res,
-                                        dtype=np.float64)
+                grid_start = int(pos_valid[0])
+                grid_end = int(pos_valid[-1]) + _grid_res
+                grid_pos = np.arange(grid_start, grid_end, _grid_res, dtype=np.float64)
 
                 # Coverage-weighted interpolation onto the regular grid
                 cov_valid = cov[valid].astype(np.float64)
@@ -2090,7 +2186,9 @@ def smooth_methylation_gaussian(
 
                 # Apply weighted Gaussian: smooth numerator and denominator separately
                 sigma_grid = max(bandwidth / _grid_res, 0.5)
-                grid_num = gaussian_filter1d(grid_beta * grid_weights, sigma=sigma_grid, mode="nearest")
+                grid_num = gaussian_filter1d(
+                    grid_beta * grid_weights, sigma=sigma_grid, mode="nearest"
+                )
                 grid_den = gaussian_filter1d(grid_weights, sigma=sigma_grid, mode="nearest")
                 smoothed_grid = grid_num / np.maximum(grid_den, 1e-9)
                 np.clip(smoothed_grid, 0.0, 1.0, out=smoothed_grid)
@@ -2101,23 +2199,25 @@ def smooth_methylation_gaussian(
             else:
                 logger.debug(
                     "  %s / %s: only %d valid sites; skipping smoothing",
-                    sample, chrom, n_valid,
+                    sample,
+                    chrom,
+                    n_valid,
                 )
 
-            chunk = pl.DataFrame({
-                "chrom":       pl.Series([chrom]  * len(df), dtype=pl.Utf8),
-                "pos":         df["pos"],
-                "sample":      pl.Series([sample] * len(df), dtype=pl.Utf8),
-                "beta_raw":    pl.Series(beta_raw),
-                "beta_smooth": pl.Series(beta_smooth),
-            })
+            chunk = pl.DataFrame(
+                {
+                    "chrom": pl.Series([chrom] * len(df), dtype=pl.Utf8),
+                    "pos": df["pos"],
+                    "sample": pl.Series([sample] * len(df), dtype=pl.Utf8),
+                    "beta_raw": pl.Series(beta_raw),
+                    "beta_smooth": pl.Series(beta_smooth),
+                }
+            )
 
             if _out_root is not None:
                 part_dir = _out_root / f"sample={sample}" / f"chrom={chrom}"
                 part_dir.mkdir(parents=True, exist_ok=True)
-                chunk.write_parquet(
-                    str(part_dir / "part-0.parquet"), compression="zstd"
-                )
+                chunk.write_parquet(str(part_dir / "part-0.parquet"), compression="zstd")
             else:
                 records.append(chunk)
 
@@ -2128,5 +2228,3 @@ def smooth_methylation_gaussian(
         return pl.DataFrame(schema=_SMOOTH_EMPTY_SCHEMA)
 
     return pl.concat(records).sort(["chrom", "pos", "sample"])
-
-

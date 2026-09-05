@@ -33,19 +33,23 @@ logger = logging.getLogger(__name__)
 
 _HMR_SCHEMA = {
     "sample_id": pl.Utf8,
-    "chrom":     pl.Utf8,
-    "start":     pl.Int32,
-    "end":       pl.Int32,
+    "chrom": pl.Utf8,
+    "start": pl.Int32,
+    "end": pl.Int32,
     "length_bp": pl.Int32,
-    "n_cpgs":    pl.Int32,
+    "n_cpgs": pl.Int32,
     "mean_beta": pl.Float32,
-    "kind":      pl.Utf8,    # "HMR" or "LMR"
+    "kind": pl.Utf8,  # "HMR" or "LMR"
 }
 
 
 def _segment_chrom(
-    store: Path, sample: str, chrom: str,
-    *, hmr_threshold: float, self_loop: float,
+    store: Path,
+    sample: str,
+    chrom: str,
+    *,
+    hmr_threshold: float,
+    self_loop: float,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     """Load one chrom's beta and return (positions, beta, viterbi)."""
     part = store / f"sample={sample}" / f"chrom={chrom}" / "part-0.parquet"
@@ -61,10 +65,12 @@ def _segment_chrom(
 
     # 2-state HMM: state 0 = hypo (mean ~= hmr_threshold * 0.5),
     # state 1 = hyper (mean ~= average of hmr_threshold and 1).
-    state_means = np.array([
-        max(hmr_threshold * 0.5, 0.05),
-        min((hmr_threshold + 1.0) / 2.0, 0.95),
-    ])
+    state_means = np.array(
+        [
+            max(hmr_threshold * 0.5, 0.05),
+            min((hmr_threshold + 1.0) / 2.0, 0.95),
+        ]
+    )
     viterbi = segment(beta, n_states=2, state_means=state_means, self_loop=self_loop)
     return positions, beta, viterbi
 
@@ -75,7 +81,7 @@ def call_hmr_one_sample(
     *,
     chromosomes: list[str] | None = None,
     hmr_threshold: float = 0.30,
-    lmr_max_density: float = 0.020,   # CpGs per bp; below this -> LMR
+    lmr_max_density: float = 0.020,  # CpGs per bp; below this -> LMR
     min_cpgs: int = 4,
     self_loop: float = 0.85,
     backend: str = "sequential",
@@ -93,8 +99,11 @@ def call_hmr_one_sample(
 
     def _hmr_chrom_handler(chrom: str) -> pl.DataFrame | None:
         pkg = _segment_chrom(
-            store, sample, chrom,
-            hmr_threshold=hmr_threshold, self_loop=self_loop,
+            store,
+            sample,
+            chrom,
+            hmr_threshold=hmr_threshold,
+            self_loop=self_loop,
         )
         if pkg is None:
             return None
@@ -119,15 +128,17 @@ def call_hmr_one_sample(
             # LMR if CpG density (n_cpgs / length_bp) is low.
             density = run_len_sites / max(length_bp, 1)
             kind = "LMR" if density < lmr_max_density else "HMR"
-            rows.append({
-                "chrom": chrom,
-                "start": int(run_start),
-                "end": int(run_end),
-                "length_bp": int(length_bp),
-                "n_cpgs": int(run_len_sites),
-                "mean_beta": float(mean_beta),
-                "kind": kind,
-            })
+            rows.append(
+                {
+                    "chrom": chrom,
+                    "start": int(run_start),
+                    "end": int(run_end),
+                    "length_bp": int(length_bp),
+                    "n_cpgs": int(run_len_sites),
+                    "mean_beta": float(mean_beta),
+                    "kind": kind,
+                }
+            )
         if not rows:
             return None
         return pl.DataFrame(
@@ -137,8 +148,11 @@ def call_hmr_one_sample(
 
     parts: list[pl.DataFrame] = []
     for chrom, chrom_result in run_chrom_pipeline(
-        chromosomes, _hmr_chrom_handler,
-        backend=backend, n_workers=n_workers, label=f"HMR[{sample}]",
+        chromosomes,
+        _hmr_chrom_handler,
+        backend=backend,
+        n_workers=n_workers,
+        label=f"HMR[{sample}]",
     ):
         parts.append(chrom_result)
     if not parts:
@@ -168,12 +182,14 @@ def hmr(
     parts: list[pl.DataFrame] = []
     for sample in samples:
         df = call_hmr_one_sample(
-            md.store, sample,
+            md.store,
+            sample,
             chromosomes=chromosomes,
             hmr_threshold=hmr_threshold,
             lmr_max_density=lmr_max_density,
             min_cpgs=min_cpgs,
-            backend=backend, n_workers=n_workers,
+            backend=backend,
+            n_workers=n_workers,
         )
         if df.height:
             df = df.with_columns(pl.lit(sample).alias("sample_id"))

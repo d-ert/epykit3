@@ -33,12 +33,12 @@ logger = logging.getLogger(__name__)
 
 
 _ENTROPY_SCHEMA = {
-    "sample_id":          pl.Utf8,
-    "chrom":              pl.Utf8,
-    "start":              pl.Int32,
-    "end":                pl.Int32,
-    "n_reads":            pl.Int32,
-    "entropy":            pl.Float64,
+    "sample_id": pl.Utf8,
+    "chrom": pl.Utf8,
+    "start": pl.Int32,
+    "end": pl.Int32,
+    "n_reads": pl.Int32,
+    "entropy": pl.Float64,
     "normalised_entropy": pl.Float64,
 }
 
@@ -91,7 +91,10 @@ def call_entropy(
     for sample_id, bam_path in bam.items():
         logger.info("[entropy] %s: reading BAM", sample_id)
         meth_df = read_methylation_calls(
-            bam_path, caller=caller, min_baseq=min_baseq, min_mapq=min_mapq,
+            bam_path,
+            caller=caller,
+            min_baseq=min_baseq,
+            min_mapq=min_mapq,
         )
         if meth_df.height == 0:
             logger.warning("[entropy] %s: no usable reads", sample_id)
@@ -102,7 +105,9 @@ def call_entropy(
                 continue
 
         df = _entropy_one_sample(
-            meth_df, window_cpgs=window_cpgs, min_reads=min_reads,
+            meth_df,
+            window_cpgs=window_cpgs,
+            min_reads=min_reads,
             log2_states=log2_states,
         )
         if df.height > 0:
@@ -112,9 +117,7 @@ def call_entropy(
     if not sample_frames:
         return pl.DataFrame(schema=_ENTROPY_SCHEMA)
 
-    return pl.concat(sample_frames, how="vertical_relaxed").sort(
-        ["sample_id", "chrom", "start"]
-    )
+    return pl.concat(sample_frames, how="vertical_relaxed").sort(["sample_id", "chrom", "start"])
 
 
 def _entropy_one_sample(
@@ -138,13 +141,11 @@ def _entropy_one_sample(
         read_calls: dict[str, dict[int, int]] = {}
         for row in chrom_grp.iter_rows(named=True):
             rid = row["read_id"]
-            read_calls.setdefault(rid, {})[int(row["pos"])] = int(
-                row["methylation_status"]
-            )
+            read_calls.setdefault(rid, {})[int(row["pos"])] = int(row["methylation_status"])
 
         # Walk every window of window_cpgs consecutive CpGs.
         for i in range(len(cpg_positions) - window_cpgs + 1):
-            window_pos = cpg_positions[i: i + window_cpgs]
+            window_pos = cpg_positions[i : i + window_cpgs]
             pattern_counts: dict[int, int] = {}
             n_reads = 0
             for calls in read_calls.values():
@@ -159,7 +160,7 @@ def _entropy_one_sample(
                     if calls[p_int] not in (0, 1):
                         ok = False
                         break
-                    pat |= (calls[p_int] << j)
+                    pat |= calls[p_int] << j
                 if not ok:
                     continue
                 pattern_counts[pat] = pattern_counts.get(pat, 0) + 1
@@ -174,18 +175,19 @@ def _entropy_one_sample(
                 p = c / n_reads
                 if p > 0:
                     ent -= p * math.log2(p)
-            out_rows.append({
-                "chrom": chrom_name[0] if isinstance(chrom_name, tuple) else chrom_name,
-                "start": int(window_pos[0]),
-                "end": int(window_pos[-1]) + 1,
-                "n_reads": int(n_reads),
-                "entropy": float(ent),
-                "normalised_entropy": float(ent / log2_states) if log2_states else 0.0,
-            })
+            out_rows.append(
+                {
+                    "chrom": chrom_name[0] if isinstance(chrom_name, tuple) else chrom_name,
+                    "start": int(window_pos[0]),
+                    "end": int(window_pos[-1]) + 1,
+                    "n_reads": int(n_reads),
+                    "entropy": float(ent),
+                    "normalised_entropy": float(ent / log2_states) if log2_states else 0.0,
+                }
+            )
 
     if not out_rows:
-        return pl.DataFrame(schema={k: v for k, v in _ENTROPY_SCHEMA.items()
-                                    if k != "sample_id"})
+        return pl.DataFrame(schema={k: v for k, v in _ENTROPY_SCHEMA.items() if k != "sample_id"})
     return pl.DataFrame(
         out_rows,
         schema={k: v for k, v in _ENTROPY_SCHEMA.items() if k != "sample_id"},
@@ -207,8 +209,11 @@ def entropy(
     if missing:
         raise ValueError(f"bam keys not in md.obs.sample_id: {missing[:5]}")
     result = call_entropy(
-        bam=bam, window_cpgs=window_cpgs, min_reads=min_reads,
-        chromosomes=chromosomes, caller=caller,
+        bam=bam,
+        window_cpgs=window_cpgs,
+        min_reads=min_reads,
+        chromosomes=chromosomes,
+        caller=caller,
     )
     md.varm["entropy"] = result
     md.uns["entropy"] = {

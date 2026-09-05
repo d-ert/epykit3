@@ -36,16 +36,12 @@ def _filter_params_payload(
         "min_coverage": int(min_coverage),
         "max_coverage_quantile": float(max_coverage_quantile),
         "blacklist_bed_sig": (
-            _cache.file_signature(Path(blacklist_bed))
-            if blacklist_bed
-            else None
+            _cache.file_signature(Path(blacklist_bed)) if blacklist_bed else None
         ),
     }
 
 
-def _can_reuse_filtered(
-    in_sample_dir: Path, out_sample_dir: Path, params: dict
-) -> bool:
+def _can_reuse_filtered(in_sample_dir: Path, out_sample_dir: Path, params: dict) -> bool:
     manifest = _cache.load_json(out_sample_dir / FILTER_MANIFEST_NAME)
     if not manifest:
         return False
@@ -61,6 +57,7 @@ def _can_reuse_filtered(
 
 # Internal helpers
 
+
 def _genome_wide_quantile(
     sample_dir: Path,
     quantile: float,
@@ -71,11 +68,13 @@ def _genome_wide_quantile(
     Reading a single column is dramatically cheaper than reading the full
     schema, so this first pass is lightweight even on large genomes.
     """
-    coverage_series = pl.concat([
-        pl.read_parquet(str(part), columns=["coverage"])["coverage"]
-        for chrom_dir in sorted(sample_dir.glob("chrom=*"))
-        for part in chrom_dir.glob("part-*.parquet")
-    ])
+    coverage_series = pl.concat(
+        [
+            pl.read_parquet(str(part), columns=["coverage"])["coverage"]
+            for chrom_dir in sorted(sample_dir.glob("chrom=*"))
+            for part in chrom_dir.glob("part-*.parquet")
+        ]
+    )
     return int(coverage_series.quantile(quantile))
 
 
@@ -93,17 +92,18 @@ def _apply_blacklist(df: pl.DataFrame, blacklist_bed: str) -> pl.DataFrame:
         import pandas as pd
     except ImportError as exc:
         raise ImportError(
-            "bioframe is required for blacklist filtering. "
-            "Install it with: pip install bioframe"
+            "bioframe is required for blacklist filtering. Install it with: pip install bioframe"
         ) from exc
 
     bl = bioframe.read_table(blacklist_bed, schema="bed3", usecols=[0, 1, 2])
 
-    cpg = pd.DataFrame({
-        "chrom": df["chrom"].to_list(),
-        "start": df["pos"].to_list(),
-        "end":   (df["pos"] + 1).to_list(),  # single-base intervals
-    })
+    cpg = pd.DataFrame(
+        {
+            "chrom": df["chrom"].to_list(),
+            "start": df["pos"].to_list(),
+            "end": (df["pos"] + 1).to_list(),  # single-base intervals
+        }
+    )
 
     hits = bioframe.overlap(cpg, bl, how="inner", suffixes=("", "_bl"))
 
@@ -111,19 +111,16 @@ def _apply_blacklist(df: pl.DataFrame, blacklist_bed: str) -> pl.DataFrame:
         return df
 
     # Build a set of (chrom, pos) pairs to exclude
-    exclude: set[tuple[str, int]] = set(
-        zip(hits["chrom"].tolist(), hits["start"].tolist())
-    )
+    exclude: set[tuple[str, int]] = set(zip(hits["chrom"].tolist(), hits["start"].tolist()))
 
     chrom_list = df["chrom"].to_list()
     pos_list = df["pos"].to_list()
-    keep = pl.Series(
-        [(c, p) not in exclude for c, p in zip(chrom_list, pos_list)]
-    )
+    keep = pl.Series([(c, p) not in exclude for c, p in zip(chrom_list, pos_list)])
     return df.filter(keep)
 
 
 # Public API
+
 
 def sample_summary(
     methylstore_path: str,
@@ -292,8 +289,7 @@ def filter_sites(
 
             # Coverage filter
             chrom_df = chrom_df.filter(
-                (pl.col("coverage") >= min_coverage)
-                & (pl.col("coverage") <= max_cov)
+                (pl.col("coverage") >= min_coverage) & (pl.col("coverage") <= max_cov)
             )
 
             if len(chrom_df) == 0:
@@ -313,10 +309,7 @@ def filter_sites(
                 compression="zstd",
             )
 
-        n_out = sum(
-            1
-            for f in out_sample_dir.rglob("part-*.parquet")
-        )
+        n_out = sum(1 for f in out_sample_dir.rglob("part-*.parquet"))
         logger.info("  Written %d chromosome file(s) for %s", n_out, samp)
 
         _cache.write_json(
@@ -378,16 +371,13 @@ def normalize_coverage_store(
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    samples = sorted(
-        d.name.removeprefix("sample=") for d in src.glob("sample=*")
-    )
+    samples = sorted(d.name.removeprefix("sample=") for d in src.glob("sample=*"))
     if not samples:
         raise ValueError(f"No sample=* directories found in {src}")
 
     # --- Cohort cache check ----------------------------------------------
     cohort_sig = {
-        samp: _cache.upstream_sample_signature(src / f"sample={samp}")
-        for samp in samples
+        samp: _cache.upstream_sample_signature(src / f"sample={samp}") for samp in samples
     }
     cohort_params = {"method": method}
     cohort_manifest_path = out / NORMALIZE_MANIFEST_NAME
@@ -404,8 +394,12 @@ def normalize_coverage_store(
             for samp in samples
         ):
             factors = {s: float(v) for s, v in cached["factors"].items()}
-            logger.info("Normalised store cached at %s (method=%s, target=%.2f)",
-                        out, method, float(cached.get("target", 0.0)))
+            logger.info(
+                "Normalised store cached at %s (method=%s, target=%.2f)",
+                out,
+                method,
+                float(cached.get("target", 0.0)),
+            )
             for samp in samples:
                 logger.info("  %s: factor=%.4f (cached)", samp, factors[samp])
             return factors
@@ -421,10 +415,9 @@ def normalize_coverage_store(
         ]
         if not parts:
             raise ValueError(f"Sample {samp!r} has no parquet parts")
-        coverage_series = pl.concat([
-            pl.read_parquet(str(p), columns=["coverage"])["coverage"]
-            for p in parts
-        ])
+        coverage_series = pl.concat(
+            [pl.read_parquet(str(p), columns=["coverage"])["coverage"] for p in parts]
+        )
         if len(coverage_series) == 0:
             raise ValueError(f"Sample {samp!r} has zero rows after read")
         # Polars-native reduction (Rust, parallel). The type: ignore is
@@ -436,26 +429,23 @@ def normalize_coverage_store(
         # PythonLiteral union over every dtype, but the int coverage column
         # always reduces to float | None at runtime.
         from typing import cast
-        scalar = (
-            coverage_series.median() if method == "median"
-            else coverage_series.mean()
-        )
+
+        scalar = coverage_series.median() if method == "median" else coverage_series.mean()
         summaries[samp] = float(cast(float, scalar))
 
     summary_values = np.array(list(summaries.values()), dtype=np.float64)
-    target = float(
-        np.median(summary_values) if method == "median" else summary_values.mean()
-    )
+    target = float(np.median(summary_values) if method == "median" else summary_values.mean())
 
-    factors = {
-        samp: (target / s if s > 0 else 1.0) for samp, s in summaries.items()
-    }
+    factors = {samp: (target / s if s > 0 else 1.0) for samp, s in summaries.items()}
 
     logger.info("Coverage normalisation (method=%s, target=%.2f):", method, target)
     for samp in samples:
         logger.info(
             "  %s: %s_cov=%.2f, factor=%.4f",
-            samp, method, summaries[samp], factors[samp],
+            samp,
+            method,
+            summaries[samp],
+            factors[samp],
         )
 
     # --- Pass 2: scale and write ------------------------------------------
@@ -481,19 +471,23 @@ def normalize_coverage_store(
             # so the two scaled counts remain consistent and coverage is
             # rebuilt from them exactly.
             scaled = (
-                chrom_df
-                .with_columns(
+                chrom_df.with_columns(
                     (pl.col("coverage") - pl.col("N_meth")).alias("_N_unmeth_orig")
                 )
-                .with_columns([
-                    (pl.col("N_meth").cast(pl.Float64) * s)
-                        .round().cast(pl.Int32).alias("N_meth"),
-                    (pl.col("_N_unmeth_orig").cast(pl.Float64) * s)
-                        .round().cast(pl.Int32).alias("_N_unmeth"),
-                ])
                 .with_columns(
-                    (pl.col("N_meth") + pl.col("_N_unmeth"))
-                    .cast(pl.Int32).alias("coverage")
+                    [
+                        (pl.col("N_meth").cast(pl.Float64) * s)
+                        .round()
+                        .cast(pl.Int32)
+                        .alias("N_meth"),
+                        (pl.col("_N_unmeth_orig").cast(pl.Float64) * s)
+                        .round()
+                        .cast(pl.Int32)
+                        .alias("_N_unmeth"),
+                    ]
+                )
+                .with_columns(
+                    (pl.col("N_meth") + pl.col("_N_unmeth")).cast(pl.Int32).alias("coverage")
                 )
                 .drop(["_N_unmeth_orig", "_N_unmeth"])
             )
@@ -513,8 +507,7 @@ def normalize_coverage_store(
             "target": target,
             "factors": factors,
             "chroms_by_sample": {
-                samp: _cache.expected_chrom_dirs(out / f"sample={samp}")
-                for samp in samples
+                samp: _cache.expected_chrom_dirs(out / f"sample={samp}") for samp in samples
             },
         },
     )
@@ -551,14 +544,12 @@ def intersect_sites(
     if not samples:
         raise ValueError("Must provide at least one sample")
 
-    lf = pl.scan_parquet(
-        f"{methylstore_path}/sample=*/chrom=*/part-*.parquet"
-    )
+    lf = pl.scan_parquet(f"{methylstore_path}/sample=*/chrom=*/part-*.parquet")
 
     intersect = (
         lf.filter(pl.col("sample").is_in(samples))
         .select(["chrom", "pos", "strand", "sample"])
-        .unique()                                   # one row per (site, sample)
+        .unique()  # one row per (site, sample)
         .group_by(["chrom", "pos", "strand"])
         .agg(pl.len().alias("n_samples"))
         .filter(pl.col("n_samples") == len(samples))
@@ -598,9 +589,7 @@ def load_chromosome_data(
     pl.DataFrame
         Columns: chrom, pos, strand, N_meth, N_unmeth, coverage, sample
     """
-    glob_pattern = (
-        f"{methylstore_path}/sample=*/chrom={chrom}/part-*.parquet"
-    )
+    glob_pattern = f"{methylstore_path}/sample=*/chrom={chrom}/part-*.parquet"
     lf = pl.scan_parquet(glob_pattern)
     lf = lf.filter(pl.col("sample").is_in(samples))
 

@@ -38,12 +38,14 @@ def _render_table_axes(ax, df, *, max_rows: int = 20, max_cols: int = 8) -> None
     """Render a polars / pandas / list-of-dicts frame as a matplotlib table."""
     try:
         import polars as pl
+
         if isinstance(df, pl.DataFrame):
             df = df.head(max_rows).to_pandas()
     except Exception:
         pass
     try:
         import pandas as pd
+
         if isinstance(df, pd.DataFrame):
             df = df.head(max_rows).iloc[:, :max_cols]
             cell_text = df.astype(str).values.tolist()
@@ -58,8 +60,10 @@ def _render_table_axes(ax, df, *, max_rows: int = 20, max_cols: int = 8) -> None
 
     ax.axis("off")
     tbl = ax.table(
-        cellText=cell_text, colLabels=col_labels,
-        loc="center", cellLoc="left",
+        cellText=cell_text,
+        colLabels=col_labels,
+        loc="center",
+        cellLoc="left",
     )
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(8)
@@ -138,7 +142,8 @@ def figure_grid(
 
     fig, axd = plt.subplot_mosaic(
         mosaic,  # type: ignore[arg-type]  # matplotlib stubs want HashableList; list[list[str]] works at runtime
-        figsize=figsize, gridspec_kw=gridspec_kw,
+        figsize=figsize,
+        gridspec_kw=gridspec_kw,
     )
 
     for letter, ax in axd.items():
@@ -149,8 +154,10 @@ def figure_grid(
 
         # 1. Pre-built (fig, ax) handoff: copy its content over.
         if (
-            isinstance(entry, tuple) and len(entry) == 2
-            and hasattr(entry[0], "axes") and hasattr(entry[1], "figure")
+            isinstance(entry, tuple)
+            and len(entry) == 2
+            and hasattr(entry[0], "axes")
+            and hasattr(entry[1], "figure")
         ):
             src_fig, src_ax = entry
             _adopt_axes_content(src_ax, ax)
@@ -173,27 +180,37 @@ def figure_grid(
 
         else:
             ax.text(
-                0.5, 0.5, f"unrecognised panel for {letter!r}",
-                ha="center", va="center", transform=ax.transAxes,
+                0.5,
+                0.5,
+                f"unrecognised panel for {letter!r}",
+                ha="center",
+                va="center",
+                transform=ax.transAxes,
             )
             ax.axis("off")
 
         # Panel label (A / B / C / ...) in the top-left corner.
         ax.text(
-            label_offset[0], label_offset[1], letter,
+            label_offset[0],
+            label_offset[1],
+            letter,
             transform=ax.transAxes,
-            fontsize=label_fontsize, fontweight=label_weight,
-            va="top", ha="right",
+            fontsize=label_fontsize,
+            fontweight=label_weight,
+            va="top",
+            ha="right",
         )
 
     fig.tight_layout()
 
     if save:
         from ._utils import _save_fig
+
         if md is not None:
             _save_fig(md, fig, save)
         else:
             from pathlib import Path
+
             path = Path(f"figures/{save}.png")
             path.parent.mkdir(parents=True, exist_ok=True)
             fig.savefig(path, dpi=300, bbox_inches="tight")
@@ -218,9 +235,12 @@ def _adopt_axes_content(src_ax, dst_ax) -> None:
 
     for ln in src_ax.get_lines():
         dst_ax.plot(
-            ln.get_xdata(), ln.get_ydata(),
-            color=ln.get_color(), linestyle=ln.get_linestyle(),
-            linewidth=ln.get_linewidth(), label=ln.get_label(),
+            ln.get_xdata(),
+            ln.get_ydata(),
+            color=ln.get_color(),
+            linestyle=ln.get_linestyle(),
+            linewidth=ln.get_linewidth(),
+            label=ln.get_label(),
         )
     for col in src_ax.collections:
         if isinstance(col, PathCollection):
@@ -230,26 +250,35 @@ def _adopt_axes_content(src_ax, dst_ax) -> None:
             if len(offs):
                 facecolors = col.get_facecolors()  # type: ignore[attr-defined]
                 dst_ax.scatter(
-                    offs[:, 0], offs[:, 1],
+                    offs[:, 0],
+                    offs[:, 1],
                     s=col.get_sizes() if col.get_sizes().size else 12,
                     c=facecolors if facecolors.size else None,
                     alpha=col.get_alpha(),
                 )
     for patch in src_ax.patches:
         if isinstance(patch, Rectangle):
-            dst_ax.add_patch(Rectangle(
-                patch.get_xy(), patch.get_width(), patch.get_height(),
-                facecolor=patch.get_facecolor(), edgecolor=patch.get_edgecolor(),
-                linewidth=patch.get_linewidth(), alpha=patch.get_alpha(),
-            ))
+            dst_ax.add_patch(
+                Rectangle(
+                    patch.get_xy(),
+                    patch.get_width(),
+                    patch.get_height(),
+                    facecolor=patch.get_facecolor(),
+                    edgecolor=patch.get_edgecolor(),
+                    linewidth=patch.get_linewidth(),
+                    alpha=patch.get_alpha(),
+                )
+            )
     for img in src_ax.get_images():
         if isinstance(img, AxesImage):
             arr = np.asarray(img.get_array())
-            dst_ax.imshow(arr, cmap=img.get_cmap(), aspect="auto",
-                          vmin=img.norm.vmin, vmax=img.norm.vmax)
+            dst_ax.imshow(
+                arr, cmap=img.get_cmap(), aspect="auto", vmin=img.norm.vmin, vmax=img.norm.vmax
+            )
     for txt in src_ax.texts:
-        dst_ax.text(*txt.get_position(), txt.get_text(),
-                    fontsize=txt.get_fontsize(), color=txt.get_color())
+        dst_ax.text(
+            *txt.get_position(), txt.get_text(), fontsize=txt.get_fontsize(), color=txt.get_color()
+        )
 
     dst_ax.set_xlabel(src_ax.get_xlabel())
     dst_ax.set_ylabel(src_ax.get_ylabel())

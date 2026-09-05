@@ -107,12 +107,19 @@ __all__ = [
     # data object
     "MethylData",
     # I/O
-    "read_bismark", "read_methyldackel", "read_combined_strand_bed",
-    "read_nfcore_methylseq", "load",
+    "read_bismark",
+    "read_methyldackel",
+    "read_combined_strand_bed",
+    "read_nfcore_methylseq",
+    "load",
     # namespaces (scanpy-style)
-    "pp", "tl", "pl", "query",
+    "pp",
+    "tl",
+    "pl",
+    "query",
     # runtime config
-    "set_tmp_dir", "get_tmp_dir",
+    "set_tmp_dir",
+    "get_tmp_dir",
     # ingestion
     "convert_sample",
     # DMCStore is the streaming-store handle returned by tl.dmc(..., return_store=True).
@@ -164,13 +171,15 @@ __all__ = [
 ]
 
 # --- Deprecation shim for demoted top-level names (1.0; removed in 1.2) ---
-_DEMOTED_TO_DMC = frozenset({
-    "process_chromosomes_dmc",
-    "apply_multiple_testing_correction",
-    "empirical_fdr_for_dmc",
-    "fisher_exact_vectorized",
-    "shrink_meth_diff",
-})
+_DEMOTED_TO_DMC = frozenset(
+    {
+        "process_chromosomes_dmc",
+        "apply_multiple_testing_correction",
+        "empirical_fdr_for_dmc",
+        "fisher_exact_vectorized",
+        "shrink_meth_diff",
+    }
+)
 
 
 def __getattr__(name: str):
@@ -185,12 +194,14 @@ def __getattr__(name: str):
         import warnings
 
         from . import dmc as _dmc_mod
+
         warnings.warn(
             f"epykit.{name} is no longer a top-level export; use "
             f"`from epykit.dmc import {name}` instead, or use the "
             f"recommended `epykit.tl.dmc` wrapper. This shim will be "
             f"removed in epykit 1.2.",
-            DeprecationWarning, stacklevel=2,
+            DeprecationWarning,
+            stacklevel=2,
         )
         return getattr(_dmc_mod, name)
     raise AttributeError(f"module 'epykit' has no attribute {name!r}")

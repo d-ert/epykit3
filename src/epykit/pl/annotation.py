@@ -34,8 +34,14 @@ from ._utils import _get_ax, _save_fig
 # back through PALETTE for known names (promoter / island / etc.) and
 # uses this cycle for anything else.
 _ANNOT_CYCLE = [
-    "#0072B2", "#D55E00", "#009E73", "#CC79A7",
-    "#F0E442", "#56B4E9", "#E69F00", "#999999",
+    "#0072B2",
+    "#D55E00",
+    "#009E73",
+    "#CC79A7",
+    "#F0E442",
+    "#56B4E9",
+    "#E69F00",
+    "#999999",
 ]
 
 
@@ -95,13 +101,13 @@ def plot_annotation_counts(
     else:
         # Don't crowd small slices with text -- only label slices >=3%.
         total = sum(values) or 1
-        slice_labels = [
-            lbl if (v / total) >= 0.03 else ""
-            for lbl, v in zip(labels, values)
-        ]
+        slice_labels = [lbl if (v / total) >= 0.03 else "" for lbl, v in zip(labels, values)]
         wedges, texts, autotexts = ax.pie(
-            values, labels=slice_labels, colors=colors,
-            autopct=autopct, startangle=90,
+            values,
+            labels=slice_labels,
+            colors=colors,
+            autopct=autopct,
+            startangle=90,
             wedgeprops=dict(edgecolor="white", linewidth=1.0),
             textprops=dict(fontsize=9),
         )
@@ -110,9 +116,11 @@ def plot_annotation_counts(
         ax.legend(
             wedges,
             [f"{lbl} ({v:,})" for lbl, v in zip(labels, values)],
-            title=annot_col, loc="center left",
+            title=annot_col,
+            loc="center left",
             bbox_to_anchor=(1.02, 0.5),
-            frameon=False, fontsize=8,
+            frameon=False,
+            fontsize=8,
         )
 
     ax.set_title(title or f"Annotation counts ({level})")
@@ -151,24 +159,23 @@ def plot_numerical_by_annotation(
     """
     df = _resolve_annotated_table(md, level)
     long = compute_numerical_by_annotation(
-        df, value_col=value, annot_col=annot_col, include_all=background,
+        df,
+        value_col=value,
+        annot_col=annot_col,
+        include_all=background,
     )
     classes = [c for c in long.get_column("annot").unique().to_list() if c != "All"]
     classes = sorted(classes)
 
     if background:
-        bg_vals = (
-            long.filter(pl.col("annot") == "All").get_column(value).to_numpy()
-        )
+        bg_vals = long.filter(pl.col("annot") == "All").get_column(value).to_numpy()
     else:
         bg_vals = None
 
     # Bin edges shared across panels so the "All" overlay aligns.
     flat = long.filter(pl.col("annot") != "All").get_column(value).to_numpy()
     if flat.size == 0:
-        raise ValueError(
-            f"No values for {value!r} across any class; check the annotated table."
-        )
+        raise ValueError(f"No values for {value!r} across any class; check the annotated table.")
     edges = np.linspace(float(np.nanmin(flat)), float(np.nanmax(flat)), bins + 1)
 
     nrows = ceil(len(classes) / ncols)
@@ -176,27 +183,36 @@ def plot_numerical_by_annotation(
         figsize = (3.4 * ncols, 2.4 * nrows)
 
     import matplotlib.pyplot as plt
+
     fig, axes = plt.subplots(
-        nrows, ncols, figsize=figsize, sharex=sharex,
+        nrows,
+        ncols,
+        figsize=figsize,
+        sharex=sharex,
         squeeze=False,
     )
     axes_flat = axes.flat
 
     for i, cls in enumerate(classes):
         ax = axes_flat[i]
-        vals = (
-            long.filter(pl.col("annot") == cls).get_column(value).to_numpy()
-        )
+        vals = long.filter(pl.col("annot") == cls).get_column(value).to_numpy()
         ax.hist(
-            vals, bins=edges, density=density,
+            vals,
+            bins=edges,
+            density=density,
             color=PALETTE.get("neutral", "#888888"),
-            alpha=0.7, label="Data",
+            alpha=0.7,
+            label="Data",
         )
         if background and bg_vals is not None and bg_vals.size:
             ax.hist(
-                bg_vals, bins=edges, density=density,
-                histtype="step", color=PALETTE.get("hyper", "#e05263"),
-                linewidth=1.4, label="Background",
+                bg_vals,
+                bins=edges,
+                density=density,
+                histtype="step",
+                color=PALETTE.get("hyper", "#e05263"),
+                linewidth=1.4,
+                label="Background",
             )
         ax.set_title(str(cls), fontsize=10)
         ax.set_xlabel(value)
@@ -280,9 +296,14 @@ def plot_coannotations(
             else:
                 text = fmt.format(matrix[i, j])
             ax.text(
-                j, i, text, ha="center", va="center",
-                color="white" if (display[i, j] if not np.isnan(display[i, j]) else 0)
-                                > np.nanmean(display) else "black",
+                j,
+                i,
+                text,
+                ha="center",
+                va="center",
+                color="white"
+                if (display[i, j] if not np.isnan(display[i, j]) else 0) > np.nanmean(display)
+                else "black",
                 fontsize=8,
             )
     fig.colorbar(im, ax=ax, label=cbar_label, fraction=0.04, pad=0.02)
@@ -335,14 +356,18 @@ def plot_categorical(
     """
     df = _resolve_annotated_table(md, level)
     props = compute_categorical_proportions(
-        df, group_col=group_col, annot_col=annot_col,
+        df,
+        group_col=group_col,
+        annot_col=annot_col,
         include_all_group=include_all_group,
         normalize=(position == "fill"),
     )
     # If autodetection in the compute layer swapped to DM_status / dmr_type,
     # honour it on the resulting columns.
-    resolved_group = group_col if group_col in props.columns else (
-        "DM_status" if "DM_status" in props.columns else "dmr_type"
+    resolved_group = (
+        group_col
+        if group_col in props.columns
+        else ("DM_status" if "DM_status" in props.columns else "dmr_type")
     )
     value_col = "proportion" if position == "fill" else "count"
     groups_present = props.get_column(resolved_group).unique().to_list()
@@ -370,10 +395,13 @@ def plot_categorical(
     bottom = np.zeros(len(ordered_groups))
     for ci, cls in enumerate(ordered_classes):
         ax.bar(
-            ordered_groups, mat[:, ci],
-            bottom=bottom, label=str(cls),
+            ordered_groups,
+            mat[:, ci],
+            bottom=bottom,
+            label=str(cls),
             color=_color_for(cls, ci),
-            edgecolor="white", linewidth=0.4,
+            edgecolor="white",
+            linewidth=0.4,
         )
         bottom += mat[:, ci]
 
@@ -383,8 +411,11 @@ def plot_categorical(
     if position == "fill":
         ax.set_ylim(0, 1.0)
     ax.legend(
-        title=annot_col, bbox_to_anchor=(1.02, 1.0),
-        loc="upper left", frameon=False, fontsize=9,
+        title=annot_col,
+        bbox_to_anchor=(1.02, 1.0),
+        loc="upper left",
+        frameon=False,
+        fontsize=9,
     )
     fig.tight_layout()
 

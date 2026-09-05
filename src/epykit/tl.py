@@ -100,10 +100,12 @@ def _warn_fisher_once() -> None:
         return
     _FISHER_WARNED = True
     import warnings
+
     warnings.warn(
         "test='fisher' ignores between-replicate variance; p-values are "
         "anti-conservative. Prefer test='lr' at n >= 2.",
-        UserWarning, stacklevel=3,
+        UserWarning,
+        stacklevel=3,
     )
 
 
@@ -125,11 +127,13 @@ def _check_n1_and_union_footgun(
         and min_samples_control == 0
     ):
         import warnings
+
         warnings.warn(
             f"unite='union' with min_samples_treatment=min_samples_control=0 "
             f"will test {unit} covered in only one sample per group. "
             f"Recommended: both >= 2 (or unite='intersect').",
-            UserWarning, stacklevel=3,
+            UserWarning,
+            stacklevel=3,
         )
 
 
@@ -165,6 +169,7 @@ def _auto_test_simple(md: MethylData, allow_n1: bool = False) -> str:
                 f"as evidence of differential methylation."
             )
         import warnings
+
         warnings.warn(
             "n<2 per group: falling back to Fisher exact on pooled reads. "
             "Between-replicate variance is ignored and p-values are anti-conservative.",
@@ -195,6 +200,7 @@ def _resolve_tsv_output(
     """
     if csv is not None or csv_full or csv_alpha != 0.05:
         import warnings
+
         warnings.warn(
             "The `csv` / `csv_full` / `csv_alpha` arguments are deprecated "
             "aliases for `tsv` / `tsv_full` / `tsv_alpha` and will be removed in "
@@ -242,6 +248,7 @@ def _resolve_auto_tsv(
     """
     if csv is not None or csv_full or csv_alpha != 0.05:
         import warnings
+
         warnings.warn(
             "The `csv` / `csv_full` / `csv_alpha` arguments are deprecated "
             "aliases for `tsv` / `tsv_full` / `tsv_alpha` and will be removed "
@@ -260,12 +267,14 @@ def _resolve_auto_tsv(
         return None, full, alpha, False
 
     import os
+
     if os.environ.get("EPYKIT_NO_AUTO_TSV") in ("1", "true", "True"):
         return None, full, alpha, False
     root = getattr(md, "analysis_root", None)
     if not root:
         return None, full, alpha, False
     from pathlib import Path
+
     return str(Path(root) / "results" / default_name), full, alpha, True
 
 
@@ -319,14 +328,16 @@ def qc(
     if len(cov_report) > 0:
         cov_genome = cov_report.filter(pl.col("chrom") == "genome")
         obs = obs.join(
-            cov_genome.select([
-                "sample",
-                "mean_coverage",
-                "frac_ge_1x",
-                "frac_ge_5x",
-                "frac_ge_10x",
-                "low_coverage_flag",
-            ]).rename({"sample": "sample_id"}),
+            cov_genome.select(
+                [
+                    "sample",
+                    "mean_coverage",
+                    "frac_ge_1x",
+                    "frac_ge_5x",
+                    "frac_ge_10x",
+                    "low_coverage_flag",
+                ]
+            ).rename({"sample": "sample_id"}),
             on="sample_id",
             how="left",
         )
@@ -338,9 +349,10 @@ def qc(
                 rate = bisulfite_conversion_rate(md.store, sample, chh_context_store)
             except Exception as exc:
                 logger.warning(
-                    "Bisulfite conversion rate unavailable for sample %s "
-                    "(CHH store %s): %s",
-                    sample, chh_context_store, exc,
+                    "Bisulfite conversion rate unavailable for sample %s (CHH store %s): %s",
+                    sample,
+                    chh_context_store,
+                    exc,
                 )
                 rate = None
             conv.append({"sample_id": sample, "bisulfite_conversion_rate": rate})
@@ -349,6 +361,7 @@ def qc(
     # --- clinical QC additions ----------------------------------
     if run_sex_check:
         from .qc import sex_check as _sex_check
+
         expected = None
         if expected_sex_col and expected_sex_col in obs.columns:
             expected = {
@@ -362,19 +375,21 @@ def qc(
             sex_df.select(["sample_id", "inferred_sex", "mismatch"]).rename(
                 {"mismatch": "sex_mismatch"}
             ),
-            on="sample_id", how="left",
+            on="sample_id",
+            how="left",
         )
 
     if run_contamination:
         from .qc import contamination_estimate as _contam
+
         scores = [
-            {"sample_id": s, "contamination_score": float(_contam(md.store, s))}
-            for s in samples
+            {"sample_id": s, "contamination_score": float(_contam(md.store, s))} for s in samples
         ]
         obs = obs.join(pl.DataFrame(scores), on="sample_id", how="left")
 
     if run_sample_correlation:
         from .qc import sample_correlation as _samp_corr
+
         corr_df = _samp_corr(md.store, samples, method=correlation_method)
         md.uns["qc_sample_correlation"] = corr_df
         if len(corr_df) > 0:
@@ -394,6 +409,7 @@ def qc(
     tsv, _, _ = _resolve_tsv_output(tsv, csv)
     if tsv is not None:
         from .export import qc_to_tsv
+
         qc_to_tsv(md, tsv)
 
 
@@ -585,9 +601,14 @@ def dmc(
         min_samples_treatment = 0
 
     tsv, tsv_full, tsv_alpha, _tsv_is_auto = _resolve_auto_tsv(
-        md, tsv, csv, default_name="dmc.significant.tsv",
-        tsv_full=tsv_full, csv_full=csv_full,
-        tsv_alpha=tsv_alpha, csv_alpha=csv_alpha,
+        md,
+        tsv,
+        csv,
+        default_name="dmc.significant.tsv",
+        tsv_full=tsv_full,
+        csv_full=csv_full,
+        tsv_alpha=tsv_alpha,
+        csv_alpha=csv_alpha,
     )
 
     if test == "logit_t":
@@ -634,29 +655,38 @@ def dmc(
                 "path or implement a custom stratified permutation."
             )
         _run_dmc_contrast(
-            md, test=test, formula=formula, contrast=contrast,
-            covariates=covariates, treatment_col=treatment_col,
+            md,
+            test=test,
+            formula=formula,
+            contrast=contrast,
+            covariates=covariates,
+            treatment_col=treatment_col,
             chromosomes=chromosomes,
             min_samples_treatment=min_samples_treatment,
             min_samples_control=min_samples_control,
-            dispersion=dispersion, reference=reference,
+            dispersion=dispersion,
+            reference=reference,
             fdr_method=fdr_method,
             reference_level=reference_level,
         )
         # P1-11 deprecation notice for GLM / contrast path.
         import warnings as _warnings
+
         _warnings.warn(
             "The 'log2_odds_ratio' column is deprecated and is slated for "
             "removal in 1.1. Use 'log2_odds_ratio_pooled' for pooled-count "
             "tests (lr, fisher) or 'coef_treatment_log2' for the glm backend. "
             "The transitional column is NaN-filled.",
-            FutureWarning, stacklevel=2,
+            FutureWarning,
+            stacklevel=2,
         )
         if tsv is not None:
             from .export import dmc_to_tsv
+
             _emit_result_tsv(
                 lambda: dmc_to_tsv(md, tsv, alpha=tsv_alpha, full=tsv_full),
-                tsv, is_auto=_tsv_is_auto,
+                tsv,
+                is_auto=_tsv_is_auto,
             )
         return
 
@@ -665,7 +695,10 @@ def dmc(
     # check up front so explicit test="lr"/"fisher" with n<2 also gets
     # caught instead of silently running on degenerate data.
     _check_n1_and_union_footgun(
-        md, allow_n1, min_samples_treatment, min_samples_control,
+        md,
+        allow_n1,
+        min_samples_treatment,
+        min_samples_control,
     )
     selected_test = _auto_test(md, allow_n1=allow_n1) if test == "auto" else test
 
@@ -694,19 +727,21 @@ def dmc(
                 logger.info(
                     "Auto-enabling neighbour_combine (lr+ stack, "
                     "power_stack=%s, n=%d). Pass power_stack='off' to "
-                    "disable.", power_stack, _min_n,
+                    "disable.",
+                    power_stack,
+                    _min_n,
                 )
             if fdr_method == "fdr_bh":
                 fdr_method = "fdr_tsbh"
                 logger.info(
-                    "Auto-switching fdr_method 'fdr_bh' -> 'fdr_tsbh' "
-                    "(lr+ stack, power_stack=%s).", power_stack,
+                    "Auto-switching fdr_method 'fdr_bh' -> 'fdr_tsbh' (lr+ stack, power_stack=%s).",
+                    power_stack,
                 )
             if not sep_fallback:
                 sep_fallback = True
                 logger.info(
-                    "Auto-enabling sep_fallback (lr+ stack, "
-                    "power_stack=%s).", power_stack,
+                    "Auto-enabling sep_fallback (lr+ stack, power_stack=%s).",
+                    power_stack,
                 )
 
     if selected_test == "fisher":
@@ -723,11 +758,13 @@ def dmc(
     # would not survive.)
     if not materialize:
         _incompat = [
-            name for name, on in (
+            name
+            for name, on in (
                 ("neighbour_combine", neighbour_combine),
                 ("empirical_fdr", empirical_fdr),
                 ("use_smoothed", use_smoothed),
-            ) if on
+            )
+            if on
         ]
         if _incompat:
             raise ValueError(
@@ -749,6 +786,7 @@ def dmc(
 
         from ._cache import input_signature, manifest_append, manifest_find
         from .dmc import _canonicalise_test_name as _canon
+
         canonical_for_key = _canon(selected_test)
         resume_stage_name = f"dmc_{canonical_for_key}"
         resume_root = md.analysis_root or md.store
@@ -787,9 +825,11 @@ def dmc(
                     sidecar = Path(resume_root) / sidecar
                 if sidecar.exists():
                     import logging as _lg
+
                     _lg.getLogger(__name__).info(
                         "[resume] %s: loading cached result from %s",
-                        resume_stage_name, sidecar,
+                        resume_stage_name,
+                        sidecar,
                     )
                     md.varm[resume_stage_name] = pl.read_parquet(str(sidecar))
                     md.uns["dmc"] = {
@@ -815,9 +855,11 @@ def dmc(
                     }
                     if tsv is not None:
                         from .export import dmc_to_tsv
+
                         _emit_result_tsv(
                             lambda: dmc_to_tsv(md, tsv, alpha=tsv_alpha, full=tsv_full),
-                            tsv, is_auto=_tsv_is_auto,
+                            tsv,
+                            is_auto=_tsv_is_auto,
                         )
                     return
 
@@ -826,8 +868,10 @@ def dmc(
     # when the with-block exits.
     import tempfile as _tempfile
     from pathlib import Path as _Path
+
     if use_smoothed:
         import warnings as _warnings
+
         _warnings.warn(
             "use_smoothed=True (pseudo-count transform of raw reads via "
             "BSmooth) is NOT equivalent to DSS's smoothing=TRUE -- it's "
@@ -838,7 +882,8 @@ def dmc(
             "test, matching DMLfit.multiFactor(smoothing=TRUE)). The "
             "use_smoothed pseudo-count path will be removed in a future "
             "minor release.",
-            DeprecationWarning, stacklevel=2,
+            DeprecationWarning,
+            stacklevel=2,
         )
         if "smooth_path" not in md.uns:
             raise ValueError(
@@ -851,6 +896,7 @@ def dmc(
         _smoothed_tmp = _tempfile.TemporaryDirectory(prefix="epykit_dmc_smoothed_")
         _dmc_store = _smoothed_tmp.name
         from ._smoothed_store import build_smoothed_pseudo_count_store
+
         build_smoothed_pseudo_count_store(
             raw_store=_Path(md.store),
             smooth_store=_Path(smooth_path),
@@ -916,6 +962,7 @@ def dmc(
         # enough neighbours fall back to their raw p-value identity.
         if neighbour_combine and len(result) > 0:
             from .dmc import combine_neighbour_pvalues
+
             result = combine_neighbour_pvalues(result, neighbour_bp=neighbour_bp)
             # Keep `pvalue` / `qvalue` as the raw per-CpG values.
             # `combine_neighbour_pvalues` already added a `pvalue_combined`
@@ -924,8 +971,10 @@ def dmc(
             # combined values must opt in by reading `pvalue_combined` /
             # `qvalue_combined`.
             result = apply_multiple_testing_correction(
-                result, method=fdr_method,
-                pvalue_col="pvalue_combined", qvalue_col="qvalue_combined",
+                result,
+                method=fdr_method,
+                pvalue_col="pvalue_combined",
+                qvalue_col="qvalue_combined",
             )
 
         if empirical_fdr and len(result) > 0:
@@ -959,6 +1008,7 @@ def dmc(
 
     # Canonicalise key name (test_used reflects the canonical name post-rename)
     from .dmc import _canonicalise_test_name
+
     canonical_used = _canonicalise_test_name(selected_test)
     key = f"dmc_{canonical_used}_smoothed" if use_smoothed else f"dmc_{canonical_used}"
     if materialize:
@@ -992,9 +1042,7 @@ def dmc(
         # been run in the same session.
         "last_key": key,
         "use_smoothed": use_smoothed,
-        "smooth_method": (
-            md.uns.get("smooth_params", {}).get("method") if use_smoothed else None
-        ),
+        "smooth_method": (md.uns.get("smooth_params", {}).get("method") if use_smoothed else None),
         # DSS-style count smoothing (DMLfit.multiFactor(smoothing=TRUE)
         # analogue). Surface params for both modes so the metadata
         # round-trips through save / report consistently; the span is
@@ -1018,12 +1066,14 @@ def dmc(
             from pathlib import Path
 
             from ._cache import manifest_append
+
             sidecar_dir = Path(resume_root) / ".epykit_results"
             sidecar_dir.mkdir(parents=True, exist_ok=True)
             sidecar = sidecar_dir / f"{resume_stage_name}.parquet"
             result.write_parquet(str(sidecar))
             manifest_append(
-                resume_root, resume_stage_name,
+                resume_root,
+                resume_stage_name,
                 params={
                     "test": canonical_used,
                     "unite": unite,
@@ -1039,29 +1089,35 @@ def dmc(
             )
         except OSError as exc:
             import logging as _lg
+
             _lg.getLogger(__name__).warning(
                 "[resume] failed to persist %s sidecar: %s",
-                resume_stage_name, exc,
+                resume_stage_name,
+                exc,
             )
 
     # P1-11 deprecation notice – emitted once per tl.dmc call (not per-row,
     # not per-chromosome).  The transitional 'log2_odds_ratio' column is
     # NaN-filled and slated for removal in 1.1.
     import warnings as _warnings
+
     _warnings.warn(
         "The 'log2_odds_ratio' column is deprecated and is slated for "
         "removal in 1.1. Use 'log2_odds_ratio_pooled' for pooled-count "
         "tests (lr, fisher) or 'coef_treatment_log2' for the glm backend. "
         "The transitional column is NaN-filled.",
-        FutureWarning, stacklevel=2,
+        FutureWarning,
+        stacklevel=2,
     )
 
     if tsv is not None:
         if materialize:
             from .export import dmc_to_tsv
+
             _emit_result_tsv(
                 lambda: dmc_to_tsv(md, tsv, alpha=tsv_alpha, full=tsv_full),
-                tsv, is_auto=_tsv_is_auto,
+                tsv,
+                is_auto=_tsv_is_auto,
             )
         else:
             logger.info(
@@ -1107,17 +1163,15 @@ def _run_dmc_contrast(
     need_treatment = (treatment_col in md.obs.columns) and (
         formula is None or treatment_col in formula
     )
-    design_full, _design_reduced, coef_idx, term_names, formula_used, design_info = (
-        build_design(
-            md.obs,
-            samples_ordered=samples_all,
-            formula=formula,
-            covariates=covariates,
-            treatment_col=treatment_col,
-            require_treatment_col=need_treatment,
-            return_design_info=True,
-            reference_level=reference_level,
-        )
+    design_full, _design_reduced, coef_idx, term_names, formula_used, design_info = build_design(
+        md.obs,
+        samples_ordered=samples_all,
+        formula=formula,
+        covariates=covariates,
+        treatment_col=treatment_col,
+        require_treatment_col=need_treatment,
+        return_design_info=True,
+        reference_level=reference_level,
     )
 
     # Resolve the contrast against the design.
@@ -1157,7 +1211,8 @@ def _run_dmc_contrast(
             logger.warning(
                 "Could not derive case/control split from treatment column "
                 "%r; mean_beta_case/control will be NaN: %s",
-                treatment_col, exc,
+                treatment_col,
+                exc,
             )
 
     unite_info = md.uns.get("unite")
@@ -1181,9 +1236,7 @@ def _run_dmc_contrast(
         group_labels_per_sample=group_labels,
         return_store=True,
     )
-    dmc_store_contrast = apply_multiple_testing_correction(
-        dmc_store_contrast, method=fdr_method
-    )
+    dmc_store_contrast = apply_multiple_testing_correction(dmc_store_contrast, method=fdr_method)
     result = dmc_store_contrast.to_dataframe()
 
     key = "dmc_glm_contrast"
@@ -1382,7 +1435,11 @@ def dmr(
     _note_dmr_fdr_calibration_once()
     if method == "tile":
         _check_n1_and_union_footgun(
-            md, allow_n1, min_samples_treatment, min_samples_control, unit="tiles",
+            md,
+            allow_n1,
+            min_samples_treatment,
+            min_samples_control,
+            unit="tiles",
         )
         selected_test = (
             _auto_test(md, design=design, covariates=covariates, allow_n1=allow_n1)
@@ -1402,6 +1459,7 @@ def dmr(
         formula_used: str | None = None
         if selected_test == "glm" or design is not None or covariates is not None:
             from ._glm import build_design
+
             samples_ordered = md.treatment_ids + md.control_ids
             design_full, design_reduced, coef_idx, term_names, formula_used = build_design(
                 md.obs,
@@ -1441,9 +1499,7 @@ def dmr(
         # `alpha`, but a stricter user threshold is allowed here). Shared with
         # the CLI tile branch via apply_region_qfilter so the two cannot drift;
         # tile filters on the per-tile `qvalue` column only.
-        dmr_df = apply_region_qfilter(
-            dmr_df, min_mean_qvalue, candidate_cols=("qvalue",)
-        )
+        dmr_df = apply_region_qfilter(dmr_df, min_mean_qvalue, candidate_cols=("qvalue",))
 
         # permutation FDR. Refuses to run when a covariate design
         # is in play (shuffling treatment labels invalidates the assumed
@@ -1459,14 +1515,10 @@ def dmr(
             strata_map: dict[str, list[str]] | None = None
             if empirical_strata is not None and empirical_strata in md.obs.columns:
                 all_samples = list(md.treatment_ids) + list(md.control_ids)
-                obs_indexed = md.obs.filter(
-                    pl.col("sample_id").is_in(all_samples)
-                )
+                obs_indexed = md.obs.filter(pl.col("sample_id").is_in(all_samples))
                 strata_map = {}
                 for row in obs_indexed.iter_rows(named=True):
-                    strata_map.setdefault(row[empirical_strata], []).append(
-                        row["sample_id"]
-                    )
+                    strata_map.setdefault(row[empirical_strata], []).append(row["sample_id"])
             if len(dmr_df) > 0:
                 dmr_df = empirical_fdr_for_dmr(
                     methylstore_path=md.store,
@@ -1517,6 +1569,7 @@ def dmr(
         }
         if tsv is not None:
             from .export import dmr_to_tsv
+
             _emit_result_tsv(lambda: dmr_to_tsv(md, tsv), tsv, is_auto=_tsv_is_auto)
         return
 
@@ -1531,6 +1584,7 @@ def dmr(
             from pathlib import Path as _Path
 
             from ._dmc_store import DMCStore
+
             store_path = _Path(dmc_store_path)
             if (store_path / ".epykit_dmc_manifest.json").exists():
                 dmc_input = DMCStore.open(store_path)
@@ -1575,16 +1629,16 @@ def dmr(
         }
         if tsv is not None:
             from .export import dmr_to_tsv
+
             _emit_result_tsv(lambda: dmr_to_tsv(md, tsv), tsv, is_auto=_tsv_is_auto)
         return
 
     if method == "segment":
         from .dmr_segment import call_dmr_rule_segment
+
         dmc_df = md.dmc
         if dmc_df is None:
-            raise ValueError(
-                "method='segment' needs a DMC table on md. Run ep.tl.dmc(md) first."
-            )
+            raise ValueError("method='segment' needs a DMC table on md. Run ep.tl.dmc(md) first.")
         # None sentinel -> segment's documented default of 5.
         seg_min_cpgs = min_cpgs if min_cpgs is not None else _DMR_DEFAULT_MIN_CPGS
         dmr_df = call_dmr_rule_segment(
@@ -1602,6 +1656,7 @@ def dmr(
         }
         if tsv is not None:
             from .export import dmr_to_tsv
+
             _emit_result_tsv(lambda: dmr_to_tsv(md, tsv), tsv, is_auto=_tsv_is_auto)
         return
 
@@ -1615,6 +1670,7 @@ def dmr(
             from pathlib import Path as _Path
 
             from ._dmc_store import DMCStore
+
             store_path = _Path(dmc_store_path)
             if (store_path / ".epykit_dmc_manifest.json").exists():
                 dmc_input = DMCStore.open(store_path)
@@ -1625,8 +1681,7 @@ def dmr(
 
         if dmc_input is None:
             raise ValueError(
-                "method='chain_merge' needs a DMC table on md. "
-                "Run ep.tl.dmc(md) first."
+                "method='chain_merge' needs a DMC table on md. Run ep.tl.dmc(md) first."
             )
 
         # Resolve min_cpgs with a None sentinel (M10) via the shared
@@ -1671,6 +1726,7 @@ def dmr(
         }
         if tsv is not None:
             from .export import dmr_to_tsv
+
             _emit_result_tsv(lambda: dmr_to_tsv(md, tsv), tsv, is_auto=_tsv_is_auto)
         return
 
@@ -1757,8 +1813,7 @@ def diagnose_dmr_calling(
         dmc_key = md.uns.get("dmc", {}).get("last_key")
     if dmc_key is None or dmc_key not in md.varm:
         raise ValueError(
-            "No DMC table found on md. Run ep.tl.dmc(md, ...) first, or pass "
-            "dmc_key= explicitly."
+            "No DMC table found on md. Run ep.tl.dmc(md, ...) first, or pass dmc_key= explicitly."
         )
     dmc = md.varm[dmc_key]
 
@@ -1770,11 +1825,13 @@ def diagnose_dmr_calling(
     ours_dmr = md.uns["dmr"]
 
     # Normalize reference column types
-    ref = reference_dmrs.with_columns([
-        pl.col("chrom").cast(pl.Utf8),
-        pl.col("start").cast(pl.Int64),
-        pl.col("end").cast(pl.Int64),
-    ])
+    ref = reference_dmrs.with_columns(
+        [
+            pl.col("chrom").cast(pl.Utf8),
+            pl.col("start").cast(pl.Int64),
+            pl.col("end").cast(pl.Int64),
+        ]
+    )
 
     # Optional chromosome filter
     if chromosomes is not None:
@@ -1782,9 +1839,7 @@ def diagnose_dmr_calling(
         ref = ref.filter(pl.col("chrom").is_in(chrom_set))
 
     # Pick the q-value column on the DMC table (prefer qvalue over pvalue)
-    qcol = "qvalue" if "qvalue" in dmc.columns else (
-        "pvalue" if "pvalue" in dmc.columns else None
-    )
+    qcol = "qvalue" if "qvalue" in dmc.columns else ("pvalue" if "pvalue" in dmc.columns else None)
     if qcol is None:
         raise ValueError(
             f"DMC table at varm[{dmc_key!r}] has neither 'qvalue' nor "
@@ -1804,8 +1859,10 @@ def diagnose_dmr_calling(
         # Linear scan is fine for typical DMR-set sizes; bisect would help
         # only with 100k+ DMRs which is unusual.
         for ps, pe in intervals:
-            if pe < s: continue
-            if ps > e: break
+            if pe < s:
+                continue
+            if ps > e:
+                break
             return True
         return False
 
@@ -1826,8 +1883,11 @@ def diagnose_dmr_calling(
 
     # ---- Classify ----
     buckets: dict[str, list[int]] = {
-        "SUCCESS_OVERLAP": [], "H1_NO_CPGS": [], "H2_NO_SIG_CPGS": [],
-        "H3a_WEAK_ALPHA": [], "H3b_STRUCTURE": [],
+        "SUCCESS_OVERLAP": [],
+        "H1_NO_CPGS": [],
+        "H2_NO_SIG_CPGS": [],
+        "H3a_WEAK_ALPHA": [],
+        "H3b_STRUCTURE": [],
     }
 
     for idx, r in enumerate(ref.iter_rows(named=True)):
@@ -1872,14 +1932,19 @@ def diagnose_dmr_calling(
         "",
     ]
     bucket_help = {
-        "SUCCESS_OVERLAP":  "already recovered (no fix needed)",
-        "H1_NO_CPGS":       "no CpGs present  -> coverage/unite issue",
-        "H2_NO_SIG_CPGS":   "no sig CpGs at q<0.05  -> need better test stat (e.g. Wald-smoothed)",
-        "H3a_WEAK_ALPHA":   f"sig CpGs at q<0.05 but not q<{alpha_threshold:.0e}  -> loosen alpha (preset='permissive')",
-        "H3b_STRUCTURE":    "sig CpGs exist but chain-merge dropped  -> loosen dis_merge_bp first",
+        "SUCCESS_OVERLAP": "already recovered (no fix needed)",
+        "H1_NO_CPGS": "no CpGs present  -> coverage/unite issue",
+        "H2_NO_SIG_CPGS": "no sig CpGs at q<0.05  -> need better test stat (e.g. Wald-smoothed)",
+        "H3a_WEAK_ALPHA": f"sig CpGs at q<0.05 but not q<{alpha_threshold:.0e}  -> loosen alpha (preset='permissive')",
+        "H3b_STRUCTURE": "sig CpGs exist but chain-merge dropped  -> loosen dis_merge_bp first",
     }
-    for name in ("SUCCESS_OVERLAP", "H1_NO_CPGS", "H2_NO_SIG_CPGS",
-                 "H3a_WEAK_ALPHA", "H3b_STRUCTURE"):
+    for name in (
+        "SUCCESS_OVERLAP",
+        "H1_NO_CPGS",
+        "H2_NO_SIG_CPGS",
+        "H3a_WEAK_ALPHA",
+        "H3b_STRUCTURE",
+    ):
         n = counts[name]
         pct = n / max(n_ref, 1)
         lines.append(f"  {name:<18} {n:>5} ({pct:>5.1%})  -- {bucket_help[name]}")
@@ -1945,6 +2010,7 @@ def dvc(
         i.e. variance changes that aren't accompanied by mean changes.
     """
     from .dvc import process_chromosomes_dvc
+
     unite_info = md.uns.get("unite")
     unite = (unite_info is not None) and (unite_info.get("type") == "intersect")
     result = process_chromosomes_dvc(
@@ -1971,11 +2037,16 @@ def dvc(
     }
 
     tsv, tsv_full, tsv_alpha = _resolve_tsv_output(
-        tsv, csv, tsv_full=tsv_full, csv_full=csv_full,
-        tsv_alpha=tsv_alpha, csv_alpha=csv_alpha,
+        tsv,
+        csv,
+        tsv_full=tsv_full,
+        csv_full=csv_full,
+        tsv_alpha=tsv_alpha,
+        csv_alpha=csv_alpha,
     )
     if tsv is not None:
         from .export import dvc_to_tsv
+
         dvc_to_tsv(md, tsv, alpha=tsv_alpha, full=tsv_full)
 
 
@@ -2003,10 +2074,9 @@ def dvr(
         BH q-value threshold for the ``is_dvr`` flag. Default 0.05.
     """
     if "dvc" not in md.varm or md.varm["dvc"] is None:
-        raise ValueError(
-            "md.varm['dvc'] is missing. Run ep.tl.dvc(md) before ep.tl.dvr(md)."
-        )
+        raise ValueError("md.varm['dvc'] is missing. Run ep.tl.dvc(md) before ep.tl.dvr(md).")
     from .dvc import call_dvr_density
+
     dvr_df = call_dvr_density(
         md.varm["dvc"],
         tile_size_bp=tile_size_bp,
@@ -2043,14 +2113,20 @@ def age_clock(
     ``md.uns[f'{name}_diagnostics']`` for QC.
     """
     from .clocks import age_clock as _age_clock
+
     result = _age_clock(
-        md, coefficients, manifest,
-        intercept=intercept, transform=transform,
-        impute_missing=impute_missing, name=name,
+        md,
+        coefficients,
+        manifest,
+        intercept=intercept,
+        transform=transform,
+        impute_missing=impute_missing,
+        name=name,
     )
     md.obs = md.obs.join(
         result.select(["sample_id", name]),
-        on="sample_id", how="left",
+        on="sample_id",
+        how="left",
     )
     md.uns[f"{name}_diagnostics"] = result
 
@@ -2072,14 +2148,21 @@ def deconvolve(
     proportions can be used as covariates.
     """
     from .clocks import deconvolve as _deconvolve
+
     long = _deconvolve(
-        md, reference, manifest, method=method, cell_types=cell_types,
+        md,
+        reference,
+        manifest,
+        method=method,
+        cell_types=cell_types,
     )
     md.uns[uns_key] = long
     if long.is_empty():
         return
     wide = long.pivot(
-        values="proportion", index="sample_id", on="cell_type",
+        values="proportion",
+        index="sample_id",
+        on="cell_type",
         aggregate_function="first",
     )
     # Prefix columns so cell-type names like 'CD4T' don't collide with
@@ -2232,13 +2315,14 @@ def annotate(
         gc.collect()
 
     # Auto-emit the annotated DMC table as a human-readable TSV (default on).
-    tsv_out, _, _, _tsv_is_auto = _resolve_auto_tsv(
-        md, tsv, csv, default_name="dmc_annotated.tsv"
-    )
+    tsv_out, _, _, _tsv_is_auto = _resolve_auto_tsv(md, tsv, csv, default_name="dmc_annotated.tsv")
     if tsv_out is not None and md.get_dmc(annotated=True) is not None:
         from .export import dmc_to_tsv
+
         _emit_result_tsv(
-            lambda: dmc_to_tsv(md, tsv_out, full=True), tsv_out, is_auto=_tsv_is_auto,
+            lambda: dmc_to_tsv(md, tsv_out, full=True),
+            tsv_out,
+            is_auto=_tsv_is_auto,
         )
 
 
@@ -2270,11 +2354,16 @@ def asm(
         biallelic SNVs are used as phasing anchors.
     """
     from .asm import asm as _asm
-    _asm(md, bam=bam, vcf=vcf,
-         min_reads_per_haplotype=min_reads_per_haplotype,
-         min_phased_snvs=min_phased_snvs,
-         chromosomes=chromosomes,
-         caller=caller)
+
+    _asm(
+        md,
+        bam=bam,
+        vcf=vcf,
+        min_reads_per_haplotype=min_reads_per_haplotype,
+        min_phased_snvs=min_phased_snvs,
+        chromosomes=chromosomes,
+        caller=caller,
+    )
 
 
 def entropy(
@@ -2292,8 +2381,15 @@ def entropy(
     window Shannon entropy is stored at ``md.varm["entropy"]``.
     """
     from .entropy import entropy as _entropy
-    _entropy(md, bam=bam, window_cpgs=window_cpgs, min_reads=min_reads,
-             chromosomes=chromosomes, caller=caller)
+
+    _entropy(
+        md,
+        bam=bam,
+        window_cpgs=window_cpgs,
+        min_reads=min_reads,
+        chromosomes=chromosomes,
+        caller=caller,
+    )
 
 
 def pmd(
@@ -2314,9 +2410,17 @@ def pmd(
     in ``md.uns["pmd"]``.
     """
     from .pmd import pmd as _pmd
-    _pmd(md, samples=samples, bandwidth_bp=bandwidth_bp,
-         beta_threshold=beta_threshold, min_pmd_bp=min_pmd_bp,
-         chromosomes=chromosomes, backend=backend, n_workers=n_workers)
+
+    _pmd(
+        md,
+        samples=samples,
+        bandwidth_bp=bandwidth_bp,
+        beta_threshold=beta_threshold,
+        min_pmd_bp=min_pmd_bp,
+        chromosomes=chromosomes,
+        backend=backend,
+        n_workers=n_workers,
+    )
 
 
 def hmr(
@@ -2337,6 +2441,14 @@ def hmr(
     ``md.uns["hmr"]`` and ``md.uns["lmr"]``.
     """
     from .hmr import hmr as _hmr
-    _hmr(md, samples=samples, hmr_threshold=hmr_threshold,
-         lmr_max_density=lmr_max_density, min_cpgs=min_cpgs,
-         chromosomes=chromosomes, backend=backend, n_workers=n_workers)
+
+    _hmr(
+        md,
+        samples=samples,
+        hmr_threshold=hmr_threshold,
+        lmr_max_density=lmr_max_density,
+        min_cpgs=min_cpgs,
+        chromosomes=chromosomes,
+        backend=backend,
+        n_workers=n_workers,
+    )

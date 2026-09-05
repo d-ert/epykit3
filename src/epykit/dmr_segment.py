@@ -92,13 +92,11 @@ def call_dmr_rule_segment(
         chrom_sorted = chrom_grp.sort("pos")
         positions = chrom_sorted["pos"].to_numpy().astype(np.int64)
         meth_diff = chrom_sorted["meth_diff"].to_numpy().astype(np.float64)
-        pvals_per_cpg = (
-            chrom_sorted["pvalue"].to_numpy().astype(np.float64)
-            if has_pvalue else None
-        )
+        pvals_per_cpg = chrom_sorted["pvalue"].to_numpy().astype(np.float64) if has_pvalue else None
 
         viterbi = segment(
-            meth_diff, n_states=3,
+            meth_diff,
+            n_states=3,
             state_means=state_means,
             self_loop=self_loop,
             emission="gaussian",
@@ -129,42 +127,48 @@ def call_dmr_rule_segment(
                 # get small p-values.
                 seg_p = (
                     _stouffer_combine_signed(pvals_per_cpg[mask], run_md)
-                    if pvals_per_cpg is not None else float("nan")
+                    if pvals_per_cpg is not None
+                    else float("nan")
                 )
-                out_rows.append({
-                    "chrom":             str(chrom),
-                    "start":             int(run_start),
-                    "end":               int(run_end),
-                    "n_cpgs":            int(n_cpgs_run),
-                    "n_case":            0,
-                    "n_control":         0,
-                    "mean_beta_case":    float("nan"),
-                    "mean_beta_control": float("nan"),
-                    "meth_diff":         float(mean_md),
-                    "log2_odds_ratio":   float("nan"),
-                    "pvalue":            float(seg_p),
-                    "qvalue":            float("nan"),   # filled by BH below
-                    "dmr_type":          label,
-                })
+                out_rows.append(
+                    {
+                        "chrom": str(chrom),
+                        "start": int(run_start),
+                        "end": int(run_end),
+                        "n_cpgs": int(n_cpgs_run),
+                        "n_case": 0,
+                        "n_control": 0,
+                        "mean_beta_case": float("nan"),
+                        "mean_beta_control": float("nan"),
+                        "meth_diff": float(mean_md),
+                        "log2_odds_ratio": float("nan"),
+                        "pvalue": float(seg_p),
+                        "qvalue": float("nan"),  # filled by BH below
+                        "dmr_type": label,
+                    }
+                )
 
     if not out_rows:
         return pl.DataFrame(schema=_DMR_TILE_SCHEMA)
 
-    df = pl.DataFrame(out_rows, schema={
-        "chrom":             pl.Utf8,
-        "start":             pl.Int32,
-        "end":               pl.Int32,
-        "n_cpgs":            pl.Int32,
-        "n_case":            pl.Int32,
-        "n_control":         pl.Int32,
-        "mean_beta_case":    pl.Float32,
-        "mean_beta_control": pl.Float32,
-        "meth_diff":         pl.Float32,
-        "log2_odds_ratio":   pl.Float64,
-        "pvalue":            pl.Float64,
-        "qvalue":            pl.Float64,
-        "dmr_type":          pl.Utf8,
-    }).sort(["chrom", "start"])
+    df = pl.DataFrame(
+        out_rows,
+        schema={
+            "chrom": pl.Utf8,
+            "start": pl.Int32,
+            "end": pl.Int32,
+            "n_cpgs": pl.Int32,
+            "n_case": pl.Int32,
+            "n_control": pl.Int32,
+            "mean_beta_case": pl.Float32,
+            "mean_beta_control": pl.Float32,
+            "meth_diff": pl.Float32,
+            "log2_odds_ratio": pl.Float64,
+            "pvalue": pl.Float64,
+            "qvalue": pl.Float64,
+            "dmr_type": pl.Utf8,
+        },
+    ).sort(["chrom", "start"])
 
     # BH per chromosome.
     if has_pvalue:

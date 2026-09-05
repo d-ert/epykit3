@@ -42,12 +42,12 @@ _BAM_READ_SCHEMA = {
     "read_id": pl.Utf8,
     "chrom": pl.Utf8,
     "pos": pl.Int32,
-    "methylation_status": pl.Int8,   # 1 = methylated, 0 = unmethylated, -1 = no call
+    "methylation_status": pl.Int8,  # 1 = methylated, 0 = unmethylated, -1 = no call
     "base_qual": pl.Int8,
     "mapq": pl.Int8,
-    "mate_pair_id": pl.Int8,         # 1 / 2 for paired-end, 0 for single-end
-    "strand": pl.Utf8,               # "+" / "-"
-    "allele_base": pl.Utf8,          # base call at pos, used by ASM for haplotyping
+    "mate_pair_id": pl.Int8,  # 1 / 2 for paired-end, 0 for single-end
+    "strand": pl.Utf8,  # "+" / "-"
+    "allele_base": pl.Utf8,  # base call at pos, used by ASM for haplotyping
 }
 
 
@@ -66,8 +66,8 @@ def _require_pysam():
 
 
 # Bismark XM tag dispatch
-_BISMARK_METHYLATED = set("ZXH")     # methylated CpG / CHG / CHH
-_BISMARK_UNMETHYLATED = set("zxh")   # unmethylated CpG / CHG / CHH
+_BISMARK_METHYLATED = set("ZXH")  # methylated CpG / CHG / CHH
+_BISMARK_UNMETHYLATED = set("zxh")  # unmethylated CpG / CHG / CHH
 
 
 def read_methylation_calls(
@@ -202,17 +202,19 @@ def _extract_bismark(read, *, min_baseq: int, context: str) -> list[dict[str, ob
             continue
         meth_status = 1 if letter in _BISMARK_METHYLATED else 0
         allele = seq[query_idx] if seq else ""
-        out.append({
-            "read_id": read_id,
-            "chrom": chrom,
-            "pos": int(ref_pos),
-            "methylation_status": meth_status,
-            "base_qual": min(baseq, 127),
-            "mapq": min(mapq, 127),
-            "mate_pair_id": mate,
-            "strand": strand,
-            "allele_base": allele,
-        })
+        out.append(
+            {
+                "read_id": read_id,
+                "chrom": chrom,
+                "pos": int(ref_pos),
+                "methylation_status": meth_status,
+                "base_qual": min(baseq, 127),
+                "mapq": min(mapq, 127),
+                "mate_pair_id": mate,
+                "strand": strand,
+                "allele_base": allele,
+            }
+        )
     return out
 
 
@@ -287,17 +289,19 @@ def _extract_methyldackel(read, *, min_baseq: int) -> list[dict[str, object]]:
         if baseq < min_baseq:
             continue
         meth_status = 1 if int(prob) >= 128 else 0
-        out.append({
-            "read_id": read_id,
-            "chrom": chrom,
-            "pos": int(ref_pos),
-            "methylation_status": meth_status,
-            "base_qual": min(baseq, 127),
-            "mapq": min(mapq, 127),
-            "mate_pair_id": mate,
-            "strand": strand,
-            "allele_base": seq[q_idx] if seq else "",
-        })
+        out.append(
+            {
+                "read_id": read_id,
+                "chrom": chrom,
+                "pos": int(ref_pos),
+                "methylation_status": meth_status,
+                "base_qual": min(baseq, 127),
+                "mapq": min(mapq, 127),
+                "mate_pair_id": mate,
+                "strand": strand,
+                "allele_base": seq[q_idx] if seq else "",
+            }
+        )
     return out
 
 

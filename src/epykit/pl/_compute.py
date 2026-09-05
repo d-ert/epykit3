@@ -30,18 +30,18 @@ import polars as pl
 
 @dataclass
 class PCAResult:
-    coords: np.ndarray            # (n_samples, n_components)
-    explained_var: tuple          # per-component ratios
-    samples: list[str]            # row order of coords
-    groups: list                  # one group label per sample, parallel to samples
-    group_col: str                # which md.obs column was used
-    n_sites_used: int             # rows entering PCA after subsampling + NaN drop
+    coords: np.ndarray  # (n_samples, n_components)
+    explained_var: tuple  # per-component ratios
+    samples: list[str]  # row order of coords
+    groups: list  # one group label per sample, parallel to samples
+    group_col: str  # which md.obs column was used
+    n_sites_used: int  # rows entering PCA after subsampling + NaN drop
 
 
 @dataclass
 class MetaplotResult:
-    x: np.ndarray                 # bin centre coordinates, length n_bins
-    mean_beta: np.ndarray         # (n_samples, n_bins)
+    x: np.ndarray  # bin centre coordinates, length n_bins
+    mean_beta: np.ndarray  # (n_samples, n_bins)
     samples: list[str]
     groups: list
     group_col: str | None
@@ -54,7 +54,7 @@ class VolcanoData:
     meth_diff: np.ndarray
     neg_log_p: np.ndarray
     p_col: str
-    sig: np.ndarray               # bool mask
+    sig: np.ndarray  # bool mask
     hyper: np.ndarray
     hypo: np.ndarray
 
@@ -71,7 +71,7 @@ class MAData:
 
 @dataclass
 class ManhattanData:
-    chrom_blocks: list            # list of dicts: {chrom, x, y, n}
+    chrom_blocks: list  # list of dicts: {chrom, x, y, n}
     p_col: str
     alpha_line_y: float
     tick_pos: list[float]
@@ -172,31 +172,30 @@ def compute_sample_site_matrix(
     # the same modulus on pos picks the same positions on every chrom
     # and the same chrom across samples, so per-site coverage is
     # consistent.
-    lf = (
-        pl.scan_parquet(pattern)
-        .filter(pl.col("coverage") > 0)
-    )
+    lf = pl.scan_parquet(pattern).filter(pl.col("coverage") > 0)
     if k > 1:
         lf = lf.filter((pl.col("pos") % k) == (seed % k))
-    lf = lf.select(["chrom", "pos", "sample", "N_meth", "coverage"]).with_columns(
-        (pl.col("N_meth").cast(pl.Float64) / pl.col("coverage").cast(pl.Float64))
-        .alias("beta")
-    ).select(["chrom", "pos", "sample", "beta"])
+    lf = (
+        lf.select(["chrom", "pos", "sample", "N_meth", "coverage"])
+        .with_columns(
+            (pl.col("N_meth").cast(pl.Float64) / pl.col("coverage").cast(pl.Float64)).alias("beta")
+        )
+        .select(["chrom", "pos", "sample", "beta"])
+    )
 
     df = lf.collect()
     if df.is_empty():
         raise ValueError("No CpGs survived subsampling")
 
     pivot = df.pivot(
-        values="beta", index=["chrom", "pos"], on="sample",
+        values="beta",
+        index=["chrom", "pos"],
+        on="sample",
         aggregate_function="mean",
     )
     present = [s for s in samples if s in pivot.columns]
     if len(present) < 2:
-        raise ValueError(
-            f"Only {len(present)} samples have data after pivot; "
-            "PCA / UMAP need >=2."
-        )
+        raise ValueError(f"Only {len(present)} samples have data after pivot; PCA / UMAP need >=2.")
     matrix = pivot.select(present).to_numpy()
     valid = ~np.isnan(matrix).any(axis=1)
     matrix = matrix[valid]
@@ -243,12 +242,13 @@ def compute_pca(
         from sklearn.decomposition import PCA
     except ImportError as exc:
         raise ImportError(
-            "scikit-learn is required for PCA. "
-            "Install with: pip install scikit-learn"
+            "scikit-learn is required for PCA. Install with: pip install scikit-learn"
         ) from exc
 
     matrix, samples, n_sites_used = compute_sample_site_matrix(
-        md, n_sites=n_sites, seed=seed,
+        md,
+        n_sites=n_sites,
+        seed=seed,
     )
     pca = PCA(n_components=n_components)
     coords = pca.fit_transform(matrix)
@@ -289,21 +289,21 @@ def _tss_intervals(gtf_path: str, *, window_bp: int, max_genes: int | None):
     df = pl.from_pandas(
         genes_pd[["Chromosome", "Start", "End", "Strand", "gene_id", "gene_name"]]
     ).rename({"Chromosome": "chrom", "Strand": "strand"})
-    tss = (
-        df.with_columns(
-            pl.when(pl.col("strand") == "-")
-              .then(pl.col("End") - 1)
-              .otherwise(pl.col("Start"))
-              .cast(pl.Int64).alias("tss")
-        )
-        .select(["chrom", "tss", "strand", "gene_id", "gene_name"])
-    )
+    tss = df.with_columns(
+        pl.when(pl.col("strand") == "-")
+        .then(pl.col("End") - 1)
+        .otherwise(pl.col("Start"))
+        .cast(pl.Int64)
+        .alias("tss")
+    ).select(["chrom", "tss", "strand", "gene_id", "gene_name"])
     if max_genes is not None and len(tss) > max_genes:
         tss = tss.head(max_genes)
-    return tss.with_columns([
-        (pl.col("tss") - window_bp).alias("start"),
-        (pl.col("tss") + window_bp).alias("end"),
-    ]).select(["chrom", "start", "end", "tss", "strand", "gene_id"])
+    return tss.with_columns(
+        [
+            (pl.col("tss") - window_bp).alias("start"),
+            (pl.col("tss") + window_bp).alias("end"),
+        ]
+    ).select(["chrom", "start", "end", "tss", "strand", "gene_id"])
 
 
 def _merge_intervals(starts: np.ndarray, ends: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -395,9 +395,12 @@ def compute_tss_metaplot(
                     .filter(pl.col("coverage") > 0)
                     # Cheap bounding-box filter; polars pushes this into
                     # the parquet reader.
-                    .filter(pl.col("pos").is_between(
-                        int(merged_s[0]), int(merged_e[-1]),
-                    ))
+                    .filter(
+                        pl.col("pos").is_between(
+                            int(merged_s[0]),
+                            int(merged_e[-1]),
+                        )
+                    )
                 )
                 df = lf.collect()
             except Exception:
@@ -448,8 +451,13 @@ def compute_tss_metaplot(
     groups = [sample_to_group.get(s, "unknown") for s in samples]
 
     result = MetaplotResult(
-        x=x, mean_beta=mean_beta, samples=samples, groups=groups,
-        group_col=resolved_col, window_bp=window_bp, n_bins=n_bins,
+        x=x,
+        mean_beta=mean_beta,
+        samples=samples,
+        groups=groups,
+        group_col=resolved_col,
+        window_bp=window_bp,
+        n_bins=n_bins,
     )
     if use_cache:
         _cache_put(md, cache_key, result)
@@ -477,10 +485,7 @@ def compute_coverage_distribution(
     if total == 0:
         return np.array([], dtype=np.int64)
     if total <= max_points:
-        return (
-            pl.scan_parquet(pattern).select("coverage").collect()["coverage"]
-            .to_numpy()
-        )
+        return pl.scan_parquet(pattern).select("coverage").collect()["coverage"].to_numpy()
     k = max(1, total // max_points)
     return (
         pl.scan_parquet(pattern)
@@ -502,8 +507,9 @@ def _dmc_p_col(dmc: pl.DataFrame) -> str:
     return "qvalue" if "qvalue" in dmc.columns else "pvalue"
 
 
-def _subsample_keep_sig(sig: np.ndarray, max_points: int | None,
-                        seed: int = 42) -> np.ndarray | None:
+def _subsample_keep_sig(
+    sig: np.ndarray, max_points: int | None, seed: int = 42
+) -> np.ndarray | None:
     """Return sorted indices retaining ALL significant rows plus a random
     sample of the non-significant rows so the total is <= ``max_points``.
 
@@ -549,8 +555,12 @@ def compute_volcano_data(
     if keep is not None:
         diff, neg_log_p, sig = diff[keep], neg_log_p[keep], sig[keep]
     return VolcanoData(
-        meth_diff=diff, neg_log_p=neg_log_p, p_col=p_col,
-        sig=sig, hyper=sig & (diff > 0), hypo=sig & (diff < 0),
+        meth_diff=diff,
+        neg_log_p=neg_log_p,
+        p_col=p_col,
+        sig=sig,
+        hyper=sig & (diff > 0),
+        hypo=sig & (diff < 0),
     )
 
 
@@ -570,17 +580,18 @@ def compute_ma_data(
     p_col = _dmc_p_col(dmc)
     diff = dmc["meth_diff"].to_numpy()
     pval = dmc[p_col].to_numpy()
-    mean_beta = (
-        dmc["mean_beta_case"].to_numpy()
-        + dmc["mean_beta_control"].to_numpy()
-    ) / 2.0
+    mean_beta = (dmc["mean_beta_case"].to_numpy() + dmc["mean_beta_control"].to_numpy()) / 2.0
     sig = (pval < alpha) & (np.abs(diff) >= min_abs_diff)
     keep = _subsample_keep_sig(sig, max_points, seed)
     if keep is not None:
         mean_beta, diff, sig = mean_beta[keep], diff[keep], sig[keep]
     return MAData(
-        mean_beta=mean_beta, meth_diff=diff, p_col=p_col,
-        sig=sig, hyper=sig & (diff > 0), hypo=sig & (diff < 0),
+        mean_beta=mean_beta,
+        meth_diff=diff,
+        p_col=p_col,
+        sig=sig,
+        hyper=sig & (diff > 0),
+        hypo=sig & (diff < 0),
     )
 
 
@@ -609,10 +620,7 @@ def compute_manhattan_data(
             mask[keep] = True
             dmc_sorted = dmc_sorted.filter(pl.Series(mask))
     chroms = dmc_sorted["chrom"].unique().to_list()
-    canonical = (
-        [f"chr{i}" for i in range(1, 23)]
-        + [f"chr{c}" for c in ("X", "Y", "M")]
-    )
+    canonical = [f"chr{i}" for i in range(1, 23)] + [f"chr{c}" for c in ("X", "Y", "M")]
     # Drop unplaced/alt/random contigs (chrUn_*, *_random, *_alt) by default --
     # they clutter the genome-wide axis with dozens of tiny blocks.
     extra = [] if canonical_only else [c for c in chroms if c not in canonical]
@@ -638,8 +646,11 @@ def compute_manhattan_data(
         tick_label.append(c.replace("chr", ""))
         cumulative += float(pos.max()) + 1e7
     return ManhattanData(
-        chrom_blocks=blocks, p_col=p_col, alpha_line_y=-np.log10(alpha),
-        tick_pos=tick_pos, tick_label=tick_label,
+        chrom_blocks=blocks,
+        p_col=p_col,
+        alpha_line_y=-np.log10(alpha),
+        tick_pos=tick_pos,
+        tick_label=tick_label,
     )
 
 
@@ -679,8 +690,7 @@ def _explode_multi_annotation(
     """
     if annot_col not in df.columns:
         raise ValueError(
-            f"annotation column {annot_col!r} not on table. "
-            f"Available: {sorted(df.columns)[:10]}..."
+            f"annotation column {annot_col!r} not on table. Available: {sorted(df.columns)[:10]}..."
         )
     out = df.with_row_index("_region_id")
     if out.schema[annot_col] == pl.List(pl.Utf8):
@@ -730,8 +740,7 @@ def compute_coannotation_matrix(
     # Get list[str] per region.
     if df.schema[annot_col] != pl.List(pl.Utf8):
         raise ValueError(
-            f"{annot_col!r} must be List[Utf8]; "
-            "use the annotatr-style multi-annotation columns."
+            f"{annot_col!r} must be List[Utf8]; use the annotatr-style multi-annotation columns."
         )
     classes_raw: set[str] = set()
     rows: list[list[str]] = []
@@ -751,7 +760,7 @@ def compute_coannotation_matrix(
         for a in region_annots:
             mat[idx[a], idx[a]] += 1
         for i, a in enumerate(region_annots):
-            for b in region_annots[i + 1:]:
+            for b in region_annots[i + 1 :]:
                 ia, ib = idx[a], idx[b]
                 mat[ia, ib] += 1
                 mat[ib, ia] += 1
@@ -839,17 +848,11 @@ def compute_categorical_proportions(
 
     blocks: list[pl.DataFrame] = []
     if include_all_group:
-        blocks.append(
-            base.select([annot_col]).with_columns(pl.lit("all").alias(group_col))
-        )
+        blocks.append(base.select([annot_col]).with_columns(pl.lit("all").alias(group_col)))
     blocks.append(base.select([annot_col, group_col]))
     long = pl.concat(blocks, how="vertical_relaxed")
 
-    counts = (
-        long.group_by([group_col, annot_col])
-        .len()
-        .rename({"len": "count"})
-    )
+    counts = long.group_by([group_col, annot_col]).len().rename({"len": "count"})
     if not normalize:
         return counts.sort([group_col, annot_col])
     totals = counts.group_by(group_col).agg(pl.col("count").sum().alias("_total"))
@@ -903,8 +906,10 @@ def compute_global_methylation(md):
     if "global_methylation" not in obs.columns:
         raise ValueError("Run ep.tl.qc(md) first (no 'global_methylation' in obs)")
     samples = obs.get_column("sample_id").to_list()
-    values = [float(v) if v is not None else float("nan")
-              for v in obs.get_column("global_methylation").to_list()]
+    values = [
+        float(v) if v is not None else float("nan")
+        for v in obs.get_column("global_methylation").to_list()
+    ]
     _, groups = _resolve_group_col(md, None)
     return samples, values, groups
 
@@ -918,13 +923,12 @@ def compute_sample_correlation_matrix(md):
     """
     corr_df = md.uns.get("qc_sample_correlation")
     if corr_df is None or not isinstance(corr_df, pl.DataFrame) or corr_df.is_empty():
-        raise ValueError(
-            "Run ep.tl.qc(md, run_sample_correlation=True) first"
+        raise ValueError("Run ep.tl.qc(md, run_sample_correlation=True) first")
+    labels = list(
+        dict.fromkeys(
+            corr_df.get_column("sample_a").to_list() + corr_df.get_column("sample_b").to_list()
         )
-    labels = list(dict.fromkeys(
-        corr_df.get_column("sample_a").to_list()
-        + corr_df.get_column("sample_b").to_list()
-    ))
+    )
     idx = {s: i for i, s in enumerate(labels)}
     n = len(labels)
     mat = np.full((n, n), np.nan)
@@ -948,8 +952,9 @@ def compute_sample_correlation_matrix(md):
     return mat, labels
 
 
-def compute_scree(md, *, n_sites: int = 10_000, max_components: int = 6,
-                  seed: int = 42) -> np.ndarray:
+def compute_scree(
+    md, *, n_sites: int = 10_000, max_components: int = 6, seed: int = 42
+) -> np.ndarray:
     """Explained-variance ratios for the first ``max_components`` PCs.
 
     Independent of :func:`compute_pca` (which caches only 2 components) so
@@ -959,8 +964,7 @@ def compute_scree(md, *, n_sites: int = 10_000, max_components: int = 6,
         from sklearn.decomposition import PCA
     except ImportError as exc:
         raise ImportError(
-            "scikit-learn is required for the scree plot. "
-            "Install with: pip install scikit-learn"
+            "scikit-learn is required for the scree plot. Install with: pip install scikit-learn"
         ) from exc
     matrix, _samples, _n = compute_sample_site_matrix(md, n_sites=n_sites, seed=seed)
     k = min(max_components, matrix.shape[0], matrix.shape[1])

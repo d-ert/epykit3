@@ -30,8 +30,13 @@ logger = logging.getLogger(__name__)
 
 
 _METHYLKIT_SCHEMA: tuple[str, ...] = (
-    "chrBase", "chr", "base", "strand",
-    "coverage", "freqC", "freqT",
+    "chrBase",
+    "chr",
+    "base",
+    "strand",
+    "coverage",
+    "freqC",
+    "freqT",
 )
 
 
@@ -44,18 +49,13 @@ def _write_one_sample(
 ) -> int:
     sample_dir = store_root / f"sample={sample}"
     if not sample_dir.exists():
-        raise FileNotFoundError(
-            f"sample={sample} not present under {store_root}"
-        )
+        raise FileNotFoundError(f"sample={sample} not present under {store_root}")
     written = 0
     out_path.parent.mkdir(parents=True, exist_ok=True)
     chrom_dirs = sorted(sample_dir.glob("chrom=*"))
     if chromosomes:
         wanted = set(chromosomes)
-        chrom_dirs = [
-            d for d in chrom_dirs
-            if d.name.removeprefix("chrom=") in wanted
-        ]
+        chrom_dirs = [d for d in chrom_dirs if d.name.removeprefix("chrom=") in wanted]
     with gzip.open(out_path, "wt") as fh:
         fh.write("\t".join(_METHYLKIT_SCHEMA) + "\n")
         for chrom_dir in chrom_dirs:
@@ -112,22 +112,29 @@ def to_methylkit_tabix(
 
     manifest: dict = {"samples": [], "schema": list(_METHYLKIT_SCHEMA)}
     treatment_col = (
-        md.obs.get_column("treatment").to_list()
-        if "treatment" in md.obs.columns else None
+        md.obs.get_column("treatment").to_list() if "treatment" in md.obs.columns else None
     )
     obs_samples = md.obs.get_column("sample_id").to_list()
     for sample in samples:
         out_path = out / f"{sample}.methylraw.txt.gz"
         n_rows = _write_one_sample(
-            store_root, sample, out_path, chromosomes=chromosomes,
+            store_root,
+            sample,
+            out_path,
+            chromosomes=chromosomes,
         )
         # Best-effort tabix indexing.
         tbi_path: str | None = None
         try:
             import pysam
+
             tbi = pysam.tabix_index(
-                str(out_path), preset=None, seq_col=1, start_col=2,
-                end_col=2, force=True,
+                str(out_path),
+                preset=None,
+                seq_col=1,
+                start_col=2,
+                end_col=2,
+                force=True,
             )
             tbi_path = tbi
         except ImportError:
@@ -145,13 +152,15 @@ def to_methylkit_tabix(
                 treatment = int(treatment_col[obs_samples.index(sample)])
             except (ValueError, IndexError):
                 treatment = None
-        manifest["samples"].append({
-            "sample_id": sample,
-            "file": out_path.name,
-            "tabix": (Path(tbi_path).name if tbi_path else None),
-            "n_rows": n_rows,
-            "treatment": treatment,
-        })
+        manifest["samples"].append(
+            {
+                "sample_id": sample,
+                "file": out_path.name,
+                "tabix": (Path(tbi_path).name if tbi_path else None),
+                "n_rows": n_rows,
+                "treatment": treatment,
+            }
+        )
 
     (out / "epykit_to_methylkit.json").write_text(
         json.dumps(manifest, indent=2),

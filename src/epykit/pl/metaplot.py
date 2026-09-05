@@ -27,23 +27,26 @@ def _tss_table_from_gtf(gtf_path: str) -> pl.DataFrame:
     """
     genes_pd, _ = _parse_gtf_streaming(gtf_path)
     if genes_pd is None or len(genes_pd) == 0:
-        return pl.DataFrame(schema={
-            "chrom": pl.Utf8, "tss": pl.Int64, "strand": pl.Utf8,
-            "gene_id": pl.Utf8, "gene_name": pl.Utf8,
-        })
+        return pl.DataFrame(
+            schema={
+                "chrom": pl.Utf8,
+                "tss": pl.Int64,
+                "strand": pl.Utf8,
+                "gene_id": pl.Utf8,
+                "gene_name": pl.Utf8,
+            }
+        )
 
     genes = pl.from_pandas(
         genes_pd[["Chromosome", "Start", "End", "Strand", "gene_id", "gene_name"]]
     ).rename({"Chromosome": "chrom", "Strand": "strand"})
-    return (
-        genes.with_columns(
-            pl.when(pl.col("strand") == "-")
-              .then(pl.col("End") - 1)
-              .otherwise(pl.col("Start"))
-              .cast(pl.Int64).alias("tss")
-        )
-        .select(["chrom", "tss", "strand", "gene_id", "gene_name"])
-    )
+    return genes.with_columns(
+        pl.when(pl.col("strand") == "-")
+        .then(pl.col("End") - 1)
+        .otherwise(pl.col("Start"))
+        .cast(pl.Int64)
+        .alias("tss")
+    ).select(["chrom", "tss", "strand", "gene_id", "gene_name"])
 
 
 def tss_metaplot(
@@ -91,9 +94,12 @@ def tss_metaplot(
     (Figure, Axes)
     """
     res = compute_tss_metaplot(
-        md, gtf_path,
-        window_bp=window_bp, n_bins=n_bins,
-        group_by=group_by, max_genes=max_genes,
+        md,
+        gtf_path,
+        window_bp=window_bp,
+        n_bins=n_bins,
+        group_by=group_by,
+        max_genes=max_genes,
     )
     samples = res.samples
     mean_beta = res.mean_beta
@@ -109,9 +115,11 @@ def tss_metaplot(
         }
         for i, samp in enumerate(samples):
             ax.plot(
-                x, mean_beta[i],
+                x,
+                mean_beta[i],
                 color=group_palette.get(groups[i], PALETTE["neutral"]),
-                alpha=0.25, linewidth=1,
+                alpha=0.25,
+                linewidth=1,
             )
         for g in unique_groups:
             mask = np.array([gg == g for gg in groups])
@@ -119,9 +127,11 @@ def tss_metaplot(
                 continue
             grp_mean = np.nanmean(mean_beta[mask], axis=0)
             ax.plot(
-                x, grp_mean,
+                x,
+                grp_mean,
                 color=group_palette.get(g, PALETTE["neutral"]),
-                linewidth=2.2, label=str(g),
+                linewidth=2.2,
+                label=str(g),
             )
         ax.legend(title=res.group_col, frameon=False)
     else:
@@ -144,19 +154,36 @@ def _gene_table_from_gtf(gtf_path: str) -> pl.DataFrame:
     """Per-gene (chrom, tx_start, tx_end, strand, gene_id, gene_name)."""
     genes_pd, _ = _parse_gtf_streaming(gtf_path)
     if genes_pd is None or len(genes_pd) == 0:
-        return pl.DataFrame(schema={
-            "chrom": pl.Utf8, "tx_start": pl.Int64, "tx_end": pl.Int64,
-            "strand": pl.Utf8, "gene_id": pl.Utf8, "gene_name": pl.Utf8,
-        })
+        return pl.DataFrame(
+            schema={
+                "chrom": pl.Utf8,
+                "tx_start": pl.Int64,
+                "tx_end": pl.Int64,
+                "strand": pl.Utf8,
+                "gene_id": pl.Utf8,
+                "gene_name": pl.Utf8,
+            }
+        )
     genes = pl.from_pandas(
         genes_pd[["Chromosome", "Start", "End", "Strand", "gene_id", "gene_name"]]
-    ).rename({
-        "Chromosome": "chrom", "Strand": "strand",
-        "Start": "tx_start", "End": "tx_end",
-    })
-    return genes.select([
-        "chrom", "tx_start", "tx_end", "strand", "gene_id", "gene_name",
-    ])
+    ).rename(
+        {
+            "Chromosome": "chrom",
+            "Strand": "strand",
+            "Start": "tx_start",
+            "End": "tx_end",
+        }
+    )
+    return genes.select(
+        [
+            "chrom",
+            "tx_start",
+            "tx_end",
+            "strand",
+            "gene_id",
+            "gene_name",
+        ]
+    )
 
 
 def gene_body_metaplot(
@@ -197,13 +224,10 @@ def gene_body_metaplot(
     genes = _gene_table_from_gtf(gtf_path)
     if genes.is_empty():
         raise ValueError(f"No gene records found in GTF {gtf_path!r}")
-    genes = genes.filter(
-        (pl.col("tx_end") - pl.col("tx_start")) >= min_gene_bp
-    )
+    genes = genes.filter((pl.col("tx_end") - pl.col("tx_start")) >= min_gene_bp)
     if genes.is_empty():
         raise ValueError(
-            f"No genes >={min_gene_bp} bp in the GTF -- every record is too short "
-            "for body-binning."
+            f"No genes >={min_gene_bp} bp in the GTF -- every record is too short for body-binning."
         )
     if max_genes is not None and len(genes) > max_genes:
         genes = genes.head(max_genes)
@@ -242,17 +266,17 @@ def gene_body_metaplot(
             continue
         positions = chrom_df["pos"].to_numpy().astype(np.int64)
         samples_arr = chrom_df["sample"].to_list()
-        betas = (
-            chrom_df["N_meth"].to_numpy().astype(np.float64)
-            / chrom_df["coverage"].to_numpy().astype(np.float64)
-        )
+        betas = chrom_df["N_meth"].to_numpy().astype(np.float64) / chrom_df[
+            "coverage"
+        ].to_numpy().astype(np.float64)
         order = np.argsort(positions, kind="mergesort")
         positions = positions[order]
         betas = betas[order]
         samples_arr = [samples_arr[i] for i in order]
         samples_idx_arr = np.fromiter(
             (sample_idx.get(s, -1) for s in samples_arr),
-            count=len(samples_arr), dtype=np.int32,
+            count=len(samples_arr),
+            dtype=np.int32,
         )
 
         for tx_start, tx_end, strand in zip(starts, ends, strands):
@@ -289,7 +313,7 @@ def gene_body_metaplot(
 
             bin_idx = np.zeros(chunk_pos.shape, dtype=np.int64)
             # Left flank: rel  in  [-flank, 0) -> bins [0, n_bins_flank).
-            rel_left = (chunk_pos[in_left] - tx_start)  # negative
+            rel_left = chunk_pos[in_left] - tx_start  # negative
             bf = np.floor((rel_left + flank_bp) / (flank_bp / n_bins_flank))
             bin_idx[in_left] = np.clip(bf, 0, n_bins_flank - 1)
             # Body: fraction along gene -> [body_start, body_end).
@@ -297,13 +321,16 @@ def gene_body_metaplot(
             frac = (chunk_pos[in_body] - tx_start) / body_len
             bin_idx[in_body] = body_start + np.clip(
                 np.floor(frac * n_bins_body).astype(np.int64),
-                0, n_bins_body - 1,
+                0,
+                n_bins_body - 1,
             )
             # Right flank: rel  in  (0, flank] -> bins [body_end, total).
             rel_right = chunk_pos[in_right] - tx_end
             br = np.floor(rel_right / (flank_bp / n_bins_flank))
             bin_idx[in_right] = body_end + np.clip(
-                br.astype(np.int64), 0, n_bins_flank - 1,
+                br.astype(np.int64),
+                0,
+                n_bins_flank - 1,
             )
 
             if strand == -1:
@@ -326,15 +353,18 @@ def gene_body_metaplot(
         unique_groups = sorted(set(groups))
         group_palette = {
             g: PALETTE.get(
-                "treatment" if i else "control", PALETTE["neutral"],
+                "treatment" if i else "control",
+                PALETTE["neutral"],
             )
             for i, g in enumerate(unique_groups)
         }
         for i, samp in enumerate(samples):
             ax.plot(
-                x, mean_beta[i],
+                x,
+                mean_beta[i],
                 color=group_palette.get(groups[i], PALETTE["neutral"]),
-                alpha=0.25, linewidth=1,
+                alpha=0.25,
+                linewidth=1,
             )
         for g in unique_groups:
             mask = np.array([gg == g for gg in groups])
@@ -342,9 +372,11 @@ def gene_body_metaplot(
                 continue
             grp_mean = np.nanmean(mean_beta[mask], axis=0)
             ax.plot(
-                x, grp_mean,
+                x,
+                grp_mean,
                 color=group_palette.get(g, PALETTE["neutral"]),
-                linewidth=2.2, label=str(g),
+                linewidth=2.2,
+                label=str(g),
             )
         ax.legend(title=group_by, frameon=False)
     else:
@@ -356,20 +388,24 @@ def gene_body_metaplot(
     ax.axvline(body_start - 0.5, color="black", lw=0.7, ls="--", alpha=0.5)
     ax.axvline(body_end - 0.5, color="black", lw=0.7, ls="--", alpha=0.5)
     tick_pos = [
-        0, body_start - 0.5, (body_start + body_end - 1) / 2,
-        body_end - 0.5, total_bins - 1,
+        0,
+        body_start - 0.5,
+        (body_start + body_end - 1) / 2,
+        body_end - 0.5,
+        total_bins - 1,
     ]
     tick_lbl = [
-        f"-{flank_bp}", "TSS", "gene body", "TES", f"+{flank_bp}",
+        f"-{flank_bp}",
+        "TSS",
+        "gene body",
+        "TES",
+        f"+{flank_bp}",
     ]
     ax.set_xticks(tick_pos)
     ax.set_xticklabels(tick_lbl)
     ax.set_xlabel("Position along gene")
     ax.set_ylabel("Mean beta")
-    ax.set_title(
-        f"Gene-body metaplot (+/-{flank_bp} bp flanks, "
-        f"n_genes={len(genes):,})"
-    )
+    ax.set_title(f"Gene-body metaplot (+/-{flank_bp} bp flanks, n_genes={len(genes):,})")
 
     if save:
         _save_fig(md, fig, save)

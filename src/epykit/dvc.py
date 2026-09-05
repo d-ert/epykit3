@@ -38,25 +38,23 @@ from .dmc import (
 logger = logging.getLogger(__name__)
 
 _DVC_EMPTY_SCHEMA = {
-    "chrom":          pl.Utf8,
-    "pos":            pl.Int32,
-    "strand":         pl.Utf8,
-    "n_treatment":    pl.Int32,
-    "n_control":      pl.Int32,
-    "var_treatment":  pl.Float64,
-    "var_control":    pl.Float64,
-    "var_log_ratio":  pl.Float64,
-    "p_variance":     pl.Float64,
-    "q_variance":     pl.Float64,
-    "p_mean":         pl.Float64,
-    "q_mean":         pl.Float64,
-    "is_dvc":         pl.Boolean,
+    "chrom": pl.Utf8,
+    "pos": pl.Int32,
+    "strand": pl.Utf8,
+    "n_treatment": pl.Int32,
+    "n_control": pl.Int32,
+    "var_treatment": pl.Float64,
+    "var_control": pl.Float64,
+    "var_log_ratio": pl.Float64,
+    "p_variance": pl.Float64,
+    "q_variance": pl.Float64,
+    "p_mean": pl.Float64,
+    "q_mean": pl.Float64,
+    "is_dvc": pl.Boolean,
 }
 
 
-def _per_site_variance_test(
-    group_a: np.ndarray, group_b: np.ndarray
-) -> tuple[float, float]:
+def _per_site_variance_test(group_a: np.ndarray, group_b: np.ndarray) -> tuple[float, float]:
     """Brown-Forsythe variance equality test (median-centred Levene).
 
     Equivalent to ``scipy.stats.levene(group_a, group_b, center='median')``.
@@ -116,22 +114,22 @@ def _brown_forsythe_vectorised(
     p-values (anti-conservative). Excluding n<3 sites keeps the test honest.
     """
     # Stack to (n_samples x n_sites) matrices; NaN = missing.
-    mat_a = np.stack(betas_a, axis=0)   # shape (na, n_sites)
-    mat_b = np.stack(betas_b, axis=0)   # shape (nb, n_sites)
+    mat_a = np.stack(betas_a, axis=0)  # shape (na, n_sites)
+    mat_b = np.stack(betas_b, axis=0)  # shape (nb, n_sites)
 
     # Median per site ignoring NaN.
     with np.errstate(invalid="ignore"):
-        med_a = np.nanmedian(mat_a, axis=0)   # (n_sites,)
+        med_a = np.nanmedian(mat_a, axis=0)  # (n_sites,)
         med_b = np.nanmedian(mat_b, axis=0)
 
     # Absolute deviations from group median.
-    z_a = np.abs(mat_a - med_a[np.newaxis, :])   # (na, n_sites)
-    z_b = np.abs(mat_b - med_b[np.newaxis, :])   # (nb, n_sites)
+    z_a = np.abs(mat_a - med_a[np.newaxis, :])  # (na, n_sites)
+    z_b = np.abs(mat_b - med_b[np.newaxis, :])  # (nb, n_sites)
 
     # Count finite observations per site per group.
-    finite_a = np.isfinite(mat_a)   # (na, n_sites)
+    finite_a = np.isfinite(mat_a)  # (na, n_sites)
     finite_b = np.isfinite(mat_b)
-    n_a = finite_a.sum(axis=0).astype(np.float64)   # (n_sites,)
+    n_a = finite_a.sum(axis=0).astype(np.float64)  # (n_sites,)
     n_b = finite_b.sum(axis=0).astype(np.float64)
 
     # Brown-Forsythe needs >=3 finite obs per group: at n=2 the median-centred
@@ -148,16 +146,13 @@ def _brown_forsythe_vectorised(
 
     # Vectorised one-way F-test over deviation arrays per site.
     # mean_i = nanmean of z_i; grand_mean = weighted combo.
-    mean_a = np.nanmean(z_a, axis=0)   # (n_sites,)
+    mean_a = np.nanmean(z_a, axis=0)  # (n_sites,)
     mean_b = np.nanmean(z_b, axis=0)
     N = n_a + n_b
     grand_mean = (n_a * mean_a + n_b * mean_b) / np.maximum(N, 1)
 
     # Between-group SS (df=1 for two groups).
-    ss_between = (
-        n_a * (mean_a - grand_mean) ** 2
-        + n_b * (mean_b - grand_mean) ** 2
-    )
+    ss_between = n_a * (mean_a - grand_mean) ** 2 + n_b * (mean_b - grand_mean) ** 2
     # Within-group SS (df = N - 2 for two groups).
     ss_within_a = np.nansum((z_a - mean_a[np.newaxis, :]) ** 2, axis=0)
     ss_within_b = np.nansum((z_b - mean_b[np.newaxis, :]) ** 2, axis=0)
@@ -165,7 +160,7 @@ def _brown_forsythe_vectorised(
     df_within = N - 2
 
     with np.errstate(invalid="ignore", divide="ignore"):
-        ms_between = ss_between   # df_between = 1
+        ms_between = ss_between  # df_between = 1
         ms_within = np.where(df_within > 0, ss_within / df_within, np.nan)
         f_stat = np.where(ms_within > 0, ms_between / ms_within, np.nan)
 
@@ -235,9 +230,8 @@ def _process_one_chromosome_dvc(
     with np.errstate(invalid="ignore", divide="ignore"):
         t_stat = np.where(se > 0, (mean_t - mean_c) / se, np.nan)
         dof_num = (vm_t + vm_c) ** 2
-        dof_den = (
-            np.where(n_t > 1, vm_t ** 2 / np.maximum(n_t - 1, 1), 0.0)
-            + np.where(n_c > 1, vm_c ** 2 / np.maximum(n_c - 1, 1), 0.0)
+        dof_den = np.where(n_t > 1, vm_t**2 / np.maximum(n_t - 1, 1), 0.0) + np.where(
+            n_c > 1, vm_c**2 / np.maximum(n_c - 1, 1), 0.0
         )
         dof = np.where(dof_den > 0, dof_num / dof_den, 1.0)
         dof = np.maximum(dof, 1.0)
@@ -250,18 +244,20 @@ def _process_one_chromosome_dvc(
             np.nan,
         )
 
-    return pl.DataFrame({
-        "chrom":         pl.Series([chrom] * n_sites, dtype=pl.Utf8),
-        "pos":           canonical_df["pos"],
-        "strand":        canonical_df["strand"],
-        "n_treatment":   pl.Series(n_t.astype(np.int32)),
-        "n_control":     pl.Series(n_c.astype(np.int32)),
-        "var_treatment": pl.Series(var_t),
-        "var_control":   pl.Series(var_c),
-        "var_log_ratio": pl.Series(var_log_ratio),
-        "p_variance":    pl.Series(p_var),
-        "p_mean":        pl.Series(p_mean),
-    }).sort("pos")
+    return pl.DataFrame(
+        {
+            "chrom": pl.Series([chrom] * n_sites, dtype=pl.Utf8),
+            "pos": canonical_df["pos"],
+            "strand": canonical_df["strand"],
+            "n_treatment": pl.Series(n_t.astype(np.int32)),
+            "n_control": pl.Series(n_c.astype(np.int32)),
+            "var_treatment": pl.Series(var_t),
+            "var_control": pl.Series(var_c),
+            "var_log_ratio": pl.Series(var_log_ratio),
+            "p_variance": pl.Series(p_var),
+            "p_mean": pl.Series(p_mean),
+        }
+    ).sort("pos")
 
 
 def process_chromosomes_dvc(
@@ -296,6 +292,7 @@ def process_chromosomes_dvc(
     Raise ``min_coverage`` (e.g. 5-10) on cohorts with uneven depth.
     """
     import warnings
+
     if test not in ("brown_forsythe", "bartlett"):
         raise ValueError(
             f"DVC test={test!r} not supported. "
@@ -332,14 +329,20 @@ def process_chromosomes_dvc(
     def _dvc_chrom_handler(chrom: str) -> pl.DataFrame | None:
         canonical_df = (
             _intersect_chrom(store, chrom, all_samples)
-            if unite else _union_chrom(store, chrom, all_samples)
+            if unite
+            else _union_chrom(store, chrom, all_samples)
         )
         if len(canonical_df) == 0:
             return None
         return _process_one_chromosome_dvc(
-            store, chrom, canonical_df,
-            samples_treatment, samples_control,
-            test=test, mean_filter_alpha=mean_filter_alpha, alpha=alpha,
+            store,
+            chrom,
+            canonical_df,
+            samples_treatment,
+            samples_control,
+            test=test,
+            mean_filter_alpha=mean_filter_alpha,
+            alpha=alpha,
             min_coverage=min_coverage,
         )
 
@@ -347,8 +350,11 @@ def process_chromosomes_dvc(
         tmp = Path(tmpdir)
         written: list[Path] = []
         for chrom, chrom_result in run_chrom_pipeline(
-            chromosomes, _dvc_chrom_handler,
-            backend=backend, n_workers=n_workers, label="DVC",
+            chromosomes,
+            _dvc_chrom_handler,
+            backend=backend,
+            n_workers=n_workers,
+            label="DVC",
         ):
             tmp_file = tmp / f"{chrom}.parquet"
             chrom_result.write_parquet(str(tmp_file))
@@ -362,6 +368,7 @@ def process_chromosomes_dvc(
 
     # BH-correct p_variance and p_mean separately.
     from statsmodels.stats.multitest import multipletests
+
     def _bh(p: np.ndarray) -> np.ndarray:
         finite = np.isfinite(p)
         q = np.full_like(p, np.nan, dtype=np.float64)
@@ -376,14 +383,17 @@ def process_chromosomes_dvc(
     q_mean = _bh(p_mean_arr)
     is_dvc = (q_var < alpha) & (p_mean_arr > mean_filter_alpha)
 
-    return combined.with_columns([
-        pl.Series("q_variance", q_var),
-        pl.Series("q_mean",     q_mean),
-        pl.Series("is_dvc",     is_dvc),
-    ])
+    return combined.with_columns(
+        [
+            pl.Series("q_variance", q_var),
+            pl.Series("q_mean", q_mean),
+            pl.Series("is_dvc", is_dvc),
+        ]
+    )
 
 
 # Differentially Variable Regions (DVR) -- density-based aggregation
+
 
 def call_dvr_density(
     dvc_df: pl.DataFrame,
@@ -434,63 +444,78 @@ def call_dvr_density(
     missing = needed - set(dvc_df.columns)
     if missing:
         raise ValueError(
-            f"call_dvr_density: dvc_df missing columns {sorted(missing)}. "
-            "Run ep.tl.dvc(md) first."
+            f"call_dvr_density: dvc_df missing columns {sorted(missing)}. Run ep.tl.dvc(md) first."
         )
     if len(dvc_df) == 0:
-        return pl.DataFrame(schema={
-            "chrom": pl.Utf8, "start": pl.Int64, "end": pl.Int64,
-            "n_cpgs": pl.Int64, "n_dvc": pl.Int64,
-            "frac_dvc": pl.Float64, "pvalue": pl.Float64,
-            "qvalue": pl.Float64, "mean_var_log_ratio": pl.Float64,
-            "dvr_type": pl.Utf8, "is_dvr": pl.Boolean,
-        })
+        return pl.DataFrame(
+            schema={
+                "chrom": pl.Utf8,
+                "start": pl.Int64,
+                "end": pl.Int64,
+                "n_cpgs": pl.Int64,
+                "n_dvc": pl.Int64,
+                "frac_dvc": pl.Float64,
+                "pvalue": pl.Float64,
+                "qvalue": pl.Float64,
+                "mean_var_log_ratio": pl.Float64,
+                "dvr_type": pl.Utf8,
+                "is_dvr": pl.Boolean,
+            }
+        )
 
     # Genome-wide DVC rate (the background). Treat null is_dvc / NaN
     # values as not-DVC; they still contribute to the denominator.
     total_cpgs = int(dvc_df.height)
-    total_dvc = int(
-        dvc_df.get_column("is_dvc").fill_null(False).cast(pl.Int64).sum()
-    )
+    total_dvc = int(dvc_df.get_column("is_dvc").fill_null(False).cast(pl.Int64).sum())
     p0 = total_dvc / total_cpgs if total_cpgs > 0 else 0.0
     if p0 == 0.0:
-        logger.warning(
-            "call_dvr_density: no DVCs in the input -- every tile is null."
-        )
+        logger.warning("call_dvr_density: no DVCs in the input -- every tile is null.")
 
     # Per-tile aggregation.
     tiles = (
         dvc_df.lazy()
-        .with_columns([
-            (pl.col("pos") // tile_size_bp).alias("_tile"),
-            pl.col("is_dvc").fill_null(False).cast(pl.Int64).alias("_is_dvc"),
-            # Only count signs of DVCs themselves to determine direction.
-            pl.when(pl.col("is_dvc").fill_null(False))
-            .then(pl.col("var_log_ratio"))
-            .otherwise(None)
-            .alias("_dvc_vlr"),
-        ])
+        .with_columns(
+            [
+                (pl.col("pos") // tile_size_bp).alias("_tile"),
+                pl.col("is_dvc").fill_null(False).cast(pl.Int64).alias("_is_dvc"),
+                # Only count signs of DVCs themselves to determine direction.
+                pl.when(pl.col("is_dvc").fill_null(False))
+                .then(pl.col("var_log_ratio"))
+                .otherwise(None)
+                .alias("_dvc_vlr"),
+            ]
+        )
         .group_by(["chrom", "_tile"])
-        .agg([
-            pl.col("pos").min().alias("_pos_min"),
-            pl.col("pos").max().alias("_pos_max"),
-            pl.len().alias("n_cpgs"),
-            pl.col("_is_dvc").sum().alias("n_dvc"),
-            pl.col("_dvc_vlr").mean().alias("mean_var_log_ratio"),
-            pl.col("_dvc_vlr").sign().sum().alias("_vlr_sign_sum"),
-        ])
+        .agg(
+            [
+                pl.col("pos").min().alias("_pos_min"),
+                pl.col("pos").max().alias("_pos_max"),
+                pl.len().alias("n_cpgs"),
+                pl.col("_is_dvc").sum().alias("n_dvc"),
+                pl.col("_dvc_vlr").mean().alias("mean_var_log_ratio"),
+                pl.col("_dvc_vlr").sign().sum().alias("_vlr_sign_sum"),
+            ]
+        )
         .filter(pl.col("n_cpgs") >= min_cpgs_per_tile)
         .collect()
     )
 
     if tiles.is_empty():
-        return pl.DataFrame(schema={
-            "chrom": pl.Utf8, "start": pl.Int64, "end": pl.Int64,
-            "n_cpgs": pl.Int64, "n_dvc": pl.Int64,
-            "frac_dvc": pl.Float64, "pvalue": pl.Float64,
-            "qvalue": pl.Float64, "mean_var_log_ratio": pl.Float64,
-            "dvr_type": pl.Utf8, "is_dvr": pl.Boolean,
-        })
+        return pl.DataFrame(
+            schema={
+                "chrom": pl.Utf8,
+                "start": pl.Int64,
+                "end": pl.Int64,
+                "n_cpgs": pl.Int64,
+                "n_dvc": pl.Int64,
+                "frac_dvc": pl.Float64,
+                "pvalue": pl.Float64,
+                "qvalue": pl.Float64,
+                "mean_var_log_ratio": pl.Float64,
+                "dvr_type": pl.Utf8,
+                "is_dvr": pl.Boolean,
+            }
+        )
 
     n_cpgs = tiles.get_column("n_cpgs").to_numpy()
     n_dvc = tiles.get_column("n_dvc").to_numpy()
@@ -506,6 +531,7 @@ def call_dvr_density(
     pvals = np.clip(pvals, np.finfo(float).tiny, 1.0)
 
     from statsmodels.stats.multitest import multipletests
+
     finite = np.isfinite(pvals)
     qvals = np.full_like(pvals, np.nan, dtype=np.float64)
     if finite.any():
@@ -514,7 +540,8 @@ def call_dvr_density(
 
     # Tile direction: majority sign of DVC var_log_ratio.
     direction = np.where(
-        sign_sum > 0, "var_up",
+        sign_sum > 0,
+        "var_up",
         np.where(sign_sum < 0, "var_down", "mixed"),
     )
     # Tiles with 0 DVCs have sign_sum = 0; mark them mixed (or null).
@@ -523,18 +550,35 @@ def call_dvr_density(
     is_dvr = (qvals < alpha) & (n_dvc > 0)
     frac_dvc = n_dvc / np.maximum(n_cpgs, 1)
 
-    out = tiles.with_columns([
-        # End is half-open by convention; +1 so a single-CpG tile has end>start.
-        (pl.col("_pos_min")).alias("start"),
-        (pl.col("_pos_max") + 1).alias("end"),
-        pl.Series("frac_dvc", frac_dvc),
-        pl.Series("pvalue", pvals),
-        pl.Series("qvalue", qvals),
-        pl.Series("dvr_type", direction),
-        pl.Series("is_dvr", is_dvr),
-    ]).select([
-        "chrom", "start", "end", "n_cpgs", "n_dvc", "frac_dvc",
-        "pvalue", "qvalue", "mean_var_log_ratio", "dvr_type", "is_dvr",
-    ]).sort(["chrom", "start"])
+    out = (
+        tiles.with_columns(
+            [
+                # End is half-open by convention; +1 so a single-CpG tile has end>start.
+                (pl.col("_pos_min")).alias("start"),
+                (pl.col("_pos_max") + 1).alias("end"),
+                pl.Series("frac_dvc", frac_dvc),
+                pl.Series("pvalue", pvals),
+                pl.Series("qvalue", qvals),
+                pl.Series("dvr_type", direction),
+                pl.Series("is_dvr", is_dvr),
+            ]
+        )
+        .select(
+            [
+                "chrom",
+                "start",
+                "end",
+                "n_cpgs",
+                "n_dvc",
+                "frac_dvc",
+                "pvalue",
+                "qvalue",
+                "mean_var_log_ratio",
+                "dvr_type",
+                "is_dvr",
+            ]
+        )
+        .sort(["chrom", "start"])
+    )
 
     return out

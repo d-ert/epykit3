@@ -142,9 +142,7 @@ def irls_binomial_batch_gpu(
         var = mu * (1.0 - mu)
 
         w = cp.where(has_cov, cov_d * var, 0.0)
-        resid_over_var = cp.where(
-            has_cov, (meth_d / cp.maximum(cov_d, 1.0) - mu) / var, 0.0
-        )
+        resid_over_var = cp.where(has_cov, (meth_d / cp.maximum(cov_d, 1.0) - mu) / var, 0.0)
         z = eta + resid_over_var
 
         beta_new = _solve_weighted_lsq_gpu(cp, X_d, z, w)
@@ -177,9 +175,7 @@ def irls_binomial_batch_gpu(
     )
     term_b = cp.where(
         (n_minus_y > 0) & has_cov,
-        n_minus_y * cp.log(
-            cp.maximum(n_minus_y, _EPS) / cp.maximum(n_one_minus_mu, _EPS)
-        ),
+        n_minus_y * cp.log(cp.maximum(n_minus_y, _EPS) / cp.maximum(n_one_minus_mu, _EPS)),
         0.0,
     )
     deviance = 2.0 * (term_a + term_b).sum(axis=1)
@@ -214,7 +210,9 @@ def irls_binomial_batch_gpu(
         logger.warning(
             "GPU IRLS: GLM design matrix singular under batched inversion; "
             "fell back to per-site solve. %d / %d sites still failed and "
-            "were NaN'd.", n_fallback_failures, n_sites,
+            "were NaN'd.",
+            n_fallback_failures,
+            n_sites,
         )
 
     degenerate = (n_eff < 2) | site_separated
@@ -231,7 +229,9 @@ def irls_binomial_batch_gpu(
         log_fn(
             "GPU IRLS: separation detected at %d / %d sites (%.1f%%); "
             "NaN'd for dispersion + p-value computation.",
-            n_separated, n_sites, 100.0 * sep_frac,
+            n_separated,
+            n_sites,
+            100.0 * sep_frac,
         )
 
     # ---- Transfer back to host -----------------------------------------
