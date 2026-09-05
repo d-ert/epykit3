@@ -492,7 +492,9 @@ def _classify_sex_from_values(
     else:
         cut = fixed_threshold  # single sample: fixed fallback
 
-    return {sid: ("male" if v < cut else "female") for sid, v in zip(sample_ids, values)}
+    return {
+        sid: ("male" if v < cut else "female") for sid, v in zip(sample_ids, values, strict=False)
+    }
 
 
 def sex_check(

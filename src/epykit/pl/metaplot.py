@@ -279,7 +279,7 @@ def gene_body_metaplot(
             dtype=np.int32,
         )
 
-        for tx_start, tx_end, strand in zip(starts, ends, strands):
+        for tx_start, tx_end, strand in zip(starts, ends, strands, strict=True):
             # Choose window depending on strand orientation.
             # For + strand: left flank = [tx_start - flank, tx_start),
             #               body         = [tx_start, tx_end],

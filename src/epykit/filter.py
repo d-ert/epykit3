@@ -111,11 +111,13 @@ def _apply_blacklist(df: pl.DataFrame, blacklist_bed: str) -> pl.DataFrame:
         return df
 
     # Build a set of (chrom, pos) pairs to exclude
-    exclude: set[tuple[str, int]] = set(zip(hits["chrom"].tolist(), hits["start"].tolist()))
+    exclude: set[tuple[str, int]] = set(
+        zip(hits["chrom"].tolist(), hits["start"].tolist(), strict=True)
+    )
 
     chrom_list = df["chrom"].to_list()
     pos_list = df["pos"].to_list()
-    keep = pl.Series([(c, p) not in exclude for c, p in zip(chrom_list, pos_list)])
+    keep = pl.Series([(c, p) not in exclude for c, p in zip(chrom_list, pos_list, strict=True)])
     return df.filter(keep)
 
 

@@ -275,7 +275,7 @@ def _merge_intervals(starts: list[int], ends: list[int]) -> list[tuple[int, int]
     """Merge overlapping (start, end) integer intervals."""
     if not starts:
         return []
-    pairs = sorted(zip(starts, ends), key=lambda x: x[0])
+    pairs = sorted(zip(starts, ends, strict=False), key=lambda x: x[0])
     merged: list[tuple[int, int]] = [pairs[0]]
     for s, e in pairs[1:]:
         if s <= merged[-1][1]:
@@ -1024,7 +1024,7 @@ def call_dmr_chain_merge(
         np.cumsum(is_sig_int, out=cum_sig[1:])
 
         chrom_dmrs = 0
-        for lo, hi in zip(chain_lo, chain_hi):
+        for lo, hi in zip(chain_lo, chain_hi, strict=True):
             i_first = int(sig_idx[lo])
             i_last = int(sig_idx[hi])
             start_pos = int(positions[i_first])
@@ -1398,7 +1398,7 @@ def call_dmr_tile_based(
                 # output reflects the most CpG-dense observation of the
                 # tile).
                 for tile_start, n_cpgs_val in zip(
-                    tiled["pos"].to_list(), tiled["n_cpgs"].to_list()
+                    tiled["pos"].to_list(), tiled["n_cpgs"].to_list(), strict=True
                 ):
                     key = (chrom, int(tile_start))
                     if n_cpgs_val > tile_n_cpgs.get(key, 0):

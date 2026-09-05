@@ -170,11 +170,10 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-# Ratchet history: F, I, W, UP, E, B landed with a one-shot format (#3); RUF
-# landed with the zip() strictness audit.
+# Ratchet history: F, I, W, UP, E, B landed with a one-shot format (#3); RUF and
+# B905 (every zip() carries an audited strict=) followed.
 select = ["F", "I", "W", "UP", "E", "B", "RUF"]
-# B905 (zip strict=) became active with target-version py310; auditing the 30 zip() calls for strict=True is a follow-up.
-ignore = ["E501", "B905"]  # the formatter owns line length
+ignore = ["E501"]  # the formatter owns line length
 # The multiplication sign is the coverage-fold notation in report text ("10x" is
 # rendered as "10×"). Every other flagged character was a typo and was replaced.
 allowed-confusables = ["×"]
@@ -184,8 +183,9 @@ allowed-confusables = ["×"]
 "src/epykit/__init__.py" = ["F401"]  # re-exports
 # re-exports; E402 because _apply_theme() must run before the plot modules import
 "src/epykit/pl/__init__.py" = ["F401", "E402"]
-# pending the tl.dmc refactor (PR 1): one en dash comment, one unused unpack, one stale noqa
-"src/epykit/tl.py" = ["RUF003", "RUF059", "RUF100"]
+# pending the tl.dmc refactor (PR 1): two zip() calls, one en dash comment, one unused
+# unpack, one stale noqa
+"src/epykit/tl.py" = ["B905", "RUF003", "RUF059", "RUF100"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["epykit"]

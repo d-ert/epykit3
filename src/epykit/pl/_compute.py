@@ -254,7 +254,7 @@ def compute_pca(
     coords = pca.fit_transform(matrix)
 
     resolved_col, groups_full = _resolve_group_col(md, group_col)
-    sample_to_group = dict(zip(md.obs.get_column("sample_id").to_list(), groups_full))
+    sample_to_group = dict(zip(md.obs.get_column("sample_id").to_list(), groups_full, strict=False))
     groups = [sample_to_group.get(s, "unknown") for s in samples]
 
     result = PCAResult(
@@ -429,7 +429,7 @@ def compute_tss_metaplot(
             # Per-TSS window: pull the CpGs inside, compute relative bin,
             # accumulate. The Python loop is over TSS (~ thousands), not
             # CpGs, so vectorisation lives inside.
-            for tss_pos, sign in zip(tss_positions, strand_sign):
+            for tss_pos, sign in zip(tss_positions, strand_sign, strict=True):
                 lo = int(tss_pos) - window_bp
                 hi = int(tss_pos) + window_bp
                 left = np.searchsorted(positions, lo, side="left")
@@ -447,7 +447,7 @@ def compute_tss_metaplot(
     x = np.linspace(-window_bp, window_bp, n_bins, endpoint=False) + bin_size / 2.0
 
     resolved_col, groups_full = _resolve_group_col(md, group_by)
-    sample_to_group = dict(zip(md.obs.get_column("sample_id").to_list(), groups_full))
+    sample_to_group = dict(zip(md.obs.get_column("sample_id").to_list(), groups_full, strict=False))
     groups = [sample_to_group.get(s, "unknown") for s in samples]
 
     result = MetaplotResult(
