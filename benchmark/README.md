@@ -128,7 +128,7 @@ The exact resolved Python environment is committed as `uv.lock` at the repo
 root. Reproduce the epykit numbers against that exact environment with:
 
 ```bash
-uv sync --frozen --extra dev --extra all
+uv sync --locked --group dev --extra all
 ```
 
 All published epykit timings and per-CpG counts were produced **single-threaded**

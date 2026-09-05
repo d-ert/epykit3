@@ -68,8 +68,9 @@ pip install -e .
 # or with uv
 uv pip install -e .
 
-# dev install
-pip install -e ".[dev]"
+# dev install (test + lint tools live in the `dev` dependency group)
+uv sync --group dev --extra all
+pip install -e . --group dev          # pip >= 25.1 equivalent
 
 # full feature install (report + export + anndata + viz)
 pip install -e ".[all]"
@@ -299,7 +300,7 @@ The headline claims are made around the bare `lr` engine (the 1.0 default). The 
 ## Tests
 
 ```bash
-pip install -e ".[dev]"
+uv sync --group dev --extra all   # or: pip install -e . --group dev  (pip >= 25.1)
 pytest -m "not slow"        # fast tier (the CI invocation)
 pytest -m slow              # opt-in slow tier (>~5s tests)
 ```

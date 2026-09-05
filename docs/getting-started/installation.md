@@ -64,10 +64,17 @@ To install everything except GPU extras:
 pip install -e ".[all]"
 ```
 
-To include development tools:
+To include development tools (pytest, ruff, mypy live in the `dev`
+dependency group, not in an extra):
 
 ```bash
-pip install -e ".[dev]"
+uv sync --group dev --extra all
+```
+
+or, with pip 25.1 or newer:
+
+```bash
+pip install -e . --group dev
 ```
 
 !!! note "pysam on Windows"

@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Use `uv` (matches CI in `.github/workflows/test.yml`). Plain `pip` works too.
 
 ```bash
-uv sync --extra dev --extra all          # install dev + all optional extras
+uv sync --group dev --extra all          # install dev tooling + all optional extras
 uv run pytest -m "not slow" --strict-markers -ra   # the CI invocation
 uv run pytest tests/test_dmc_multigroup.py::test_name   # single test
 uv run pytest -m slow                    # the slow tier (>~5s tests, opt-in)

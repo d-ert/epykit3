@@ -173,6 +173,15 @@ redesigned HTML report.
   raised to `>=0.60` (numpy-2 support).
 - **`uv.lock` is now committed (M-PKG4)** for reproducibility; documented
   `uv sync --frozen` and thread-pinning in `benchmark/README.md`.
+- **The `dev` extra is gone; contributor tooling lives in dependency groups.**
+  `pytest` and `pytest-cov` moved from `[project.optional-dependencies].dev`
+  into `[dependency-groups].dev` next to `mypy` and `ruff`, and a new `docs`
+  group pins the mkdocs toolchain that was previously installed ad hoc via
+  `uv run --with`. `uv sync` installs `dev` by default; pip users need
+  `pip install -e . --group dev` (pip >= 25.1) instead of `pip install -e
+  ".[dev]"`. The user-facing extras (`all`, `report`, `export`, ...) are
+  unchanged. CI installs with `--locked`, checks `uv lock --check`, and pins
+  the uv release; `.python-version` pins the interpreter to 3.12.
 - **`epykit dmc` / `epykit dmr --method tile` default to `union` (D10/`--unite`).**
   Bare CLI DMC previously intersected sites while bare `ep.tl.dmc` unioned them
   (intersect only after an explicit `ep.pp.unite`). The CLI now defaults to

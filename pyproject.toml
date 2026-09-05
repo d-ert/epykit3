@@ -67,10 +67,6 @@ Issues = "https://github.com/d-ert/epykit/issues"
 Changelog = "https://github.com/d-ert/epykit/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
-dev = [
-  "pytest>=8.4.2",
-  "pytest-cov",
-]
 report = [
   "jinja2>=3.1",
   "plotly>=5.20",
@@ -193,7 +189,17 @@ no_strict_optional = true
 warn_unused_ignores = true
 
 [dependency-groups]
+# Contributor tooling, not a user-facing extra (nothing in epykit imports
+# these). `uv sync` installs `dev` by default; pip >= 25.1 installs it with
+# `pip install -e . --group dev`.
 dev = [
+    "pytest>=8.4.2",
+    "pytest-cov",
     "mypy>=1.19.1",
     "ruff>=0.15.14",
+]
+# Docs toolchain: `uv run --only-group docs mkdocs build --strict`.
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
 ]
