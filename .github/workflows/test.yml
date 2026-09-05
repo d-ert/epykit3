@@ -3,8 +3,9 @@ name: tests
 on:
   push:
     branches: [main, master]
+  # No branch filter on pull_request: stacked PRs whose base is another
+  # feature branch must run CI too. Pushes stay filtered to main.
   pull_request:
-    branches: [main, master]
 
 env:
   # Pinned uv release. Bump deliberately, together with Dockerfile.python,
