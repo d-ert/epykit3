@@ -27,7 +27,8 @@ time (a tiny up-front cost).
 from __future__ import annotations
 
 import logging
-from typing import Any, Literal, Optional, Sequence, Union, overload
+from collections.abc import Sequence
+from typing import Any, Literal, overload
 
 import numpy as np
 import polars as pl
@@ -40,46 +41,47 @@ _PROP_CLIP = 1e-6
 
 # Design matrix construction
 
+
 @overload
 def build_design(
     obs: pl.DataFrame,
     samples_ordered: Sequence[str],
-    formula: Optional[str] = ...,
-    covariates: Optional[Sequence[str]] = ...,
+    formula: str | None = ...,
+    covariates: Sequence[str] | None = ...,
     treatment_col: str = ...,
     require_treatment_col: bool = ...,
     return_design_info: Literal[False] = ...,
-    reference_level: Optional[str] = ...,
-) -> tuple[np.ndarray, Optional[np.ndarray], int, list[str], str]: ...
+    reference_level: str | None = ...,
+) -> tuple[np.ndarray, np.ndarray | None, int, list[str], str]: ...
 
 
 @overload
 def build_design(
     obs: pl.DataFrame,
     samples_ordered: Sequence[str],
-    formula: Optional[str] = ...,
-    covariates: Optional[Sequence[str]] = ...,
+    formula: str | None = ...,
+    covariates: Sequence[str] | None = ...,
     treatment_col: str = ...,
     require_treatment_col: bool = ...,
     *,
     return_design_info: Literal[True],
-    reference_level: Optional[str] = ...,
-) -> tuple[np.ndarray, Optional[np.ndarray], int, list[str], str, Any]: ...
+    reference_level: str | None = ...,
+) -> tuple[np.ndarray, np.ndarray | None, int, list[str], str, Any]: ...
 
 
 def build_design(
     obs: pl.DataFrame,
     samples_ordered: Sequence[str],
-    formula: Optional[str] = None,
-    covariates: Optional[Sequence[str]] = None,
+    formula: str | None = None,
+    covariates: Sequence[str] | None = None,
     treatment_col: str = "treatment",
     require_treatment_col: bool = True,
     return_design_info: bool = False,
-    reference_level: Optional[str] = None,
-) -> Union[
-    tuple[np.ndarray, Optional[np.ndarray], int, list[str], str],
-    tuple[np.ndarray, Optional[np.ndarray], int, list[str], str, Any],
-]:
+    reference_level: str | None = None,
+) -> (
+    tuple[np.ndarray, np.ndarray | None, int, list[str], str]
+    | tuple[np.ndarray, np.ndarray | None, int, list[str], str, Any]
+):
     """Build full + reduced model matrices from ``md.obs``.
 
     Parameters
@@ -131,8 +133,7 @@ def build_design(
     """
     if require_treatment_col and treatment_col not in obs.columns:
         raise ValueError(
-            f"Treatment column '{treatment_col}' not found in md.obs. "
-            f"Available: {obs.columns}"
+            f"Treatment column '{treatment_col}' not found in md.obs. Available: {obs.columns}"
         )
 
     # ---- Synthesise / normalise the formula --------------------------------
@@ -167,8 +168,7 @@ def build_design(
         # (b) has a string/categorical dtype -- i.e. a genuine factor for
         # which setting the reference level makes sense.
         obs_str_cols: set[str] = {
-            c for c, d in zip(obs.columns, obs.dtypes)
-            if d in (pl.Utf8, pl.Categorical, pl.String)
+            c for c, d in zip(obs.columns, obs.dtypes) if d in (pl.Utf8, pl.Categorical, pl.String)
         }
         wrapped_terms: list[str] = []
         _did_wrap = False
@@ -183,7 +183,8 @@ def build_design(
                 "build_design: reference_level=%r was specified but no "
                 "string/categorical column matching a formula term was found "
                 "in obs (terms=%r). reference_level has no effect.",
-                reference_level, terms,
+                reference_level,
+                terms,
             )
         terms = wrapped_terms
 
@@ -193,9 +194,7 @@ def build_design(
     obs_pd = obs.to_pandas().set_index("sample_id")
     missing = [s for s in samples_ordered if s not in obs_pd.index]
     if missing:
-        raise ValueError(
-            f"Samples missing from md.obs: {missing}"
-        )
+        raise ValueError(f"Samples missing from md.obs: {missing}")
     obs_pd = obs_pd.loc[list(samples_ordered)]
 
     # ---- Validate covariate columns are present and complete ----------------
@@ -268,6 +267,7 @@ def build_design(
 
 # Batched IRLS for the binomial GLM
 
+
 def irls_dispatch(
     meth: np.ndarray,
     cov: np.ndarray,
@@ -290,10 +290,9 @@ def irls_dispatch(
         return irls_binomial_batch(meth, cov, X, **kwargs)
     if backend == "gpu":
         from ._glm_gpu import irls_binomial_batch_gpu
+
         return irls_binomial_batch_gpu(meth, cov, X, **kwargs)
-    raise ValueError(
-        f"Unknown glm_backend {backend!r}. Use 'cpu' (default) or 'gpu'."
-    )
+    raise ValueError(f"Unknown glm_backend {backend!r}. Use 'cpu' (default) or 'gpu'.")
 
 
 def irls_binomial_batch(
@@ -303,9 +302,10 @@ def irls_binomial_batch(
     max_iter: int = 25,
     tol: float = 1e-6,
     return_cov: bool = False,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | tuple[
-    np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
-]:
+) -> (
+    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+    | tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+):
     """Batched IRLS for binomial GLMs sharing a design matrix.
 
     Fits one independent GLM per row (= per site / tile) where the response
@@ -350,7 +350,7 @@ def irls_binomial_batch(
             f"{n_samples} samples; rows must match number of samples."
         )
 
-    cov_f  = cov.astype(np.float64, copy=False)
+    cov_f = cov.astype(np.float64, copy=False)
     meth_f = meth.astype(np.float64, copy=False)
     has_cov = cov_f > 0
     n_eff = has_cov.sum(axis=1).astype(np.int32)
@@ -362,16 +362,16 @@ def irls_binomial_batch(
     with np.errstate(invalid="ignore", divide="ignore"):
         prop_raw = np.where(has_cov, meth_f / np.maximum(cov_f, 1.0), 0.5)
     prop_init = np.clip(prop_raw, _PROP_CLIP, 1.0 - _PROP_CLIP)
-    z_init = np.log(prop_init / (1.0 - prop_init))     # (n_sites, n_samples)
+    z_init = np.log(prop_init / (1.0 - prop_init))  # (n_sites, n_samples)
     # weights for init: coverage (mass) only where covered
     w_init = np.where(has_cov, cov_f, 0.0)
 
-    beta = _solve_weighted_lsq(X, z_init, w_init)       # (n_sites, p)
+    beta = _solve_weighted_lsq(X, z_init, w_init)  # (n_sites, p)
     converged = np.zeros(n_sites, dtype=bool)
 
     # ---- IRLS iterations ---------------------------------------------------
-    for it in range(max_iter):
-        eta = beta @ X.T                                # (n_sites, n_samples)
+    for _it in range(max_iter):
+        eta = beta @ X.T  # (n_sites, n_samples)
         # clip eta to avoid sigmoid saturation breaking the weights
         eta = np.clip(eta, -30.0, 30.0)
         mu = 1.0 / (1.0 + np.exp(-eta))
@@ -382,9 +382,7 @@ def irls_binomial_batch(
         w = np.where(has_cov, cov_f * var, 0.0)
         # Working response: z = eta + (y/n - mu) / var.
         with np.errstate(invalid="ignore", divide="ignore"):
-            resid_over_var = np.where(
-                has_cov, (meth_f / np.maximum(cov_f, 1.0) - mu) / var, 0.0
-            )
+            resid_over_var = np.where(has_cov, (meth_f / np.maximum(cov_f, 1.0) - mu) / var, 0.0)
         z = eta + resid_over_var
 
         beta_new = _solve_weighted_lsq(X, z, w)
@@ -434,9 +432,7 @@ def irls_binomial_batch(
         )
         term_b = np.where(
             (n_minus_y > 0) & has_cov,
-            n_minus_y * np.log(
-                np.maximum(n_minus_y, _EPS) / np.maximum(n_one_minus_mu, _EPS)
-            ),
+            n_minus_y * np.log(np.maximum(n_minus_y, _EPS) / np.maximum(n_one_minus_mu, _EPS)),
             0.0,
         )
     deviance = 2.0 * (term_a + term_b).sum(axis=1)
@@ -477,7 +473,8 @@ def irls_binomial_batch(
             "GLM design matrix singular under batched inversion; fell back "
             "to per-site solve. %d / %d sites still failed and were NaN'd. "
             "Check for collinear covariates or perfect separation.",
-            n_fallback_failures, n_sites,
+            n_fallback_failures,
+            n_sites,
         )
 
     # Sites with no usable data are degenerate. Sites where the GLM
@@ -506,7 +503,9 @@ def irls_binomial_batch(
         log_fn(
             "GLM separation detected at %d / %d sites (%.1f%%); "
             "NaN'd for dispersion + p-value computation.",
-            n_separated, n_sites, 100.0 * sep_frac,
+            n_separated,
+            n_sites,
+            100.0 * sep_frac,
         )
 
     # P1-5: log non-convergence separately from separation. Non-converged
@@ -524,12 +523,16 @@ def irls_binomial_batch(
                 "IRLS non-convergence at %d / %d sites (%.1f%%); their Wald "
                 "statistics are NaN-masked. Consider increasing max_iter or "
                 "checking design matrix rank.",
-                n_nonconverged_only, n_sites, 100.0 * nonconv_frac,
+                n_nonconverged_only,
+                n_sites,
+                100.0 * nonconv_frac,
             )
         else:
             logger.info(
                 "IRLS non-convergence at %d / %d sites (%.1f%%); NaN-masked.",
-                n_nonconverged_only, n_sites, 100.0 * nonconv_frac,
+                n_nonconverged_only,
+                n_sites,
+                100.0 * nonconv_frac,
             )
 
     if return_cov:
@@ -583,6 +586,7 @@ def _solve_weighted_lsq(
 
 
 # Dispersion + reference-distribution helpers (shared with _score_finalize)
+
 
 def compute_dispersion_phi(
     pearson_per_site: np.ndarray,
@@ -642,9 +646,10 @@ def compute_dispersion_phi(
         df_chrom = 1.0
         if dispersion == "chrom":
             logger.warning(
-                "%s: only %d sites usable for dispersion estimation; "
-                "falling back to phi = %.2f.",
-                chrom_name, n_usable, min_dispersion,
+                "%s: only %d sites usable for dispersion estimation; falling back to phi = %.2f.",
+                chrom_name,
+                n_usable,
+                min_dispersion,
             )
     else:
         pearson_sum = float(pearson_per_site[usable].sum())
@@ -655,14 +660,19 @@ def compute_dispersion_phi(
         phi_hat = float(max(min_dispersion, phi_raw))
         logger.info(
             "%s: chrom-pooled phi = %.3f (raw %.3f, %d sites, df=%s); dispersion='%s'",
-            chrom_name, phi_hat, phi_raw, n_usable, f"{int(df_chrom):,}", dispersion,
+            chrom_name,
+            phi_hat,
+            phi_raw,
+            n_usable,
+            f"{int(df_chrom):,}",
+            dispersion,
         )
 
     df_safe = np.where(df_per_site > 0, df_per_site, 1.0)
 
     if dispersion == "chrom":
         phi_eff = np.full(pearson_per_site.shape, phi_hat, dtype=np.float64)
-        df_phi  = np.full(pearson_per_site.shape, df_chrom, dtype=np.float64)
+        df_phi = np.full(pearson_per_site.shape, df_chrom, dtype=np.float64)
         return phi_eff, phi_hat, df_phi
 
     # site / shrink / eb: per-site estimate (or weighted average involving it)
@@ -697,7 +707,8 @@ def compute_dispersion_phi(
         df_phi = np.where(usable, df_safe + float(w_eb), df_chrom).astype(np.float64)
         logger.info(
             "%s: empirical-Bayes shrinkage w_eb=%.2f",
-            chrom_name, w_eb,
+            chrom_name,
+            w_eb,
         )
         return phi_eff, phi_hat, df_phi
 
@@ -735,13 +746,9 @@ def reference_pvalues(
     than ``lr`` on identical data (M4).
     """
     if reference == "methylkit":
-        raise ValueError(
-            "reference='methylkit' was renamed to 'adaptive' in this release."
-        )
+        raise ValueError("reference='methylkit' was renamed to 'adaptive' in this release.")
     if reference not in {"adaptive", "F", "chi2"}:
-        raise ValueError(
-            f"reference must be 'adaptive', 'F', or 'chi2'; got {reference!r}"
-        )
+        raise ValueError(f"reference must be 'adaptive', 'F', or 'chi2'; got {reference!r}")
     from scipy import stats as sp_stats
 
     df_eff = np.maximum(df_resid, df_floor) if df_floor else df_resid
@@ -756,6 +763,7 @@ def reference_pvalues(
 
 
 # Contrast / Wald-test helpers -- used by tl.dmc(formula=..., contrast=...)
+
 
 def resolve_contrast(
     contrast,
@@ -785,15 +793,11 @@ def resolve_contrast(
     if isinstance(contrast, np.ndarray):
         C = np.atleast_2d(contrast).astype(np.float64)
         if C.shape[1] != p:
-            raise ValueError(
-                f"Contrast matrix has {C.shape[1]} columns but design has p={p}"
-            )
+            raise ValueError(f"Contrast matrix has {C.shape[1]} columns but design has p={p}")
         return C, f"matrix[{C.shape[0]}x{C.shape[1]}]"
 
     if not isinstance(contrast, str):
-        raise TypeError(
-            f"contrast must be str or np.ndarray; got {type(contrast).__name__}"
-        )
+        raise TypeError(f"contrast must be str or np.ndarray; got {type(contrast).__name__}")
 
     # Exact column match -- single-row contrast selecting that coefficient
     if contrast in term_names:
@@ -808,9 +812,7 @@ def resolve_contrast(
         try:
             constraint = design_info.linear_constraint(contrast)
         except Exception as exc:
-            raise ValueError(
-                f"Could not parse contrast {contrast!r} with patsy: {exc}"
-            ) from exc
+            raise ValueError(f"Could not parse contrast {contrast!r} with patsy: {exc}") from exc
         C = np.asarray(constraint.coefs, dtype=np.float64)
         if C.ndim == 1:
             C = C[None, :]
@@ -824,8 +826,10 @@ def resolve_contrast(
     # Also match C(factor, ...)[...] terms produced when reference_level wraps
     # the factor column with a Treatment(...) coding spec.
     factor_terms = [
-        (i, t) for i, t in enumerate(term_names)
-        if t.startswith(f"{contrast}[") or t == f"C({contrast})"
+        (i, t)
+        for i, t in enumerate(term_names)
+        if t.startswith(f"{contrast}[")
+        or t == f"C({contrast})"
         or t.startswith(f"C({contrast})[")
         or t.startswith(f"C({contrast},")
     ]
@@ -846,8 +850,8 @@ def wald_test(
     beta: np.ndarray,
     cov_beta: np.ndarray,
     C: np.ndarray,
-    phi_eff: Optional[np.ndarray] = None,
-    df_resid: Optional[np.ndarray] = None,
+    phi_eff: np.ndarray | None = None,
+    df_resid: np.ndarray | None = None,
     reference: str = "adaptive",
     df_floor: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray, np.signedinteger]:
@@ -893,13 +897,9 @@ def wald_test(
     n_sites, p = beta.shape
     k = C.shape[0]
     if C.shape[1] != p:
-        raise ValueError(
-            f"Contrast has {C.shape[1]} columns but beta has p={p}"
-        )
+        raise ValueError(f"Contrast has {C.shape[1]} columns but beta has p={p}")
     if cov_beta.shape != (n_sites, p, p):
-        raise ValueError(
-            f"cov_beta shape {cov_beta.shape} != (n_sites={n_sites}, p={p}, p={p})"
-        )
+        raise ValueError(f"cov_beta shape {cov_beta.shape} != (n_sites={n_sites}, p={p}, p={p})")
 
     # Cbeta -- shape (n_sites, k)
     Cb = beta @ C.T
@@ -913,10 +913,7 @@ def wald_test(
     CSCt = np.einsum("kp,ipq,lq->ikl", C, cov_scaled, C)
 
     stat = np.full(n_sites, np.nan, dtype=np.float64)
-    finite = (
-        np.isfinite(Cb).all(axis=1)
-        & np.isfinite(CSCt).reshape(n_sites, -1).all(axis=1)
-    )
+    finite = np.isfinite(Cb).all(axis=1) & np.isfinite(CSCt).reshape(n_sites, -1).all(axis=1)
     if k == 1:
         var = CSCt[:, 0, 0]
         good = finite & (var > 0)
@@ -924,9 +921,7 @@ def wald_test(
     else:
         try:
             inv_block = np.linalg.inv(CSCt[finite])
-            stat[finite] = np.einsum(
-                "ij,ijk,ik->i", Cb[finite], inv_block, Cb[finite]
-            )
+            stat[finite] = np.einsum("ij,ijk,ik->i", Cb[finite], inv_block, Cb[finite])
         except np.linalg.LinAlgError:
             for i in np.where(finite)[0]:
                 try:
@@ -938,11 +933,7 @@ def wald_test(
     # Reference distribution -> p-value. df_floor lower-bounds the F
     # denominator df (the GLM callers pass DF_PHI_FLOOR so glm matches lr;
     # see reference_pvalues for the rationale -- M4).
-    df_eff = (
-        np.maximum(df_resid, df_floor)
-        if (df_resid is not None and df_floor)
-        else df_resid
-    )
+    df_eff = np.maximum(df_resid, df_floor) if (df_resid is not None and df_floor) else df_resid
     if df_resid is None or reference == "chi2":
         pvalue = sp_stats.chi2.sf(stat, df=k)
     elif reference == "F":
@@ -963,7 +954,7 @@ def wald_test(
 def delta_method_meth_diff_ci(
     coef: np.ndarray,
     coef_se: np.ndarray,
-    ref_eta: Optional[np.ndarray] = None,
+    ref_eta: np.ndarray | None = None,
     alpha: float = 0.05,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Delta-method CI on the meth-scale difference Deltabeta from a logit-scale Wald CI.
@@ -989,6 +980,7 @@ def delta_method_meth_diff_ci(
     (ci_lo, ci_hi) -- float64 arrays of shape (n_sites,), clamped to [-1, 1].
     """
     from scipy import stats as sp_stats
+
     z = float(sp_stats.norm.isf(alpha / 2.0))
     coef = np.asarray(coef, dtype=np.float64)
     coef_se = np.asarray(coef_se, dtype=np.float64)
@@ -1024,7 +1016,7 @@ def welch_meth_diff_ci(
     mean_ctrl: np.ndarray,
     var_mean_ctrl: np.ndarray,
     alpha: float = 0.05,
-    dof: Optional[np.ndarray] = None,
+    dof: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """CI on Deltabeta from per-group Welford accumulators.
 
@@ -1040,6 +1032,7 @@ def welch_meth_diff_ci(
     ``dof=None`` preserves the legacy normal interval.
     """
     from scipy import stats as sp_stats
+
     if dof is None:
         crit: np.ndarray | float = float(sp_stats.norm.isf(alpha / 2.0))
     else:
@@ -1058,8 +1051,8 @@ def newcombe_diff_ci(
     cov_b: np.ndarray,
     alpha: float = 0.05,
     *,
-    phi: Optional[np.ndarray] = None,
-    df: Optional[np.ndarray] = None,
+    phi: np.ndarray | None = None,
+    df: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Newcombe (1998) hybrid Wilson-score CI for pi_a - pi_b on POOLED counts.
 
@@ -1083,6 +1076,7 @@ def newcombe_diff_ci(
     Newcombe interval -- byte-identical to the pre-phi behaviour.
     """
     from scipy import stats as sp_stats
+
     z_norm = float(sp_stats.norm.isf(alpha / 2.0))
     z_eff: np.ndarray | float
     if phi is None:
@@ -1102,17 +1096,21 @@ def newcombe_diff_ci(
         z_eff = np.where(phi > 1.0, np.sqrt(phi) * t_mult, z_norm)
 
     def _wilson(m, n):
-        m = m.astype(np.float64); n = n.astype(np.float64)
+        m = m.astype(np.float64)
+        n = n.astype(np.float64)
         z = z_eff  # scalar (fisher) or per-site array (lr); broadcasts on n
         with np.errstate(invalid="ignore", divide="ignore"):
             p_hat = np.where(n > 0, m / n, np.nan)
             denom = 1.0 + (z * z) / np.maximum(n, 1e-12)
             centre = (p_hat + (z * z) / (2.0 * np.maximum(n, 1e-12))) / denom
             half = (
-                z * np.sqrt(
-                    np.maximum(p_hat * (1.0 - p_hat) / np.maximum(n, 1e-12)
-                               + (z * z) / (4.0 * np.maximum(n, 1e-12) ** 2),
-                               0.0)
+                z
+                * np.sqrt(
+                    np.maximum(
+                        p_hat * (1.0 - p_hat) / np.maximum(n, 1e-12)
+                        + (z * z) / (4.0 * np.maximum(n, 1e-12) ** 2),
+                        0.0,
+                    )
                 )
                 / denom
             )

@@ -52,9 +52,7 @@ def _value_lf(lf: pl.LazyFrame, value: ValueKind) -> pl.LazyFrame:
         return lf.with_columns(pl.col("coverage").cast(pl.Float64).alias("value"))
     if value == "N_meth":
         return lf.with_columns(pl.col("N_meth").cast(pl.Float64).alias("value"))
-    raise ValueError(
-        f"value must be one of 'beta', 'coverage', 'N_meth'; got {value!r}"
-    )
+    raise ValueError(f"value must be one of 'beta', 'coverage', 'N_meth'; got {value!r}")
 
 
 def _validate_sample(md: MethylData, sample: str) -> None:
@@ -124,10 +122,7 @@ def to_bedgraph(
 
     n_rows = 0
     with out.open("w", encoding="utf-8") as f:
-        f.write(
-            f'track type=bedGraph name="{sample}_{value}" '
-            f'description="{value} from epykit"\n'
-        )
+        f.write(f'track type=bedGraph name="{sample}_{value}" description="{value} from epykit"\n')
         # Stream one chromosome at a time so we never hold the whole genome
         # as Python lists (M12). Peak memory is O(largest chromosome).
         for chrom, df in _iter_sample_chrom_value(md, sample, value):
@@ -146,15 +141,9 @@ def _infer_chrom_sizes(md: MethylData) -> dict[str, int]:
     """Compute the maximum CpG position + 1 per chromosome from the store."""
     pattern = f"{md.store}/sample=*/chrom=*/part-*.parquet"
     sizes_df = (
-        pl.scan_parquet(pattern)
-        .group_by("chrom")
-        .agg(pl.max("pos").alias("max_pos"))
-        .collect()
+        pl.scan_parquet(pattern).group_by("chrom").agg(pl.max("pos").alias("max_pos")).collect()
     )
-    return {
-        row["chrom"]: int(row["max_pos"]) + 1
-        for row in sizes_df.iter_rows(named=True)
-    }
+    return {row["chrom"]: int(row["max_pos"]) + 1 for row in sizes_df.iter_rows(named=True)}
 
 
 def to_bigwig(
@@ -212,19 +201,14 @@ def to_bigwig(
     try:
         header = [(c, chrom_sizes[c]) for c in observed_chroms if c in chrom_sizes]
         if not header:
-            raise ValueError(
-                "chrom_sizes does not cover any chromosome present in the sample"
-            )
+            raise ValueError("chrom_sizes does not cover any chromosome present in the sample")
         bw.addHeader(header)
         for c, sub in _iter_sample_chrom_value(md, sample, value):
             if c not in chrom_sizes:
                 continue
             starts = sub["pos"].cast(pl.Int64).to_list()
             ends = [s + 1 for s in starts]
-            vals = [
-                float(v) if v is not None else 0.0
-                for v in sub["value"].to_list()
-            ]
+            vals = [float(v) if v is not None else 0.0 for v in sub["value"].to_list()]
             bw.addEntries([c] * len(starts), starts, ends=ends, values=vals)
     finally:
         bw.close()
@@ -233,14 +217,10 @@ def to_bigwig(
     return str(out.resolve())
 
 
-def _resolve_dmc_table(
-    md: MethylData, test: str | None
-) -> pl.DataFrame:
+def _resolve_dmc_table(md: MethylData, test: str | None) -> pl.DataFrame:
     df = md.get_dmc(test=test, annotated=True)
     if df is None:
-        raise ValueError(
-            "No DMC results on this MethylData. Run ep.tl.dmc(md) first."
-        )
+        raise ValueError("No DMC results on this MethylData. Run ep.tl.dmc(md) first.")
     return df
 
 
@@ -281,7 +261,7 @@ def dmcs_to_bed(
     out.parent.mkdir(parents=True, exist_ok=True)
 
     with out.open("w", encoding="utf-8") as f:
-        f.write("track name=epykit_dmcs description=\"epykit DMC calls\"\n")
+        f.write('track name=epykit_dmcs description="epykit DMC calls"\n')
         for i, row in enumerate(filt.iter_rows(named=True), start=1):
             chrom = row["chrom"]
             pos = int(row["pos"])
@@ -290,9 +270,7 @@ def dmcs_to_bed(
             score = 0 if q is None or q != q else int(max(0.0, min(1000.0, 1000.0 * (1.0 - q))))
             strand = "+" if md_diff > 0 else "-"
             name = f"dmc_{i}"
-            f.write(
-                f"{chrom}\t{pos}\t{pos + 1}\t{name}\t{score}\t{strand}\n"
-            )
+            f.write(f"{chrom}\t{pos}\t{pos + 1}\t{name}\t{score}\t{strand}\n")
     logger.info("Wrote DMC BED: %s (%d rows)", out, len(filt))
     return str(out.resolve())
 
@@ -300,9 +278,7 @@ def dmcs_to_bed(
 def _resolve_dmr_table(md: MethylData) -> pl.DataFrame:
     df = md.uns.get("dmr")
     if df is None or not isinstance(df, pl.DataFrame) or len(df) == 0:
-        raise ValueError(
-            "No DMR results on this MethylData. Run ep.tl.dmr(md) first."
-        )
+        raise ValueError("No DMR results on this MethylData. Run ep.tl.dmr(md) first.")
     return df
 
 
@@ -321,9 +297,12 @@ def dmrs_to_bed(
     df = _resolve_dmr_table(md)
     diff_col = "meth_diff" if "meth_diff" in df.columns else "mean_meth_diff"
     q_col = (
-        "qvalue" if "qvalue" in df.columns
-        else "combined_qvalue" if "combined_qvalue" in df.columns
-        else "combined_pvalue" if "combined_pvalue" in df.columns
+        "qvalue"
+        if "qvalue" in df.columns
+        else "combined_qvalue"
+        if "combined_qvalue" in df.columns
+        else "combined_pvalue"
+        if "combined_pvalue" in df.columns
         else None
     )
 
@@ -332,7 +311,7 @@ def dmrs_to_bed(
 
     df_sorted = df.sort(["chrom", "start"])
     with out.open("w", encoding="utf-8") as f:
-        f.write("track name=epykit_dmrs description=\"epykit DMR calls\"\n")
+        f.write('track name=epykit_dmrs description="epykit DMR calls"\n')
         for i, row in enumerate(df_sorted.iter_rows(named=True), start=1):
             chrom = row["chrom"]
             start = int(row["start"])
@@ -348,6 +327,7 @@ def dmrs_to_bed(
                 q = row.get(q_col)
                 if q is not None and q == q and q > 0:
                     import math
+
                     score = int(max(0.0, min(1000.0, -100.0 * math.log10(q))))
             name = f"dmr_{i}"
             f.write(f"{chrom}\t{start}\t{end}\t{name}\t{score}\t{strand}\n")
@@ -372,9 +352,7 @@ def _flatten_nested_for_csv(df: pl.DataFrame) -> pl.DataFrame:
     exprs = []
     for name, dtype in df.schema.items():
         if isinstance(dtype, pl.List):
-            exprs.append(
-                pl.col(name).cast(pl.List(pl.String)).list.join("; ").alias(name)
-            )
+            exprs.append(pl.col(name).cast(pl.List(pl.String)).list.join("; ").alias(name))
         elif isinstance(dtype, pl.Struct):
             exprs.append(pl.col(name).struct.json_encode().alias(name))
     return df.with_columns(exprs) if exprs else df
@@ -438,14 +416,11 @@ def dmc_to_tsv(
         else:
             gate_col = "pvalue"
 
-        out_df = (
-            df.filter(
-                pl.col(gate_col).is_not_null()
-                & pl.col(gate_col).is_not_nan()
-                & (pl.col(gate_col) < alpha)
-            )
-            .sort(gate_col)
-        )
+        out_df = df.filter(
+            pl.col(gate_col).is_not_null()
+            & pl.col(gate_col).is_not_nan()
+            & (pl.col(gate_col) < alpha)
+        ).sort(gate_col)
     return _write_table(out_df, path)
 
 
@@ -464,22 +439,15 @@ def dvc_to_tsv(
     """
     df = md.varm.get("dvc")
     if df is None or len(df) == 0:
-        raise ValueError(
-            "No DVC results on this MethylData. Run ep.tl.dvc(md) first."
-        )
+        raise ValueError("No DVC results on this MethylData. Run ep.tl.dvc(md) first.")
     if full:
         sort_cols = ["chrom", "pos"] if "pos" in df.columns else ["chrom"]
         out_df = df.sort(sort_cols)
     else:
         gate = "q_variance" if "q_variance" in df.columns else "p_variance"
-        out_df = (
-            df.filter(
-                pl.col(gate).is_not_null()
-                & pl.col(gate).is_not_nan()
-                & (pl.col(gate) < alpha)
-            )
-            .sort(gate)
-        )
+        out_df = df.filter(
+            pl.col(gate).is_not_null() & pl.col(gate).is_not_nan() & (pl.col(gate) < alpha)
+        ).sort(gate)
     return _write_table(out_df, path)
 
 
@@ -552,9 +520,7 @@ def export_tables(
                 md, str(out / f"{dmc_key}.significant.{ext}"), alpha=alpha
             )
             if full:
-                written["dmc_full"] = dmc_to_tsv(
-                    md, str(out / f"{dmc_key}.{ext}"), full=True
-                )
+                written["dmc_full"] = dmc_to_tsv(md, str(out / f"{dmc_key}.{ext}"), full=True)
 
     if dmr:
         dmr_df = md.uns.get("dmr")
@@ -568,16 +534,16 @@ def export_tables(
                 md, str(out / f"dvc.significant.{ext}"), alpha=alpha
             )
             if full:
-                written["dvc_full"] = dvc_to_tsv(
-                    md, str(out / f"dvc.{ext}"), full=True
-                )
+                written["dvc_full"] = dvc_to_tsv(md, str(out / f"dvc.{ext}"), full=True)
 
     if qc and md.obs is not None and len(md.obs):
         written["qc"] = qc_to_tsv(md, str(out / f"qc_summary.{ext}"))
 
     logger.info(
         "export_tables wrote %d table(s) to %s: %s",
-        len(written), out, ", ".join(sorted(written)) or "(none)",
+        len(written),
+        out,
+        ", ".join(sorted(written)) or "(none)",
     )
     return written
 

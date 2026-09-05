@@ -8,6 +8,7 @@ answers:
 * ``unite='union'`` + ``min_samples_*=0`` warns once (B8).
 * Explicit ``test='fisher'`` emits a one-shot ``UserWarning`` per session
   (B6 second half).
+* Engines removed in 0.7.5 raise ``ValueError`` with a migration hint.
 """
 
 from __future__ import annotations
@@ -212,3 +213,28 @@ def test_smooth_before_filter_raises(synth_md):
     import epykit as ep
     with pytest.raises(ValueError, match=r"filter_coverage"):
         ep.pp.smooth(synth_md, bandwidth=500)
+
+
+
+# Removed engines
+
+
+@pytest.mark.parametrize("engine,hint_substring", [
+    ("logit_t", "welch_t"),
+    ("bb_lr",   "lr"),
+    ("score",   "lr"),
+    ("cmh",     "formula='~ group + batch'"),
+])
+def test_dropped_engine_raises_with_migration_hint(
+    synth_md_filtered, engine, hint_substring,
+):
+    """Each engine dropped in 0.7.5 raises ValueError; the message includes
+    text pointing at the recommended replacement."""
+    import epykit as ep
+    with pytest.raises(ValueError) as exc:
+        ep.tl.dmc(synth_md_filtered, test=engine)
+    msg = str(exc.value)
+    assert "removed in 0.7.5" in msg, f"missing version note in: {msg}"
+    assert hint_substring in msg, (
+        f"missing migration hint '{hint_substring}' in: {msg}"
+    )

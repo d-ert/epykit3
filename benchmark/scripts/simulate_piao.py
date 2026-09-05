@@ -3,7 +3,7 @@
 Used to validate epykit defaults on held-out data not used during
 parameter selection. The simulator's intrinsic `is_dmc` flag becomes
 the ground truth, replacing the noisy threshold-reconstruction in
-`_make_truth.py`. See `docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md`
+`_make_truth.py`. See `docs/history/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md`
 §2.1 for the design rationale.
 
 Simulation model

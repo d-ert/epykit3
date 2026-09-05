@@ -32,13 +32,12 @@ Tests
 from __future__ import annotations
 
 import gc
-import hashlib
 import logging
 import tempfile
 import time
 import warnings
 from pathlib import Path
-from typing import Literal, Optional, Tuple, Union, overload
+from typing import Literal, overload
 
 import numpy as np
 import polars as pl
@@ -52,27 +51,29 @@ logger = logging.getLogger(__name__)
 _SMOOTH_BOX_NJIT_FN = None
 
 _EMPTY_SCHEMA = {
-    "chrom":                  pl.Utf8,
-    "pos":                    pl.Int32,
-    "strand":                 pl.Utf8,
-    "n_case":                 pl.Int32,
-    "n_control":              pl.Int32,
-    "mean_beta_case":         pl.Float32,
-    "mean_beta_control":      pl.Float32,
-    "pvalue":                 pl.Float64,
+    "chrom": pl.Utf8,
+    "pos": pl.Int32,
+    "strand": pl.Utf8,
+    "n_case": pl.Int32,
+    "n_control": pl.Int32,
+    "mean_beta_case": pl.Float32,
+    "mean_beta_control": pl.Float32,
+    "pvalue": pl.Float64,
     "log2_odds_ratio_pooled": pl.Float64,
-    "log2_odds_ratio":        pl.Float64,   # transitional NaN-filled; deprecated, slated for removal in 1.1
-    "meth_diff":              pl.Float32,
-    "meth_diff_ci_lo":        pl.Float32,
-    "meth_diff_ci_hi":        pl.Float32,
+    "log2_odds_ratio": pl.Float64,  # transitional NaN-filled; deprecated, slated for removal in 1.1
+    "meth_diff": pl.Float32,
+    "meth_diff_ci_lo": pl.Float32,
+    "meth_diff_ci_hi": pl.Float32,
 }
 
 # Backends where log2_ors is a logit coefficient (not a pooled log2-OR).
 _GLM_BACKENDS = frozenset({"glm", "glm_contrast"})
 
+
 def _epykit_version() -> str:
     try:
         from . import __version__
+
         return __version__
     except ImportError:
         return "0.0.0+unknown"
@@ -93,9 +94,9 @@ def _dmc_input_signature(
     min_samples_control: int,
     dispersion: str,
     reference: str,
-    samples_all_ordered: Optional[list[str]],
-    group_labels_per_sample: Optional[list[str]],
-    contrast_label: Optional[str],
+    samples_all_ordered: list[str] | None,
+    group_labels_per_sample: list[str] | None,
+    contrast_label: str | None,
     smoothing: bool = False,
     smoothing_span_bp: int = 500,
     sep_fallback: bool = False,
@@ -116,43 +117,44 @@ def _dmc_input_signature(
     after a genuine upstream change, delete the ``.cache/dmc/<test>/``
     directory.
     """
-    h = hashlib.sha256()
     msp = Path(methylstore_path).resolve()
-    h.update(b"|store="); h.update(str(msp).encode())
-    h.update(b"|case=");    h.update(",".join(samples_case).encode())
-    h.update(b"|ctrl=");    h.update(",".join(samples_control).encode())
-    h.update(b"|test=");    h.update(test.encode())
-    h.update(b"|chroms=");  h.update(",".join(chromosomes).encode())
-    h.update(b"|unite=");   h.update(str(bool(unite)).encode())
-    h.update(b"|min_case="); h.update(str(min_samples_case).encode())
-    h.update(b"|min_ctrl="); h.update(str(min_samples_control).encode())
-    h.update(b"|disp=");    h.update(str(dispersion).encode())
-    h.update(b"|ref=");     h.update(str(reference).encode())
+    fields: list[tuple[str, str]] = [
+        ("store", str(msp)),
+        ("case", ",".join(samples_case)),
+        ("ctrl", ",".join(samples_control)),
+        ("test", test),
+        ("chroms", ",".join(chromosomes)),
+        ("unite", str(bool(unite))),
+        ("min_case", str(min_samples_case)),
+        ("min_ctrl", str(min_samples_control)),
+        ("disp", str(dispersion)),
+        ("ref", str(reference)),
+    ]
     if samples_all_ordered is not None:
-        h.update(b"|all=");     h.update(",".join(samples_all_ordered).encode())
+        fields.append(("all", ",".join(samples_all_ordered)))
     if group_labels_per_sample is not None:
-        h.update(b"|grp=");     h.update(",".join(group_labels_per_sample).encode())
+        fields.append(("grp", ",".join(group_labels_per_sample)))
     if contrast_label is not None:
-        h.update(b"|contrast="); h.update(contrast_label.encode())
+        fields.append(("contrast", contrast_label))
     # DSS-style count-smoothing tunables. The flag itself is always
     # hashed so a False->True toggle invalidates the cache. The span is
     # only hashed when smoothing is on (when off, the span has no effect
     # and should not invalidate the cache).
-    h.update(b"|sm=");      h.update(b"1" if smoothing else b"0")
+    fields.append(("sm", "1" if smoothing else "0"))
     if smoothing:
-        h.update(b"|span=");    h.update(str(int(smoothing_span_bp)).encode())
+        fields.append(("span", str(int(smoothing_span_bp))))
     # Separation-aware fallback (since 0.7.1) -- ON/OFF and threshold change
     # the per-site p-values, so they must be part of the cache key.
-    h.update(b"|sep=");     h.update(b"1" if sep_fallback else b"0")
+    fields.append(("sep", "1" if sep_fallback else "0"))
     if sep_fallback:
-        h.update(b"|sept=");    h.update(f"{sep_threshold:.6f}".encode())
-    return h.hexdigest()
+        fields.append(("sept", f"{sep_threshold:.6f}"))
+    return _cache.fingerprint(fields)
 
 
 def _resolve_dmc_store_dir(
     methylstore_path: Path,
     test: str,
-    out_dir: Optional[Union[str, Path]],
+    out_dir: str | Path | None,
     smoothing: bool = False,
 ) -> Path:
     """Pick the directory used for the persistent DMC store.
@@ -175,7 +177,7 @@ def _resolve_dmc_store_dir(
     bucket = f"{test}_smooth" if smoothing else test
     if out_dir is not None:
         return Path(out_dir)
-    msp    = Path(methylstore_path).resolve()
+    msp = Path(methylstore_path).resolve()
     parent = msp.parent
     if parent.exists():
         # Detect "methylstore is a stage dir inside .cache/" -- drop the
@@ -187,7 +189,8 @@ def _resolve_dmc_store_dir(
     logger.warning(
         "Could not derive a persistent DMC store dir from %s; "
         "falling back to ephemeral %s. Pass out_dir= to keep DMC results.",
-        methylstore_path, fallback,
+        methylstore_path,
+        fallback,
     )
     return fallback
 
@@ -196,8 +199,9 @@ def _canonicalise_test_name(test: str) -> str:
     """Map deprecated test names to their canonical form."""
     return test
 
+
 _TEST_RECOMMENDATIONS = {
-    range(1, 3):   "fisher (single-rep only; effect size dominates)",
+    range(1, 3): "fisher (single-rep only; effect size dominates)",
     range(3, 999): "lr (quasi-binomial likelihood-ratio with MN overdispersion)",
 }
 
@@ -229,15 +233,15 @@ DF_PHI_FLOOR: float = 50.0
 _DF_PHI_FLOOR_F_VS_CHI2_TOL_AT_P05: float = 0.12
 
 
-
 # Core statistical tests (public, used by unit tests)
+
 
 def fisher_exact_vectorized(
     meth_a: np.ndarray,
     unmeth_a: np.ndarray,
     meth_b: np.ndarray,
     unmeth_b: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Vectorised Fisher exact test on 2x2 contingency tables.
 
     Two-sided p-value matches ``scipy.stats.fisher_exact(alternative='two-sided')``:
@@ -257,18 +261,18 @@ def fisher_exact_vectorized(
     log2_or : ndarray of float64
         Log2 odds ratios with Haldane-Anscombe (+0.5) correction.
     """
-    a = np.asarray(meth_a,   dtype=np.int64)
+    a = np.asarray(meth_a, dtype=np.int64)
     b = np.asarray(unmeth_a, dtype=np.int64)
-    c = np.asarray(meth_b,   dtype=np.int64)
+    c = np.asarray(meth_b, dtype=np.int64)
     d = np.asarray(unmeth_b, dtype=np.int64)
 
-    n       = len(a)
-    pvals   = np.full(n, np.nan, dtype=np.float64)
+    n = len(a)
+    pvals = np.full(n, np.nan, dtype=np.float64)
     log2_or = np.full(n, np.nan, dtype=np.float64)
 
-    row1  = a + b   # group A total
-    row2  = c + d   # group B total
-    col1  = a + c   # methylated total
+    row1 = a + b  # group A total
+    row2 = c + d  # group B total
+    col1 = a + c  # methylated total
     total = row1 + row2
 
     valid = (row1 > 0) & (row2 > 0)
@@ -286,18 +290,18 @@ def fisher_exact_vectorized(
     # Matches scipy.stats.fisher_exact(alternative='two-sided') to 1e-12.
     vi = np.where(valid)[0]
     for idx in vi:
-        Ni  = int(total[idx])
+        Ni = int(total[idx])
         n1i = int(row1[idx])
         m1i = int(col1[idx])
-        ai  = int(a[idx])
+        ai = int(a[idx])
         # Degenerate: fixed marginals leave no freedom
         if Ni == 0 or n1i == 0 or n1i == Ni or m1i == 0 or m1i == Ni:
             pvals[idx] = 1.0
             continue
         k_min = max(0, n1i + m1i - Ni)
         k_max = min(n1i, m1i)
-        ks    = np.arange(k_min, k_max + 1)
-        pmf   = sp_stats.hypergeom.pmf(ks, Ni, m1i, n1i)
+        ks = np.arange(k_min, k_max + 1)
+        pmf = sp_stats.hypergeom.pmf(ks, Ni, m1i, n1i)
         obs_pmf = sp_stats.hypergeom.pmf(ai, Ni, m1i, n1i)
         pvals[idx] = float(np.clip(pmf[pmf <= obs_pmf + 1e-15].sum(), 0.0, 1.0))
 
@@ -305,6 +309,7 @@ def fisher_exact_vectorized(
 
 
 # Welford online statistics -- O(n_sites) memory regardless of n_samples
+
 
 def _welford_init(n: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Allocate Welford accumulators for n sites.
@@ -314,7 +319,7 @@ def _welford_init(n: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return (
         np.zeros(n, dtype=np.float64),  # running mean
         np.zeros(n, dtype=np.float64),  # running sum of squared deviations
-        np.zeros(n, dtype=np.int32),    # non-NaN replicate count per site
+        np.zeros(n, dtype=np.int32),  # non-NaN replicate count per site
     )
 
 
@@ -337,10 +342,10 @@ def _welford_update(
     if not np.any(valid):
         return
     n_valid[valid] += 1
-    delta          = beta[valid] - mean[valid]
-    mean[valid]   += delta / n_valid[valid]
-    delta2         = beta[valid] - mean[valid]
-    M2[valid]     += delta * delta2
+    delta = beta[valid] - mean[valid]
+    mean[valid] += delta / n_valid[valid]
+    delta2 = beta[valid] - mean[valid]
+    M2[valid] += delta * delta2
 
 
 def _welford_var_mean(M2: np.ndarray, n_valid: np.ndarray) -> np.ndarray:
@@ -433,6 +438,7 @@ def _safe_log2_odds_ratio(
 # count-based test (does not throw away the information that 5/10 carries
 # less weight than 500/1000), and runs single-pass / O(n_sites) memory.
 
+
 def _score_init(
     n: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -456,17 +462,17 @@ def _score_init(
 
 
 def _score_update(
-    sum_n:   np.ndarray,
-    sum_m:   np.ndarray,
+    sum_n: np.ndarray,
+    sum_m: np.ndarray,
     sum_m2n: np.ndarray,
     n_valid: np.ndarray,
-    meth:    np.ndarray,
-    cov:     np.ndarray,
+    meth: np.ndarray,
+    cov: np.ndarray,
 ) -> None:
     """Fold one sample's (meth, coverage) arrays into the accumulators."""
-    cov_f  = cov.astype(np.float64,  copy=False)
+    cov_f = cov.astype(np.float64, copy=False)
     meth_f = meth.astype(np.float64, copy=False)
-    valid  = cov > 0
+    valid = cov > 0
 
     sum_n += cov_f
     sum_m += meth_f
@@ -477,15 +483,15 @@ def _score_update(
 
 
 def _smooth_box_kernel_py(
-    pos:      np.ndarray,
+    pos: np.ndarray,
     cum_meth: np.ndarray,
-    cum_cov:  np.ndarray,
-    half:     int,
-    n:        int,
-    meth_sm:  np.ndarray,
-    cov_sm:   np.ndarray,
+    cum_cov: np.ndarray,
+    half: int,
+    n: int,
+    meth_sm: np.ndarray,
+    cov_sm: np.ndarray,
     meth_raw: np.ndarray,
-    cov_raw:  np.ndarray,
+    cov_raw: np.ndarray,
 ) -> None:
     """Two-pointer sweep for box smoothing (pure-Python / numba target)."""
     lo = 0
@@ -501,10 +507,10 @@ def _smooth_box_kernel_py(
         n_window = hi - lo
         if n_window <= 0:
             meth_sm[i] = float(meth_raw[i])
-            cov_sm[i]  = float(cov_raw[i])
+            cov_sm[i] = float(cov_raw[i])
         else:
             meth_sm[i] = (cum_meth[hi] - cum_meth[lo]) / n_window
-            cov_sm[i]  = (cum_cov[hi]  - cum_cov[lo])  / n_window
+            cov_sm[i] = (cum_cov[hi] - cum_cov[lo]) / n_window
 
 
 def _smooth_box_make_njit():
@@ -524,10 +530,10 @@ def _smooth_box_make_njit():
 
 
 def _smooth_sample_counts_box(
-    meth:       np.ndarray,
-    cov:        np.ndarray,
-    positions:  np.ndarray,
-    window_bp:  int,
+    meth: np.ndarray,
+    cov: np.ndarray,
+    positions: np.ndarray,
+    window_bp: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Per-sample uniform-box smoothing of (meth, cov) counts.
 
@@ -567,37 +573,52 @@ def _smooth_sample_counts_box(
         return meth.astype(np.float64, copy=False), cov.astype(np.float64, copy=False)
 
     half = int(window_bp) // 2
-    pos  = positions.astype(np.int64, copy=False)
+    pos = positions.astype(np.int64, copy=False)
 
     cum_meth = np.empty(n + 1, dtype=np.int64)
-    cum_cov  = np.empty(n + 1, dtype=np.int64)
+    cum_cov = np.empty(n + 1, dtype=np.int64)
     cum_meth[0] = 0
-    cum_cov[0]  = 0
+    cum_cov[0] = 0
     np.cumsum(meth.astype(np.int64, copy=False), out=cum_meth[1:])
-    np.cumsum(cov.astype(np.int64,  copy=False), out=cum_cov[1:])
+    np.cumsum(cov.astype(np.int64, copy=False), out=cum_cov[1:])
 
     meth_sm = np.empty(n, dtype=np.float64)
-    cov_sm  = np.empty(n, dtype=np.float64)
+    cov_sm = np.empty(n, dtype=np.float64)
 
     kernel = _smooth_box_make_njit()
-    kernel(pos, cum_meth, cum_cov, half, n, meth_sm, cov_sm,
-           meth.astype(np.float64), cov.astype(np.float64))
+    kernel(
+        pos,
+        cum_meth,
+        cum_cov,
+        half,
+        n,
+        meth_sm,
+        cov_sm,
+        meth.astype(np.float64),
+        cov.astype(np.float64),
+    )
 
     return meth_sm, cov_sm
 
 
 def _score_finalize(
-    sn_case:  np.ndarray, sm_case:  np.ndarray, sm2n_case: np.ndarray, nv_case: np.ndarray,
-    sn_ctrl:  np.ndarray, sm_ctrl:  np.ndarray, sm2n_ctrl: np.ndarray, nv_ctrl: np.ndarray,
-    chrom_name:     str   = "?",
+    sn_case: np.ndarray,
+    sm_case: np.ndarray,
+    sm2n_case: np.ndarray,
+    nv_case: np.ndarray,
+    sn_ctrl: np.ndarray,
+    sm_ctrl: np.ndarray,
+    sm2n_ctrl: np.ndarray,
+    nv_ctrl: np.ndarray,
+    chrom_name: str = "?",
     min_dispersion: float = 1.0,
-    min_disp_sites: int   = 100,
-    dispersion:     str   = "site",
+    min_disp_sites: int = 100,
+    dispersion: str = "site",
     shrink_pseudo_df: float = 4.0,
-    statistic:      str   = "lr",
-    reference:      str   = "adaptive",
-    sep_fallback:   bool  = False,
-    sep_threshold:  float = 0.9,
+    statistic: str = "lr",
+    reference: str = "adaptive",
+    sep_fallback: bool = False,
+    sep_threshold: float = 0.9,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, np.ndarray, np.ndarray]:
     """Compute per-site score p-values with McCullagh-Nelder overdispersion.
 
@@ -702,17 +723,11 @@ def _score_finalize(
             f"dispersion must be 'site', 'chrom', 'shrink', or 'eb'; got {dispersion!r}"
         )
     if statistic not in {"lr"}:
-        raise ValueError(
-            f"statistic must be 'lr'; got {statistic!r}"
-        )
+        raise ValueError(f"statistic must be 'lr'; got {statistic!r}")
     if reference == "methylkit":
-        raise ValueError(
-            "reference='methylkit' was renamed to 'adaptive' in this release."
-        )
+        raise ValueError("reference='methylkit' was renamed to 'adaptive' in this release.")
     if reference not in {"adaptive", "F", "chi2"}:
-        raise ValueError(
-            f"reference must be 'adaptive', 'F', or 'chi2'; got {reference!r}"
-        )
+        raise ValueError(f"reference must be 'adaptive', 'F', or 'chi2'; got {reference!r}")
     eps = _BETA_EPSILON
 
     # --- Group MLE proportions under the full (unrestricted) model ---
@@ -727,24 +742,24 @@ def _score_finalize(
     # variance 0 and contribute nothing to the dispersion estimate.
     with np.errstate(invalid="ignore", divide="ignore"):
         # numerator term Sigma_j(m - npi)^2/n   =  S2 - S1^2/S0
-        num_case = sm2n_case - np.where(sn_case > 0, sm_case ** 2 / sn_case, 0.0)
-        num_ctrl = sm2n_ctrl - np.where(sn_ctrl > 0, sm_ctrl ** 2 / sn_ctrl, 0.0)
+        num_case = sm2n_case - np.where(sn_case > 0, sm_case**2 / sn_case, 0.0)
+        num_ctrl = sm2n_ctrl - np.where(sn_ctrl > 0, sm_ctrl**2 / sn_ctrl, 0.0)
 
         den_case = np.where(
             sn_case > 0,
-            sm_case * (sn_case - sm_case) / (sn_case ** 2),
+            sm_case * (sn_case - sm_case) / (sn_case**2),
             0.0,
         )
         den_ctrl = np.where(
             sn_ctrl > 0,
-            sm_ctrl * (sn_ctrl - sm_ctrl) / (sn_ctrl ** 2),
+            sm_ctrl * (sn_ctrl - sm_ctrl) / (sn_ctrl**2),
             0.0,
         )
 
         chi_case = np.where(den_case > 0, num_case / den_case, 0.0)
         chi_ctrl = np.where(den_ctrl > 0, num_ctrl / den_ctrl, 0.0)
 
-    sites_both    = (sn_case > 0) & (sn_ctrl > 0) & (nv_case > 0) & (nv_ctrl > 0)
+    sites_both = (sn_case > 0) & (sn_ctrl > 0) & (nv_case > 0) & (nv_ctrl > 0)
     sites_dispers = sites_both & (den_case > 0) & (den_ctrl > 0)
 
     # --- Chromosome-pooled phi (always computed; used directly in "chrom"
@@ -756,7 +771,9 @@ def _score_finalize(
             logger.warning(
                 "%s: only %d sites usable for dispersion estimation; "
                 "falling back to phi = %.2f (no overdispersion correction).",
-                chrom_name, n_disp, min_dispersion,
+                chrom_name,
+                n_disp,
+                min_dispersion,
             )
         phi_hat = float(min_dispersion)
         phi_raw = float(min_dispersion)
@@ -767,17 +784,20 @@ def _score_finalize(
         n_obs = int(nv_case[sites_dispers].sum() + nv_ctrl[sites_dispers].sum())
         df_chrom = float(max(n_obs - 2 * n_disp, 1))
 
-        pearson_sum = float(
-            chi_case[sites_dispers].sum() + chi_ctrl[sites_dispers].sum()
-        )
+        pearson_sum = float(chi_case[sites_dispers].sum() + chi_ctrl[sites_dispers].sum())
         phi_raw = pearson_sum / df_chrom
         phi_hat = float(max(min_dispersion, phi_raw))
 
         logger.info(
             "%s: chrom-pooled phi = %.3f (raw %.3f, %s sites, %s obs, df=%s); "
             "applying dispersion='%s'",
-            chrom_name, phi_hat, phi_raw,
-            f"{n_disp:,}", f"{n_obs:,}", f"{int(df_chrom):,}", dispersion,
+            chrom_name,
+            phi_hat,
+            phi_raw,
+            f"{n_disp:,}",
+            f"{n_obs:,}",
+            f"{int(df_chrom):,}",
+            dispersion,
         )
 
     # --- Per-site Pearson dispersion phi_i (only used when needed) ---------
@@ -841,13 +861,15 @@ def _score_finalize(
             logger.info(
                 "%s: empirical-Bayes shrinkage with w_eb=%.2f (phi_chrom=%.3f, "
                 "phi_site var=%.2g over %d sites).",
-                chrom_name, w_eb, phi_hat,
-                v if 'v' in locals() else float('nan'),
+                chrom_name,
+                w_eb,
+                phi_hat,
+                v if "v" in locals() else float("nan"),
                 int(np.sum(valid_phi)),
             )
         else:  # "shrink": James-Stein-style weighted average toward chrom mean
             # phi_shrunk_i = (df_i * phi_site_i + w * phi_chrom) / (df_i + w)
-            w   = float(shrink_pseudo_df)
+            w = float(shrink_pseudo_df)
             num = df_i_safe * phi_site + w * phi_hat
             den = df_i_safe + w
             phi_eff = np.maximum(num / den, min_dispersion)
@@ -874,7 +896,7 @@ def _score_finalize(
     sn_total = sn_case + sn_ctrl
     sm_total = sm_case + sm_ctrl
     with np.errstate(invalid="ignore", divide="ignore"):
-        pi_pool      = np.where(sn_total > 0, sm_total / sn_total, np.nan)
+        pi_pool = np.where(sn_total > 0, sm_total / sn_total, np.nan)
         pi_pool_safe = np.clip(pi_pool, eps, 1.0 - eps)
 
         # Variance of the null-MLE score U.  Used by both branches: the
@@ -882,9 +904,7 @@ def _score_finalize(
         # as a degenerate-site guard (variance == 0 -> no information at
         # that site, so the LR is also undefined).
         var_U_bin = (
-            (sn_case * sn_ctrl / np.maximum(sn_total, 1.0))
-            * pi_pool_safe
-            * (1.0 - pi_pool_safe)
+            (sn_case * sn_ctrl / np.maximum(sn_total, 1.0)) * pi_pool_safe * (1.0 - pi_pool_safe)
         )
 
         if statistic == "score":
@@ -935,20 +955,16 @@ def _score_finalize(
     # the F branch; the chi^2 branch (clamped phi) is unaffected.
     if reference == "adaptive":
         df_phi_floored = np.maximum(df_phi, DF_PHI_FLOOR)
-        p_F    = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi_floored)
+        p_F = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi_floored)
         p_chi2 = sp_stats.chi2.sf(chi2_stat, df=1)
-        pvals  = np.where(phi_eff > 1.0, p_F, p_chi2)
+        pvals = np.where(phi_eff > 1.0, p_F, p_chi2)
     elif reference == "F":
         df_phi_floored = np.maximum(df_phi, DF_PHI_FLOOR)
         pvals = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi_floored)
     else:  # "chi2"
         pvals = sp_stats.chi2.sf(chi2_stat, df=1)
 
-    degenerate = (
-        ~sites_both
-        | np.isnan(chi2_stat)
-        | (var_U_bin <= 0)
-    )
+    degenerate = ~sites_both | np.isnan(chi2_stat) | (var_U_bin <= 0)
     pvals = np.where(degenerate, np.nan, pvals)
 
     log2_or = _safe_log2_odds_ratio(pi_case, pi_ctrl)
@@ -992,6 +1008,7 @@ def _score_finalize(
         n_fb = int(np.sum(fb_mask))
         if n_fb > 0:
             from scipy.stats import fisher_exact as _scipy_fisher
+
             idx = np.flatnonzero(fb_mask)
             M_a = sm_case[idx].astype(np.int64)
             U_a = (sn_case[idx] - sm_case[idx]).astype(np.int64)
@@ -1013,7 +1030,10 @@ def _score_finalize(
             logger.info(
                 "%s: separation fallback fired on %d sites "
                 "(|meth_diff|>=%.2f & LR-p>0.05); %d had Fisher-p<LR-p.",
-                chrom_name, n_fb, sep_threshold, n_improved,
+                chrom_name,
+                n_fb,
+                sep_threshold,
+                n_improved,
             )
 
     return pvals, log2_or, pi_case, pi_ctrl, phi_hat, phi_eff, df_phi
@@ -1047,8 +1067,8 @@ def _beta_binom_mom_from_welford_logit(
     var_case = M2_case / np.maximum(n_valid_case - 1, 1)
     var_ctrl = M2_ctrl / np.maximum(n_valid_ctrl - 1, 1)
 
-    var_logit_case = var_case * (jac_case ** 2)
-    var_logit_ctrl = var_ctrl * (jac_ctrl ** 2)
+    var_logit_case = var_case * (jac_case**2)
+    var_logit_ctrl = var_ctrl * (jac_ctrl**2)
 
     # Normalize by sample size (variance of the mean)
     var_mean_logit_case = var_logit_case / np.maximum(n_valid_case, 1)
@@ -1062,10 +1082,9 @@ def _beta_binom_mom_from_welford_logit(
 
     # Welch-Satterthwaite degrees of freedom
     dof_num = (var_mean_logit_case + var_mean_logit_ctrl) ** 2
-    dof_den = (
-        np.where(n_valid_case > 1, var_mean_logit_case ** 2 / (n_valid_case - 1), 0.0)
-        + np.where(n_valid_ctrl > 1, var_mean_logit_ctrl ** 2 / (n_valid_ctrl - 1), 0.0)
-    )
+    dof_den = np.where(
+        n_valid_case > 1, var_mean_logit_case**2 / (n_valid_case - 1), 0.0
+    ) + np.where(n_valid_ctrl > 1, var_mean_logit_ctrl**2 / (n_valid_ctrl - 1), 0.0)
     with np.errstate(invalid="ignore", divide="ignore"):
         dof = np.where(dof_den > 0, dof_num / dof_den, 1.0)
         dof = np.maximum(dof, 1.0)
@@ -1084,13 +1103,13 @@ def _beta_binom_mom_from_welford_logit(
     # well-calibrated near beta = 0 / 1. For trustworthy inference use
     # ``test="lr"``, which gets variance from the
     # binomial count model and isn't affected by replicate collapse.
-    both_zero_var = (
-        (n_valid_case >= 2) & (M2_case <= 0.0)
-        & (n_valid_ctrl >= 2) & (M2_ctrl <= 0.0)
-    )
+    both_zero_var = (n_valid_case >= 2) & (M2_case <= 0.0) & (n_valid_ctrl >= 2) & (M2_ctrl <= 0.0)
     degenerate = (
-        np.isnan(mean_case) | np.isnan(mean_ctrl) | np.isnan(t_stat)
-        | (n_valid_case == 0) | (n_valid_ctrl == 0)
+        np.isnan(mean_case)
+        | np.isnan(mean_ctrl)
+        | np.isnan(t_stat)
+        | (n_valid_case == 0)
+        | (n_valid_ctrl == 0)
         | both_zero_var
     )
     pvals[degenerate] = np.nan
@@ -1128,9 +1147,8 @@ def _beta_binom_mom_from_welford(
 
     # Welch-Satterthwaite degrees of freedom (per-site n_valid)
     dof_num = (vm_case + vm_ctrl) ** 2
-    dof_den = (
-        np.where(n_valid_case > 1, vm_case ** 2 / (n_valid_case - 1), 0.0)
-        + np.where(n_valid_ctrl > 1, vm_ctrl ** 2 / (n_valid_ctrl - 1), 0.0)
+    dof_den = np.where(n_valid_case > 1, vm_case**2 / (n_valid_case - 1), 0.0) + np.where(
+        n_valid_ctrl > 1, vm_ctrl**2 / (n_valid_ctrl - 1), 0.0
     )
     with np.errstate(invalid="ignore", divide="ignore"):
         dof = np.where(dof_den > 0, dof_num / dof_den, 1.0)
@@ -1144,13 +1162,13 @@ def _beta_binom_mom_from_welford(
     # *either*-zero version killed real signal at boundary beta.
     # welch_t is treated as a weak fallback -- use ``test="lr"``
     # for trustworthy inference.
-    both_zero_var = (
-        (n_valid_case >= 2) & (M2_case <= 0.0)
-        & (n_valid_ctrl >= 2) & (M2_ctrl <= 0.0)
-    )
+    both_zero_var = (n_valid_case >= 2) & (M2_case <= 0.0) & (n_valid_ctrl >= 2) & (M2_ctrl <= 0.0)
     degenerate = (
-        np.isnan(mean_case) | np.isnan(mean_ctrl) | np.isnan(t_stat)
-        | (n_valid_case == 0) | (n_valid_ctrl == 0)
+        np.isnan(mean_case)
+        | np.isnan(mean_ctrl)
+        | np.isnan(t_stat)
+        | (n_valid_case == 0)
+        | (n_valid_ctrl == 0)
         | both_zero_var
     )
     pvals[degenerate] = np.nan
@@ -1164,6 +1182,7 @@ def _beta_binom_mom_from_welford(
 
 
 # Internal per-chromosome helpers
+
 
 def _detect_chromosomes(methylstore_path: Path) -> list[str]:
     chroms: set[str] = set()
@@ -1195,39 +1214,42 @@ def _intersect_chrom(
     on `pos` would multiply rows downstream -- silently breaking the
     one-row-per-site contract that _load_sample_chrom relies on.
     """
-    _empty = pl.DataFrame({
-        "pos":    pl.Series([], dtype=pl.Int32),
-        "strand": pl.Series([], dtype=pl.Utf8),
-    })
+    _empty = pl.DataFrame(
+        {
+            "pos": pl.Series([], dtype=pl.Int32),
+            "strand": pl.Series([], dtype=pl.Utf8),
+        }
+    )
     n_samples = len(samples)
     if n_samples == 0:
         return _empty
 
     site_dfs: list[pl.DataFrame] = []
     for sample in samples:
-        part_file = (
-            methylstore_path / f"sample={sample}" / f"chrom={chrom}" / "part-0.parquet"
-        )
+        part_file = methylstore_path / f"sample={sample}" / f"chrom={chrom}" / "part-0.parquet"
         if not part_file.exists():
             logger.debug(
                 "  Sample '%s' missing %s; chromosome excluded from intersection",
-                sample, chrom,
+                sample,
+                chrom,
             )
             return _empty
         site_dfs.append(
-            pl.read_parquet(str(part_file), columns=["pos", "strand"])
-            .unique(subset=["pos"], keep="first")
+            pl.read_parquet(str(part_file), columns=["pos", "strand"]).unique(
+                subset=["pos"], keep="first"
+            )
         )
 
     combined = pl.concat(site_dfs)
     intersected = (
-        combined
-        .group_by("pos")
-        .agg([
-            pl.len().alias("_n"),
-            pl.col("strand").filter(pl.col("strand") != "*").first().alias("_strand_real"),
-            pl.col("strand").first().alias("_strand_fb"),
-        ])
+        combined.group_by("pos")
+        .agg(
+            [
+                pl.len().alias("_n"),
+                pl.col("strand").filter(pl.col("strand") != "*").first().alias("_strand_real"),
+                pl.col("strand").first().alias("_strand_fb"),
+            ]
+        )
         .filter(pl.col("_n") == n_samples)
         .with_columns(
             pl.when(pl.col("_strand_real").is_not_null())
@@ -1241,8 +1263,8 @@ def _intersect_chrom(
 
     if len(intersected) == 0:
         logger.warning(
-            "  Intersection is empty on %s. "
-            "Check strand consistency across samples.", chrom,
+            "  Intersection is empty on %s. Check strand consistency across samples.",
+            chrom,
         )
 
     return intersected
@@ -1256,18 +1278,16 @@ def _union_chrom(
     """Return (pos, strand) rows seen in at least one sample."""
     site_dfs: list[pl.DataFrame] = []
     for sample in samples:
-        part_file = (
-            methylstore_path / f"sample={sample}" / f"chrom={chrom}" / "part-0.parquet"
-        )
+        part_file = methylstore_path / f"sample={sample}" / f"chrom={chrom}" / "part-0.parquet"
         if part_file.exists():
-            site_dfs.append(
-                pl.read_parquet(str(part_file), columns=["pos", "strand"])
-            )
+            site_dfs.append(pl.read_parquet(str(part_file), columns=["pos", "strand"]))
     if not site_dfs:
-        return pl.DataFrame({
-            "pos":    pl.Series([], dtype=pl.Int32),
-            "strand": pl.Series([], dtype=pl.Utf8),
-        })
+        return pl.DataFrame(
+            {
+                "pos": pl.Series([], dtype=pl.Int32),
+                "strand": pl.Series([], dtype=pl.Utf8),
+            }
+        )
     return (
         pl.concat(site_dfs)
         .unique(subset=["pos"], keep="first")  # dedupe on pos only
@@ -1286,9 +1306,7 @@ def _load_sample_chrom(
     Left-joins to canonical_pos so arrays are aligned to the same site order.
     Missing sites are filled with 0 .
     """
-    part_file = (
-        methylstore_path / f"sample={sample}" / f"chrom={chrom}" / "part-0.parquet"
-    )
+    part_file = methylstore_path / f"sample={sample}" / f"chrom={chrom}" / "part-0.parquet"
     n_sites = len(canonical_pos)
 
     if not part_file.exists():
@@ -1299,12 +1317,11 @@ def _load_sample_chrom(
 
     df = pl.read_parquet(str(part_file), columns=["pos", "N_meth", "coverage"])
     if df.height != df["pos"].n_unique():
-        df = (
-            df.group_by("pos")
-            .agg([
+        df = df.group_by("pos").agg(
+            [
                 pl.sum("N_meth").alias("N_meth"),
                 pl.sum("coverage").alias("coverage"),
-            ])
+            ]
         )
     aligned = canonical_pos.join(df, on="pos", how="left").fill_null(0)
 
@@ -1325,13 +1342,13 @@ def _process_one_chromosome(
     min_samples_control: int = 0,
     dispersion: str = "site",
     reference: str = "adaptive",
-    design_full: Optional[np.ndarray] = None,
-    design_reduced: Optional[np.ndarray] = None,
-    coef_idx: Optional[int] = None,
-    contrast_matrix: Optional[np.ndarray] = None,
-    contrast_label: Optional[str] = None,
-    samples_all_ordered: Optional[list[str]] = None,
-    group_labels_per_sample: Optional[list[str]] = None,
+    design_full: np.ndarray | None = None,
+    design_reduced: np.ndarray | None = None,
+    coef_idx: int | None = None,
+    contrast_matrix: np.ndarray | None = None,
+    contrast_label: str | None = None,
+    samples_all_ordered: list[str] | None = None,
+    group_labels_per_sample: list[str] | None = None,
     glm_backend: str = "cpu",
     smoothing: bool = False,
     smoothing_span_bp: int = 500,
@@ -1382,21 +1399,21 @@ def _process_one_chromosome(
     # `multigroup_mode` at the end.
     multigroup_mode = False
     level_mean_beta: dict[str, np.ndarray] = {}
-    f_stat_out: Optional[np.ndarray] = None
-    df1_out: Optional[int] = None
-    df2_out: Optional[np.ndarray] = None
+    f_stat_out: np.ndarray | None = None
+    df1_out: int | None = None
+    df2_out: np.ndarray | None = None
 
     # Pooled counts retained for Newcombe CI (lr and fisher paths only).
     # Set to non-None by those branches before the del statements below so
     # the unified CI block can use newcombe_diff_ci instead of Wald.
-    _newcombe_meth_a: Optional[np.ndarray] = None
-    _newcombe_cov_a: Optional[np.ndarray] = None
-    _newcombe_meth_b: Optional[np.ndarray] = None
-    _newcombe_cov_b: Optional[np.ndarray] = None
+    _newcombe_meth_a: np.ndarray | None = None
+    _newcombe_cov_a: np.ndarray | None = None
+    _newcombe_meth_b: np.ndarray | None = None
+    _newcombe_cov_b: np.ndarray | None = None
     # Per-site dispersion for a phi-aware Newcombe CI (lr only). Left None for
     # fisher (no dispersion estimate -> binomial CI, byte-identical).
-    _newcombe_phi: Optional[np.ndarray] = None
-    _newcombe_df: Optional[np.ndarray] = None
+    _newcombe_phi: np.ndarray | None = None
+    _newcombe_df: np.ndarray | None = None
 
     # --- Statistical test ---
     if test == "fisher":
@@ -1411,21 +1428,21 @@ def _process_one_chromosome(
         # ``_validate_sample_size_and_warn`` -- not here, to avoid the
         # per-chromosome warning spam this used to produce.
         meth_case_sum = np.zeros(n_sites, dtype=np.int64)
-        cov_case_sum  = np.zeros(n_sites, dtype=np.int64)
+        cov_case_sum = np.zeros(n_sites, dtype=np.int64)
         meth_ctrl_sum = np.zeros(n_sites, dtype=np.int64)
-        cov_ctrl_sum  = np.zeros(n_sites, dtype=np.int64)
+        cov_ctrl_sum = np.zeros(n_sites, dtype=np.int64)
 
         for sample in samples_case:
             meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
             meth_case_sum += meth.astype(np.int64)
-            cov_case_sum  += cov.astype(np.int64)
+            cov_case_sum += cov.astype(np.int64)
             _welford_update(mean_case, M2_case, n_valid_case, meth, cov)
             del meth, cov
 
         for sample in samples_control:
             meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
             meth_ctrl_sum += meth.astype(np.int64)
-            cov_ctrl_sum  += cov.astype(np.int64)
+            cov_ctrl_sum += cov.astype(np.int64)
             _welford_update(mean_ctrl, M2_ctrl, n_valid_ctrl, meth, cov)
             del meth, cov
 
@@ -1436,9 +1453,9 @@ def _process_one_chromosome(
         )
         # Save for Newcombe CI (P1-3).
         _newcombe_meth_a = meth_case_sum.astype(np.float64)
-        _newcombe_cov_a  = cov_case_sum.astype(np.float64)
+        _newcombe_cov_a = cov_case_sum.astype(np.float64)
         _newcombe_meth_b = meth_ctrl_sum.astype(np.float64)
-        _newcombe_cov_b  = cov_ctrl_sum.astype(np.float64)
+        _newcombe_cov_b = cov_ctrl_sum.astype(np.float64)
         del meth_case_sum, cov_case_sum, unmeth_case_sum
         del meth_ctrl_sum, cov_ctrl_sum, unmeth_ctrl_sum
 
@@ -1455,15 +1472,16 @@ def _process_one_chromosome(
         # CpGs within +/-smoothing_span_bp//2 bp before they hit the score
         # accumulators. The kernel matches DSS's smooth.chr / nitem_bin /
         # windowFilter exactly. Counts stay float for accumulator precision.
-        chrom_positions = (
-            canonical_pos.to_series().to_numpy() if smoothing else None
-        )
+        chrom_positions = canonical_pos.to_series().to_numpy() if smoothing else None
 
         for sample in samples_case:
             meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
             if smoothing:
                 meth, cov = _smooth_sample_counts_box(
-                    meth, cov, chrom_positions, smoothing_span_bp,
+                    meth,
+                    cov,
+                    chrom_positions,
+                    smoothing_span_bp,
                 )
             _score_update(sn_case, sm_case, sm2n_case, nv_case, meth, cov)
             # Welford accumulators are also updated so that downstream code
@@ -1478,15 +1496,24 @@ def _process_one_chromosome(
             meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
             if smoothing:
                 meth, cov = _smooth_sample_counts_box(
-                    meth, cov, chrom_positions, smoothing_span_bp,
+                    meth,
+                    cov,
+                    chrom_positions,
+                    smoothing_span_bp,
                 )
             _score_update(sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl, meth, cov)
             _welford_update(mean_ctrl, M2_ctrl, n_valid_ctrl, meth, cov)
             del meth, cov
 
         pvals, log2_ors, pi_case, pi_ctrl, _phi_hat, _phi_eff, _df_phi = _score_finalize(
-            sn_case, sm_case, sm2n_case, nv_case,
-            sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl,
+            sn_case,
+            sm_case,
+            sm2n_case,
+            nv_case,
+            sn_ctrl,
+            sm_ctrl,
+            sm2n_ctrl,
+            nv_ctrl,
             chrom_name=chrom,
             dispersion=dispersion,
             statistic="lr",
@@ -1507,16 +1534,16 @@ def _process_one_chromosome(
         # Save pooled counts for Newcombe CI (P1-3). sn_case = pooled coverage
         # (sum across samples), sm_case = pooled methylated-read count.
         _newcombe_meth_a = sm_case.copy()
-        _newcombe_cov_a  = sn_case.copy()
+        _newcombe_cov_a = sn_case.copy()
         _newcombe_meth_b = sm_ctrl.copy()
-        _newcombe_cov_b  = sn_ctrl.copy()
+        _newcombe_cov_b = sn_ctrl.copy()
         # Share the test's variance model with the CI: per-site dispersion
         # and its df (pre-floored to DF_PHI_FLOOR, matching the adaptive
         # F(1, df_phi) reference the p-value uses). Without this the CI is an
         # anti-conservatively narrow binomial interval next to an
         # overdispersion-aware p-value (M1).
         _newcombe_phi = _phi_eff
-        _newcombe_df  = np.maximum(_df_phi, DF_PHI_FLOOR)
+        _newcombe_df = np.maximum(_df_phi, DF_PHI_FLOOR)
 
         del sn_case, sm_case, sm2n_case, nv_case
         del sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl
@@ -1535,8 +1562,12 @@ def _process_one_chromosome(
 
         # Welford path: no (n_sites x n_replicates) matrix ever built.
         pvals, log2_ors = _beta_binom_mom_from_welford(
-            mean_case, M2_case, n_valid_case,
-            mean_ctrl, M2_ctrl, n_valid_ctrl,
+            mean_case,
+            M2_case,
+            n_valid_case,
+            mean_ctrl,
+            M2_ctrl,
+            n_valid_ctrl,
         )
 
     elif test == "glm":
@@ -1567,11 +1598,11 @@ def _process_one_chromosome(
             )
 
         meth_stack = np.zeros((n_sites, n_samples), dtype=np.int32)
-        cov_stack  = np.zeros((n_sites, n_samples), dtype=np.int32)
+        cov_stack = np.zeros((n_sites, n_samples), dtype=np.int32)
         for j, sample in enumerate(all_samples):
             meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
             meth_stack[:, j] = meth
-            cov_stack[:, j]  = cov
+            cov_stack[:, j] = cov
             # Welford accumulators for the unadjusted mean_beta_* columns.
             if j < len(samples_case):
                 _welford_update(mean_case, M2_case, n_valid_case, meth, cov)
@@ -1582,15 +1613,21 @@ def _process_one_chromosome(
         from . import _glm
 
         beta_full, se_full, dev_full, pearson_full, n_eff = _glm.irls_dispatch(
-            meth_stack, cov_stack, design_full, backend=glm_backend,
+            meth_stack,
+            cov_stack,
+            design_full,
+            backend=glm_backend,
         )
         _beta_red, _se_red, dev_red, _pearson_red, _ne_red = _glm.irls_dispatch(
-            meth_stack, cov_stack, design_reduced, backend=glm_backend,
+            meth_stack,
+            cov_stack,
+            design_reduced,
+            backend=glm_backend,
         )
 
         # df_resid_i = n_eff_i - p_full   (per-site, since coverage gates samples)
         p_full = design_full.shape[1]
-        df_resid_per_site = (n_eff.astype(np.float64) - float(p_full))
+        df_resid_per_site = n_eff.astype(np.float64) - float(p_full)
         df_resid_safe = np.maximum(df_resid_per_site, 1.0)
 
         phi_eff, _phi_hat, df_phi = _glm.compute_dispersion_phi(
@@ -1613,25 +1650,26 @@ def _process_one_chromosome(
         # dispersion="site"; for "chrom"/"shrink"/"eb" it's the chrom-pool or
         # shrinkage-effective df. Same bug-fix as in _score_finalize.
         pvals = _glm.reference_pvalues(
-            chi2_stat, phi_eff, df_phi, reference=reference,
+            chi2_stat,
+            phi_eff,
+            df_phi,
+            reference=reference,
             df_floor=DF_PHI_FLOOR,
         )
 
         # Effect-size columns from the GLM coefficient (log-odds) and its SE.
         coef_treatment = beta_full[:, coef_idx].astype(np.float64)
-        coef_se        = se_full[:, coef_idx].astype(np.float64)
+        coef_se = se_full[:, coef_idx].astype(np.float64)
 
         # Bookkeeping for the unified output block at the bottom.
-        log2_ors = (coef_treatment / np.log(2.0))   # log-odds -> log2 odds
-        degenerate = (
-            np.isnan(chi2_stat) | np.isnan(pvals) | (n_eff < 2)
-        )
+        log2_ors = coef_treatment / np.log(2.0)  # log-odds -> log2 odds
+        degenerate = np.isnan(chi2_stat) | np.isnan(pvals) | (n_eff < 2)
         pvals = np.where(degenerate, np.nan, pvals)
         log2_ors = np.where(degenerate, np.nan, log2_ors)
 
         # Stash for the schema additions below.
         extras["coef_treatment"] = coef_treatment
-        extras["coef_se"]        = coef_se
+        extras["coef_se"] = coef_se
         del meth_stack, cov_stack, beta_full, se_full, dev_full, dev_red
         del pearson_full, n_eff
 
@@ -1640,11 +1678,7 @@ def _process_one_chromosome(
         # The caller supplies (a) a shared design matrix `design_full`,
         # (b) a `contrast_matrix` C of shape (k, p), and (c) an ordered
         # list `samples_all_ordered` whose row order matches design_full.
-        if (
-            design_full is None
-            or contrast_matrix is None
-            or samples_all_ordered is None
-        ):
+        if design_full is None or contrast_matrix is None or samples_all_ordered is None:
             raise ValueError(
                 "test='glm_contrast' requires design_full, contrast_matrix, "
                 "and samples_all_ordered."
@@ -1657,7 +1691,7 @@ def _process_one_chromosome(
             )
 
         meth_stack = np.zeros((n_sites, n_samples), dtype=np.int32)
-        cov_stack  = np.zeros((n_sites, n_samples), dtype=np.int32)
+        cov_stack = np.zeros((n_sites, n_samples), dtype=np.int32)
         # Welford per-level accumulators. We keep mean_case/mean_ctrl as
         # "all samples that map to label 'case'" vs "all samples that
         # don't" -- chosen so the binary-case columns of the schema still
@@ -1672,7 +1706,7 @@ def _process_one_chromosome(
         for j, sample in enumerate(samples_all_ordered):
             meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
             meth_stack[:, j] = meth
-            cov_stack[:, j]  = cov
+            cov_stack[:, j] = cov
             # Backwards-compat columns: split on whether sample is in samples_case.
             if sample in samples_case:
                 _welford_update(mean_case, M2_case, n_valid_case, meth, cov)
@@ -1684,15 +1718,17 @@ def _process_one_chromosome(
             del meth, cov
 
         from . import _glm
-        beta_full, se_full, dev_full, pearson_full, n_eff, cov_beta = (
-            _glm.irls_dispatch(
-                meth_stack, cov_stack, design_full, return_cov=True,
-                backend=glm_backend,
-            )
+
+        beta_full, se_full, dev_full, pearson_full, n_eff, cov_beta = _glm.irls_dispatch(
+            meth_stack,
+            cov_stack,
+            design_full,
+            return_cov=True,
+            backend=glm_backend,
         )
 
         p_full = design_full.shape[1]
-        df_resid_per_site = (n_eff.astype(np.float64) - float(p_full))
+        df_resid_per_site = n_eff.astype(np.float64) - float(p_full)
         phi_eff, _phi_hat, df_phi = _glm.compute_dispersion_phi(
             pearson_per_site=pearson_full,
             df_per_site=df_resid_per_site,
@@ -1703,15 +1739,17 @@ def _process_one_chromosome(
 
         # F-reference uses df_phi (see comment in glm path above).
         stat, pvals, k_rank_np = _glm.wald_test(
-            beta_full, cov_beta, contrast_matrix,
-            phi_eff=phi_eff, df_resid=df_phi, reference=reference,
+            beta_full,
+            cov_beta,
+            contrast_matrix,
+            phi_eff=phi_eff,
+            df_resid=df_phi,
+            reference=reference,
             df_floor=DF_PHI_FLOOR,
         )
         k_rank = int(k_rank_np)
 
-        degenerate = (
-            np.isnan(stat) | np.isnan(pvals) | (n_eff < p_full + 1)
-        )
+        degenerate = np.isnan(stat) | np.isnan(pvals) | (n_eff < p_full + 1)
         pvals = np.where(degenerate, np.nan, pvals)
 
         if k_rank == 1:
@@ -1721,14 +1759,15 @@ def _process_one_chromosome(
             with np.errstate(invalid="ignore"):
                 var_Cb = np.einsum(
                     "kp,ipq,lq->ikl",
-                    contrast_matrix, cov_beta * phi_eff[:, None, None],
+                    contrast_matrix,
+                    cov_beta * phi_eff[:, None, None],
                     contrast_matrix,
                 )[:, 0, 0]
                 cse = np.sqrt(np.where(var_Cb > 0, var_Cb, np.nan))
-            log2_ors = (Cb / np.log(2.0))
+            log2_ors = Cb / np.log(2.0)
             log2_ors = np.where(degenerate, np.nan, log2_ors)
             extras["coef_treatment"] = Cb
-            extras["coef_se"]        = cse
+            extras["coef_se"] = cse
             # Single-coef path still emits the standard binary schema.
         else:
             # Joint contrast: emit multi-group schema. We do NOT populate
@@ -1752,8 +1791,7 @@ def _process_one_chromosome(
 
     else:
         raise NotImplementedError(
-            f"Test '{test}' not implemented. "
-            "Choose 'lr', 'fisher', 'welch_t', or 'glm'."
+            f"Test '{test}' not implemented. Choose 'lr', 'fisher', 'welch_t', or 'glm'."
         )
 
     # --- equal-weight per-replicate mean beta ---
@@ -1775,15 +1813,19 @@ def _process_one_chromosome(
     #   p-value (even in sign on a confounded design).
     # welch_t: Welch-normal Wald CI from the Welford accumulators.
     from . import _glm as _glm_for_ci
+
     if not multigroup_mode:
         if _newcombe_meth_a is not None:
             # P1-3: lr and fisher paths -- use Newcombe CI on pooled counts.
             # lr passes per-site phi/df so the interval shares the test's
             # overdispersion model (M1); fisher passes None (binomial).
             ci_lo, ci_hi = _glm_for_ci.newcombe_diff_ci(
-                _newcombe_meth_a, _newcombe_cov_a,
-                _newcombe_meth_b, _newcombe_cov_b,
-                phi=_newcombe_phi, df=_newcombe_df,
+                _newcombe_meth_a,
+                _newcombe_cov_a,
+                _newcombe_meth_b,
+                _newcombe_cov_b,
+                phi=_newcombe_phi,
+                df=_newcombe_df,
             )
         elif "coef_treatment" in extras:
             # M2: covariate-ADJUSTED effect + CI for the single-coef GLM paths
@@ -1798,14 +1840,16 @@ def _process_one_chromosome(
             # quasi-binomial variance model the p-value uses. Read from
             # `extras` (the contrast branch stores Cb/cse there under different
             # local names).
-            coef_t  = np.asarray(extras["coef_treatment"], dtype=np.float64)
-            coef_s  = np.asarray(extras["coef_se"], dtype=np.float64)
+            coef_t = np.asarray(extras["coef_treatment"], dtype=np.float64)
+            coef_s = np.asarray(extras["coef_se"], dtype=np.float64)
             eps = _BETA_EPSILON
             ctrl_clip = np.clip(mean_ctrl.astype(np.float64), eps, 1.0 - eps)
-            ref_eta = np.log(ctrl_clip / (1.0 - ctrl_clip))   # logit(control mean)
+            ref_eta = np.log(ctrl_clip / (1.0 - ctrl_clip))  # logit(control mean)
             se_disp = np.sqrt(np.maximum(phi_eff, 0.0)) * coef_s
             ci_lo, ci_hi = _glm_for_ci.delta_method_meth_diff_ci(
-                coef_t, se_disp, ref_eta=ref_eta,
+                coef_t,
+                se_disp,
+                ref_eta=ref_eta,
             )
             # Adjusted central estimate (= delta_method_meth_diff_ci's central
             # diff), so the CI brackets it by construction. mean_beta_case /
@@ -1813,7 +1857,7 @@ def _process_one_chromosome(
             # GLM, meth_diff != mean_beta_case - mean_beta_control by design.
             with np.errstate(over="ignore", under="ignore"):
                 p_treat = 1.0 / (1.0 + np.exp(-np.clip(ref_eta + coef_t, -30.0, 30.0)))
-                p_ref   = 1.0 / (1.0 + np.exp(-np.clip(ref_eta, -30.0, 30.0)))
+                p_ref = 1.0 / (1.0 + np.exp(-np.clip(ref_eta, -30.0, 30.0)))
             meth_diff_adj = p_treat - p_ref
             # Preserve the existing boundary semantics: NaN where either raw
             # group mean is undefined (zero valid replicates). For a pure
@@ -1835,16 +1879,17 @@ def _process_one_chromosome(
             # Welch-Satterthwaite df, identical to the welch_t p-value path
             # (t.sf(|t|, dof)), so the CI critical value matches the test (M13).
             _dof_num = (vm_case + vm_ctrl) ** 2
-            _dof_den = (
-                np.where(n_valid_case > 1, vm_case ** 2 / np.maximum(n_valid_case - 1, 1), 0.0)
-                + np.where(n_valid_ctrl > 1, vm_ctrl ** 2 / np.maximum(n_valid_ctrl - 1, 1), 0.0)
-            )
+            _dof_den = np.where(
+                n_valid_case > 1, vm_case**2 / np.maximum(n_valid_case - 1, 1), 0.0
+            ) + np.where(n_valid_ctrl > 1, vm_ctrl**2 / np.maximum(n_valid_ctrl - 1, 1), 0.0)
             with np.errstate(invalid="ignore", divide="ignore"):
                 _welch_dof = np.where(_dof_den > 0, _dof_num / _dof_den, 1.0)
             _welch_dof = np.maximum(_welch_dof, 1.0)
             ci_lo, ci_hi = _glm_for_ci.welch_meth_diff_ci(
-                mean_case.astype(np.float64), vm_case,
-                mean_ctrl.astype(np.float64), vm_ctrl,
+                mean_case.astype(np.float64),
+                vm_case,
+                mean_ctrl.astype(np.float64),
+                vm_ctrl,
                 dof=_welch_dof,
             )
         ci_lo = ci_lo.astype(np.float32)
@@ -1859,17 +1904,18 @@ def _process_one_chromosome(
     # passes NaNs through, so these sites are effectively excluded from
     # genome-wide FDR control without disturbing site-position alignment.
     if min_samples_case > 0 or min_samples_control > 0:
-        keep_mask = (
-            (n_valid_case >= max(min_samples_case, 0))
-            & (n_valid_ctrl >= max(min_samples_control, 0))
+        keep_mask = (n_valid_case >= max(min_samples_case, 0)) & (
+            n_valid_ctrl >= max(min_samples_control, 0)
         )
         n_dropped = int((~keep_mask).sum())
         if n_dropped > 0:
             logger.info(
-                "  %s: masking %s/%s sites with n_valid_case < %d or "
-                "n_valid_ctrl < %d",
-                chrom, f"{n_dropped:,}", f"{n_sites:,}",
-                min_samples_case, min_samples_control,
+                "  %s: masking %s/%s sites with n_valid_case < %d or n_valid_ctrl < %d",
+                chrom,
+                f"{n_dropped:,}",
+                f"{n_sites:,}",
+                min_samples_case,
+                min_samples_control,
             )
             pvals = np.where(keep_mask, pvals, np.nan)
             log2_ors = np.where(keep_mask, log2_ors, np.nan)
@@ -1887,37 +1933,30 @@ def _process_one_chromosome(
     #   all other backends: genuine pooled log2 odds ratio => log2_odds_ratio_pooled.
     # A transitional log2_odds_ratio column is NaN-filled so existing code
     # doesn't silently break; it is slated for removal in 1.1.
-    _log2_col = (
-        "coef_treatment_log2"
-        if test in _GLM_BACKENDS
-        else "log2_odds_ratio_pooled"
-    )
+    _log2_col = "coef_treatment_log2" if test in _GLM_BACKENDS else "log2_odds_ratio_pooled"
     out_cols = {
-        "chrom":             pl.Series([chrom] * n_sites, dtype=pl.Utf8),
-        "pos":               canonical_df["pos"],
-        "strand":            canonical_df["strand"],
-        "n_case":            pl.Series(
-                                 np.full(n_sites, len(samples_case),    dtype=np.int32)),
-        "n_control":         pl.Series(
-                                 np.full(n_sites, len(samples_control), dtype=np.int32)),
-        "mean_beta_case":    pl.Series(mean_beta_case),
+        "chrom": pl.Series([chrom] * n_sites, dtype=pl.Utf8),
+        "pos": canonical_df["pos"],
+        "strand": canonical_df["strand"],
+        "n_case": pl.Series(np.full(n_sites, len(samples_case), dtype=np.int32)),
+        "n_control": pl.Series(np.full(n_sites, len(samples_control), dtype=np.int32)),
+        "mean_beta_case": pl.Series(mean_beta_case),
         "mean_beta_control": pl.Series(mean_beta_ctrl),
-        "pvalue":            pl.Series(pvals),
-        _log2_col:           pl.Series(log2_ors),
+        "pvalue": pl.Series(pvals),
+        _log2_col: pl.Series(log2_ors),
         # Transitional alias – NaN-filled; emits FutureWarning in tl.dmc.
-        "log2_odds_ratio":   pl.Series(
-                                 np.full(n_sites, np.nan, dtype=np.float64)),
-        "meth_diff":         pl.Series(meth_diff),
-        "meth_diff_ci_lo":   pl.Series(ci_lo),
-        "meth_diff_ci_hi":   pl.Series(ci_hi),
+        "log2_odds_ratio": pl.Series(np.full(n_sites, np.nan, dtype=np.float64)),
+        "meth_diff": pl.Series(meth_diff),
+        "meth_diff_ci_lo": pl.Series(ci_lo),
+        "meth_diff_ci_hi": pl.Series(ci_hi),
     }
     if "coef_treatment" in extras and "coef_se" in extras:
         out_cols["coef_treatment"] = pl.Series(extras["coef_treatment"])
-        out_cols["coef_se"]        = pl.Series(extras["coef_se"])
+        out_cols["coef_se"] = pl.Series(extras["coef_se"])
     if multigroup_mode and f_stat_out is not None and df2_out is not None:
         out_cols["f_stat"] = pl.Series(f_stat_out)
-        out_cols["df1"]    = pl.Series(np.full(n_sites, int(df1_out), dtype=np.int32))
-        out_cols["df2"]    = pl.Series(df2_out)
+        out_cols["df1"] = pl.Series(np.full(n_sites, int(df1_out), dtype=np.int32))
+        out_cols["df2"] = pl.Series(df2_out)
         # Per-level mean beta columns (stable sort for deterministic schema).
         for lvl in sorted(level_mean_beta.keys()):
             out_cols[f"mean_beta_{lvl}"] = pl.Series(level_mean_beta[lvl])
@@ -1939,8 +1978,7 @@ def _validate_sample_size_and_warn(n_case: int, n_ctrl: int, test: str) -> None:
 
     if min_n == 0:
         raise ValueError(
-            "Cannot perform DMC with zero samples in a group. "
-            f"n_case={n_case}, n_control={n_ctrl}"
+            f"Cannot perform DMC with zero samples in a group. n_case={n_case}, n_control={n_ctrl}"
         )
 
     if min_n == 1:
@@ -1992,30 +2030,31 @@ def _validate_sample_size_and_warn(n_case: int, n_ctrl: int, test: str) -> None:
 
 # Public API
 
+
 @overload
 def process_chromosomes_dmc(
     methylstore_path: str,
-    samples_treatment: Optional[list[str]] = ...,
-    samples_control: Optional[list[str]] = ...,
+    samples_treatment: list[str] | None = ...,
+    samples_control: list[str] | None = ...,
     test: str = ...,
-    chromosomes: Optional[list[str]] = ...,
+    chromosomes: list[str] | None = ...,
     unite: bool = ...,
-    min_samples_treatment: Optional[int] = ...,
+    min_samples_treatment: int | None = ...,
     min_samples_control: int = ...,
     dispersion: str = ...,
     reference: str = ...,
-    design_full: Optional[np.ndarray] = ...,
-    design_reduced: Optional[np.ndarray] = ...,
-    coef_idx: Optional[int] = ...,
-    contrast_matrix: Optional[np.ndarray] = ...,
-    contrast_label: Optional[str] = ...,
-    samples_all_ordered: Optional[list[str]] = ...,
-    group_labels_per_sample: Optional[list[str]] = ...,
+    design_full: np.ndarray | None = ...,
+    design_reduced: np.ndarray | None = ...,
+    coef_idx: int | None = ...,
+    contrast_matrix: np.ndarray | None = ...,
+    contrast_label: str | None = ...,
+    samples_all_ordered: list[str] | None = ...,
+    group_labels_per_sample: list[str] | None = ...,
     *,
     backend: str = ...,
-    n_workers: Optional[int] = ...,
+    n_workers: int | None = ...,
     glm_backend: str = ...,
-    out_dir: Optional[Union[str, Path]] = ...,
+    out_dir: str | Path | None = ...,
     return_store: Literal[True],
     smoothing: bool = ...,
     smoothing_span_bp: int = ...,
@@ -2027,27 +2066,27 @@ def process_chromosomes_dmc(
 @overload
 def process_chromosomes_dmc(
     methylstore_path: str,
-    samples_treatment: Optional[list[str]] = ...,
-    samples_control: Optional[list[str]] = ...,
+    samples_treatment: list[str] | None = ...,
+    samples_control: list[str] | None = ...,
     test: str = ...,
-    chromosomes: Optional[list[str]] = ...,
+    chromosomes: list[str] | None = ...,
     unite: bool = ...,
-    min_samples_treatment: Optional[int] = ...,
+    min_samples_treatment: int | None = ...,
     min_samples_control: int = ...,
     dispersion: str = ...,
     reference: str = ...,
-    design_full: Optional[np.ndarray] = ...,
-    design_reduced: Optional[np.ndarray] = ...,
-    coef_idx: Optional[int] = ...,
-    contrast_matrix: Optional[np.ndarray] = ...,
-    contrast_label: Optional[str] = ...,
-    samples_all_ordered: Optional[list[str]] = ...,
-    group_labels_per_sample: Optional[list[str]] = ...,
+    design_full: np.ndarray | None = ...,
+    design_reduced: np.ndarray | None = ...,
+    coef_idx: int | None = ...,
+    contrast_matrix: np.ndarray | None = ...,
+    contrast_label: str | None = ...,
+    samples_all_ordered: list[str] | None = ...,
+    group_labels_per_sample: list[str] | None = ...,
     *,
     backend: str = ...,
-    n_workers: Optional[int] = ...,
+    n_workers: int | None = ...,
     glm_backend: str = ...,
-    out_dir: Optional[Union[str, Path]] = ...,
+    out_dir: str | Path | None = ...,
     return_store: Literal[False] = ...,
     smoothing: bool = ...,
     smoothing_span_bp: int = ...,
@@ -2058,33 +2097,33 @@ def process_chromosomes_dmc(
 
 def process_chromosomes_dmc(
     methylstore_path: str,
-    samples_treatment: Optional[list[str]] = None,
-    samples_control: Optional[list[str]] = None,
+    samples_treatment: list[str] | None = None,
+    samples_control: list[str] | None = None,
     test: str = "lr",
-    chromosomes: Optional[list[str]] = None,
+    chromosomes: list[str] | None = None,
     unite: bool = True,
-    min_samples_treatment: Optional[int] = None,
+    min_samples_treatment: int | None = None,
     min_samples_control: int = 0,
     dispersion: str = "site",
     reference: str = "adaptive",
-    design_full: Optional[np.ndarray] = None,
-    design_reduced: Optional[np.ndarray] = None,
-    coef_idx: Optional[int] = None,
-    contrast_matrix: Optional[np.ndarray] = None,
-    contrast_label: Optional[str] = None,
-    samples_all_ordered: Optional[list[str]] = None,
-    group_labels_per_sample: Optional[list[str]] = None,
+    design_full: np.ndarray | None = None,
+    design_reduced: np.ndarray | None = None,
+    coef_idx: int | None = None,
+    contrast_matrix: np.ndarray | None = None,
+    contrast_label: str | None = None,
+    samples_all_ordered: list[str] | None = None,
+    group_labels_per_sample: list[str] | None = None,
     *,
     backend: str = "sequential",
-    n_workers: Optional[int] = None,
+    n_workers: int | None = None,
     glm_backend: str = "cpu",
-    out_dir: Optional[Union[str, Path]] = None,
+    out_dir: str | Path | None = None,
     return_store: bool = False,
     smoothing: bool = False,
     smoothing_span_bp: int = 500,
     sep_fallback: bool = False,
     sep_threshold: float = 0.9,
-) -> Union[pl.DataFrame, DMCStore]:
+) -> pl.DataFrame | DMCStore:
     """Process differential methylation for all chromosomes.
 
     Parameters
@@ -2159,15 +2198,13 @@ def process_chromosomes_dmc(
 
     test = _canonicalise_test_name(test)
 
-    store       = Path(methylstore_path)
+    store = Path(methylstore_path)
     # For glm_contrast the case/control split is not meaningful -- the
     # caller passes a samples_all_ordered list that the engine uses for
     # design-row alignment. Use that as the chromosome-intersection basis.
     if test == "glm_contrast":
         if samples_all_ordered is None:
-            raise ValueError(
-                "test='glm_contrast' requires samples_all_ordered."
-            )
+            raise ValueError("test='glm_contrast' requires samples_all_ordered.")
         all_samples = list(samples_all_ordered)
     else:
         all_samples = samples_case + samples_control
@@ -2178,9 +2215,7 @@ def process_chromosomes_dmc(
 
     for rng, rec in _TEST_RECOMMENDATIONS.items():
         if min_group in rng:
-            logger.info(
-                "N replicates / group = %d; recommended test: %s", min_group, rec
-            )
+            logger.info("N replicates / group = %d; recommended test: %s", min_group, rec)
             break
 
     if chromosomes is None:
@@ -2188,15 +2223,18 @@ def process_chromosomes_dmc(
         logger.info("Auto-detected %d chromosomes", len(chromosomes))
 
     logger.info(
-        "DMC: %d case / %d control, test=%s, unite=%s, "
-        "min_samples_case=%d, min_samples_control=%d",
-        len(samples_case), len(samples_control), test, unite,
-        min_samples_case, min_samples_control,
+        "DMC: %d case / %d control, test=%s, unite=%s, min_samples_case=%d, min_samples_control=%d",
+        len(samples_case),
+        len(samples_control),
+        test,
+        unite,
+        min_samples_case,
+        min_samples_control,
     )
 
     from ._compute import run_chrom_pipeline
 
-    def _dmc_chrom_handler(chrom: str) -> Optional[pl.DataFrame]:
+    def _dmc_chrom_handler(chrom: str) -> pl.DataFrame | None:
         canonical_df = (
             _intersect_chrom(store, chrom, all_samples)
             if unite
@@ -2207,8 +2245,12 @@ def process_chromosomes_dmc(
             return None
         logger.info("  %s sites to test (%s)", f"{len(canonical_df):,}", chrom)
         return _process_one_chromosome(
-            store, chrom, canonical_df,
-            samples_case, samples_control, test,
+            store,
+            chrom,
+            canonical_df,
+            samples_case,
+            samples_control,
+            test,
             min_samples_case=min_samples_case,
             min_samples_control=min_samples_control,
             dispersion=dispersion,
@@ -2235,16 +2277,26 @@ def process_chromosomes_dmc(
     # bit-identical to what we'd recompute. Skip straight to returning
     # a DMCStore over the cached dir.
     input_sig = _dmc_input_signature(
-        store, samples_case, samples_control, test, chromosomes,
-        unite, min_samples_case, min_samples_control,
-        dispersion, reference,
-        samples_all_ordered, group_labels_per_sample, contrast_label,
+        store,
+        samples_case,
+        samples_control,
+        test,
+        chromosomes,
+        unite,
+        min_samples_case,
+        min_samples_control,
+        dispersion,
+        reference,
+        samples_all_ordered,
+        group_labels_per_sample,
+        contrast_label,
         smoothing=smoothing,
         smoothing_span_bp=smoothing_span_bp,
         sep_fallback=sep_fallback,
         sep_threshold=sep_threshold,
     )
     from ._dmc_store import _MANIFEST_NAME
+
     cached_manifest = _cache.load_json(staging / _MANIFEST_NAME)
     if cached_manifest is not None and cached_manifest.get("chroms"):
         # Strict hit: signatures match exactly.
@@ -2280,8 +2332,7 @@ def process_chromosomes_dmc(
 
         if strict_hit and all_present:
             logger.info(
-                "DMC cache hit at %s (%s sites, %d chrom file(s)); "
-                "skipping recompute.",
+                "DMC cache hit at %s (%s sites, %d chrom file(s)); skipping recompute.",
                 staging,
                 f"{cached_manifest.get('total_sites', 0):,}",
                 len(cached_manifest.get("chroms", [])),
@@ -2305,8 +2356,8 @@ def process_chromosomes_dmc(
 
         if not all_present:
             logger.info(
-                "DMC manifest at %s references missing per-chrom files; "
-                "recomputing.", staging,
+                "DMC manifest at %s references missing per-chrom files; recomputing.",
+                staging,
             )
 
     # Wipe stale per-chrom files from a prior partial run in the same
@@ -2318,13 +2369,16 @@ def process_chromosomes_dmc(
     if stale_manifest.exists():
         stale_manifest.unlink()
 
-    chrom_enum   = pl.Enum(list(chromosomes))
-    strand_enum  = pl.Enum(["+", "-", "*"])
+    chrom_enum = pl.Enum(list(chromosomes))
+    strand_enum = pl.Enum(["+", "-", "*"])
 
     written_entries: list[dict] = []
     for chrom, chrom_result in run_chrom_pipeline(
-        chromosomes, _dmc_chrom_handler,
-        backend=backend, n_workers=n_workers, label="DMC",
+        chromosomes,
+        _dmc_chrom_handler,
+        backend=backend,
+        n_workers=n_workers,
+        label="DMC",
     ):
         # Cast chrom/strand to Enum at write time to keep peak DataFrame
         # memory bounded on full-genome inputs. On 22M rows this drops
@@ -2337,11 +2391,13 @@ def process_chromosomes_dmc(
         out_file = staging / _chrom_filename(chrom)
         chrom_result.write_parquet(str(out_file))
         n_sites = len(chrom_result)
-        written_entries.append({
-            "name": chrom,
-            "n_sites": int(n_sites),
-            "file": out_file.name,
-        })
+        written_entries.append(
+            {
+                "name": chrom,
+                "n_sites": int(n_sites),
+                "file": out_file.name,
+            }
+        )
         logger.info("  %s sites -> staged to disk (%s)", f"{n_sites:,}", chrom)
         del chrom_result
         gc.collect()
@@ -2352,6 +2408,7 @@ def process_chromosomes_dmc(
         empty_df = pl.DataFrame(schema=_EMPTY_SCHEMA)
         if return_store:
             from ._dmc_store import _MANIFEST_NAME
+
             empty_manifest = {
                 "epykit_version": _epykit_version(),
                 "test": test,
@@ -2367,7 +2424,9 @@ def process_chromosomes_dmc(
     total_sites = sum(e["n_sites"] for e in written_entries)
     logger.info(
         "Assembled DMC store at %s (%d chromosomes, %s sites)",
-        staging, len(written_entries), f"{total_sites:,}",
+        staging,
+        len(written_entries),
+        f"{total_sites:,}",
     )
 
     manifest = {
@@ -2543,7 +2602,7 @@ def combine_neighbour_pvalues(
     out_n_chunks: list[np.ndarray] = []
     keys: list[pl.DataFrame] = []
 
-    for chrom, sub in dmc_df.group_by(chrom_col, maintain_order=True):
+    for _chrom, sub in dmc_df.group_by(chrom_col, maintain_order=True):
         sub_sorted = sub.sort(pos_col)
         positions = sub_sorted[pos_col].to_numpy()
         pvals = sub_sorted[pvalue_col].to_numpy().astype(np.float64)
@@ -2599,7 +2658,7 @@ def combine_neighbour_pvalues(
                     # Count how many neighbours share the focal site's
                     # effect direction (used by the sign-agreement guard).
                     focal_sign = sign[i]
-                    n_agree[i] = int(np.sum((slice_sign[mask] == focal_sign)))
+                    n_agree[i] = int(np.sum(slice_sign[mask] == focal_sign))
         with np.errstate(invalid="ignore", divide="ignore"):
             z_combined = np.where(n_in > 0, z_sum / np.sqrt(n_in), 0.0)
         p_combined = 2.0 * _norm.sf(np.abs(z_combined))
@@ -2662,9 +2721,7 @@ def _apply_storey_qvalues(pvals: np.ndarray) -> tuple[np.ndarray, np.ndarray, fl
     return reject, qvals, pi0
 
 
-def _fdr_correct_finite(
-    pvals: np.ndarray, method: str
-) -> tuple[np.ndarray, np.ndarray, float]:
+def _fdr_correct_finite(pvals: np.ndarray, method: str) -> tuple[np.ndarray, np.ndarray, float]:
     """Run the FDR procedure over the FINITE p-values only (M6).
 
     NaN p-values mark *untested* hypotheses -- sites masked by the
@@ -2694,6 +2751,7 @@ def _fdr_correct_finite(
         rej_fin, q_fin, pi0 = _apply_storey_qvalues(p_fin)
     else:
         from statsmodels.stats.multitest import multipletests
+
         rej_fin, q_fin, _, _ = multipletests(p_fin, method=method)
         pi0 = 1.0
     qvals[finite] = q_fin
@@ -2720,11 +2778,11 @@ def apply_multiple_testing_correction(
 
 
 def apply_multiple_testing_correction(
-    dmc_results: Union[pl.DataFrame, DMCStore],
+    dmc_results: pl.DataFrame | DMCStore,
     method: str = "fdr_bh",
     pvalue_col: str = "pvalue",
     qvalue_col: str = "qvalue",
-) -> Union[pl.DataFrame, DMCStore]:
+) -> pl.DataFrame | DMCStore:
     """Apply multiple testing correction (Benjamini-Hochberg default).
 
     This function accepts two input types and behaves accordingly:
@@ -2766,9 +2824,7 @@ def apply_multiple_testing_correction(
     name differs from the default so the two outputs don't collide.
     """
     if method not in _VALID_FDR_METHODS:
-        raise ValueError(
-            f"method must be one of {sorted(_VALID_FDR_METHODS)}; got {method!r}"
-        )
+        raise ValueError(f"method must be one of {sorted(_VALID_FDR_METHODS)}; got {method!r}")
 
     if isinstance(dmc_results, DMCStore):
         # Cache hit: if this store was already corrected with the
@@ -2777,14 +2833,12 @@ def apply_multiple_testing_correction(
         # collect + writeback.
         prev_qcol = dmc_results.manifest.get("bh_qvalue_col", "qvalue")
         prev_method = dmc_results.manifest.get("bh_method", "fdr_bh")
-        if (
-            dmc_results.bh_applied
-            and prev_qcol == qvalue_col
-            and prev_method == method
-        ):
+        if dmc_results.bh_applied and prev_qcol == qvalue_col and prev_method == method:
             logger.info(
                 "FDR correction cache hit on %s (method=%s, qvalue_col=%s); skipping.",
-                dmc_results.path, method, qvalue_col,
+                dmc_results.path,
+                method,
+                qvalue_col,
             )
             return dmc_results
         return _apply_bh_to_store(dmc_results, method, pvalue_col, qvalue_col)
@@ -2796,14 +2850,18 @@ def apply_multiple_testing_correction(
     if method == "fdr_storey":
         logger.info(
             "Storey FDR: pi0_hat = %.4f (finite pvals=%d / %d)",
-            pi0_hat, int(np.isfinite(pvals).sum()), len(pvals),
+            pi0_hat,
+            int(np.isfinite(pvals).sum()),
+            len(pvals),
         )
 
     reject_col = "reject" if qvalue_col == "qvalue" else f"{qvalue_col}_reject"
-    return dmc_results.with_columns([
-        pl.Series(qvalue_col, qvals),
-        pl.Series(reject_col, reject),
-    ])
+    return dmc_results.with_columns(
+        [
+            pl.Series(qvalue_col, qvals),
+            pl.Series(reject_col, reject),
+        ]
+    )
 
 
 def _apply_bh_to_store(
@@ -2832,7 +2890,9 @@ def _apply_bh_to_store(
 
     logger.info(
         "FDR correction (streaming, method=%s): collecting %s p-values from %d chrom file(s)...",
-        method, f"{total:,}", len(store.chroms()),
+        method,
+        f"{total:,}",
+        len(store.chroms()),
     )
 
     pvals = np.empty(total, dtype=np.float64)
@@ -2842,7 +2902,7 @@ def _apply_bh_to_store(
         n = len(df)
         if n == 0:
             continue
-        pvals[offset:offset + n] = df[pvalue_col].to_numpy()
+        pvals[offset : offset + n] = df[pvalue_col].to_numpy()
         spans.append((chrom, offset, offset + n))
         offset += n
         del df
@@ -2858,17 +2918,21 @@ def _apply_bh_to_store(
     if method == "fdr_storey":
         logger.info(
             "Storey FDR: pi0_hat = %.4f (finite pvals=%d / %d)",
-            pi0_hat, int(np.isfinite(pvals).sum()), len(pvals),
+            pi0_hat,
+            int(np.isfinite(pvals).sum()),
+            len(pvals),
         )
     del pvals
 
     logger.info("BH correction (streaming): writing q-values back per chromosome...")
     for chrom, start, end in spans:
         df = store.read_chrom(chrom)
-        df = df.with_columns([
-            pl.Series(qvalue_col, qvals[start:end]),
-            pl.Series(reject_col, reject[start:end]),
-        ])
+        df = df.with_columns(
+            [
+                pl.Series(qvalue_col, qvals[start:end]),
+                pl.Series(reject_col, reject[start:end]),
+            ]
+        )
         store.update_chrom(chrom, df)
         del df
 
@@ -2877,6 +2941,7 @@ def _apply_bh_to_store(
 
 
 # Empirical-Bayes shrinkage of meth_diff
+
 
 def shrink_meth_diff(
     dmc_df: pl.DataFrame,
@@ -2933,9 +2998,7 @@ def shrink_meth_diff(
           near 0 mean "shrink hard," near 1 mean "barely touched."
     """
     if "meth_diff" not in dmc_df.columns:
-        raise ValueError(
-            "shrink_meth_diff: dmc_df has no 'meth_diff' column."
-        )
+        raise ValueError("shrink_meth_diff: dmc_df has no 'meth_diff' column.")
     if se_from == "ci":
         for col in ("meth_diff_ci_lo", "meth_diff_ci_hi"):
             if col not in dmc_df.columns:
@@ -2950,14 +3013,11 @@ def shrink_meth_diff(
     elif se_from == "coef_se":
         if "coef_se" not in dmc_df.columns:
             raise ValueError(
-                "se_from='coef_se' requires the 'coef_se' column "
-                "(present on GLM DMC outputs)."
+                "se_from='coef_se' requires the 'coef_se' column (present on GLM DMC outputs)."
             )
         se = dmc_df.get_column("coef_se").to_numpy().astype(np.float64)
     else:
-        raise ValueError(
-            f"se_from must be 'ci' or 'coef_se'; got {se_from!r}"
-        )
+        raise ValueError(f"se_from must be 'ci' or 'coef_se'; got {se_from!r}")
 
     meth_diff = dmc_df.get_column("meth_diff").to_numpy().astype(np.float64)
     finite = np.isfinite(meth_diff) & np.isfinite(se) & (se > 0)
@@ -2965,11 +3025,13 @@ def shrink_meth_diff(
         # Nothing to shrink; return all-NaN columns so downstream code
         # doesn't trip on missing fields.
         n = dmc_df.height
-        return dmc_df.with_columns([
-            pl.Series(out_col, np.full(n, np.nan, dtype=np.float64)),
-            pl.Series("meth_diff_se", np.where(np.isfinite(se), se, np.nan)),
-            pl.Series("shrinkage_factor", np.full(n, np.nan, dtype=np.float64)),
-        ])
+        return dmc_df.with_columns(
+            [
+                pl.Series(out_col, np.full(n, np.nan, dtype=np.float64)),
+                pl.Series("meth_diff_se", np.where(np.isfinite(se), se, np.nan)),
+                pl.Series("shrinkage_factor", np.full(n, np.nan, dtype=np.float64)),
+            ]
+        )
 
     var_md = float(np.var(meth_diff[finite], ddof=1))
     mean_se2 = float(np.mean(se[finite] ** 2))
@@ -2988,14 +3050,17 @@ def shrink_meth_diff(
         shrink_factor[finite] = tau2 / denom
         shrunk[finite] = meth_diff[finite] * shrink_factor[finite]
 
-    return dmc_df.with_columns([
-        pl.Series(out_col, shrunk),
-        pl.Series("meth_diff_se", np.where(np.isfinite(se), se, np.nan)),
-        pl.Series("shrinkage_factor", shrink_factor),
-    ])
+    return dmc_df.with_columns(
+        [
+            pl.Series(out_col, shrunk),
+            pl.Series("meth_diff_se", np.where(np.isfinite(se), se, np.nan)),
+            pl.Series("shrinkage_factor", shrink_factor),
+        ]
+    )
 
 
 # Permutation-based empirical FDR for DMC
+
 
 def empirical_fdr_for_dmc(
     methylstore_path: str,
@@ -3074,10 +3139,12 @@ def empirical_fdr_for_dmc(
         ``empirical_qvalue``.
     """
     if len(observed_dmc) == 0:
-        return observed_dmc.with_columns([
-            pl.lit(None, dtype=pl.Float64).alias("empirical_pvalue"),
-            pl.lit(None, dtype=pl.Float64).alias("empirical_qvalue"),
-        ])
+        return observed_dmc.with_columns(
+            [
+                pl.lit(None, dtype=pl.Float64).alias("empirical_pvalue"),
+                pl.lit(None, dtype=pl.Float64).alias("empirical_qvalue"),
+            ]
+        )
     if "pvalue" not in observed_dmc.columns:
         raise ValueError(
             "observed_dmc has no 'pvalue' column; empirical FDR needs raw "
@@ -3130,6 +3197,7 @@ def empirical_fdr_for_dmc(
         except Exception as exc:
             logger.warning("DMC permutation %d failed: %s", perm_idx, exc)
             import shutil
+
             shutil.rmtree(perm_dir, ignore_errors=True)
             return np.array([], dtype=np.float64)
         try:
@@ -3153,13 +3221,12 @@ def empirical_fdr_for_dmc(
     else:
         try:
             from joblib import Parallel, delayed
+
             null_pvals_list = Parallel(n_jobs=n_jobs)(
                 delayed(_run_one_perm)(i) for i in range(n_perm)
             )
         except ImportError:
-            logger.warning(
-                "joblib not installed; running DMC permutations serially."
-            )
+            logger.warning("joblib not installed; running DMC permutations serially.")
             null_pvals_list = [_run_one_perm(i) for i in range(n_perm)]
 
     # Failed permutations (engine exception, zero null sites) MUST be
@@ -3174,7 +3241,9 @@ def empirical_fdr_for_dmc(
         logger.info(
             "empirical_fdr_for_dmc: %d/%d permutations produced zero null "
             "sites; denominator uses n_perm_used=%d.",
-            n_perm_failed, n_perm, n_perm_used,
+            n_perm_failed,
+            n_perm,
+            n_perm_used,
         )
     if n_perm_used == 0:
         logger.warning(
@@ -3222,13 +3291,16 @@ def empirical_fdr_for_dmc(
     emp_p = np.where(obs_finite_mask, emp_p, np.nan)
 
     from statsmodels.stats.multitest import multipletests
+
     finite = np.isfinite(emp_p)
     emp_q = np.full_like(emp_p, np.nan, dtype=np.float64)
     if finite.any():
         _, q_finite, _, _ = multipletests(emp_p[finite], method="fdr_bh")
         emp_q[finite] = q_finite
 
-    return observed_dmc.with_columns([
-        pl.Series("empirical_pvalue", emp_p),
-        pl.Series("empirical_qvalue", emp_q),
-    ])
+    return observed_dmc.with_columns(
+        [
+            pl.Series("empirical_pvalue", emp_p),
+            pl.Series("empirical_qvalue", emp_q),
+        ]
+    )

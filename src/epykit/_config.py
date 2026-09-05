@@ -1,4 +1,4 @@
-"""Process-wide runtime configuration helpers.
+r"""Process-wide runtime configuration helpers.
 
 Currently exposes one knob: :func:`set_tmp_dir`, which redirects every
 internal ``tempfile.TemporaryDirectory`` call (DMC chrom staging, DMR
@@ -14,12 +14,11 @@ import logging
 import os
 import tempfile
 from pathlib import Path
-from typing import Optional, Union
 
 logger = logging.getLogger(__name__)
 
 
-def set_tmp_dir(path: Optional[Union[str, Path]]) -> str:
+def set_tmp_dir(path: str | Path | None) -> str:
     """Redirect all of epykit's transient temp files to ``path``.
 
     Sets :data:`tempfile.tempdir` to ``path`` (created if it doesn't

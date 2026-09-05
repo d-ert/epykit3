@@ -44,8 +44,7 @@ def umap(
         import umap as umap_lib
     except ImportError as exc:
         raise ImportError(
-            "umap-learn is required for pl.umap. "
-            "Install with: pip install 'epykit[viz]'"
+            "umap-learn is required for pl.umap. Install with: pip install 'epykit[viz]'"
         ) from exc
 
     matrix, samples = build_sample_site_matrix(md, n_sites=n_sites)
@@ -71,17 +70,24 @@ def umap(
 
     fig, ax = _get_ax(ax, figsize)
     unique_groups = sorted(set(groups), key=lambda g: (g is None, str(g)))
-    palette = (
-        [PALETTE.get("control"), PALETTE.get("treatment"),
-         PALETTE.get("hyper"), PALETTE.get("hypo"), PALETTE.get("neutral")]
-    )
+    palette = [
+        PALETTE.get("control"),
+        PALETTE.get("treatment"),
+        PALETTE.get("hyper"),
+        PALETTE.get("hypo"),
+        PALETTE.get("neutral"),
+    ]
     for i, g in enumerate(unique_groups):
         mask = np.array([row == g for row in groups])
         if mask.any():
             color_val = palette[i % len(palette)]
             ax.scatter(
-                coords[mask, 0], coords[mask, 1], s=80, alpha=0.7,
-                label=str(g), color=color_val,
+                coords[mask, 0],
+                coords[mask, 1],
+                s=80,
+                alpha=0.7,
+                label=str(g),
+                color=color_val,
             )
     ax.set_xlabel("UMAP1")
     ax.set_ylabel("UMAP2")

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12, polars, numpy, scipy.stats, statsmodels, patsy (existing). New: `diptest` for the sex-check unimodality fallback. R + methylKit for one integration script (Item 1; test skips when `Rscript` absent).
 
-**Companion spec:** [docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md](../specs/2026-05-27-phase-3-engine-freeze-design.md). Each task below references the spec §4 commit number.
+**Companion spec:** [docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md](../specs/2026-05-27-phase-3-engine-freeze-design.md). Each task below references the spec §4 commit number.
 
 ---
 
@@ -70,7 +70,7 @@ git log --oneline -3
 git tag --list "v0.7.4-phase2-scripts"
 ```
 
-Expected: working tree shows only untracked dirs (`.github/`, `CLAUDE.md` if not committed). HEAD is `5ac245d` (the spec commit) or later. Tag exists. If not on `p0-fixes`, run `git checkout p0-fixes` and verify the spec doc exists at `docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md`.
+Expected: working tree shows only untracked dirs (`.github/`, `CLAUDE.md` if not committed). HEAD is `5ac245d` (the spec commit) or later. Tag exists. If not on `p0-fixes`, run `git checkout p0-fixes` and verify the spec doc exists at `docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md`.
 
 - [ ] **Step 2: Baseline test count**
 
@@ -91,7 +91,7 @@ Expected: 15 passed (Phase 2 baseline). Record.
 - [ ] **Step 4: Confirm spec file readable**
 
 ```
-uv run python -c "from pathlib import Path; p = Path('docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md'); print(f'{p.stat().st_size:,} bytes')"
+uv run python -c "from pathlib import Path; p = Path('docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md'); print(f'{p.stat().st_size:,} bytes')"
 ```
 
 Expected: prints ~24,000 bytes. Use this spec as the source of truth for any ambiguity; this plan is the execution-level layer.
@@ -506,7 +506,7 @@ FutureWarning, mapped to ``method='segment'``.
 
 Affects: segment@all
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 1
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 1
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -743,7 +743,7 @@ docs/analysis/dmc.md updated.
 
 Affects: lr@all, fisher@all, glm@all
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 2
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 2
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -874,7 +874,7 @@ Migration: test='logit_t' -> test='welch_t' (one-line edit).
 
 Affects:
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 3
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 3
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -985,7 +985,7 @@ machinery, higher power at small n).
 
 Affects:
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 4
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 4
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1085,7 +1085,7 @@ identical).
 
 Affects:
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 5
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 5
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1178,7 +1178,7 @@ batch-stratified analysis.
 
 Affects:
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 6
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 6
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1341,7 +1341,7 @@ that exercises all four ValueError guards in one file.
 
 Affects:
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 7
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 7
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1495,7 +1495,7 @@ slightly.
 
 Affects: fisher@small-table-cells
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 8
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 8
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1650,7 +1650,7 @@ cells. Point estimates (meth_diff) unchanged.
 
 Affects: lr@all, fisher@all
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 9
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 9
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1791,7 +1791,7 @@ log emission change.
 
 Affects:
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 10
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 10
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1921,7 +1921,7 @@ fraction non-converged at WARNING when > 1%.
 
 Affects: glm@degenerate-cells
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 11
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 11
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -2090,7 +2090,7 @@ This commit:
 
 Affects: empirical_dmr@paired-cells
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 12
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 12
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -2233,7 +2233,7 @@ synthetic bimodal fixture. DVC not in paper; no headline impact.
 
 Affects: dvc@all
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 13
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 13
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -2385,7 +2385,7 @@ Added diptest to the qc extra in pyproject.toml.
 
 Affects: qc@single-sex-cohorts
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 14
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 14
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -2516,7 +2516,7 @@ spline-smoother variant.
 Affects: lr@all-significant-cells (edge case; default fdr_tsbh uses
 bootstrap pi0).
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 15
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 15
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -2771,7 +2771,7 @@ chromosome). Mixed-direction windows fall back to the raw p-value
 (conservative). Test SKIPS when Rscript not on PATH; otherwise
 verifies against a 6-CpG hand-computed fixture.
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 16
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 16
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -3033,7 +3033,7 @@ main(). This commit:
 Tests (slow): 9 engines x deterministic-with-seed + value-range
 assertions on a synth fixture.
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 17
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 17
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -3259,7 +3259,7 @@ locked re-run will populate that cache during the main eval pass;
 Phase 3 wires the mechanism with NaN-fill fallback so the columns
 always exist.
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 18
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 18
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -3534,7 +3534,7 @@ the locked re-run.
 --run-cheap and --run-all are Phase 4 expansion targets; they
 print a message and exit 2 if invoked in 0.7.5.
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 19
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 19
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -3818,7 +3818,7 @@ Production usage in Phase 4:
     --post benchmark/data/study1/eval_summary_post_phase3.parquet \\
     --commits-json commits.json --out audit.parquet
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 20
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 20
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -3938,7 +3938,7 @@ git commit -m "docs(changelog): Phase 3 wrap-up sweep
 
 Adds any bullets missed during the per-task commits.
 
-Refs docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 21
+Refs docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md §4 commit 21
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ```
@@ -3965,7 +3965,7 @@ Engine schema and public API are now final. Phase 4 = locked
 benchmark re-run (multi-seed simulator + Studies 2 / 3 re-runs +
 null calibration on real data) + paper rewrite + P2 hygiene.
 
-Companion: docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md"
+Companion: docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md"
 ```
 
 - [ ] **Step 13: Brief out**
@@ -3979,7 +3979,7 @@ Append a one-paragraph closeout note to the design spec's §9 (Handoff to Phase 
 Commit:
 
 ```
-git add docs/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md
+git add docs/history/superpowers/specs/2026-05-27-phase-3-engine-freeze-design.md
 git commit -m "docs(spec): Phase 3 closeout note in §9
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"

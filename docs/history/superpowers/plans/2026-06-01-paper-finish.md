@@ -819,7 +819,7 @@ git push -u origin paper
 ```powershell
 gh pr create --title "epykit 1.0 -- paper finish (claims.yaml, paper.md rewrite, 20-seed sweep)" --body "$(cat <<'EOF'
 ## Summary
-- Implements §3 (paper track) + paper-side §5 hygiene of the [1.0 + paper-finish design spec](docs/superpowers/specs/2026-06-01-library-1.0-and-paper-finish-design.md)
+- Implements §3 (paper track) + paper-side §5 hygiene of the [1.0 + paper-finish design spec](docs/history/superpowers/specs/2026-06-01-library-1.0-and-paper-finish-design.md)
 - 20-seed simulator parallel column (methylKit + DSS); scored intrinsically against truth.parquet
 - Timings table built from timings_post_phase3.parquet
 - claims.yaml populated with paper headline cells; regen_all.py --verify gating in place

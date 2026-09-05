@@ -128,8 +128,8 @@ or `md.uns`.
 | Function | Description |
 |----------|-------------|
 | `ep.tl.qc(md)` | Per-sample QC metrics (coverage, global methylation, conversion rate). Optional clinical checks (sex, contamination, correlation). |
-| `ep.tl.dmc(md)` | Per-CpG differential methylation calling. 8 test backends; supports covariates via patsy formulas. |
-| `ep.tl.dmr(md)` | Region-level DMR calling. 4 methods: `chain_merge`, `tile`, `sliding_window`, `hmm`. |
+| `ep.tl.dmc(md)` | Per-CpG differential methylation calling. Four test backends (`lr`, `welch_t`, `fisher`, `glm`; `auto` picks `lr` at n ≥ 2); supports covariates via patsy formulas. |
+| `ep.tl.dmr(md)` | Region-level DMR calling. 4 methods: `chain_merge` (default), `tile`, `sliding_window`, `segment`. |
 | `ep.tl.annotate(md)` | Gene-feature and CpG-island annotation of DMC and DMR results. |
 
 ### `ep.pl.*` -- Plotting

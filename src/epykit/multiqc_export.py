@@ -52,9 +52,12 @@ def report_multiqc(md, output_dir: str) -> str:
                 for s, v in zip(samples, vals)
             },
         }
-        written.append(_write_json(
-            out / "epykit_conversion_rate_mqc.json", payload,
-        ))
+        written.append(
+            _write_json(
+                out / "epykit_conversion_rate_mqc.json",
+                payload,
+            )
+        )
 
     if "mean_coverage" in obs.columns:
         cov = obs.get_column("mean_coverage").to_numpy()
@@ -68,9 +71,12 @@ def report_multiqc(md, output_dir: str) -> str:
                 for s, v in zip(samples, cov)
             },
         }
-        written.append(_write_json(
-            out / "epykit_coverage_mqc.json", payload,
-        ))
+        written.append(
+            _write_json(
+                out / "epykit_coverage_mqc.json",
+                payload,
+            )
+        )
 
     if "global_methylation" in obs.columns:
         gm = obs.get_column("global_methylation").to_numpy()
@@ -84,18 +90,20 @@ def report_multiqc(md, output_dir: str) -> str:
                 for s, v in zip(samples, gm)
             },
         }
-        written.append(_write_json(
-            out / "epykit_global_methylation_mqc.json", payload,
-        ))
+        written.append(
+            _write_json(
+                out / "epykit_global_methylation_mqc.json",
+                payload,
+            )
+        )
 
     if "qc_sample_correlation" in md.uns and isinstance(
         md.uns["qc_sample_correlation"], pl.DataFrame
     ):
         df = md.uns["qc_sample_correlation"]
-        nodes = sorted(set(
-            df.get_column("sample_a").to_list()
-            + df.get_column("sample_b").to_list()
-        ))
+        nodes = sorted(
+            set(df.get_column("sample_a").to_list() + df.get_column("sample_b").to_list())
+        )
         data: dict[str, dict[str, float]] = {n: {} for n in nodes}
         for row in df.iter_rows(named=True):
             data[row["sample_a"]][row["sample_b"]] = float(row["correlation"])
@@ -106,9 +114,12 @@ def report_multiqc(md, output_dir: str) -> str:
             "plot_type": "heatmap",
             "data": data,
         }
-        written.append(_write_json(
-            out / "epykit_sample_correlation_mqc.json", payload,
-        ))
+        written.append(
+            _write_json(
+                out / "epykit_sample_correlation_mqc.json",
+                payload,
+            )
+        )
 
     # DMC / DMR summary
     if "dmc" in md.uns and isinstance(md.uns["dmc"], dict):
@@ -126,9 +137,12 @@ def report_multiqc(md, output_dir: str) -> str:
                 },
             },
         }
-        written.append(_write_json(
-            out / "epykit_dmc_summary_mqc.json", payload,
-        ))
+        written.append(
+            _write_json(
+                out / "epykit_dmc_summary_mqc.json",
+                payload,
+            )
+        )
 
     logger.info("MultiQC custom files: wrote %d file(s) to %s", len(written), out)
     return str(out)

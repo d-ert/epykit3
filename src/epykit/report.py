@@ -26,7 +26,7 @@ import html
 import json
 import logging
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 import numpy as np
 import polars as pl
@@ -40,7 +40,7 @@ _TEMPLATE_DIR = Path(__file__).parent / "templates"
 # Default QC pass/warn/fail thresholds (WGBS-sensible). Override per call via
 # ``generate_report(..., qc_thresholds={...})``.
 _DEFAULT_QC_THRESHOLDS: dict = {
-    "bisulfite_conversion_rate": (0.99, 0.98),   # >= pass, >= warn, else fail
+    "bisulfite_conversion_rate": (0.99, 0.98),  # >= pass, >= warn, else fail
     "frac_ge_10x": (0.70, 0.50),
     "mean_coverage": (10.0, 5.0),
     "min_pairwise_corr": (0.85, 0.75),
@@ -55,6 +55,7 @@ _DEFAULT_QC_THRESHOLDS: dict = {
 def _require_jinja():
     try:
         from jinja2 import Environment, FileSystemLoader, select_autoescape
+
         return Environment, FileSystemLoader, select_autoescape
     except ImportError as exc:
         raise ImportError(
@@ -128,7 +129,7 @@ def _elide_path(p: Any, *, keep: int = 1) -> tuple[str, str]:
         return "--", ""
     full = str(p)
     parts = full.replace("\\", "/").rstrip("/").split("/")
-    short = "/".join(parts[-(keep + 1):]) if len(parts) > keep else full
+    short = "/".join(parts[-(keep + 1) :]) if len(parts) > keep else full
     return short, full
 
 
@@ -161,7 +162,7 @@ def _html_table(rows: list[dict], columns: list[dict], table_id: str) -> str:
         body_rows.append("<tr>" + "".join(cells) + "</tr>")
     return (
         f'<table class="df" id="{table_id}"><thead><tr>{head}</tr></thead>'
-        f'<tbody>{"".join(body_rows)}</tbody></table>'
+        f"<tbody>{''.join(body_rows)}</tbody></table>"
     )
 
 
@@ -207,28 +208,49 @@ def _samples_table(md: MethylData) -> str:
     rows = list(md.obs.iter_rows(named=True))
     cols: list[dict] = [{"key": "sample_id", "label": "sample_id"}]
     if "group" in has:
-        cols.append({"key": "group", "label": "group",
-                     "fmt": lambda v, r: _chip(v, gmap.get(v, "n"))})
+        cols.append(
+            {"key": "group", "label": "group", "fmt": lambda v, r: _chip(v, gmap.get(v, "n"))}
+        )
     if "global_methylation" in has:
-        cols.append({"key": "global_methylation", "label": "global meth",
-                     "num": True, "fmt": lambda v, r: _esc(_fmt_pct(v))})
+        cols.append(
+            {
+                "key": "global_methylation",
+                "label": "global meth",
+                "num": True,
+                "fmt": lambda v, r: _esc(_fmt_pct(v)),
+            }
+        )
     if "mean_coverage" in has:
-        cols.append({"key": "mean_coverage", "label": "mean cov", "num": True,
-                     "fmt": lambda v, r: _esc(f"{v:.1f}×") if v is not None else "--"})
+        cols.append(
+            {
+                "key": "mean_coverage",
+                "label": "mean cov",
+                "num": True,
+                "fmt": lambda v, r: _esc(f"{v:.1f}×") if v is not None else "--",
+            }
+        )
     if "frac_ge_10x" in has:
-        cols.append({"key": "frac_ge_10x", "label": "≥10×", "num": True,
-                     "fmt": lambda v, r: _esc(_fmt_pct(v))})
+        cols.append(
+            {
+                "key": "frac_ge_10x",
+                "label": "≥10×",
+                "num": True,
+                "fmt": lambda v, r: _esc(_fmt_pct(v)),
+            }
+        )
     # Source file (elided, full path on hover) if a path-like column exists.
     path_col = next((c for c in ("path", "file", "source", "filepath") if c in has), None)
     if path_col:
+
         def _pf(v, r):
             short, full = _elide_path(v)
             return f'<span class="path" title="{_esc(full)}">{_esc(short)}</span>'
+
         cols.append({"key": path_col, "label": "source file", "fmt": _pf})
     return _html_table(rows, cols, "tSamples")
 
 
-def _qc_status(value: Any, thresholds: tuple, higher_is_better: bool = True) -> Optional[str]:
+def _qc_status(value: Any, thresholds: tuple, higher_is_better: bool = True) -> str | None:
     if value is None or (isinstance(value, float) and value != value):
         return None
     pass_t, warn_t = thresholds
@@ -283,8 +305,9 @@ def _qc_rows(md: MethylData, thresholds: dict) -> tuple[list[dict], list[str]]:
             rec["global_methylation"] = row.get("global_methylation")
         if "bisulfite_conversion_rate" in has:
             rec["bisulfite_conversion_rate"] = row.get("bisulfite_conversion_rate")
-            s = _qc_status(row.get("bisulfite_conversion_rate"),
-                           thresholds["bisulfite_conversion_rate"])
+            s = _qc_status(
+                row.get("bisulfite_conversion_rate"), thresholds["bisulfite_conversion_rate"]
+            )
             if s:
                 statuses.append(s)
         if "min_pairwise_corr" in has:
@@ -306,9 +329,12 @@ def _qc_rows(md: MethylData, thresholds: dict) -> tuple[list[dict], list[str]]:
     # OUTLIER versus the cohort (robust MAD rule) or is absolutely broken.
     corr_floor = None
     if "min_pairwise_corr" in has:
-        vals = [r["min_pairwise_corr"] for r in out
-                if r.get("min_pairwise_corr") is not None
-                and r["min_pairwise_corr"] == r["min_pairwise_corr"]]
+        vals = [
+            r["min_pairwise_corr"]
+            for r in out
+            if r.get("min_pairwise_corr") is not None
+            and r["min_pairwise_corr"] == r["min_pairwise_corr"]
+        ]
         if len(vals) >= 4:
             med = float(np.median(vals))
             mad = float(np.median([abs(v - med) for v in vals])) * 1.4826
@@ -335,7 +361,9 @@ def _qc_rows(md: MethylData, thresholds: dict) -> tuple[list[dict], list[str]]:
     if "bisulfite_conversion_rate" in has:
         applied.append("conversion ≥ 99% pass · ≥ 98% warn")
     if "min_pairwise_corr" in has:
-        applied.append("min pairwise r is advisory (flags only cohort outliers, not the heatmap below)")
+        applied.append(
+            "min pairwise r is advisory (flags only cohort outliers, not the heatmap below)"
+        )
     return out, applied
 
 
@@ -345,25 +373,66 @@ def _qc_table(md: MethylData, qc_rows: list[dict]) -> str:
     has = {k for r in qc_rows for k in r}
     cols: list[dict] = [{"key": "sample_id", "label": "sample"}]
     if "mean_coverage" in has:
-        cols.append({"key": "mean_coverage", "label": "mean cov", "num": True,
-                     "fmt": lambda v, r: _esc(f"{v:.1f}×") if v is not None else "--"})
+        cols.append(
+            {
+                "key": "mean_coverage",
+                "label": "mean cov",
+                "num": True,
+                "fmt": lambda v, r: _esc(f"{v:.1f}×") if v is not None else "--",
+            }
+        )
     if "frac_ge_1x" in has:
-        cols.append({"key": "frac_ge_1x", "label": "≥1×", "num": True,
-                     "fmt": lambda v, r: _esc(_fmt_pct(v))})
+        cols.append(
+            {
+                "key": "frac_ge_1x",
+                "label": "≥1×",
+                "num": True,
+                "fmt": lambda v, r: _esc(_fmt_pct(v)),
+            }
+        )
     if "frac_ge_10x" in has:
-        cols.append({"key": "frac_ge_10x", "label": "≥10×", "num": True,
-                     "fmt": lambda v, r: _esc(_fmt_pct(v))})
+        cols.append(
+            {
+                "key": "frac_ge_10x",
+                "label": "≥10×",
+                "num": True,
+                "fmt": lambda v, r: _esc(_fmt_pct(v)),
+            }
+        )
     if "global_methylation" in has:
-        cols.append({"key": "global_methylation", "label": "global meth", "num": True,
-                     "fmt": lambda v, r: _esc(_fmt_pct(v))})
+        cols.append(
+            {
+                "key": "global_methylation",
+                "label": "global meth",
+                "num": True,
+                "fmt": lambda v, r: _esc(_fmt_pct(v)),
+            }
+        )
     if "bisulfite_conversion_rate" in has:
-        cols.append({"key": "bisulfite_conversion_rate", "label": "conversion", "num": True,
-                     "fmt": lambda v, r: _esc(_fmt_pct(v, 2))})
+        cols.append(
+            {
+                "key": "bisulfite_conversion_rate",
+                "label": "conversion",
+                "num": True,
+                "fmt": lambda v, r: _esc(_fmt_pct(v, 2)),
+            }
+        )
     if "min_pairwise_corr" in has:
-        cols.append({"key": "min_pairwise_corr", "label": "min pairwise r", "num": True,
-                     "fmt": lambda v, r: _esc(f"{v:.2f}") if v is not None else "--"})
-    cols.append({"key": "_status", "label": "status",
-                 "fmt": lambda v, r: f'<span class="badge {v}">{v}</span>'})
+        cols.append(
+            {
+                "key": "min_pairwise_corr",
+                "label": "min pairwise r",
+                "num": True,
+                "fmt": lambda v, r: _esc(f"{v:.2f}") if v is not None else "--",
+            }
+        )
+    cols.append(
+        {
+            "key": "_status",
+            "label": "status",
+            "fmt": lambda v, r: f'<span class="badge {v}">{v}</span>',
+        }
+    )
     return _html_table(qc_rows, cols, "tQC")
 
 
@@ -381,6 +450,7 @@ def _q_cell(alpha):
             return "--"
         cls = "cell-sig" if v < alpha else ""
         return f'<span class="{cls}">{_fmt_sci(v)}</span>'
+
     return f
 
 
@@ -390,43 +460,59 @@ def _dir_cell(gmap_dir):
         if diff is None:
             return "--"
         return _chip("hyper" if diff > 0 else "hypo", "t" if diff > 0 else "c")
+
     return f
 
 
-def _top_dmc_table(md: MethylData, n: int, alpha: float) -> Optional[str]:
+def _top_dmc_table(md: MethylData, n: int, alpha: float) -> str | None:
     dmc = md.dmc
     if dmc is None:
         return None
     p_col = "qvalue" if "qvalue" in dmc.columns else "pvalue"
-    sub = (
-        dmc.filter(pl.col(p_col).is_not_nan())
-        .sort(p_col).head(n)
-    )
+    sub = dmc.filter(pl.col(p_col).is_not_nan()).sort(p_col).head(n)
     rows = list(sub.iter_rows(named=True))
     cols: list[dict] = [
         {"key": "chrom", "label": "chrom"},
-        {"key": "pos", "label": "pos", "num": True,
-         "fmt": lambda v, r: _esc(_fmt_int(v))},
+        {"key": "pos", "label": "pos", "num": True, "fmt": lambda v, r: _esc(_fmt_int(v))},
         {"key": "meth_diff", "label": "Δβ", "num": True, "fmt": _dbeta_cell},
-        {"key": p_col, "label": p_col[0] if p_col == "qvalue" else "p",
-         "num": True, "fmt": _q_cell(alpha)},
+        {
+            "key": p_col,
+            "label": p_col[0] if p_col == "qvalue" else "p",
+            "num": True,
+            "fmt": _q_cell(alpha),
+        },
         {"key": "_dir", "label": "dir", "fmt": _dir_cell(None)},
     ]
-    for opt, lab in (("feature_type", "feature"), ("gene_name", "gene"),
-                     ("cpg_context", "CpG ctx")):
+    for opt, lab in (
+        ("feature_type", "feature"),
+        ("gene_name", "gene"),
+        ("cpg_context", "CpG ctx"),
+    ):
         if opt in sub.columns:
-            cols.append({"key": opt, "label": lab,
-                         "fmt": lambda v, r: _esc(v) if v not in (None, "") else
-                         '<span class="muted">—</span>'})
+            cols.append(
+                {
+                    "key": opt,
+                    "label": lab,
+                    "fmt": lambda v, r: (
+                        _esc(v) if v not in (None, "") else '<span class="muted">—</span>'
+                    ),
+                }
+            )
     return _html_table(rows, cols, "tDMC")
 
 
-def _top_dmr_table(md: MethylData, n: int) -> Optional[str]:
+def _top_dmr_table(md: MethylData, n: int) -> str | None:
     dmr = md.uns.get("dmr")
     if dmr is None or not isinstance(dmr, pl.DataFrame) or dmr.is_empty():
         return None
-    q_col = next((c for c in ("qvalue", "combined_qvalue", "combined_pvalue",
-                              "empirical_qvalue") if c in dmr.columns), None)
+    q_col = next(
+        (
+            c
+            for c in ("qvalue", "combined_qvalue", "combined_pvalue", "empirical_qvalue")
+            if c in dmr.columns
+        ),
+        None,
+    )
     sub = dmr.sort(q_col).head(n) if q_col else dmr.head(n)
     rows = list(sub.iter_rows(named=True))
 
@@ -440,20 +526,34 @@ def _top_dmr_table(md: MethylData, n: int) -> Optional[str]:
     cols: list[dict] = [{"key": "chrom", "label": "region", "fmt": region}]
     if "n_cpgs" in sub.columns:
         cols.append({"key": "n_cpgs", "label": "CpGs", "num": True})
-    diff_col = "meth_diff" if "meth_diff" in sub.columns else (
-        "mean_meth_diff" if "mean_meth_diff" in sub.columns else None)
+    diff_col = (
+        "meth_diff"
+        if "meth_diff" in sub.columns
+        else ("mean_meth_diff" if "mean_meth_diff" in sub.columns else None)
+    )
     if diff_col:
         cols.append({"key": diff_col, "label": "Δβ", "num": True, "fmt": _dbeta_cell})
     if q_col:
         cols.append({"key": q_col, "label": "q", "num": True, "fmt": _q_cell(1.0)})
     if "dmr_type" in sub.columns:
-        cols.append({"key": "dmr_type", "label": "type",
-                     "fmt": lambda v, r: _chip(v, "t" if v == "hyper" else "c")})
+        cols.append(
+            {
+                "key": "dmr_type",
+                "label": "type",
+                "fmt": lambda v, r: _chip(v, "t" if v == "hyper" else "c"),
+            }
+        )
     for opt, lab in (("gene_name", "gene"), ("feature_type", "feature")):
         if opt in sub.columns:
-            cols.append({"key": opt, "label": lab,
-                         "fmt": lambda v, r: _esc(v) if v not in (None, "") else
-                         '<span class="muted">—</span>'})
+            cols.append(
+                {
+                    "key": opt,
+                    "label": lab,
+                    "fmt": lambda v, r: (
+                        _esc(v) if v not in (None, "") else '<span class="muted">—</span>'
+                    ),
+                }
+            )
     return _html_table(rows, cols, "tDMR")
 
 
@@ -472,14 +572,17 @@ def _preproc_flow(md: MethylData) -> list[dict]:
         if isinstance(n, int) and isinstance(prev, int) and prev > 0:
             delta_pct = (n - prev) / prev * 100.0
             delta_cls = "dn" if delta_pct < -0.05 else ("up" if delta_pct > 0.05 else "flat")
-        out.append({
-            "step": h.get("step", "?"),
-            "n_sites_str": _fmt_int(n) if isinstance(n, int) else "--",
-            "delta": (f"{delta_pct:+.1f}% sites" if delta_pct is not None else
-                      h.get("note", "")),
-            "delta_cls": delta_cls,
-            "path": h.get("path", "?"),
-        })
+        out.append(
+            {
+                "step": h.get("step", "?"),
+                "n_sites_str": _fmt_int(n) if isinstance(n, int) else "--",
+                "delta": (
+                    f"{delta_pct:+.1f}% sites" if delta_pct is not None else h.get("note", "")
+                ),
+                "delta_cls": delta_cls,
+                "path": h.get("path", "?"),
+            }
+        )
         if isinstance(n, int):
             prev = n
     return out
@@ -490,8 +593,9 @@ def _preproc_flow(md: MethylData) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def _dmc_stats(md: MethylData, alpha: float, min_abs_diff: float,
-               dmc: Optional[pl.DataFrame] = None) -> dict:
+def _dmc_stats(
+    md: MethylData, alpha: float, min_abs_diff: float, dmc: pl.DataFrame | None = None
+) -> dict:
     if dmc is None:
         dmc = md.dmc
     if dmc is None:
@@ -505,11 +609,14 @@ def _dmc_stats(md: MethylData, alpha: float, min_abs_diff: float,
     med_abs = float(np.median(np.abs(diff[sig]))) if n_sig else float("nan")
     n_total = int(valid.sum())
     return {
-        "available": True, "n_total": n_total, "n_sig": n_sig,
+        "available": True,
+        "n_total": n_total,
+        "n_sig": n_sig,
         "n_hyper": int((sig & (diff > 0)).sum()),
         "n_hypo": int((sig & (diff < 0)).sum()),
         "pct_sig": (n_sig / n_total) if n_total else 0.0,
-        "median_abs_diff": med_abs, "p_col": p_col,
+        "median_abs_diff": med_abs,
+        "p_col": p_col,
     }
 
 
@@ -550,8 +657,9 @@ def _global_meth_by_group(md: MethylData) -> dict:
 def _summary_narrative(md, facts, dmc_stats, dmr_stats) -> str:
     """Build a colour-coded HTML sentence describing the run."""
     gc = facts["group_counts"]
-    grp_phrase = ", ".join(f"{n} {_esc(g)}" for g, n in gc.items()) if gc else \
-        f"{md.n_samples} samples"
+    grp_phrase = (
+        ", ".join(f"{n} {_esc(g)}" for g, n in gc.items()) if gc else f"{md.n_samples} samples"
+    )
     parts = [
         f"This report summarises a {_esc(md.context or 'methylation')} comparison of "
         f"<b>{md.n_samples} samples</b> ({grp_phrase}) across "
@@ -577,75 +685,106 @@ def _summary_narrative(md, facts, dmc_stats, dmr_stats) -> str:
 
 def _build_facts(md, dmc_stats, dmr_stats, alpha, min_abs_diff) -> dict:
     n_sites = (
-        md.uns.get("n_sites_filtered")
-        or md.uns.get("n_sites_regions")
-        or md.uns.get("n_sites_raw")
+        md.uns.get("n_sites_filtered") or md.uns.get("n_sites_regions") or md.uns.get("n_sites_raw")
     )
     hist = md.uns.get("_store_history", []) or []
     n_raw = next((h.get("n_sites") for h in hist if isinstance(h.get("n_sites"), int)), None)
-    n_final = n_sites if isinstance(n_sites, int) else (
-        next((h.get("n_sites") for h in reversed(hist)
-              if isinstance(h.get("n_sites"), int)), None))
+    n_final = (
+        n_sites
+        if isinstance(n_sites, int)
+        else (
+            next(
+                (h.get("n_sites") for h in reversed(hist) if isinstance(h.get("n_sites"), int)),
+                None,
+            )
+        )
+    )
     dmc_uns = md.uns.get("dmc") or {}
     return {
         "n_sites_str": _fmt_int(n_final) if isinstance(n_final, int) else "?",
         "n_sites_raw_str": _fmt_int(n_raw) if isinstance(n_raw, int) else None,
-        "pct_retained": (n_final / n_raw) if (isinstance(n_final, int)
-                                              and isinstance(n_raw, int) and n_raw) else None,
+        "pct_retained": (n_final / n_raw)
+        if (isinstance(n_final, int) and isinstance(n_raw, int) and n_raw)
+        else None,
         "group_counts": _group_counts(md),
         "global_meth_by_group": _global_meth_by_group(md),
-        "dmc_engine": str(dmc_uns.get("test_used") or dmc_uns.get("test_requested")
-                          or "per-CpG test"),
+        "dmc_engine": str(
+            dmc_uns.get("test_used") or dmc_uns.get("test_requested") or "per-CpG test"
+        ),
         "fdr_method": str(dmc_uns.get("fdr_method") or "BH").replace("fdr_", "").upper(),
-        "alpha": alpha, "min_abs_diff": min_abs_diff,
+        "alpha": alpha,
+        "min_abs_diff": min_abs_diff,
     }
 
 
 def _build_kpis(md, facts, dmc_stats, dmr_stats) -> list[dict]:
-    kpis: list[dict] = [{
-        "big": str(md.n_samples), "label": "samples", "cls": "",
-        "ctx": ", ".join(f"{n} {_esc(g)}" for g, n in facts["group_counts"].items())
-        or None,
-    }]
+    kpis: list[dict] = [
+        {
+            "big": str(md.n_samples),
+            "label": "samples",
+            "cls": "",
+            "ctx": ", ".join(f"{n} {_esc(g)}" for g, n in facts["group_counts"].items()) or None,
+        }
+    ]
     if facts["n_sites_str"] != "?":
         ctx = None
         if facts["pct_retained"] is not None and facts["n_sites_raw_str"]:
             ctx = f"of {facts['n_sites_raw_str']} raw ({facts['pct_retained']:.0%})"
-        kpis.append({"big": facts["n_sites_str"], "label": "sites retained",
-                     "cls": "", "ctx": ctx})
+        kpis.append({"big": facts["n_sites_str"], "label": "sites retained", "cls": "", "ctx": ctx})
     if dmc_stats.get("available"):
         total = max(dmc_stats["n_hyper"] + dmc_stats["n_hypo"], 1)
-        kpis.append({"big": f"{dmc_stats['n_hyper']:,}", "label": "hyper DMCs",
-                     "cls": "hyper",
-                     "spark": {"pct": dmc_stats["n_hyper"] / total * 100,
-                               "color": "var(--hyper)"}})
-        kpis.append({"big": f"{dmc_stats['n_hypo']:,}", "label": "hypo DMCs",
-                     "cls": "hypo",
-                     "spark": {"pct": dmc_stats["n_hypo"] / total * 100,
-                               "color": "var(--hypo)"}})
-        kpis.append({"big": _fmt_pct(dmc_stats["pct_sig"], 2), "label": "% sig of tested",
-                     "cls": "", "ctx": f"{dmc_stats['n_sig']:,} significant"})
+        kpis.append(
+            {
+                "big": f"{dmc_stats['n_hyper']:,}",
+                "label": "hyper DMCs",
+                "cls": "hyper",
+                "spark": {"pct": dmc_stats["n_hyper"] / total * 100, "color": "var(--hyper)"},
+            }
+        )
+        kpis.append(
+            {
+                "big": f"{dmc_stats['n_hypo']:,}",
+                "label": "hypo DMCs",
+                "cls": "hypo",
+                "spark": {"pct": dmc_stats["n_hypo"] / total * 100, "color": "var(--hypo)"},
+            }
+        )
+        kpis.append(
+            {
+                "big": _fmt_pct(dmc_stats["pct_sig"], 2),
+                "label": "% sig of tested",
+                "cls": "",
+                "ctx": f"{dmc_stats['n_sig']:,} significant",
+            }
+        )
     if dmr_stats.get("available"):
         ctx = None
         if "n_hyper" in dmr_stats:
             ctx = f"{dmr_stats['n_hyper']} hyper · {dmr_stats['n_hypo']} hypo"
-        kpis.append({"big": str(dmr_stats["n_total"]), "label": "DMRs", "cls": "",
-                     "ctx": ctx})
+        kpis.append({"big": str(dmr_stats["n_total"]), "label": "DMRs", "cls": "", "ctx": ctx})
     return kpis
 
 
 def _completeness(md, dmc_stats, dmr_stats) -> list[dict]:
     has = set(md.obs.columns)
-    annotated = md.dmc is not None and "feature_type" in (md.dmc.columns if md.dmc is not None else [])
+    annotated = md.dmc is not None and "feature_type" in (
+        md.dmc.columns if md.dmc is not None else []
+    )
     return [
         {"label": "Import & methylstore built", "done": bool(md.uns.get("_store_history"))},
-        {"label": "Filtering / normalisation", "done": md._filtered if hasattr(md, "_filtered") else bool(md.uns.get("filter"))},
+        {
+            "label": "Filtering / normalisation",
+            "done": md._filtered if hasattr(md, "_filtered") else bool(md.uns.get("filter")),
+        },
         {"label": "DMC calling", "done": dmc_stats.get("available", False)},
         {"label": "DMR calling", "done": dmr_stats.get("available", False)},
         {"label": "Genomic annotation", "done": annotated},
         {"label": "QC metrics", "done": "global_methylation" in has},
-        {"label": "Bisulfite conversion", "done": "bisulfite_conversion_rate" in has,
-         "note": "no CHH store" if "bisulfite_conversion_rate" not in has else ""},
+        {
+            "label": "Bisulfite conversion",
+            "done": "bisulfite_conversion_rate" in has,
+            "note": "no CHH store" if "bisulfite_conversion_rate" not in has else "",
+        },
         {"label": "Sample correlation", "done": md.uns.get("qc_sample_correlation") is not None},
     ]
 
@@ -683,8 +822,9 @@ def _methods_text(md, facts, alpha, min_abs_diff) -> str:
         method = dmr_uns.get("method") or "the configured"
         sentences.append(f"Regions were called with the '{method}' DMR caller.")
     if md.dmc is not None and "feature_type" in md.dmc.columns:
-        sentences.append("Differential sites were annotated against gene features "
-                         "and CpG-island context.")
+        sentences.append(
+            "Differential sites were annotated against gene features and CpG-island context."
+        )
     sentences.append("Analyses used polars, NumPy/SciPy, statsmodels and bioframe.")
     return " ".join(sentences)
 
@@ -748,9 +888,12 @@ def _make_fig_renderer(self_contained: bool) -> Callable:
             # responsive=True makes each chart size to its container (and resize
             # with the window) instead of a fixed ~700px width that overflows the
             # two-column grid and overlaps the neighbouring card.
-            return fig.to_html(include_plotlyjs=inc, full_html=False,
-                               default_height=None,
-                               config={"responsive": True})
+            return fig.to_html(
+                include_plotlyjs=inc,
+                full_html=False,
+                default_height=None,
+                config={"responsive": True},
+            )
         except Exception as exc:  # pragma: no cover - plotly version drift
             logger.warning("Failed to render Plotly figure: %s", exc)
             return None
@@ -777,19 +920,19 @@ def generate_report(
     md: MethylData,
     output: str,
     *,
-    title: Optional[str] = None,
-    gtf_path: Optional[str] = None,
+    title: str | None = None,
+    gtf_path: str | None = None,
     alpha: float = 0.05,
     min_abs_diff: float = 0.1,
     dmc_top_n: int = 50,
     dmr_top_n: int = 50,
-    metaplot_max_genes: Optional[int] = 5000,
+    metaplot_max_genes: int | None = 5000,
     pca_n_sites: int = 10_000,
     coverage_max_points: int = 200_000,
     dmc_max_points: int = 200_000,
     clear_cache: bool = False,
     self_contained: bool = True,
-    qc_thresholds: Optional[dict] = None,
+    qc_thresholds: dict | None = None,
 ) -> str:
     """Render a single-file, MultiQC-style HTML dashboard report.
 
@@ -842,22 +985,24 @@ def generate_report(
 
     from .pl._plotly import (
         coverage_histogram_plotly,
-        volcano_plotly,
+        cpg_island_pie_plotly,
+        dmr_size_hist_plotly,
+        feature_direction_stacked_plotly,
+        feature_pie_plotly,
+        global_methylation_bar_plotly,
         ma_plot_plotly,
         manhattan_plotly,
-        feature_pie_plotly,
-        cpg_island_pie_plotly,
         pca_plotly,
-        tss_metaplot_plotly,
         pvalue_histogram_plotly,
-        dmr_size_hist_plotly,
-        global_methylation_bar_plotly,
         sample_correlation_plotly,
         scree_plotly,
-        feature_direction_stacked_plotly,
+        tss_metaplot_plotly,
+        volcano_plotly,
     )
+
     if clear_cache:
         from .pl._compute import clear_report_cache
+
         clear_report_cache(md)
 
     thresholds = dict(_DEFAULT_QC_THRESHOLDS)
@@ -903,10 +1048,44 @@ def generate_report(
     coverage_plot = render(_safe(coverage_histogram_plotly, md, max_points=coverage_max_points))
     global_meth_bar = render(_safe(global_methylation_bar_plotly, md))
     corr_heatmap = render(_safe(sample_correlation_plotly, md))
-    volcano_plot = render(_safe(volcano_plotly, md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc_full, max_points=dmc_max_points)) if dmc_stats.get("available") else None
-    pvalue_hist = render(_safe(pvalue_histogram_plotly, md, dmc=dmc_full)) if dmc_stats.get("available") else None
-    ma_plot = render(_safe(ma_plot_plotly, md, alpha=alpha, min_abs_diff=min_abs_diff, dmc=dmc_full, max_points=dmc_max_points)) if dmc_stats.get("available") else None
-    manhattan_plot = render(_safe(manhattan_plotly, md, alpha=alpha, dmc=dmc_full, max_points=dmc_max_points)) if dmc_stats.get("available") else None
+    volcano_plot = (
+        render(
+            _safe(
+                volcano_plotly,
+                md,
+                alpha=alpha,
+                min_abs_diff=min_abs_diff,
+                dmc=dmc_full,
+                max_points=dmc_max_points,
+            )
+        )
+        if dmc_stats.get("available")
+        else None
+    )
+    pvalue_hist = (
+        render(_safe(pvalue_histogram_plotly, md, dmc=dmc_full))
+        if dmc_stats.get("available")
+        else None
+    )
+    ma_plot = (
+        render(
+            _safe(
+                ma_plot_plotly,
+                md,
+                alpha=alpha,
+                min_abs_diff=min_abs_diff,
+                dmc=dmc_full,
+                max_points=dmc_max_points,
+            )
+        )
+        if dmc_stats.get("available")
+        else None
+    )
+    manhattan_plot = (
+        render(_safe(manhattan_plotly, md, alpha=alpha, dmc=dmc_full, max_points=dmc_max_points))
+        if dmc_stats.get("available")
+        else None
+    )
     dmr_size_hist = render(_safe(dmr_size_hist_plotly, md)) if dmr_stats.get("available") else None
     # Annotation pies at BOTH levels. Per-CpG (DMC) answers "where do
     # differential cytosines fall?" (density-weighted); per-region (DMR) gives
@@ -917,7 +1096,11 @@ def generate_report(
     feature_pie_dmr = render(_safe(feature_pie_plotly, md, level="dmr"))
     cpg_pie_dmr = render(_safe(cpg_island_pie_plotly, md, level="dmr"))
     feature_stacked = render(_safe(feature_direction_stacked_plotly, md))
-    metaplot = render(_safe(tss_metaplot_plotly, md, gtf_path, max_genes=metaplot_max_genes)) if gtf_path else None
+    metaplot = (
+        render(_safe(tss_metaplot_plotly, md, gtf_path, max_genes=metaplot_max_genes))
+        if gtf_path
+        else None
+    )
     pca_plot = render(_safe(pca_plotly, md, n_sites=pca_n_sites))
     scree_plot = render(_safe(scree_plotly, md))
 
@@ -928,20 +1111,38 @@ def generate_report(
     sections = [
         {"id": "summary", "num": "00", "label": "Summary", "status": "ok"},
         {"id": "samples", "num": "01", "label": "Samples", "status": "ok"},
-        {"id": "preproc", "num": "02", "label": "Preprocessing",
-         "status": st(bool(md.uns.get("_store_history")))},
-        {"id": "qc", "num": "03", "label": "Quality control",
-         "status": st(bool(qc_rows), warn=(qc_has_fail or qc_has_warn))},
-        {"id": "dmc", "num": "04", "label": "Diff. methylation (DMC)",
-         "status": st(dmc_stats.get("available", False))},
-        {"id": "dmr", "num": "05", "label": "Diff. regions (DMR)",
-         "status": st(dmr_stats.get("available", False))},
-        {"id": "annot", "num": "06", "label": "Annotation",
-         "status": st(bool(feature_pie or cpg_pie or feature_pie_dmr or cpg_pie_dmr))},
-        {"id": "metaplot", "num": "07", "label": "TSS metaplot",
-         "status": st(bool(metaplot))},
-        {"id": "pca", "num": "08", "label": "Sample similarity",
-         "status": st(bool(pca_plot))},
+        {
+            "id": "preproc",
+            "num": "02",
+            "label": "Preprocessing",
+            "status": st(bool(md.uns.get("_store_history"))),
+        },
+        {
+            "id": "qc",
+            "num": "03",
+            "label": "Quality control",
+            "status": st(bool(qc_rows), warn=(qc_has_fail or qc_has_warn)),
+        },
+        {
+            "id": "dmc",
+            "num": "04",
+            "label": "Diff. methylation (DMC)",
+            "status": st(dmc_stats.get("available", False)),
+        },
+        {
+            "id": "dmr",
+            "num": "05",
+            "label": "Diff. regions (DMR)",
+            "status": st(dmr_stats.get("available", False)),
+        },
+        {
+            "id": "annot",
+            "num": "06",
+            "label": "Annotation",
+            "status": st(bool(feature_pie or cpg_pie or feature_pie_dmr or cpg_pie_dmr)),
+        },
+        {"id": "metaplot", "num": "07", "label": "TSS metaplot", "status": st(bool(metaplot))},
+        {"id": "pca", "num": "08", "label": "Sample similarity", "status": st(bool(pca_plot))},
         {"id": "methods", "num": "09", "label": "Methods & citations", "status": "ok"},
         {"id": "prov", "num": "10", "label": "Provenance", "status": "ok"},
     ]
@@ -1012,17 +1213,21 @@ def generate_report(
         "dmc_n_sig": _fmt_int(dmc_stats.get("n_sig")),
         "dmc_n_hyper": _fmt_int(dmc_stats.get("n_hyper")),
         "dmc_n_hypo": _fmt_int(dmc_stats.get("n_hypo")),
-        "dmc_median_abs": (_fmt_value(dmc_stats["median_abs_diff"])
-                           if dmc_stats.get("available") and
-                           dmc_stats["median_abs_diff"] == dmc_stats["median_abs_diff"]
-                           else None),
+        "dmc_median_abs": (
+            _fmt_value(dmc_stats["median_abs_diff"])
+            if dmc_stats.get("available")
+            and dmc_stats["median_abs_diff"] == dmc_stats["median_abs_diff"]
+            else None
+        ),
         "dmc_engine": facts["dmc_engine"],
         "dmc_fdr": facts["fdr_method"],
         "volcano_plot": volcano_plot,
         "pvalue_hist": pvalue_hist,
         "ma_plot": ma_plot,
         "manhattan_plot": manhattan_plot,
-        "dmc_top_table": _top_dmc_table(md, dmc_top_n, alpha) if dmc_stats.get("available") else None,
+        "dmc_top_table": _top_dmc_table(md, dmc_top_n, alpha)
+        if dmc_stats.get("available")
+        else None,
         "dmc_top_n": dmc_top_n,
         # DMR
         "dmr_available": dmr_stats.get("available", False),
@@ -1059,7 +1264,7 @@ def generate_report(
     return str(out.resolve())
 
 
-def _pretty_dict(value: Any) -> Optional[str]:
+def _pretty_dict(value: Any) -> str | None:
     if value is None:
         return None
     if isinstance(value, dict):

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12, polars, numpy, scipy.stats (binomial, hypergeom, Wilson via `scipy.stats.binomtest`), statsmodels (for `proportion_confint` if more convenient), pytest. R is not touched.
 
-**Companion spec:** [docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md](../specs/2026-05-27-paper-defendable-benchmark-design.md) §2 (gaps), §5 (script catalogue).
+**Companion spec:** [docs/history/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md](../specs/2026-05-27-paper-defendable-benchmark-design.md) §2 (gaps), §5 (script catalogue).
 
 ---
 
@@ -52,7 +52,7 @@ git log --oneline -3
 git tag --list "v0.7.3-p0-complete"
 ```
 
-Expected: working tree shows only untracked dirs (`.github/`, `CLAUDE.md`, `benchmark/`, `docs/superpowers/plans/`). HEAD is `8f447a9` or later. Tag exists.
+Expected: working tree shows only untracked dirs (`.github/`, `CLAUDE.md`, `benchmark/`, `docs/history/superpowers/plans/`). HEAD is `8f447a9` or later. Tag exists.
 
 - [ ] **Step 2: Confirm benchmark tests baseline**
 
@@ -203,7 +203,7 @@ Future work in the benchmark suite happens under epykit3/benchmark/
 exclusively. benchmarkin_merges/ on disk remains as the source-of-truth
 copy until Phase 3's locked re-run, after which it can be deleted.
 
-Refs docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md
+Refs docs/history/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -379,7 +379,7 @@ Expected: all 3 tests FAIL with `ModuleNotFoundError: No module named 'simulate_
 Used to validate epykit defaults on held-out data not used during
 parameter selection. The simulator's intrinsic `is_dmc` flag becomes
 the ground truth, replacing the noisy threshold-reconstruction in
-`_make_truth.py`. See `docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md`
+`_make_truth.py`. See `docs/history/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md`
 §2.1 for the design rationale.
 
 Simulation model
@@ -674,7 +674,7 @@ Outputs:
 Tests verify: deterministic with seed, truth-schema match, ~20% DMCs
 with |delta| ~ U(0.2, 1.0), 50/50 direction split.
 
-Refs docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md §2.1
+Refs docs/history/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md §2.1
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -823,7 +823,7 @@ _draw_baseline_beta mixture parameters and document the change in
 the commit message; record the comparison stats (Piao mean/std vs
 simulator mean/std) for the bug-fix audit table.
 
-Refs docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md §2.1
+Refs docs/history/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md §2.1
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1034,7 +1034,7 @@ reads/writes eval_summary.parquet schemas.
 
 Bootstrap CIs for AUROC / F1 land in the next commit.
 
-Refs docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md §2.3
+Refs docs/history/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md §2.3
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1233,7 +1233,7 @@ uses, so the calling convention differs.
 Determinism: seeded RNG; two calls with the same seed yield
 identical bounds.
 
-Refs docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md §2.3
+Refs docs/history/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md §2.3
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1373,7 +1373,7 @@ no true DMCs in the shuffled design, observed FDR at nominal q < 0.05
 should be ~ 0.05 if the test is well-calibrated, OR much lower if the
 test is conservative on the input data's noise regime.
 
-See `docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md`
+See `docs/history/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md`
 §2.2.
 
 This module exposes:
@@ -1539,7 +1539,7 @@ underdispersed simulator + lr default).
 Module decoupled from epykit -- takes an `engine_fn` closure so it
 tests with a mock noise engine. Real callers wire ep.tl.dmc.
 
-Refs docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md §2.2
+Refs docs/history/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md §2.2
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF

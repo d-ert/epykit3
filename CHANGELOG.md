@@ -168,6 +168,16 @@ redesigned HTML report.
 
 ### Changed
 
+- **Docs and repository layout.** README, `CLAUDE.md` and the docs no longer claim
+  that every DMR caller supports permutation FDR (only `method="tile"` does), the
+  engine count is stated as four, the CLI `dmr` default is documented as
+  `chain_merge`, and `docs/advanced/architecture.md` is the canonical engine map
+  (line-number citations replaced by function names). Planning residue moved to
+  `docs/history/`; the root `samplesheet.csv` moved to
+  `docs/getting-started/samplesheet.example.csv`. Added `CONTRIBUTING.md` and
+  GitHub issue/PR templates. Ticket-named test files (`test_p0_*`,
+  `test_phase3_drops`) were folded into behaviour-named files; no test was
+  removed.
 - **`polars>=1.0` required (M-PKG1).** The declared floor was `>=0.20.0`, but
   the code uses `DataFrame.pivot(on=...)`, a polars-1.0 API. `numba` floor
   raised to `>=0.60` (numpy-2 support).
@@ -309,7 +319,7 @@ deprecation shim so 0.7.6 code continues to run with warnings.
 ### Internal
 
 - Public-surface audit committed at
-  `docs/superpowers/specs/2026-06-01-public-surface-audit.md` —
+  `docs/history/superpowers/specs/2026-06-01-public-surface-audit.md` —
   inventory of all 47 top-level exports with per-export verdicts and a
   1.1 backlog.
 - Phase 4 plan checkboxes synced to reflect what actually shipped
@@ -519,7 +529,7 @@ on the original case/control assignment.
   the default was `"site"`; the actual code default is `"eb"`. The
   empirical-Bayes shrinkage is the intended default. Docstring corrected;
   PROTOCOL.md and EXECUTIVE_SUMMARY downstream notes follow separately. See
-  `docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md`.
+  `docs/history/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md`.
 
 - **P0-6 (docs)**: `combine_neighbour_pvalues` docstring now explicitly
   owns the Stouffer independence assumption violation under spatial

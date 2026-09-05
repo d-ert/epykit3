@@ -42,8 +42,8 @@ Examples
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Optional
 
 import polars as pl
 
@@ -54,14 +54,10 @@ _DEFAULT_COLUMNS = ["pos", "strand", "N_meth", "coverage"]
 
 
 def _list_samples(store: Path) -> list[str]:
-    return sorted(
-        d.name.removeprefix("sample=")
-        for d in store.glob("sample=*")
-        if d.is_dir()
-    )
+    return sorted(d.name.removeprefix("sample=") for d in store.glob("sample=*") if d.is_dir())
 
 
-def _resolve_samples(store: Path, samples: Optional[Iterable[str]]) -> list[str]:
+def _resolve_samples(store: Path, samples: Iterable[str] | None) -> list[str]:
     if samples is None:
         return _list_samples(store)
     return list(samples)
@@ -73,7 +69,7 @@ def query_region(
     start: int,
     end: int,
     *,
-    samples: Optional[Iterable[str]] = None,
+    samples: Iterable[str] | None = None,
 ) -> pl.DataFrame:
     """Fetch methylation data for one genomic region across samples.
 
@@ -132,8 +128,7 @@ def query_region(
         return _empty_frame()
     out = pl.concat(parts, how="vertical_relaxed")
     out = out.with_columns(
-        (pl.col("N_meth") / pl.col("coverage").cast(pl.Float64))
-        .fill_nan(None).alias("beta")
+        (pl.col("N_meth") / pl.col("coverage").cast(pl.Float64)).fill_nan(None).alias("beta")
     )
     return out.select(["sample_id", "chrom", "pos", "strand", "N_meth", "coverage", "beta"]).sort(
         ["sample_id", "pos"]
@@ -144,7 +139,7 @@ def query_regions(
     store: str | Path,
     regions: pl.DataFrame,
     *,
-    samples: Optional[Iterable[str]] = None,
+    samples: Iterable[str] | None = None,
 ) -> pl.DataFrame:
     """Batched region query -- concatenates results across multiple regions.
 
@@ -161,7 +156,10 @@ def query_regions(
     parts: list[pl.DataFrame] = []
     for region_id, row in enumerate(regions.iter_rows(named=True)):
         df = query_region(
-            store, row["chrom"], int(row["start"]), int(row["end"]),
+            store,
+            row["chrom"],
+            int(row["start"]),
+            int(row["end"]),
             samples=samples,
         )
         if df.height:
@@ -176,7 +174,7 @@ def query_sites(
     store: str | Path,
     sites: pl.DataFrame,
     *,
-    samples: Optional[Iterable[str]] = None,
+    samples: Iterable[str] | None = None,
 ) -> pl.DataFrame:
     """Exact-position queries -- return rows at specified (chrom, pos) sites.
 
@@ -234,8 +232,7 @@ def query_sites(
         return _empty_frame()
     out = pl.concat(parts, how="vertical_relaxed")
     out = out.with_columns(
-        (pl.col("N_meth") / pl.col("coverage").cast(pl.Float64))
-        .fill_nan(None).alias("beta")
+        (pl.col("N_meth") / pl.col("coverage").cast(pl.Float64)).fill_nan(None).alias("beta")
     )
     return out.select(["sample_id", "chrom", "pos", "strand", "N_meth", "coverage", "beta"]).sort(
         ["sample_id", "chrom", "pos"]

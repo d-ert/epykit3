@@ -1,5 +1,5 @@
-"""P0-2b: empirical_fdr_for_dmc must use per-permutation tail counts,
-not pooled-null counts. Same fix shape as the P0-2 DMR fix.
+"""empirical_fdr_for_dmc must use per-permutation tail counts, not
+pooled-null counts (same shape as the DMR fix in test_dmr_empirical_fdr.py).
 
 Strategy: mock process_chromosomes_dmc (the real heavy call inside
 _run_one_perm) to return a lightweight stub DMCStore yielding prebuilt

@@ -609,7 +609,7 @@ In `src/epykit/tl.py`, restructure `tl.dmr` so the `empirical_fdr` gate is **bef
             f"method='tile'. Got method={method!r}. Use method='tile' or "
             f"omit empirical_fdr=True. (Follow-up: implement permutation "
             f"FDR for chain_merge/sliding_window/segment -- tracked in "
-            f"docs/superpowers/plans/2026-06-07-epykit-audit-fixes.md "
+            f"docs/history/superpowers/plans/2026-06-07-epykit-audit-fixes.md "
             f"Batch-4-followup.)"
         )
 ```
