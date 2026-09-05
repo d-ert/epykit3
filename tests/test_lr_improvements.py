@@ -17,8 +17,8 @@ import pytest
 
 import epykit as ep
 from epykit.dmc import (
-    _storey_pi0,
     _apply_storey_qvalues,
+    _storey_pi0,
     apply_multiple_testing_correction,
     combine_neighbour_pvalues,
 )

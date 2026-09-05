@@ -16,7 +16,7 @@ import pytest
 
 pysam = pytest.importorskip("pysam", reason="pysam required for ASM tests.")
 
-from epykit.asm import call_asm
+from epykit.asm import call_asm  # noqa: E402 -- must follow importorskip
 
 
 def _write_synth_bam_and_vcf(tmp_path: Path) -> tuple[Path, Path]:

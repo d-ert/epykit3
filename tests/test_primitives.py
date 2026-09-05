@@ -12,7 +12,6 @@ import numpy as np
 import polars as pl
 import pytest
 
-
 # fisher_exact_vectorized
 
 
@@ -77,7 +76,7 @@ def test_fisher_symmetry():
 def test_fisher_degenerate_row_returns_nan():
     """A row with zero total in one group should yield NaN p-value."""
     from epykit.dmc import fisher_exact_vectorized
-    pvals, log2_or = fisher_exact_vectorized(
+    pvals, _log2_or = fisher_exact_vectorized(
         np.array([0]), np.array([0]),
         np.array([5]), np.array([5]),
     )
@@ -93,6 +92,7 @@ def test_fisher_directionally_agrees_with_scipy():
     both numerical agreement (atol=1e-12) and perfect call agreement.
     """
     from scipy.stats import fisher_exact as scipy_fisher
+
     from epykit.dmc import fisher_exact_vectorized
 
     rng = np.random.default_rng(42)
@@ -141,6 +141,7 @@ def test_bh_matches_statsmodels_on_clean_pvalues():
     """BH q-values should match statsmodels.multipletests exactly when no
     NaN p-values are present."""
     from statsmodels.stats.multitest import multipletests
+
     from epykit.dmc import apply_multiple_testing_correction
 
     rng = np.random.default_rng(0)
@@ -208,7 +209,7 @@ def test_build_design_treatment_only():
         "sample_id": ["s1", "s2", "s3", "s4"],
         "treatment": [1, 1, 0, 0],
     })
-    X_full, X_red, coef_idx, names, formula = build_design(
+    X_full, X_red, coef_idx, names, _formula = build_design(
         obs, samples_ordered=["s1", "s2", "s3", "s4"]
     )
     assert X_full.shape == (4, 2)
@@ -226,7 +227,7 @@ def test_build_design_with_continuous_covariate():
         "treatment": [1, 1, 0, 0],
         "age":       [25.0, 30.0, 28.0, 35.0],
     })
-    X_full, X_red, coef_idx, names, formula = build_design(
+    X_full, X_red, _coef_idx, names, _formula = build_design(
         obs, samples_ordered=["s1", "s2", "s3", "s4"],
         covariates=["age"],
     )
@@ -287,7 +288,7 @@ def test_irls_recovers_known_coefficients():
     cov = np.full(n_samples, 50, dtype=np.int32)
     meth = rng.binomial(cov, pi).astype(np.int32)
 
-    beta, se, dev, chi2, n_eff = irls_binomial_batch(
+    beta, _se, _dev, _chi2, _n_eff = irls_binomial_batch(
         meth[None, :], cov[None, :], X
     )
 
@@ -313,7 +314,7 @@ def test_irls_marks_degenerate_sites_nan():
     X = np.column_stack([np.ones(4), [1, 1, 0, 0]]).astype(np.float64)
     meth = np.array([[1, 0, 0, 0]], dtype=np.int32)
     cov  = np.array([[5, 0, 0, 0]], dtype=np.int32)  # only one sample covered
-    beta, se, dev, chi2, n_eff = irls_binomial_batch(meth, cov, X)
+    beta, _se, dev, _chi2, n_eff = irls_binomial_batch(meth, cov, X)
     assert n_eff[0] < 2
     assert np.isnan(dev[0])
     assert np.all(np.isnan(beta[0]))
@@ -331,7 +332,7 @@ def test_irls_batched_solves_multiple_sites_independently():
     ], dtype=np.int32)
     cov  = np.full((2, 8), 50, dtype=np.int32)
 
-    beta, se, dev, chi2, n_eff = irls_binomial_batch(meth, cov, X)
+    beta, _se, _dev, _chi2, _n_eff = irls_binomial_batch(meth, cov, X)
     # Site 0 should have a much larger treatment coefficient than site 1.
     assert abs(beta[0, 1]) > 1.0
     assert abs(beta[1, 1]) < 0.5

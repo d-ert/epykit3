@@ -23,7 +23,7 @@ def test_fisher_two_sided_matches_scipy_on_random_tables():
     epy_p, _epy_log2_or = fisher_exact_vectorized(a, b, c, d)
     ref_p = np.array([
         fisher_exact([[ai, bi], [ci, di]], alternative="two-sided")[1]
-        for ai, bi, ci, di in zip(a, b, c, d)
+        for ai, bi, ci, di in zip(a, b, c, d, strict=True)
     ])
     np.testing.assert_allclose(
         epy_p, ref_p, atol=1e-12, rtol=1e-9,

@@ -51,7 +51,7 @@ def test_segment_recovers_states_high_accuracy():
 
 def test_segment_returns_posteriors_when_requested():
     obs, _truth = _simulate_two_state_chain(n=100)
-    path, posteriors = segment(obs, n_states=2, return_posteriors=True)
+    _path, posteriors = segment(obs, n_states=2, return_posteriors=True)
     assert posteriors.shape == (100, 2)
     # Each row must sum to ~1.
     np.testing.assert_allclose(posteriors.sum(axis=1), 1.0, atol=1e-6)

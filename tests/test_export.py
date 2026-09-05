@@ -33,6 +33,7 @@ def test_to_bedgraph_streams_all_covered_sites_in_order(synth_md_filtered, tmp_p
     no sites dropped or duplicated by the refactor away from the
     whole-genome materialisation."""
     import polars as pl
+
     from epykit.export import _chromosome_sort_key
 
     md = synth_md_filtered
@@ -97,7 +98,7 @@ def test_dmcs_to_bed(synth_md_filtered, tmp_path):
     for ln in lines[:20]:
         parts = ln.split("\t")
         assert len(parts) == 6
-        chrom, start, end, name, score, strand = parts
+        _chrom, start, end, name, score, strand = parts
         assert int(end) == int(start) + 1
         assert 0 <= int(score) <= 1000
         assert strand in ("+", "-")

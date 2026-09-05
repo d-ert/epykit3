@@ -66,7 +66,7 @@ def test_dispatcher_unknown_backend_raises():
 def test_dispatcher_dask_missing_extra_message():
     """Even on Dask-less environments, the error message names the extra."""
     try:
-        import dask.distributed  # noqa: F401
+        import dask.distributed
         pytest.skip("dask is installed; cannot test the missing-extra error path")
     except ImportError:
         pass
@@ -76,7 +76,7 @@ def test_dispatcher_dask_missing_extra_message():
 
 def test_dispatcher_ray_missing_extra_message():
     try:
-        import ray  # noqa: F401
+        import ray
         pytest.skip("ray is installed; cannot test the missing-extra error path")
     except ImportError:
         pass

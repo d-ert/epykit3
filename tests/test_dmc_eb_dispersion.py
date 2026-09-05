@@ -18,8 +18,8 @@ import inspect
 import re
 
 import numpy as np
-import scipy.stats as sp_stats
 import pytest
+import scipy.stats as sp_stats
 
 import epykit as ep
 from tests.fixtures.synth import SimConfig, generate

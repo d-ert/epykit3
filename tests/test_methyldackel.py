@@ -12,7 +12,6 @@ import pytest
 
 import epykit as ep
 
-
 _TRACK_HEADER = 'track type="bedGraph" description="CpG methylation levels"\n'
 
 

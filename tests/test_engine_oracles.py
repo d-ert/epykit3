@@ -29,7 +29,6 @@ from epykit.dmc import (
     _welford_update,
 )
 
-
 # --- welch_t vs scipy.stats.ttest_ind(equal_var=False) ----------------------
 
 def test_welch_t_matches_scipy_ttest_ind():
@@ -114,7 +113,7 @@ def test_glm_se_and_deviance_match_statsmodels():
     )
     X_red = X[:, [0]]
 
-    beta, se, dev_full, _pearson, n_eff = irls_binomial_batch(
+    beta, se, dev_full, _pearson, _n_eff = irls_binomial_batch(
         meth[None, :], cov[None, :], X
     )
     _b2, _s2, dev_red, _p2, _n2 = irls_binomial_batch(meth[None, :], cov[None, :], X_red)

@@ -18,7 +18,7 @@ import pytest
 
 pysam = pytest.importorskip("pysam", reason="pysam required for entropy tests.")
 
-from epykit.entropy import call_entropy
+from epykit.entropy import call_entropy  # noqa: E402 -- must follow importorskip
 
 
 def _write_synth_bam(tmp_path: Path, ordered: bool) -> Path:

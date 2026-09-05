@@ -7,9 +7,12 @@ Both backends emit a transitional log2_odds_ratio column NaN-filled
 with a FutureWarning once per tl.dmc call.
 """
 from __future__ import annotations
+
 import warnings
+
 import numpy as np
 import pytest
+
 import epykit as ep
 
 

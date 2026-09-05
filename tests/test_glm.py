@@ -2,11 +2,14 @@
 P1-4: reference_level kwarg for patsy Treatment coding.
 P1-5: NaN-mask non-converged IRLS sites + log fraction."""
 from __future__ import annotations
+
 import logging
 import warnings
+
 import numpy as np
 import polars as pl
 import pytest
+
 import epykit as ep
 
 

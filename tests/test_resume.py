@@ -106,17 +106,7 @@ def test_dmc_resume_skips_recomputation(synth_md_filtered):
     ep.tl.dmc(md, test="lr", resumable=True)
     assert md.uns["dmc"].get("resumed") is not True  # first run computed
 
-    # Second call on a fresh MethylData (same store) must resume.
-    md2 = ep.read_bismark(
-        # rebuild MethylData but point at the same analysis root
-        samplesheet=Path(md._analysis_root) / ".." / "samplesheet.csv"
-        if md._analysis_root else "samplesheet.csv",
-        treatment_group="treatment",
-        control_group="control",
-        assembly="synth",
-        store_dir=md._analysis_root,
-    ) if False else None  # the fixture doesn't expose samplesheet path cleanly
-    # Simpler: rerun on the same md -- the manifest still applies.
+    # Second call on the same md must resume -- the manifest still applies.
     ep.tl.dmc(md, test="lr", resumable=True)
     assert md.uns["dmc"].get("resumed") is True
 
