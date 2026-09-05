@@ -1,7 +1,7 @@
 # Changelog
 
 The full version history is maintained in the project's
-[`CHANGELOG.md`](https://github.com/d-ert/epykit/blob/main/CHANGELOG.md)
+[`CHANGELOG.md`](https://github.com/d-ert/epykit3/blob/main/CHANGELOG.md)
 at the repository root.
 
 ## 1.0.0 highlights (2026-06-02)
@@ -41,4 +41,4 @@ continues to run with warnings.
 
 For the full Added / Changed / Fixed / Internal breakdown -- and the
 release history before 1.0 -- read the root
-[CHANGELOG.md](https://github.com/d-ert/epykit/blob/main/CHANGELOG.md).
+[CHANGELOG.md](https://github.com/d-ert/epykit3/blob/main/CHANGELOG.md).

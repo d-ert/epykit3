@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/d-ert/epykit3/actions/workflows/test.yml"><img src="https://github.com/d-ert/epykit3/actions/workflows/test.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/version-1.0.0-success" alt="version 1.0.0">
+  <img src="https://img.shields.io/badge/version-1.1.0-success" alt="version 1.1.0">
   <img src="https://img.shields.io/badge/python-3.10%E2%80%933.13-blue" alt="Python 3.10–3.13">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://d-ert.github.io/epykit3/"><img src="https://img.shields.io/badge/docs-d--ert.github.io-informational" alt="Documentation"></a>
@@ -26,7 +26,7 @@
 
 epykit ingests Bismark / MethylDackel coverage output into a partitioned Parquet **methylstore** and runs the whole downstream analysis (QC → filtering → DMC → DMR → annotation → plotting → report) over that store with [polars](https://pola.rs) and lazy I/O. Whole-genome data (~22 M CpGs) is never held in RAM as a single frame — every step streams over the partition tree. The Python API is organised in a scanpy-style `pp` / `tl` / `pl` namespace; a CLI mirrors the same operations for scripting.
 
-> **Status:** version 1.0.0 — stable API. MIT licensed. Linux / macOS / Windows.
+> **Status:** version 1.1.0 — stable API. MIT licensed. Linux / macOS / Windows.
 
 ---
 
@@ -322,7 +322,7 @@ the meantime you can cite the software:
   author  = {Ertuğrul, Deniz},
   title   = {epykit: a Python-native WGBS methylation analysis pipeline},
   year    = {2026},
-  version = {1.0.0},
+  version = {1.1.0},
   url     = {https://github.com/d-ert/epykit3}
 }
 ```
