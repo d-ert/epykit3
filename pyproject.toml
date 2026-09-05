@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "Parquet-backed WGBS methylation analysis pipeline (Bismark / MethylDackel → DMC/DMR → annotation)"
 readme = "README.md"
 authors = [ { name = "Deniz Ertuğrul", email = "denizert2000@gmail.com" } ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 keywords = [
   "methylation",
@@ -28,10 +28,10 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 
@@ -159,7 +159,7 @@ filterwarnings = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py310"
 extend-exclude = [
     ".venv",
     "build",
@@ -186,7 +186,7 @@ known-first-party = ["epykit"]
 
 [tool.mypy]
 # Type-check against the pinned dev interpreter (.python-version). Runtime
-# still supports 3.9+ via __future__ annotations and the 3.9 CI leg catches
+# still supports 3.10+ via __future__ annotations and the 3.10 CI leg catches
 # runtime-only breakage. The target cannot be lower: numpy >= 2.5 ships
 # PEP 695 `type` aliases in its stubs, which mypy only parses at >= 3.12.
 python_version = "3.12"

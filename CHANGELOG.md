@@ -173,6 +173,13 @@ redesigned HTML report.
   raised to `>=0.60` (numpy-2 support).
 - **`uv.lock` is now committed (M-PKG4)** for reproducibility; documented
   `uv sync --frozen` and thread-pinning in `benchmark/README.md`.
+- **Python >= 3.10 required; 3.13 added to CI.** Python 3.9 reached end of
+  life in October 2025. `requires-python` moves to `>=3.10`, the CI matrix
+  becomes `{ubuntu, windows} × {py3.10, py3.12, py3.13}`, and ruff targets
+  `py310`. No source change is needed; the floor makes `X | None` unions
+  usable outside annotations and lets future dependency floors track
+  releases that already dropped 3.9 (numpy 2.1+, scipy 1.14+, statsmodels
+  0.15, pandas 3, anndata 0.12+).
 - **The `dev` extra is gone; contributor tooling lives in dependency groups.**
   `pytest` and `pytest-cov` moved from `[project.optional-dependencies].dev`
   into `[dependency-groups].dev` next to `mypy` and `ruff`, and a new `docs`

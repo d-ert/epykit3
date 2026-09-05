@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Python >= 3.9
+- Python >= 3.10
 - A C compiler is **not** required; all heavy lifting uses pre-built wheels (polars, numba, pyarrow).
 
 ## Core dependencies
