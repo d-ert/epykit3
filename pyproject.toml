@@ -173,7 +173,7 @@ extend-exclude = [
 # baseline is green in CI, ratchet up to ["F", "E", "W", "I", "B", "UP", "RUF"]
 # and add a one-shot autofix commit.
 select = ["F", "I", "W", "UP"]
-ignore = []
+ignore = ["E501"]  # the formatter owns line length
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["F401", "F811"]
