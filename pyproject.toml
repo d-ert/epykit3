@@ -172,7 +172,7 @@ extend-exclude = [
 [tool.ruff.lint]
 # Ratchet history: F, I, W, UP, E, B landed with a one-shot format (#3); RUF and
 # B905 (every zip() carries an audited strict=) followed.
-select = ["F", "I", "W", "UP", "E", "B", "RUF"]
+select = ["F", "I", "W", "UP", "E", "B", "RUF", "C90"]
 ignore = ["E501"]  # the formatter owns line length
 # The multiplication sign is the coverage-fold notation in report text ("10x" is
 # rendered as "10×"). Every other flagged character was a typo and was replaced.
@@ -186,6 +186,12 @@ allowed-confusables = ["×"]
 # pending the tl.dmc refactor (PR 1): two zip() calls, one en dash comment, one unused
 # unpack, one stale noqa
 "src/epykit/tl.py" = ["B905", "RUF003", "RUF059", "RUF100"]
+
+[tool.ruff.lint.mccabe]
+# Ceiling, not a target: the smallest value with zero C901 findings in src/ at
+# the time it was set. The tl.dmc refactor PRs lower it; new code must not
+# raise it.
+max-complexity = 38
 
 [tool.ruff.lint.isort]
 known-first-party = ["epykit"]
