@@ -22,8 +22,9 @@ import os
 import sys
 import warnings
 from pathlib import Path
+
+from . import dmc, filter
 from .convert import convert_sample
-from . import filter, dmc
 
 
 def _auto_tsv_path(parquet_path: str, *, suffix: str = "") -> str:
@@ -217,7 +218,8 @@ def _cmd_dmc(args: argparse.Namespace):
     # MethylData on the fly so tl.dmc can resolve the contrast against
     # md.obs.
     if args.formula is not None or args.contrast is not None:
-        from . import read_bismark, tl as _tl
+        from . import read_bismark
+        from . import tl as _tl
         covariates = (
             [c.strip() for c in args.covariates.split(",")]
             if args.covariates else None
@@ -296,8 +298,9 @@ def _cmd_dmc(args: argparse.Namespace):
     tsv_suppressed, tsv_path, tsv_full, tsv_alpha = _cli_tsv_opts(args)
     if not tsv_suppressed and len(results.columns) > 0:
         import polars as pl
-        from .methyldata import MethylData
+
         from .export import dmc_to_tsv
+        from .methyldata import MethylData
         # Build a transient MethylData carrying just the dmc result so the
         # writer can re-use the same delegation path the API uses.
         obs = pl.DataFrame({"sample_id": treatment_samples + control_samples})
@@ -319,6 +322,7 @@ def _cmd_dmc(args: argparse.Namespace):
 def _cmd_dmr(args: argparse.Namespace):
     """Handler for 'dmr' subcommand."""
     import polars as pl
+
     from .dmr import (
         _DMR_DEFAULT_MIN_CPGS,
         apply_region_qfilter,
@@ -480,8 +484,8 @@ def _cmd_dmr(args: argparse.Namespace):
 
     tsv_suppressed, tsv_path_opt, _, _ = _cli_tsv_opts(args)
     if not tsv_suppressed and len(dmr_results) > 0:
-        from .methyldata import MethylData
         from .export import dmr_to_tsv
+        from .methyldata import MethylData
         md_tmp = MethylData(obs=pl.DataFrame({"sample_id": []}), store="")
         md_tmp.uns["dmr"] = dmr_results
         tsv_path = tsv_path_opt or _auto_tsv_path(args.output)
@@ -524,7 +528,8 @@ def _cmd_annotate(args: argparse.Namespace):
 def _cmd_qc_report(args: argparse.Namespace):
     """Handler for 'qc-report' subcommand."""
     import polars as pl
-    from .qc import global_methylation_report, coverage_uniformity
+
+    from .qc import coverage_uniformity, global_methylation_report
 
     samples = args.samples.split(",")
     tsv_suppressed = _cli_tsv_opts(args)[0]
@@ -595,8 +600,8 @@ def _cmd_report(args: argparse.Namespace):
 
 def _cmd_aggregate_regions(args: argparse.Namespace):
     """Handler for 'aggregate-regions' subcommand."""
-    from .methyldata import MethylData
     from . import pp as pp_mod
+    from .methyldata import MethylData
     md = MethylData.load(args.md)
     pp_mod.aggregate_regions(
         md, args.bed,
@@ -610,8 +615,8 @@ def _cmd_aggregate_regions(args: argparse.Namespace):
 
 def _cmd_export(args: argparse.Namespace):
     """Handler for 'export' subcommand."""
+    from .export import dmcs_to_bed, dmrs_to_bed, to_bedgraph, to_bigwig
     from .methyldata import MethylData
-    from .export import to_bedgraph, to_bigwig, dmcs_to_bed, dmrs_to_bed
     md = MethylData.load(args.md)
     fmt = args.export_cmd
     if fmt == "bedgraph":

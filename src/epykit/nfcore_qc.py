@@ -14,7 +14,7 @@ import csv
 import logging
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import polars as pl
 
@@ -172,10 +172,10 @@ def _resolve_sample_ids(samplesheet: str) -> list[str]:
 
 
 def read_nfcore_methylseq_qc(
-    samplesheet: Optional[str],
+    samplesheet: str | None,
     run_dir: str,
     *,
-    sample_ids: Optional[list[str]] = None,
+    sample_ids: list[str] | None = None,
 ) -> pl.DataFrame:
     """Walk an nf-core/methylseq run dir and pull per-sample QC metrics.
 

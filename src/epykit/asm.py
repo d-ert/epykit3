@@ -27,8 +27,8 @@ Inputs
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping, Optional
 
 import numpy as np
 import polars as pl
@@ -64,7 +64,7 @@ def call_asm(
     min_mapq: int = 10,
     min_phased_snvs: int = 1,
     caller: str = "bismark",
-    chromosomes: Optional[list[str]] = None,
+    chromosomes: list[str] | None = None,
 ) -> pl.DataFrame:
     """Run the ASM caller across one or more samples.
 
@@ -284,7 +284,7 @@ def asm(
     vcf: str | Path,
     min_reads_per_haplotype: int = 10,
     min_phased_snvs: int = 1,
-    chromosomes: Optional[list[str]] = None,
+    chromosomes: list[str] | None = None,
     caller: str = "bismark",
 ) -> None:
     """Run ASM and store results in ``md.varm["asm"]``.

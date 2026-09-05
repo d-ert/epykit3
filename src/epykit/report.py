@@ -26,7 +26,7 @@ import html
 import json
 import logging
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 import numpy as np
 import polars as pl
@@ -228,7 +228,7 @@ def _samples_table(md: MethylData) -> str:
     return _html_table(rows, cols, "tSamples")
 
 
-def _qc_status(value: Any, thresholds: tuple, higher_is_better: bool = True) -> Optional[str]:
+def _qc_status(value: Any, thresholds: tuple, higher_is_better: bool = True) -> str | None:
     if value is None or (isinstance(value, float) and value != value):
         return None
     pass_t, warn_t = thresholds
@@ -393,7 +393,7 @@ def _dir_cell(gmap_dir):
     return f
 
 
-def _top_dmc_table(md: MethylData, n: int, alpha: float) -> Optional[str]:
+def _top_dmc_table(md: MethylData, n: int, alpha: float) -> str | None:
     dmc = md.dmc
     if dmc is None:
         return None
@@ -421,7 +421,7 @@ def _top_dmc_table(md: MethylData, n: int, alpha: float) -> Optional[str]:
     return _html_table(rows, cols, "tDMC")
 
 
-def _top_dmr_table(md: MethylData, n: int) -> Optional[str]:
+def _top_dmr_table(md: MethylData, n: int) -> str | None:
     dmr = md.uns.get("dmr")
     if dmr is None or not isinstance(dmr, pl.DataFrame) or dmr.is_empty():
         return None
@@ -491,7 +491,7 @@ def _preproc_flow(md: MethylData) -> list[dict]:
 
 
 def _dmc_stats(md: MethylData, alpha: float, min_abs_diff: float,
-               dmc: Optional[pl.DataFrame] = None) -> dict:
+               dmc: pl.DataFrame | None = None) -> dict:
     if dmc is None:
         dmc = md.dmc
     if dmc is None:
@@ -777,19 +777,19 @@ def generate_report(
     md: MethylData,
     output: str,
     *,
-    title: Optional[str] = None,
-    gtf_path: Optional[str] = None,
+    title: str | None = None,
+    gtf_path: str | None = None,
     alpha: float = 0.05,
     min_abs_diff: float = 0.1,
     dmc_top_n: int = 50,
     dmr_top_n: int = 50,
-    metaplot_max_genes: Optional[int] = 5000,
+    metaplot_max_genes: int | None = 5000,
     pca_n_sites: int = 10_000,
     coverage_max_points: int = 200_000,
     dmc_max_points: int = 200_000,
     clear_cache: bool = False,
     self_contained: bool = True,
-    qc_thresholds: Optional[dict] = None,
+    qc_thresholds: dict | None = None,
 ) -> str:
     """Render a single-file, MultiQC-style HTML dashboard report.
 
@@ -842,19 +842,19 @@ def generate_report(
 
     from .pl._plotly import (
         coverage_histogram_plotly,
-        volcano_plotly,
+        cpg_island_pie_plotly,
+        dmr_size_hist_plotly,
+        feature_direction_stacked_plotly,
+        feature_pie_plotly,
+        global_methylation_bar_plotly,
         ma_plot_plotly,
         manhattan_plotly,
-        feature_pie_plotly,
-        cpg_island_pie_plotly,
         pca_plotly,
-        tss_metaplot_plotly,
         pvalue_histogram_plotly,
-        dmr_size_hist_plotly,
-        global_methylation_bar_plotly,
         sample_correlation_plotly,
         scree_plotly,
-        feature_direction_stacked_plotly,
+        tss_metaplot_plotly,
+        volcano_plotly,
     )
     if clear_cache:
         from .pl._compute import clear_report_cache
@@ -1059,7 +1059,7 @@ def generate_report(
     return str(out.resolve())
 
 
-def _pretty_dict(value: Any) -> Optional[str]:
+def _pretty_dict(value: Any) -> str | None:
     if value is None:
         return None
     if isinstance(value, dict):

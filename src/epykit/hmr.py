@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import polars as pl
@@ -47,7 +46,7 @@ _HMR_SCHEMA = {
 def _segment_chrom(
     store: Path, sample: str, chrom: str,
     *, hmr_threshold: float, self_loop: float,
-) -> Optional[tuple[np.ndarray, np.ndarray, np.ndarray]]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     """Load one chrom's beta and return (positions, beta, viterbi)."""
     part = store / f"sample={sample}" / f"chrom={chrom}" / "part-0.parquet"
     if not part.exists():
@@ -74,13 +73,13 @@ def call_hmr_one_sample(
     store: Path,
     sample: str,
     *,
-    chromosomes: Optional[list[str]] = None,
+    chromosomes: list[str] | None = None,
     hmr_threshold: float = 0.30,
     lmr_max_density: float = 0.020,   # CpGs per bp; below this -> LMR
     min_cpgs: int = 4,
     self_loop: float = 0.85,
     backend: str = "sequential",
-    n_workers: Optional[int] = None,
+    n_workers: int | None = None,
 ) -> pl.DataFrame:
     """Call HMRs (and tag LMR subset) for one sample.
 
@@ -92,7 +91,7 @@ def call_hmr_one_sample(
     if chromosomes is None:
         chromosomes = _detect_chromosomes(store)
 
-    def _hmr_chrom_handler(chrom: str) -> Optional[pl.DataFrame]:
+    def _hmr_chrom_handler(chrom: str) -> pl.DataFrame | None:
         pkg = _segment_chrom(
             store, sample, chrom,
             hmr_threshold=hmr_threshold, self_loop=self_loop,
@@ -150,13 +149,13 @@ def call_hmr_one_sample(
 def hmr(
     md,
     *,
-    samples: Optional[list[str]] = None,
+    samples: list[str] | None = None,
     hmr_threshold: float = 0.30,
     lmr_max_density: float = 0.020,
     min_cpgs: int = 4,
-    chromosomes: Optional[list[str]] = None,
+    chromosomes: list[str] | None = None,
     backend: str = "sequential",
-    n_workers: Optional[int] = None,
+    n_workers: int | None = None,
 ) -> None:
     """Call HMR + LMR across samples; store ``md.uns["hmr"]`` and ``md.uns["lmr"]``."""
     md_samples = md.obs.get_column("sample_id").to_list()

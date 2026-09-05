@@ -29,7 +29,6 @@ table" and a "reference matrix" through the same plumbing:
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import numpy as np
 import polars as pl
@@ -133,7 +132,7 @@ def age_clock(
     manifest: pl.DataFrame,
     *,
     intercept: float = 0.0,
-    transform: Optional[str] = None,
+    transform: str | None = None,
     coef_cpg_col: str = "cpg_id",
     coef_value_col: str = "coefficient",
     manifest_cpg_col: str = "cpg_id",
@@ -297,7 +296,7 @@ def deconvolve(
     manifest: pl.DataFrame,
     *,
     method: str = "nnls",
-    cell_types: Optional[list[str]] = None,
+    cell_types: list[str] | None = None,
     manifest_cpg_col: str = "cpg_id",
     ref_cpg_col: str = "cpg_id",
 ) -> pl.DataFrame:

@@ -46,7 +46,7 @@ def filter_coverage(
         out = str(Path(md.analysis_root) / ".cache" / "filtered")
     else:
         out = f"{md.store}_filtered"
-    
+
     filter_mod.filter_sites(
         methylstore_path=md.store,
         output_dir=out,

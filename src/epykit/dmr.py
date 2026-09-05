@@ -28,8 +28,8 @@ import hashlib
 import logging
 import math
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, Union
 
 import numpy as np
 import polars as pl
@@ -383,7 +383,7 @@ def _recompute_dmr_stats(
 # Public API -- sliding-window DMR calling (works from a DMC table)
 
 def call_dmr_sliding_window(
-    dmc_results: Union[pl.DataFrame, DMCStore, str, Path],
+    dmc_results: pl.DataFrame | DMCStore | str | Path,
     window_bp: int = 500,
     step_bp: int = 250,
     min_cpgs: int = 5,
@@ -736,7 +736,7 @@ def apply_region_qfilter(
 
 
 def call_dmr_chain_merge(
-    dmc_results: Union[pl.DataFrame, DMCStore, str, Path],
+    dmc_results: pl.DataFrame | DMCStore | str | Path,
     *,
     preset: str | None = None,
     alpha: float = 0.05,
@@ -1271,8 +1271,8 @@ def call_dmr_tile_based(
                  log2_odds_ratio, pvalue, qvalue, dmr_type.
     """
     from .dmc import (
-        process_chromosomes_dmc,
         apply_multiple_testing_correction,
+        process_chromosomes_dmc,
     )
 
     if samples_treatment is None:
@@ -1522,7 +1522,7 @@ def empirical_fdr_for_dmr(
     n_perm: int = 100,
     seed: int = 42,
     n_jobs: int = 1,
-    empirical_strata: "dict[str, list[str]] | None" = None,
+    empirical_strata: dict[str, list[str]] | None = None,
     merge_adjacent: bool = True,
     backend: str = "sequential",
     **dmr_kwargs,

@@ -21,7 +21,6 @@ import gc
 import logging
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import polars as pl
@@ -271,13 +270,13 @@ def process_chromosomes_dvc(
     samples_control: list[str],
     *,
     test: str = "brown_forsythe",
-    chromosomes: Optional[list[str]] = None,
+    chromosomes: list[str] | None = None,
     unite: bool = True,
     mean_filter_alpha: float = 0.05,
     alpha: float = 0.05,
     min_coverage: int = 1,
     backend: str = "sequential",
-    n_workers: Optional[int] = None,
+    n_workers: int | None = None,
 ) -> pl.DataFrame:
     """Run DVC analysis across all chromosomes.
 
@@ -330,7 +329,7 @@ def process_chromosomes_dvc(
 
     from ._compute import run_chrom_pipeline
 
-    def _dvc_chrom_handler(chrom: str) -> Optional[pl.DataFrame]:
+    def _dvc_chrom_handler(chrom: str) -> pl.DataFrame | None:
         canonical_df = (
             _intersect_chrom(store, chrom, all_samples)
             if unite else _union_chrom(store, chrom, all_samples)

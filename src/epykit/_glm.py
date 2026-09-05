@@ -27,7 +27,8 @@ time (a tiny up-front cost).
 from __future__ import annotations
 
 import logging
-from typing import Any, Literal, Optional, Sequence, Union, overload
+from collections.abc import Sequence
+from typing import Any, Literal, overload
 
 import numpy as np
 import polars as pl
@@ -44,42 +45,39 @@ _PROP_CLIP = 1e-6
 def build_design(
     obs: pl.DataFrame,
     samples_ordered: Sequence[str],
-    formula: Optional[str] = ...,
-    covariates: Optional[Sequence[str]] = ...,
+    formula: str | None = ...,
+    covariates: Sequence[str] | None = ...,
     treatment_col: str = ...,
     require_treatment_col: bool = ...,
     return_design_info: Literal[False] = ...,
-    reference_level: Optional[str] = ...,
-) -> tuple[np.ndarray, Optional[np.ndarray], int, list[str], str]: ...
+    reference_level: str | None = ...,
+) -> tuple[np.ndarray, np.ndarray | None, int, list[str], str]: ...
 
 
 @overload
 def build_design(
     obs: pl.DataFrame,
     samples_ordered: Sequence[str],
-    formula: Optional[str] = ...,
-    covariates: Optional[Sequence[str]] = ...,
+    formula: str | None = ...,
+    covariates: Sequence[str] | None = ...,
     treatment_col: str = ...,
     require_treatment_col: bool = ...,
     *,
     return_design_info: Literal[True],
-    reference_level: Optional[str] = ...,
-) -> tuple[np.ndarray, Optional[np.ndarray], int, list[str], str, Any]: ...
+    reference_level: str | None = ...,
+) -> tuple[np.ndarray, np.ndarray | None, int, list[str], str, Any]: ...
 
 
 def build_design(
     obs: pl.DataFrame,
     samples_ordered: Sequence[str],
-    formula: Optional[str] = None,
-    covariates: Optional[Sequence[str]] = None,
+    formula: str | None = None,
+    covariates: Sequence[str] | None = None,
     treatment_col: str = "treatment",
     require_treatment_col: bool = True,
     return_design_info: bool = False,
-    reference_level: Optional[str] = None,
-) -> Union[
-    tuple[np.ndarray, Optional[np.ndarray], int, list[str], str],
-    tuple[np.ndarray, Optional[np.ndarray], int, list[str], str, Any],
-]:
+    reference_level: str | None = None,
+) -> tuple[np.ndarray, np.ndarray | None, int, list[str], str] | tuple[np.ndarray, np.ndarray | None, int, list[str], str, Any]:
     """Build full + reduced model matrices from ``md.obs``.
 
     Parameters
@@ -846,8 +844,8 @@ def wald_test(
     beta: np.ndarray,
     cov_beta: np.ndarray,
     C: np.ndarray,
-    phi_eff: Optional[np.ndarray] = None,
-    df_resid: Optional[np.ndarray] = None,
+    phi_eff: np.ndarray | None = None,
+    df_resid: np.ndarray | None = None,
     reference: str = "adaptive",
     df_floor: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray, np.signedinteger]:
@@ -963,7 +961,7 @@ def wald_test(
 def delta_method_meth_diff_ci(
     coef: np.ndarray,
     coef_se: np.ndarray,
-    ref_eta: Optional[np.ndarray] = None,
+    ref_eta: np.ndarray | None = None,
     alpha: float = 0.05,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Delta-method CI on the meth-scale difference Deltabeta from a logit-scale Wald CI.
@@ -1024,7 +1022,7 @@ def welch_meth_diff_ci(
     mean_ctrl: np.ndarray,
     var_mean_ctrl: np.ndarray,
     alpha: float = 0.05,
-    dof: Optional[np.ndarray] = None,
+    dof: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """CI on Deltabeta from per-group Welford accumulators.
 
@@ -1058,8 +1056,8 @@ def newcombe_diff_ci(
     cov_b: np.ndarray,
     alpha: float = 0.05,
     *,
-    phi: Optional[np.ndarray] = None,
-    df: Optional[np.ndarray] = None,
+    phi: np.ndarray | None = None,
+    df: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Newcombe (1998) hybrid Wilson-score CI for pi_a - pi_b on POOLED counts.
 

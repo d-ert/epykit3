@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
 import logging
 import os
 import shutil
-from pathlib import Path
-from typing import Literal, Optional
 import warnings
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Literal
 
 import polars as pl
 
@@ -33,12 +33,12 @@ class MethylData:
     varm: dict[str, pl.DataFrame] = field(default_factory=dict)
     uns: dict = field(default_factory=dict)
 
-    analysis_root: Optional[str] = field(default=None, repr=False)
+    analysis_root: str | None = field(default=None, repr=False)
 
     # --- Deprecated alias -------------------------------------------
 
     @property
-    def _analysis_root(self) -> Optional[str]:
+    def _analysis_root(self) -> str | None:
         """Deprecated; use ``analysis_root`` (the public name).
 
         Removed in 2.0.
@@ -51,7 +51,7 @@ class MethylData:
         return self.analysis_root
 
     @_analysis_root.setter
-    def _analysis_root(self, value: Optional[str]) -> None:
+    def _analysis_root(self, value: str | None) -> None:
         warnings.warn(
             "MethylData._analysis_root is deprecated; use the public name "
             "MethylData.analysis_root. _analysis_root will be removed in 2.0.",
@@ -154,8 +154,9 @@ class MethylData:
         write side is each ``pp.*`` / ``tl.*`` function appending to the
         manifest when invoked with ``resumable=True``.
         """
-        from ._cache import manifest_find
         from pathlib import Path
+
+        from ._cache import manifest_find
         root = self.analysis_root or self.store
         if not root:
             return False
@@ -185,9 +186,9 @@ class MethylData:
 
     def get_dmc(
         self,
-        test: Optional[str] = None,
+        test: str | None = None,
         annotated: bool = True,
-    ) -> Optional[pl.DataFrame]:
+    ) -> pl.DataFrame | None:
         """Look up a DMC table by test name (explicit, recommended).
 
         Parameters
@@ -240,7 +241,7 @@ class MethylData:
         return None
 
     @property
-    def dmc(self) -> Optional[pl.DataFrame]:
+    def dmc(self) -> pl.DataFrame | None:
         """Most-recently-written DMC table (annotated if available).
 
         Equivalent to ``self.get_dmc(test=None, annotated=True)``. Use
@@ -289,7 +290,7 @@ class MethylData:
         return DMCStore.open(store_dir)
 
     @property
-    def significant_dmcs(self) -> Optional[pl.DataFrame]:
+    def significant_dmcs(self) -> pl.DataFrame | None:
         df = self.dmc
         if df is None:
             return None
@@ -420,7 +421,7 @@ class MethylData:
         (out / "methyldata.json").write_text(json.dumps(meta, indent=2, default=str))
 
     @classmethod
-    def load(cls, path: str) -> "MethylData":
+    def load(cls, path: str) -> MethylData:
         out = Path(path)
         meta = json.loads((out / "methyldata.json").read_text())
         obs = pl.read_parquet(str(out / "obs.parquet"))
@@ -483,14 +484,14 @@ class MethylData:
     def to_bigwig(
         self, sample: str, output: str,
         *, value: Literal["beta", "coverage", "N_meth"] = "beta",
-        chrom_sizes: Optional[dict] = None,
+        chrom_sizes: dict | None = None,
     ) -> str:
         from .export import to_bigwig
         return to_bigwig(self, sample, output, value=value, chrom_sizes=chrom_sizes)
 
     def dmcs_to_bed(
         self, output: str, *, alpha: float = 0.05,
-        min_abs_diff: float = 0.0, test: Optional[str] = None,
+        min_abs_diff: float = 0.0, test: str | None = None,
     ) -> str:
         from .export import dmcs_to_bed
         return dmcs_to_bed(self, output, alpha=alpha,

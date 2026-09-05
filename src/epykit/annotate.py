@@ -86,7 +86,7 @@ _FEAT_COLS = ["Chromosome", "Start", "End", "Strand", "Feature", "gene_id", "gen
 # growth in long-running notebooks. Override via the ``EPYKIT_GTF_CACHE_SIZE``
 # env var or :func:`set_gtf_cache_size`.
 _GTF_CACHE_MAX_SIZE: int = max(1, int(os.environ.get("EPYKIT_GTF_CACHE_SIZE", "2")))
-_GTF_CACHE: "OrderedDict[str, tuple[Any, Any]]" = OrderedDict()
+_GTF_CACHE: OrderedDict[str, tuple[Any, Any]] = OrderedDict()
 
 # Built-feature-index cache: bounded LRU of {key -> (features_by_chrom, tss_series, strand_lut)}.
 #
@@ -102,7 +102,7 @@ _BUILT_FEATURES_CACHE_MAX_SIZE: int = max(
     1, int(os.environ.get("EPYKIT_BUILT_FEATURES_CACHE_SIZE", "2"))
 )
 # Bundle: (features_by_chrom, tss_series, strand_lut, tss_by_chrom)
-_BUILT_FEATURES_CACHE: "OrderedDict[tuple, tuple[Any, Any, Any, Any]]" = OrderedDict()
+_BUILT_FEATURES_CACHE: OrderedDict[tuple, tuple[Any, Any, Any, Any]] = OrderedDict()
 
 
 def set_gtf_cache_size(max_size: int) -> None:
@@ -168,7 +168,7 @@ def _df_info(name: str, df) -> str:
         return f"{name}: (unknown shape)"
 
 
-def _sites_to_df(sites: pl.DataFrame) -> "pd.DataFrame":
+def _sites_to_df(sites: pl.DataFrame) -> pd.DataFrame:
     """Build a pandas DataFrame of single-base (or explicit-range) site intervals
     using the Capitalized column convention (``Chromosome``/``Start``/``End``)
     shared with the GTF-derived feature DataFrames downstream.
@@ -188,7 +188,7 @@ def _sites_to_df(sites: pl.DataFrame) -> "pd.DataFrame":
     })
 
 
-def _build_promoter_df(genes_pd, upstream_bp: int, downstream_bp: int) -> "pd.DataFrame":
+def _build_promoter_df(genes_pd, upstream_bp: int, downstream_bp: int) -> pd.DataFrame:
     import pandas as pd
     plus  = genes_pd[genes_pd["Strand"] == "+"].copy()
     minus = genes_pd[genes_pd["Strand"] == "-"].copy()
@@ -206,7 +206,7 @@ def _build_promoter_df(genes_pd, upstream_bp: int, downstream_bp: int) -> "pd.Da
     return combined
 
 
-def _build_intron_df(exons_pd, genes_pd) -> "pd.DataFrame":
+def _build_intron_df(exons_pd, genes_pd) -> pd.DataFrame:
     import pandas as pd
     if len(exons_pd) == 0 or len(genes_pd) == 0:
         return pd.DataFrame(columns=_FEAT_COLS)
@@ -244,7 +244,7 @@ def _build_intron_df(exons_pd, genes_pd) -> "pd.DataFrame":
     return introns[_FEAT_COLS].reset_index(drop=True)
 
 
-_UTR_PARSE_CACHE: "OrderedDict[str, Any]" = OrderedDict()
+_UTR_PARSE_CACHE: OrderedDict[str, Any] = OrderedDict()
 
 
 def _utr_parse_cache_get(key: str):
@@ -260,7 +260,7 @@ def _utr_parse_cache_put(key: str, value) -> None:
         _UTR_PARSE_CACHE.popitem(last=False)
 
 
-def _parse_gtf_utrs(gtf_path: str) -> "pd.DataFrame":
+def _parse_gtf_utrs(gtf_path: str) -> pd.DataFrame:
     """Stream-parse the same GTF for ``five_prime_utr`` / ``three_prime_utr``
     rows, returning a single DataFrame tagged by ``Feature``.
 
@@ -400,7 +400,7 @@ def _build_utr_df_from_refgene(genes_pd, exons_pd, side: str):
     return pd.DataFrame(columns=_FEAT_COLS)
 
 
-def _parse_gtf_streaming(gtf_path: str) -> tuple["pd.DataFrame", "pd.DataFrame"]:
+def _parse_gtf_streaming(gtf_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Stream-parse a GTF file, extracting only gene and exon rows.
 
     Results are cached in _GTF_CACHE keyed by canonical path so that
@@ -476,7 +476,7 @@ def _parse_gtf_streaming(gtf_path: str) -> tuple["pd.DataFrame", "pd.DataFrame"]
     return result
 
 
-def _parse_refgene_streaming(refgene_path: str) -> tuple["pd.DataFrame", "pd.DataFrame"]:
+def _parse_refgene_streaming(refgene_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Stream-parse a UCSC refGene.txt(.gz) file into (genes_pd, exons_pd).
 
     Produces the same DataFrame schema as :func:`_parse_gtf_streaming` so
@@ -560,7 +560,7 @@ def _parse_refgene_streaming(refgene_path: str) -> tuple["pd.DataFrame", "pd.Dat
     return result
 
 
-def _pick_best_overlap(joined_df) -> "pd.DataFrame":
+def _pick_best_overlap(joined_df) -> pd.DataFrame:
     df = joined_df.copy()
     feat_col = "Feature_b" if "Feature_b" in df.columns else "Feature"
     df["_priority"] = df[feat_col].map(_FEATURE_PRIORITY).fillna(99)
@@ -583,9 +583,9 @@ def _pick_best_overlap(joined_df) -> "pd.DataFrame":
 def _annotate_chromosome_chunk(
     chrom: str,
     chrom_sites: pl.DataFrame,
-    chrom_features_df: "pd.DataFrame",
+    chrom_features_df: pd.DataFrame,
     multi_annotation: bool = False,
-) -> "pd.DataFrame":
+) -> pd.DataFrame:
     """Run overlap + best-pick for one chromosome. Returns pandas DataFrame.
 
     When ``multi_annotation`` is True, also adds two object columns:

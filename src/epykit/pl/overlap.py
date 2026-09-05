@@ -12,8 +12,9 @@ For 2 sets the same function falls back to a clean 2-circle Venn diagram
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from itertools import combinations
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 import numpy as np
 import polars as pl

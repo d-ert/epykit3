@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 import numpy as np
 import polars as pl
 
+from ..methyldata import MethylData
 from ._compute import _resolve_annotated_table, compute_annotation_counts
 from ._utils import _get_ax, _save_fig
-from ..methyldata import MethylData
-
 
 # Natural chrom sort: chr1 .. chr22, chrX, chrY, chrM. Falls back to
 # lexicographic on anything outside the standard human set so the
@@ -84,7 +83,7 @@ def karyogram(
     value: str = "meth_diff",
     *,
     bin_size_bp: int = 1_000_000,
-    chromosomes: Optional[Sequence[str]] = None,
+    chromosomes: Sequence[str] | None = None,
     cmap: str = "RdBu_r",
     vmin: float | None = None,
     vmax: float | None = None,

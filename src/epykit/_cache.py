@@ -26,10 +26,10 @@ import hashlib
 import json
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 
-def count_store_rows(store_dir: str) -> Optional[int]:
+def count_store_rows(store_dir: str) -> int | None:
     """Total row count across all ``part-*.parquet`` files under a store.
 
     Returns ``None`` if the count cannot be determined (e.g. pyarrow is
@@ -125,7 +125,7 @@ def manifest_append(
     params: dict[str, Any],
     input_sig: str,
     output_path: str,
-    extra: Optional[dict[str, Any]] = None,
+    extra: dict[str, Any] | None = None,
 ) -> None:
     """Record one completed stage in the pipeline manifest.
 
@@ -152,7 +152,7 @@ def manifest_append(
 def manifest_find(
     analysis_root: Path | str,
     stage: str,
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Return the manifest entry for ``stage`` if present, else None."""
     for entry in manifest_read(analysis_root).get("stages", []):
         if entry.get("name") == stage:

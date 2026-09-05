@@ -24,7 +24,7 @@ labels (and optionally the posterior matrix).
 from __future__ import annotations
 
 import logging
-from typing import Literal, Optional, Union, overload
+from typing import Literal, overload
 
 import numpy as np
 
@@ -96,7 +96,7 @@ def _bernoulli_emission_logprob(
 
 def _build_transition(
     n_states: int,
-    transition_priors: Optional[np.ndarray] = None,
+    transition_priors: np.ndarray | None = None,
     self_loop: float = 0.99,
 ) -> np.ndarray:
     """Return an (n_states, n_states) row-stochastic transition matrix.
@@ -125,8 +125,8 @@ def segment(
     observations: np.ndarray,
     n_states: int = ...,
     *,
-    state_means: Optional[np.ndarray] = ...,
-    transition_priors: Optional[np.ndarray] = ...,
+    state_means: np.ndarray | None = ...,
+    transition_priors: np.ndarray | None = ...,
     self_loop: float = ...,
     return_posteriors: Literal[False] = ...,
     emission: str = ...,
@@ -139,8 +139,8 @@ def segment(
     observations: np.ndarray,
     n_states: int = ...,
     *,
-    state_means: Optional[np.ndarray] = ...,
-    transition_priors: Optional[np.ndarray] = ...,
+    state_means: np.ndarray | None = ...,
+    transition_priors: np.ndarray | None = ...,
     self_loop: float = ...,
     return_posteriors: Literal[True],
     emission: str = ...,
@@ -152,13 +152,13 @@ def segment(
     observations: np.ndarray,
     n_states: int = 2,
     *,
-    state_means: Optional[np.ndarray] = None,
-    transition_priors: Optional[np.ndarray] = None,
+    state_means: np.ndarray | None = None,
+    transition_priors: np.ndarray | None = None,
     self_loop: float = 0.99,
     return_posteriors: bool = False,
     emission: str = "bernoulli",
     emission_sd: float = 0.1,
-) -> Union[np.ndarray, tuple[np.ndarray, np.ndarray]]:
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """Forward-backward + Viterbi segmentation of a per-site beta signal.
 
     Parameters
@@ -260,7 +260,7 @@ def segment(
 def runs_of_state(
     viterbi: np.ndarray,
     target_state: int,
-    positions: Optional[np.ndarray] = None,
+    positions: np.ndarray | None = None,
 ) -> list[tuple[int, int, int]]:
     """Extract contiguous runs of ``target_state`` from a Viterbi path.
 

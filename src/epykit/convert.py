@@ -31,7 +31,6 @@ import polars as pl
 
 from . import _cache
 
-
 RAW_MANIFEST_NAME = ".epykit_raw_manifest.json"
 
 logger = logging.getLogger(__name__)
@@ -181,39 +180,39 @@ def _promote_sample_dir(temp_sample_dir: Path, final_sample_dir: Path) -> None:
 
 def _merge_cpg_pairs(df: pl.DataFrame) -> pl.DataFrame:
     """Merge + and - strand CpG pairs into single sites at the + strand position.
-    
+
     When Bismark .cov files contain both strands, a CpG dinucleotide appears as:
       - + strand at position N (C position)
       - - strand at position N+1 (G position on reverse strand)
-    
+
     This function merges them by:
       1. Shifting - strand positions back by 1 (N+1 -> N)
       2. Grouping by (chrom, pos) and summing counts
       3. Setting all merged sites to + strand
-    
+
     Validates pairing and warns if unpaired sites are found (may indicate
     incomplete bisulfite conversion or quality issues).
-    
+
     If the input already has strand-merged data (e.g., from bismark2bedGraph),
     this function is a no-op.
     """
     if "strand" not in df.columns:
         # No strand information, return as-is
         return df
-    
+
     # Separate + and - strands
     plus = df.filter(pl.col("strand") == "+")
     minus = df.filter(pl.col("strand") == "-")
-    
+
     if len(minus) == 0:
         # No - strand data, already merged or only + strand present
         return df
-    
+
     # Shift - strand positions to + strand coordinate (N+1 -> N)
     minus = minus.with_columns(
         (pl.col("pos") - 1).alias("pos")
     )
-    
+
     # VALIDATION: Check for proper pairing. Polars semi-join on
     # (chrom, pos) is cheaper than materialising two Python int sets
     # and is also correct in the (rare) multi-chrom case where the
@@ -237,10 +236,10 @@ def _merge_cpg_pairs(df: pl.DataFrame) -> pl.DataFrame:
             f"  Merging will sum paired sites and keep unpaired sites as-is.\n"
             f"  This may indicate incomplete bisulfite conversion or data quality issues."
         )
-    
+
     # Combine and merge by position
     combined = pl.concat([plus, minus])
-    
+
     # Group by chrom and pos, summing methylation counts
     merged = combined.group_by(["chrom", "pos"], maintain_order=True).agg([
         pl.sum("N_meth").alias("N_meth"),
@@ -251,7 +250,7 @@ def _merge_cpg_pairs(df: pl.DataFrame) -> pl.DataFrame:
     ]).with_columns(
         pl.lit("+").alias("strand")
     )
-    
+
     return merged.sort("pos")
 
 

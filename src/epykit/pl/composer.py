@@ -27,7 +27,7 @@ Example
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -74,9 +74,9 @@ def figure_grid(
     label_fontsize: float = 14,
     label_weight: str = "bold",
     label_offset: tuple = (-0.08, 1.02),
-    theme: Optional[str] = "publication",
-    width_ratios: Optional[Sequence[float]] = None,
-    height_ratios: Optional[Sequence[float]] = None,
+    theme: str | None = "publication",
+    width_ratios: Sequence[float] | None = None,
+    height_ratios: Sequence[float] | None = None,
     save: str | None = None,
     md=None,
 ):
@@ -213,8 +213,8 @@ def _adopt_axes_content(src_ax, dst_ax) -> None:
     target axes.
     """
     from matplotlib.collections import PathCollection
-    from matplotlib.patches import Rectangle
     from matplotlib.image import AxesImage
+    from matplotlib.patches import Rectangle
 
     for ln in src_ax.get_lines():
         dst_ax.plot(

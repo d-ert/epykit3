@@ -8,16 +8,14 @@ optionally grouped by ``md.obs[group_by]``.
 
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 import polars as pl
 
 from .._style import PALETTE
+from ..annotate import _parse_gtf_streaming
+from ..methyldata import MethylData
 from ._compute import compute_tss_metaplot
 from ._utils import _get_ax, _save_fig
-from ..methyldata import MethylData
-from ..annotate import _parse_gtf_streaming
 
 
 def _tss_table_from_gtf(gtf_path: str) -> pl.DataFrame:
@@ -54,8 +52,8 @@ def tss_metaplot(
     *,
     window_bp: int = 2000,
     n_bins: int = 100,
-    group_by: Optional[str] = "group",
-    max_genes: Optional[int] = None,
+    group_by: str | None = "group",
+    max_genes: int | None = None,
     ax=None,
     figsize=(7, 4),
     save: str | None = None,
@@ -169,8 +167,8 @@ def gene_body_metaplot(
     n_bins_flank: int = 30,
     n_bins_body: int = 40,
     min_gene_bp: int = 500,
-    group_by: Optional[str] = "group",
-    max_genes: Optional[int] = None,
+    group_by: str | None = "group",
+    max_genes: int | None = None,
     ax=None,
     figsize=(8, 4),
     save: str | None = None,

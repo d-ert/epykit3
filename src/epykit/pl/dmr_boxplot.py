@@ -14,7 +14,6 @@ import polars as pl
 from .._style import PALETTE
 from ._utils import _save_fig
 
-
 _MAX_PANELS = 25  # hard cap; see plan Sec.6 implementation notes
 
 
@@ -40,8 +39,8 @@ def dmr_boxplot(
         ``md.obs`` column used to colour samples.
     figsize, save : matplotlib plumbing.
     """
-    import matplotlib.pyplot as plt
     import matplotlib.gridspec as gridspec
+    import matplotlib.pyplot as plt
 
     dmr_df = md.uns.get("dmr")
     if not isinstance(dmr_df, pl.DataFrame) or len(dmr_df) == 0:

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Tuple
 
 import numpy as np
 from matplotlib.figure import Figure
 
 
-def _get_ax(ax=None, figsize=(6, 4)) -> Tuple[Figure, object]:
+def _get_ax(ax=None, figsize=(6, 4)) -> tuple[Figure, object]:
     if ax is None:
         import matplotlib.pyplot as plt
 

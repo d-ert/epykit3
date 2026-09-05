@@ -13,13 +13,14 @@ Each function follows the existing epykit signature pattern:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from math import ceil
-from typing import Optional, Sequence
 
 import numpy as np
 import polars as pl
 
 from .._style import PALETTE
+from ..methyldata import MethylData
 from ._compute import (
     _resolve_annotated_table,
     compute_annotation_counts,
@@ -28,8 +29,6 @@ from ._compute import (
     compute_numerical_by_annotation,
 )
 from ._utils import _get_ax, _save_fig
-from ..methyldata import MethylData
-
 
 # A modest colour-blind safe cycle for feature / context classes. Falls
 # back through PALETTE for known names (promoter / island / etc.) and
@@ -135,7 +134,7 @@ def plot_numerical_by_annotation(
     background: bool = True,
     density: bool = True,
     ncols: int = 3,
-    figsize: Optional[tuple] = None,
+    figsize: tuple | None = None,
     sharex: bool = True,
     save: str | None = None,
 ):
@@ -302,7 +301,7 @@ def plot_categorical(
     level: str = "dmr",
     position: str = "fill",
     include_all_group: bool = True,
-    annotation_order: Optional[Sequence[str]] = None,
+    annotation_order: Sequence[str] | None = None,
     ax=None,
     figsize=(6, 5),
     save: str | None = None,

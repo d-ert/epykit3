@@ -3,13 +3,13 @@ from __future__ import annotations
 import numpy as np
 
 from .._style import PALETTE
+from ..methyldata import MethylData
 from ._compute import (
-    compute_volcano_data,
     compute_ma_data,
     compute_manhattan_data,
+    compute_volcano_data,
 )
 from ._utils import _get_ax, _save_fig
-from ..methyldata import MethylData
 
 
 def volcano(

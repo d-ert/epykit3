@@ -11,28 +11,26 @@ friendly ImportError when the user lacks the report extras.
 
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 import polars as pl
 
 from .._style import PALETTE
+from ..methyldata import MethylData
 from ._compute import (
-    compute_pca,
-    compute_tss_metaplot,
-    compute_coverage_distribution,
-    compute_volcano_data,
-    compute_ma_data,
-    compute_manhattan_data,
     compute_annotation_counts,
     compute_categorical_proportions,
-    compute_pvalue_histogram,
+    compute_coverage_distribution,
     compute_dmr_size_distribution,
     compute_global_methylation,
+    compute_ma_data,
+    compute_manhattan_data,
+    compute_pca,
+    compute_pvalue_histogram,
     compute_sample_correlation_matrix,
     compute_scree,
+    compute_tss_metaplot,
+    compute_volcano_data,
 )
-from ..methyldata import MethylData
 
 # Refined dashboard accents. These affect the interactive *report* figures
 # only; the shared matplotlib ``_style.PALETTE`` is intentionally left
@@ -284,7 +282,7 @@ def cpg_island_pie_plotly(md: MethylData, *, level: str = "dmc"):
 def tss_metaplot_plotly(
     md: MethylData, gtf_path: str, *,
     window_bp: int = 2000, n_bins: int = 100,
-    group_by: Optional[str] = "group", max_genes: Optional[int] = None,
+    group_by: str | None = "group", max_genes: int | None = None,
 ):
     """Plotly-rendered version of :func:`pl.tss_metaplot`."""
     go = _require_plotly()

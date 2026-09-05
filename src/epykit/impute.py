@@ -27,7 +27,6 @@ propagation).
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import numpy as np
 
@@ -39,7 +38,7 @@ def impute_knn_beta(
     beta_matrix: np.ndarray,
     *,
     k: int = 5,
-    max_distance_bp: Optional[int] = 10_000,
+    max_distance_bp: int | None = 10_000,
     return_mask: bool = False,
 ):
     """Fill NaN entries of ``beta_matrix`` by k-nearest-neighbour kNN.
@@ -153,8 +152,8 @@ def impute_knn_anndata(
     adata,
     *,
     k: int = 5,
-    max_distance_bp: Optional[int] = 10_000,
-    layer: Optional[str] = None,
+    max_distance_bp: int | None = 10_000,
+    layer: str | None = None,
     inplace: bool = False,
 ):
     """Impute missing beta values in an :class:`anndata.AnnData`.

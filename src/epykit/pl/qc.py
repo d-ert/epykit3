@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import polars as pl
+
+from ..methyldata import MethylData
 from ._compute import compute_coverage_distribution
 from ._utils import _get_ax, _save_fig
-from ..methyldata import MethylData
-import polars as pl
 
 
 def coverage_histogram(
@@ -55,11 +56,11 @@ def methylation_heatmap(md: MethylData, n_top: int = 1000, ax=None, figsize=(8, 
         raise ValueError("No DMC rows available to build heatmap")
 
     samples = md.obs.get_column("sample_id").to_list()
-    
+
     # top is already a collected DataFrame from md.dmc, no need to call .collect()
     if len(top) == 0:
         raise ValueError("No top DMCs to build heatmap")
-    
+
     # Process each sample separately to reduce memory footprint
     site_dfs = []
     for sample in samples:
@@ -78,10 +79,10 @@ def methylation_heatmap(md: MethylData, n_top: int = 1000, ax=None, figsize=(8, 
                 pl.lit(sample).alias("sample")
             )
             site_dfs.append(sample_df)
-    
+
     if not site_dfs:
         raise ValueError("No sites found in store matching top DMCs")
-    
+
     site_df = pl.concat(site_dfs)
 
     pivot = site_df.pivot(values="beta", index=["chrom", "pos"], on="sample", aggregate_function="mean")

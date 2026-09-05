@@ -15,7 +15,6 @@ from __future__ import annotations
 import logging
 import shutil
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import polars as pl
@@ -31,7 +30,7 @@ NORMALIZE_MANIFEST_NAME = ".epykit_normalize_manifest.json"
 def _filter_params_payload(
     min_coverage: int,
     max_coverage_quantile: float,
-    blacklist_bed: Optional[str],
+    blacklist_bed: str | None,
 ) -> dict:
     return {
         "min_coverage": int(min_coverage),
@@ -129,7 +128,7 @@ def _apply_blacklist(df: pl.DataFrame, blacklist_bed: str) -> pl.DataFrame:
 def sample_summary(
     methylstore_path: str,
     sample: str,
-    output_path: Optional[str] = None,
+    output_path: str | None = None,
 ) -> pl.DataFrame:
     """Compute per-chromosome summary statistics for a single sample.
 
@@ -205,8 +204,8 @@ def filter_sites(
     output_dir: str,
     min_coverage: int = 10,
     max_coverage_quantile: float = 0.999,
-    blacklist_bed: Optional[str] = None,
-    sample: Optional[str] = None,
+    blacklist_bed: str | None = None,
+    sample: str | None = None,
 ) -> None:
     """Filter low-quality CpG sites from a Parquet methylstore.
 
@@ -527,7 +526,7 @@ def normalize_coverage_store(
 def intersect_sites(
     methylstore_path: str,
     samples: list[str],
-    output_path: Optional[str] = None,
+    output_path: str | None = None,
 ) -> pl.DataFrame:
     """Find CpG sites present in all specified samples.
 
@@ -578,7 +577,7 @@ def load_chromosome_data(
     methylstore_path: str,
     chrom: str,
     samples: list[str],
-    site_intersect: Optional[pl.DataFrame] = None,
+    site_intersect: pl.DataFrame | None = None,
 ) -> pl.DataFrame:
     """Load all data for a specific chromosome and set of samples.
 

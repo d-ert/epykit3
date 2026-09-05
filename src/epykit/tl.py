@@ -12,11 +12,12 @@ from __future__ import annotations
 import gc
 import logging
 from typing import Any, Literal
+
 import polars as pl
 
 logger = logging.getLogger(__name__)
 
-from .annotate import annotate_cpg_islands, annotate_features, _GTF_CACHE
+from .annotate import _GTF_CACHE, annotate_cpg_islands, annotate_features
 from .dmc import (
     apply_multiple_testing_correction,
     empirical_fdr_for_dmc,
@@ -744,9 +745,10 @@ def dmc(
     resume_sig = None
     resume_stage_name = None
     if resumable:
-        from .dmc import _canonicalise_test_name as _canon
-        from ._cache import input_signature, manifest_find, manifest_append
         from pathlib import Path
+
+        from ._cache import input_signature, manifest_append, manifest_find
+        from .dmc import _canonicalise_test_name as _canon
         canonical_for_key = _canon(selected_test)
         resume_stage_name = f"dmc_{canonical_for_key}"
         resume_root = md.analysis_root or md.store
@@ -1013,8 +1015,9 @@ def dmc(
     # does not propagate (the in-memory result is still valid).
     if resumable and resume_root and resume_sig and resume_stage_name and result is not None:
         try:
-            from ._cache import manifest_append
             from pathlib import Path
+
+            from ._cache import manifest_append
             sidecar_dir = Path(resume_root) / ".epykit_results"
             sidecar_dir.mkdir(parents=True, exist_ok=True)
             sidecar = sidecar_dir / f"{resume_stage_name}.parquet"
@@ -1090,8 +1093,8 @@ def _run_dmc_contrast(
     md.obs order (not the binary case/control split), so the design
     matrix matches md.obs row-for-row.
     """
-    from .dmc import process_chromosomes_dmc
     from ._glm import build_design, resolve_contrast
+    from .dmc import process_chromosomes_dmc
 
     if not md.obs.height:
         raise ValueError("md.obs is empty; cannot build a design matrix.")
@@ -1525,8 +1528,9 @@ def dmr(
         dmc_store_path = md.uns.get("dmc", {}).get("store_path")
         dmc_input: object
         if dmc_store_path:
-            from ._dmc_store import DMCStore
             from pathlib import Path as _Path
+
+            from ._dmc_store import DMCStore
             store_path = _Path(dmc_store_path)
             if (store_path / ".epykit_dmc_manifest.json").exists():
                 dmc_input = DMCStore.open(store_path)
@@ -1608,8 +1612,9 @@ def dmr(
         # 22M-CpG run stays streaming-friendly.
         dmc_store_path = md.uns.get("dmc", {}).get("store_path")
         if dmc_store_path:
-            from ._dmc_store import DMCStore
             from pathlib import Path as _Path
+
+            from ._dmc_store import DMCStore
             store_path = _Path(dmc_store_path)
             if (store_path / ".epykit_dmc_manifest.json").exists():
                 dmc_input = DMCStore.open(store_path)
@@ -1743,8 +1748,9 @@ def diagnose_dmr_calling(
     * ``"summary"`` (str) -- multi-line human-readable summary
     * ``"alpha_threshold"`` (float) -- the threshold used
     """
-    import numpy as np
     from collections import defaultdict
+
+    import numpy as np
 
     # ---- Resolve inputs ----
     if dmc_key is None:

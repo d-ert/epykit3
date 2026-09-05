@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import polars as pl
@@ -84,13 +83,13 @@ def call_pmd_one_sample(
     store: Path,
     sample: str,
     *,
-    chromosomes: Optional[list[str]] = None,
+    chromosomes: list[str] | None = None,
     bandwidth_bp: float = 10_000,
     beta_threshold: float = 0.55,
     min_pmd_bp: int = 100_000,
     self_loop: float = 0.999,
     backend: str = "sequential",
-    n_workers: Optional[int] = None,
+    n_workers: int | None = None,
 ) -> pl.DataFrame:
     """Call PMDs for a single sample across all detected chromosomes."""
     store = Path(store)
@@ -99,7 +98,7 @@ def call_pmd_one_sample(
 
     state_means = np.array([beta_threshold * 0.5, min(beta_threshold + 0.25, 0.95)])
 
-    def _pmd_chrom_handler(chrom: str) -> Optional[pl.DataFrame]:
+    def _pmd_chrom_handler(chrom: str) -> pl.DataFrame | None:
         # Build a canonical sorted (pos, strand) frame from the sample's
         # partition. PMDs are per-sample so we don't need an intersect.
         part = store / f"sample={sample}" / f"chrom={chrom}" / "part-0.parquet"
@@ -165,13 +164,13 @@ def call_pmd_one_sample(
 def pmd(
     md,
     *,
-    samples: Optional[list[str]] = None,
+    samples: list[str] | None = None,
     bandwidth_bp: float = 10_000,
     beta_threshold: float = 0.55,
     min_pmd_bp: int = 100_000,
-    chromosomes: Optional[list[str]] = None,
+    chromosomes: list[str] | None = None,
     backend: str = "sequential",
-    n_workers: Optional[int] = None,
+    n_workers: int | None = None,
 ) -> None:
     """Call PMDs across all (or specified) samples; store in ``md.uns["pmd"]``."""
     md_samples = md.obs.get_column("sample_id").to_list()

@@ -21,8 +21,8 @@ from __future__ import annotations
 import gzip
 import json
 import logging
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional, Sequence
 
 import polars as pl
 
@@ -40,7 +40,7 @@ def _write_one_sample(
     sample: str,
     out_path: Path,
     *,
-    chromosomes: Optional[Sequence[str]] = None,
+    chromosomes: Sequence[str] | None = None,
 ) -> int:
     sample_dir = store_root / f"sample={sample}"
     if not sample_dir.exists():
@@ -90,9 +90,9 @@ def _write_one_sample(
 def to_methylkit_tabix(
     md,
     output_dir: str,
-    samples: Optional[list[str]] = None,
+    samples: list[str] | None = None,
     *,
-    chromosomes: Optional[Sequence[str]] = None,
+    chromosomes: Sequence[str] | None = None,
 ) -> str:
     """Export per-sample methylKit-schema tab-delimited tables.
 
@@ -122,7 +122,7 @@ def to_methylkit_tabix(
             store_root, sample, out_path, chromosomes=chromosomes,
         )
         # Best-effort tabix indexing.
-        tbi_path: Optional[str] = None
+        tbi_path: str | None = None
         try:
             import pysam
             tbi = pysam.tabix_index(

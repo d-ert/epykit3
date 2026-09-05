@@ -36,8 +36,8 @@ def qc_dashboard(
     rendered as captioned placeholders rather than crashing -- so
     ``pl.qc_dashboard`` works on a partially-run pipeline.
     """
-    import matplotlib.pyplot as plt
     import matplotlib.gridspec as gridspec
+    import matplotlib.pyplot as plt
 
     fig = plt.figure(figsize=figsize)
     gs = gridspec.GridSpec(3, 3, figure=fig, hspace=0.45, wspace=0.35)

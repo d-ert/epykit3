@@ -3,9 +3,9 @@ from __future__ import annotations
 import numpy as np
 
 from .._style import PALETTE
+from ..methyldata import MethylData
 from ._compute import compute_pca
 from ._utils import _get_ax, _save_fig
-from ..methyldata import MethylData
 
 
 def pca(

@@ -19,11 +19,9 @@ Design rules:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 import polars as pl
-
 
 # ---------------------------------------------------------------------------
 # Result containers
@@ -46,7 +44,7 @@ class MetaplotResult:
     mean_beta: np.ndarray         # (n_samples, n_bins)
     samples: list[str]
     groups: list
-    group_col: Optional[str]
+    group_col: str | None
     window_bp: int
     n_bins: int
 
@@ -119,7 +117,7 @@ def _store_pattern(md) -> str:
     return f"{md.store}/sample=*/chrom=*/part-*.parquet"
 
 
-def _resolve_group_col(md, group_col: Optional[str]) -> tuple[Optional[str], list]:
+def _resolve_group_col(md, group_col: str | None) -> tuple[str | None, list]:
     """Pick ``group_col`` from md.obs, falling back through common names."""
     if group_col is None:
         for cand in ("group", "treatment", "condition"):
@@ -227,7 +225,7 @@ def compute_pca(
     n_sites: int = 10_000,
     n_components: int = 2,
     seed: int = 42,
-    group_col: Optional[str] = None,
+    group_col: str | None = None,
     use_cache: bool = True,
 ) -> PCAResult:
     """Compute PCA of per-sample methylation profiles.
@@ -277,7 +275,7 @@ def compute_pca(
 # ---------------------------------------------------------------------------
 
 
-def _tss_intervals(gtf_path: str, *, window_bp: int, max_genes: Optional[int]):
+def _tss_intervals(gtf_path: str, *, window_bp: int, max_genes: int | None):
     """Build a polars DataFrame of TSS windows from a GTF.
 
     Returns columns: chrom, start, end, tss, strand, gene_id, gene_name.
@@ -339,8 +337,8 @@ def compute_tss_metaplot(
     *,
     window_bp: int = 2000,
     n_bins: int = 100,
-    group_by: Optional[str] = "group",
-    max_genes: Optional[int] = None,
+    group_by: str | None = "group",
+    max_genes: int | None = None,
     use_cache: bool = True,
 ) -> MetaplotResult:
     """Compute mean beta around the TSS, with bounded peak memory.
@@ -504,8 +502,8 @@ def _dmc_p_col(dmc: pl.DataFrame) -> str:
     return "qvalue" if "qvalue" in dmc.columns else "pvalue"
 
 
-def _subsample_keep_sig(sig: np.ndarray, max_points: Optional[int],
-                        seed: int = 42) -> Optional[np.ndarray]:
+def _subsample_keep_sig(sig: np.ndarray, max_points: int | None,
+                        seed: int = 42) -> np.ndarray | None:
     """Return sorted indices retaining ALL significant rows plus a random
     sample of the non-significant rows so the total is <= ``max_points``.
 
@@ -534,8 +532,8 @@ def compute_volcano_data(
     *,
     alpha: float = 0.05,
     min_abs_diff: float = 0.1,
-    dmc: Optional[pl.DataFrame] = None,
-    max_points: Optional[int] = None,
+    dmc: pl.DataFrame | None = None,
+    max_points: int | None = None,
     seed: int = 42,
 ) -> VolcanoData:
     if dmc is None:
@@ -561,8 +559,8 @@ def compute_ma_data(
     *,
     alpha: float = 0.05,
     min_abs_diff: float = 0.1,
-    dmc: Optional[pl.DataFrame] = None,
-    max_points: Optional[int] = None,
+    dmc: pl.DataFrame | None = None,
+    max_points: int | None = None,
     seed: int = 42,
 ) -> MAData:
     if dmc is None:
@@ -590,8 +588,8 @@ def compute_manhattan_data(
     md,
     *,
     alpha: float = 0.05,
-    dmc: Optional[pl.DataFrame] = None,
-    max_points: Optional[int] = None,
+    dmc: pl.DataFrame | None = None,
+    max_points: int | None = None,
     seed: int = 42,
     canonical_only: bool = True,
 ) -> ManhattanData:
@@ -868,7 +866,7 @@ def compute_categorical_proportions(
 # ---------------------------------------------------------------------------
 
 
-def compute_pvalue_histogram(md, *, bins: int = 30, dmc: Optional[pl.DataFrame] = None):
+def compute_pvalue_histogram(md, *, bins: int = 30, dmc: pl.DataFrame | None = None):
     """Histogram of raw per-CpG p-values -- a test-calibration check.
 
     A well-behaved analysis shows a roughly uniform null with a spike near
@@ -935,7 +933,7 @@ def compute_sample_correlation_matrix(md):
         mat[i, j] = mat[j, i] = row["correlation"]
     np.fill_diagonal(mat, 1.0)
     try:
-        from scipy.cluster.hierarchy import linkage, leaves_list
+        from scipy.cluster.hierarchy import leaves_list, linkage
         from scipy.spatial.distance import squareform
 
         filled = np.where(np.isnan(mat), np.nanmean(mat), mat)

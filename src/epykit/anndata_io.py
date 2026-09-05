@@ -40,7 +40,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -87,8 +86,9 @@ def _site_index(store: str, *, unite_type: str):
         ``var[start_idx:start_idx + len(positions_int64)]`` is the
         chromosome's contiguous block. Empty chromosomes are dropped.
     """
-    import numpy as np
     from functools import reduce
+
+    import numpy as np
 
     if unite_type not in {"union", "intersect"}:
         raise ValueError(
@@ -119,8 +119,8 @@ def _site_index(store: str, *, unite_type: str):
     )
     per_chrom_log = logger.debug if len(chroms_sorted) > 50 else logger.info
 
-    chrom_index: dict[str, tuple[int, "np.ndarray"]] = {}
-    chrom_arrays: list[tuple[str, "np.ndarray"]] = []
+    chrom_index: dict[str, tuple[int, np.ndarray]] = {}
+    chrom_arrays: list[tuple[str, np.ndarray]] = []
     running_start = 0
 
     for chrom in chroms_sorted:
@@ -197,12 +197,12 @@ def _site_index(store: str, *, unite_type: str):
 
 
 def _value_lazyframe(
-    lf: "pl.LazyFrame",
+    lf: pl.LazyFrame,
     chrom: str,
     layer: str,
     *,
-    pl_value_dtype: "pl.DataType",
-) -> "pl.LazyFrame":
+    pl_value_dtype: pl.DataType,
+) -> pl.LazyFrame:
     """Return a lazy frame with columns (pos: Int64, value: pl_value_dtype) for one chromosome.
 
     The value dtype is pinned in polars so the downstream
@@ -238,7 +238,7 @@ def _fill_layer(
     samples: list[str],
     n_sites: int,
     layer: str,
-    chrom_index: dict[str, tuple[int, "np.ndarray"]],
+    chrom_index: dict[str, tuple[int, np.ndarray]],
     dtype,
 ):
     """Stream sample x chromosome, filling a (n_samples x n_sites) array.

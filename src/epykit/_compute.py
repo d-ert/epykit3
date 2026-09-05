@@ -24,7 +24,8 @@ closure or :func:`functools.partial`; both work under
 from __future__ import annotations
 
 import logging
-from typing import Callable, Iterable, Iterator, Optional
+from collections.abc import Iterable, Iterator
+from typing import Callable, Optional
 
 import polars as pl
 
@@ -39,7 +40,7 @@ def run_chrom_pipeline(
     handler: ChromHandler,
     *,
     backend: str = "sequential",
-    n_workers: Optional[int] = None,
+    n_workers: int | None = None,
     label: str = "chrom",
 ) -> Iterator[tuple[str, pl.DataFrame]]:
     """Run one handler invocation per chromosome through the chosen backend.
@@ -86,7 +87,7 @@ def run_chrom_pipeline(
         )
 
 
-def _emit(chrom: str, result: Optional[pl.DataFrame]) -> Optional[tuple[str, pl.DataFrame]]:
+def _emit(chrom: str, result: pl.DataFrame | None) -> tuple[str, pl.DataFrame] | None:
     """Filter empty / None results; return None to signal 'skip'."""
     if result is None:
         return None
@@ -112,7 +113,7 @@ def _run_sequential(
 def _run_dask(
     chromosomes: list[str],
     handler: ChromHandler,
-    n_workers: Optional[int],
+    n_workers: int | None,
     label: str,
 ) -> Iterator[tuple[str, pl.DataFrame]]:
     try:
@@ -125,8 +126,8 @@ def _run_dask(
 
     # Reuse an active client if the caller already opened one; otherwise
     # spin up a LocalCluster sized to n_workers.
-    owned_cluster: Optional[LocalCluster] = None
-    owned_client: Optional[Client] = None
+    owned_cluster: LocalCluster | None = None
+    owned_client: Client | None = None
     try:
         try:
             client = get_client()
@@ -170,7 +171,7 @@ def _run_dask(
 def _run_ray(
     chromosomes: list[str],
     handler: ChromHandler,
-    n_workers: Optional[int],
+    n_workers: int | None,
     label: str,
 ) -> Iterator[tuple[str, pl.DataFrame]]:
     try:

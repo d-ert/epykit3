@@ -22,8 +22,8 @@ from __future__ import annotations
 
 import logging
 import math
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping, Optional
 
 import polars as pl
 
@@ -48,7 +48,7 @@ def call_entropy(
     *,
     window_cpgs: int = 4,
     min_reads: int = 10,
-    chromosomes: Optional[list[str]] = None,
+    chromosomes: list[str] | None = None,
     caller: str = "bismark",
     min_baseq: int = 20,
     min_mapq: int = 10,
@@ -198,7 +198,7 @@ def entropy(
     bam: Mapping[str, str | Path],
     window_cpgs: int = 4,
     min_reads: int = 10,
-    chromosomes: Optional[list[str]] = None,
+    chromosomes: list[str] | None = None,
     caller: str = "bismark",
 ) -> None:
     """Run entropy and store results in ``md.varm["entropy"]``."""

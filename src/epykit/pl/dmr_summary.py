@@ -9,14 +9,12 @@ labels) of multi-panel methylation figures.
 
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 import polars as pl
 
 from .._style import PALETTE
-from ._utils import _save_fig
 from ..methyldata import MethylData
+from ._utils import _save_fig
 
 
 def _resolve_dmr(md: MethylData) -> pl.DataFrame:
@@ -215,7 +213,7 @@ def dmr_heatmap(
     cluster_rows: bool = True,
     cluster_method: str = "average",
     cluster_metric: str = "euclidean",
-    group_by: Optional[str] = "group",
+    group_by: str | None = "group",
     label_genes: int | bool = 20,
     cmap: str = "RdYlBu_r",
     vmin: float = 0.0,
@@ -285,7 +283,7 @@ def dmr_heatmap(
     valid_row_mask = ~np.isnan(matrix).any(axis=1)
     row_order = np.arange(matrix.shape[0])
     if cluster_rows and valid_row_mask.sum() > 2:
-        from scipy.cluster.hierarchy import linkage, leaves_list
+        from scipy.cluster.hierarchy import leaves_list, linkage
         # Cluster valid rows; keep NaN rows at the bottom in their existing
         # order so the dendrogram doesn't choke.
         valid_rows = np.where(valid_row_mask)[0]

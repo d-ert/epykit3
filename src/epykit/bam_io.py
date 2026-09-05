@@ -28,8 +28,8 @@ wheel).
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Iterable, Iterator, Optional
 
 import polars as pl
 
@@ -73,7 +73,7 @@ _BISMARK_UNMETHYLATED = set("zxh")   # unmethylated CpG / CHG / CHH
 def read_methylation_calls(
     bam_path: str | Path,
     *,
-    regions: Optional[Iterable[tuple[str, int, int]]] = None,
+    regions: Iterable[tuple[str, int, int]] | None = None,
     min_mapq: int = 10,
     min_baseq: int = 20,
     caller: str = "bismark",

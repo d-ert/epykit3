@@ -42,7 +42,8 @@ This split lets host applications and notebooks consume epykit without
 having their stdout polluted, while CLI users see the expected output.
 """
 
-from importlib.metadata import version as _v, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _v
 
 try:
     __version__ = _v("epykit")
@@ -50,54 +51,55 @@ except PackageNotFoundError:
     # editable install or running from source without install
     __version__ = "0.0.0+unknown"
 
-from .methyldata import MethylData
-from .io import (
-    read_bismark,
-    read_methyldackel,
-    read_combined_strand_bed,
-    read_nfcore_methylseq,
-    load,
-)
-from . import pp, tl, pl, query
-from ._config import set_tmp_dir, get_tmp_dir
-
-from .convert import convert_sample
+from . import pl, pp, query, tl
+from ._config import get_tmp_dir, set_tmp_dir
 from ._dmc_store import DMCStore
+from ._glm import build_design
+from .anndata_io import to_anndata, to_mudata
+from .annotate import (
+    HOMER_FEATURES,
+    annotate_cpg_islands,
+    annotate_features,
+)
+from .clocks import age_clock, deconvolve
+from .convert import convert_sample
 from .dmr import (
     DMR_PRESETS,
     call_dmr_chain_merge,
     call_dmr_sliding_window,
-    smooth_methylation_gaussian,
     smooth_methylation_bsmooth,
+    smooth_methylation_gaussian,
 )
-from .annotate import (
-    annotate_features,
-    annotate_cpg_islands,
-    HOMER_FEATURES,
-)
-from .qc import (
-    bisulfite_conversion_rate,
-    global_methylation_report,
-    coverage_uniformity,
-)
-from ._glm import build_design
+from .dvc import call_dvr_density, process_chromosomes_dvc  # noqa: F401
 
 # Export / interop (lazy heavy deps inside)
-from .export import to_bedgraph, to_bigwig, dmcs_to_bed, dmrs_to_bed, export_tables
-from .anndata_io import to_anndata, to_mudata
+from .export import dmcs_to_bed, dmrs_to_bed, export_tables, to_bedgraph, to_bigwig
+from .impute import impute_knn_anndata, impute_knn_beta
+from .io import (
+    load,
+    read_bismark,
+    read_combined_strand_bed,
+    read_methyldackel,
+    read_nfcore_methylseq,
+)
+from .methyldata import MethylData
 from .methylkit_io import to_methylkit_tabix
 from .multiqc_export import report_multiqc
 from .nfcore_qc import read_nfcore_methylseq_qc
-from .report import generate_report
-from .dvc import process_chromosomes_dvc, call_dvr_density  # noqa: F401
-from .impute import impute_knn_beta, impute_knn_anndata
-from .clocks import age_clock, deconvolve
 from .qc import (
-    sex_check,
+    bisulfite_conversion_rate,
     contamination_estimate,
-    sample_correlation as sample_correlation_qc,
+    coverage_uniformity,
+    global_methylation_report,
+    sex_check,
+)
+from .qc import (
     power as power_calc,
 )
+from .qc import (
+    sample_correlation as sample_correlation_qc,
+)
+from .report import generate_report
 
 __all__ = [
     # version
@@ -181,6 +183,7 @@ def __getattr__(name: str):
     """
     if name in _DEMOTED_TO_DMC:
         import warnings
+
         from . import dmc as _dmc_mod
         warnings.warn(
             f"epykit.{name} is no longer a top-level export; use "

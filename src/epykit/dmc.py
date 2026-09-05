@@ -38,7 +38,7 @@ import tempfile
 import time
 import warnings
 from pathlib import Path
-from typing import Literal, Optional, Tuple, Union, overload
+from typing import Literal, overload
 
 import numpy as np
 import polars as pl
@@ -93,9 +93,9 @@ def _dmc_input_signature(
     min_samples_control: int,
     dispersion: str,
     reference: str,
-    samples_all_ordered: Optional[list[str]],
-    group_labels_per_sample: Optional[list[str]],
-    contrast_label: Optional[str],
+    samples_all_ordered: list[str] | None,
+    group_labels_per_sample: list[str] | None,
+    contrast_label: str | None,
     smoothing: bool = False,
     smoothing_span_bp: int = 500,
     sep_fallback: bool = False,
@@ -152,7 +152,7 @@ def _dmc_input_signature(
 def _resolve_dmc_store_dir(
     methylstore_path: Path,
     test: str,
-    out_dir: Optional[Union[str, Path]],
+    out_dir: str | Path | None,
     smoothing: bool = False,
 ) -> Path:
     """Pick the directory used for the persistent DMC store.
@@ -237,7 +237,7 @@ def fisher_exact_vectorized(
     unmeth_a: np.ndarray,
     meth_b: np.ndarray,
     unmeth_b: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Vectorised Fisher exact test on 2x2 contingency tables.
 
     Two-sided p-value matches ``scipy.stats.fisher_exact(alternative='two-sided')``:
@@ -1325,13 +1325,13 @@ def _process_one_chromosome(
     min_samples_control: int = 0,
     dispersion: str = "site",
     reference: str = "adaptive",
-    design_full: Optional[np.ndarray] = None,
-    design_reduced: Optional[np.ndarray] = None,
-    coef_idx: Optional[int] = None,
-    contrast_matrix: Optional[np.ndarray] = None,
-    contrast_label: Optional[str] = None,
-    samples_all_ordered: Optional[list[str]] = None,
-    group_labels_per_sample: Optional[list[str]] = None,
+    design_full: np.ndarray | None = None,
+    design_reduced: np.ndarray | None = None,
+    coef_idx: int | None = None,
+    contrast_matrix: np.ndarray | None = None,
+    contrast_label: str | None = None,
+    samples_all_ordered: list[str] | None = None,
+    group_labels_per_sample: list[str] | None = None,
     glm_backend: str = "cpu",
     smoothing: bool = False,
     smoothing_span_bp: int = 500,
@@ -1382,21 +1382,21 @@ def _process_one_chromosome(
     # `multigroup_mode` at the end.
     multigroup_mode = False
     level_mean_beta: dict[str, np.ndarray] = {}
-    f_stat_out: Optional[np.ndarray] = None
-    df1_out: Optional[int] = None
-    df2_out: Optional[np.ndarray] = None
+    f_stat_out: np.ndarray | None = None
+    df1_out: int | None = None
+    df2_out: np.ndarray | None = None
 
     # Pooled counts retained for Newcombe CI (lr and fisher paths only).
     # Set to non-None by those branches before the del statements below so
     # the unified CI block can use newcombe_diff_ci instead of Wald.
-    _newcombe_meth_a: Optional[np.ndarray] = None
-    _newcombe_cov_a: Optional[np.ndarray] = None
-    _newcombe_meth_b: Optional[np.ndarray] = None
-    _newcombe_cov_b: Optional[np.ndarray] = None
+    _newcombe_meth_a: np.ndarray | None = None
+    _newcombe_cov_a: np.ndarray | None = None
+    _newcombe_meth_b: np.ndarray | None = None
+    _newcombe_cov_b: np.ndarray | None = None
     # Per-site dispersion for a phi-aware Newcombe CI (lr only). Left None for
     # fisher (no dispersion estimate -> binomial CI, byte-identical).
-    _newcombe_phi: Optional[np.ndarray] = None
-    _newcombe_df: Optional[np.ndarray] = None
+    _newcombe_phi: np.ndarray | None = None
+    _newcombe_df: np.ndarray | None = None
 
     # --- Statistical test ---
     if test == "fisher":
@@ -1995,27 +1995,27 @@ def _validate_sample_size_and_warn(n_case: int, n_ctrl: int, test: str) -> None:
 @overload
 def process_chromosomes_dmc(
     methylstore_path: str,
-    samples_treatment: Optional[list[str]] = ...,
-    samples_control: Optional[list[str]] = ...,
+    samples_treatment: list[str] | None = ...,
+    samples_control: list[str] | None = ...,
     test: str = ...,
-    chromosomes: Optional[list[str]] = ...,
+    chromosomes: list[str] | None = ...,
     unite: bool = ...,
-    min_samples_treatment: Optional[int] = ...,
+    min_samples_treatment: int | None = ...,
     min_samples_control: int = ...,
     dispersion: str = ...,
     reference: str = ...,
-    design_full: Optional[np.ndarray] = ...,
-    design_reduced: Optional[np.ndarray] = ...,
-    coef_idx: Optional[int] = ...,
-    contrast_matrix: Optional[np.ndarray] = ...,
-    contrast_label: Optional[str] = ...,
-    samples_all_ordered: Optional[list[str]] = ...,
-    group_labels_per_sample: Optional[list[str]] = ...,
+    design_full: np.ndarray | None = ...,
+    design_reduced: np.ndarray | None = ...,
+    coef_idx: int | None = ...,
+    contrast_matrix: np.ndarray | None = ...,
+    contrast_label: str | None = ...,
+    samples_all_ordered: list[str] | None = ...,
+    group_labels_per_sample: list[str] | None = ...,
     *,
     backend: str = ...,
-    n_workers: Optional[int] = ...,
+    n_workers: int | None = ...,
     glm_backend: str = ...,
-    out_dir: Optional[Union[str, Path]] = ...,
+    out_dir: str | Path | None = ...,
     return_store: Literal[True],
     smoothing: bool = ...,
     smoothing_span_bp: int = ...,
@@ -2027,27 +2027,27 @@ def process_chromosomes_dmc(
 @overload
 def process_chromosomes_dmc(
     methylstore_path: str,
-    samples_treatment: Optional[list[str]] = ...,
-    samples_control: Optional[list[str]] = ...,
+    samples_treatment: list[str] | None = ...,
+    samples_control: list[str] | None = ...,
     test: str = ...,
-    chromosomes: Optional[list[str]] = ...,
+    chromosomes: list[str] | None = ...,
     unite: bool = ...,
-    min_samples_treatment: Optional[int] = ...,
+    min_samples_treatment: int | None = ...,
     min_samples_control: int = ...,
     dispersion: str = ...,
     reference: str = ...,
-    design_full: Optional[np.ndarray] = ...,
-    design_reduced: Optional[np.ndarray] = ...,
-    coef_idx: Optional[int] = ...,
-    contrast_matrix: Optional[np.ndarray] = ...,
-    contrast_label: Optional[str] = ...,
-    samples_all_ordered: Optional[list[str]] = ...,
-    group_labels_per_sample: Optional[list[str]] = ...,
+    design_full: np.ndarray | None = ...,
+    design_reduced: np.ndarray | None = ...,
+    coef_idx: int | None = ...,
+    contrast_matrix: np.ndarray | None = ...,
+    contrast_label: str | None = ...,
+    samples_all_ordered: list[str] | None = ...,
+    group_labels_per_sample: list[str] | None = ...,
     *,
     backend: str = ...,
-    n_workers: Optional[int] = ...,
+    n_workers: int | None = ...,
     glm_backend: str = ...,
-    out_dir: Optional[Union[str, Path]] = ...,
+    out_dir: str | Path | None = ...,
     return_store: Literal[False] = ...,
     smoothing: bool = ...,
     smoothing_span_bp: int = ...,
@@ -2058,33 +2058,33 @@ def process_chromosomes_dmc(
 
 def process_chromosomes_dmc(
     methylstore_path: str,
-    samples_treatment: Optional[list[str]] = None,
-    samples_control: Optional[list[str]] = None,
+    samples_treatment: list[str] | None = None,
+    samples_control: list[str] | None = None,
     test: str = "lr",
-    chromosomes: Optional[list[str]] = None,
+    chromosomes: list[str] | None = None,
     unite: bool = True,
-    min_samples_treatment: Optional[int] = None,
+    min_samples_treatment: int | None = None,
     min_samples_control: int = 0,
     dispersion: str = "site",
     reference: str = "adaptive",
-    design_full: Optional[np.ndarray] = None,
-    design_reduced: Optional[np.ndarray] = None,
-    coef_idx: Optional[int] = None,
-    contrast_matrix: Optional[np.ndarray] = None,
-    contrast_label: Optional[str] = None,
-    samples_all_ordered: Optional[list[str]] = None,
-    group_labels_per_sample: Optional[list[str]] = None,
+    design_full: np.ndarray | None = None,
+    design_reduced: np.ndarray | None = None,
+    coef_idx: int | None = None,
+    contrast_matrix: np.ndarray | None = None,
+    contrast_label: str | None = None,
+    samples_all_ordered: list[str] | None = None,
+    group_labels_per_sample: list[str] | None = None,
     *,
     backend: str = "sequential",
-    n_workers: Optional[int] = None,
+    n_workers: int | None = None,
     glm_backend: str = "cpu",
-    out_dir: Optional[Union[str, Path]] = None,
+    out_dir: str | Path | None = None,
     return_store: bool = False,
     smoothing: bool = False,
     smoothing_span_bp: int = 500,
     sep_fallback: bool = False,
     sep_threshold: float = 0.9,
-) -> Union[pl.DataFrame, DMCStore]:
+) -> pl.DataFrame | DMCStore:
     """Process differential methylation for all chromosomes.
 
     Parameters
@@ -2196,7 +2196,7 @@ def process_chromosomes_dmc(
 
     from ._compute import run_chrom_pipeline
 
-    def _dmc_chrom_handler(chrom: str) -> Optional[pl.DataFrame]:
+    def _dmc_chrom_handler(chrom: str) -> pl.DataFrame | None:
         canonical_df = (
             _intersect_chrom(store, chrom, all_samples)
             if unite
@@ -2599,7 +2599,7 @@ def combine_neighbour_pvalues(
                     # Count how many neighbours share the focal site's
                     # effect direction (used by the sign-agreement guard).
                     focal_sign = sign[i]
-                    n_agree[i] = int(np.sum((slice_sign[mask] == focal_sign)))
+                    n_agree[i] = int(np.sum(slice_sign[mask] == focal_sign))
         with np.errstate(invalid="ignore", divide="ignore"):
             z_combined = np.where(n_in > 0, z_sum / np.sqrt(n_in), 0.0)
         p_combined = 2.0 * _norm.sf(np.abs(z_combined))
@@ -2720,11 +2720,11 @@ def apply_multiple_testing_correction(
 
 
 def apply_multiple_testing_correction(
-    dmc_results: Union[pl.DataFrame, DMCStore],
+    dmc_results: pl.DataFrame | DMCStore,
     method: str = "fdr_bh",
     pvalue_col: str = "pvalue",
     qvalue_col: str = "qvalue",
-) -> Union[pl.DataFrame, DMCStore]:
+) -> pl.DataFrame | DMCStore:
     """Apply multiple testing correction (Benjamini-Hochberg default).
 
     This function accepts two input types and behaves accordingly:

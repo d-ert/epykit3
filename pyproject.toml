@@ -172,7 +172,7 @@ extend-exclude = [
 # Start minimal: pyflakes (undefined names, unused imports) only. Once the
 # baseline is green in CI, ratchet up to ["F", "E", "W", "I", "B", "UP", "RUF"]
 # and add a one-shot autofix commit.
-select = ["F"]
+select = ["F", "I", "W", "UP"]
 ignore = []
 
 [tool.ruff.lint.per-file-ignores]
