@@ -180,9 +180,11 @@ ignore = []
 known-first-party = ["epykit"]
 
 [tool.mypy]
-# Runtime supports 3.9+ via __future__ annotations; mypy itself dropped
-# its 3.9 target option in recent versions, so we type-check against 3.10.
-python_version = "3.10"
+# Type-check against the pinned dev interpreter (.python-version). Runtime
+# still supports 3.9+ via __future__ annotations and the 3.9 CI leg catches
+# runtime-only breakage. The target cannot be lower: numpy >= 2.5 ships
+# PEP 695 `type` aliases in its stubs, which mypy only parses at >= 3.12.
+python_version = "3.12"
 follow_imports = "silent"
 ignore_missing_imports = true
 no_strict_optional = true
