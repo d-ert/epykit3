@@ -24,15 +24,14 @@ closure or :func:`functools.partial`; both work under
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Iterator
-from typing import Callable, Optional
+from collections.abc import Callable, Iterable, Iterator
 
 import polars as pl
 
 logger = logging.getLogger(__name__)
 
 
-ChromHandler = Callable[[str], Optional[pl.DataFrame]]
+ChromHandler = Callable[[str], pl.DataFrame | None]
 
 
 def run_chrom_pipeline(

@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/d-ert/epykit3/actions/workflows/test.yml"><img src="https://github.com/d-ert/epykit3/actions/workflows/test.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/version-1.0.0-success" alt="version 1.0.0">
-  <img src="https://img.shields.io/badge/python-3.9%E2%80%933.12-blue" alt="Python 3.9–3.12">
+  <img src="https://img.shields.io/badge/python-3.10%E2%80%933.13-blue" alt="Python 3.10–3.13">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://d-ert.github.io/epykit3/"><img src="https://img.shields.io/badge/docs-d--ert.github.io-informational" alt="Documentation"></a>
 </p>
@@ -59,7 +59,7 @@ The WGBS analysis ecosystem is fragmented across R/Bioconductor (methylKit, DSS,
 
 ## Installation
 
-Requires Python ≥ 3.9.
+Requires Python ≥ 3.10.
 
 ```bash
 # from the repo checkout
@@ -68,8 +68,9 @@ pip install -e .
 # or with uv
 uv pip install -e .
 
-# dev install
-pip install -e ".[dev]"
+# dev install (test + lint tools live in the `dev` dependency group)
+uv sync --group dev --extra all
+pip install -e . --group dev          # pip >= 25.1 equivalent
 
 # full feature install (report + export + anndata + viz)
 pip install -e ".[all]"
@@ -77,7 +78,7 @@ pip install -e ".[all]"
 
 Core dependencies: `polars`, `pyarrow`, `numpy`, `scipy`, `numba`, `bioframe`, `pyfaidx`, `statsmodels`, `patsy`, `psutil`, `scikit-learn`, `matplotlib`, `seaborn`. Optional extras: `report` (Jinja2 + Plotly), `export` (pyBigWig), `anndata` (anndata + mudata), `viz` (umap-learn), `methylkit` (pysam, for tabix indexing on Linux/macOS). The CLI is installed as the `epykit` console script.
 
-> **Platform note.** The pure-Python core and the `report` / `anndata` / `viz` extras run on Linux, macOS, and Windows (CI covers `{ubuntu, windows} × {py3.9, py3.12}`). A few extras are Linux/macOS only because they have no Windows wheel: `export` (pyBigWig) and the `pysam`-backed `methylkit` / `bam` extras.
+> **Platform note.** The pure-Python core and the `report` / `anndata` / `viz` extras run on Linux, macOS, and Windows (CI covers `{ubuntu, windows} × {py3.10, py3.12, py3.13}`). A few extras are Linux/macOS only because they have no Windows wheel: `export` (pyBigWig) and the `pysam`-backed `methylkit` / `bam` extras.
 
 ---
 
@@ -301,7 +302,7 @@ The headline claims are made around the bare `lr` engine (the 1.0 default). The 
 ## Tests
 
 ```bash
-pip install -e ".[dev]"
+uv sync --group dev --extra all   # or: pip install -e . --group dev  (pip >= 25.1)
 pytest -m "not slow"        # fast tier (the CI invocation)
 pytest -m slow              # opt-in slow tier (>~5s tests)
 ```

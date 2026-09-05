@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "Parquet-backed WGBS methylation analysis pipeline (Bismark / MethylDackel → DMC/DMR → annotation)"
 readme = "README.md"
 authors = [ { name = "Deniz Ertuğrul", email = "denizert2000@gmail.com" } ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 keywords = [
   "methylation",
@@ -28,10 +28,10 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 
@@ -50,6 +50,11 @@ dependencies = [
   # numba>=0.60 is the first release with numpy 2.0 support.
   "numba>=0.60",
   "bioframe>=0.7",
+  # Imported directly by annotate.py, filter.py and pl/composer.py; it used to
+  # arrive only transitively through bioframe / statsmodels / seaborn. 2.0 is
+  # the oldest line exercised (nullable Int64 + to_numpy(na_value=...) in
+  # annotate.py); see tests/test_deps_floor.py.
+  "pandas>=2.0",
   "pyfaidx>=0.7",
   "statsmodels>=0.14",
   "patsy>=0.5",
@@ -67,10 +72,6 @@ Issues = "https://github.com/d-ert/epykit/issues"
 Changelog = "https://github.com/d-ert/epykit/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
-dev = [
-  "pytest>=8.4.2",
-  "pytest-cov",
-]
 report = [
   "jinja2>=3.1",
   "plotly>=5.20",
@@ -158,7 +159,7 @@ filterwarnings = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py310"
 extend-exclude = [
     ".venv",
     "build",
@@ -173,7 +174,8 @@ extend-exclude = [
 # baseline is green in CI, ratchet up to ["F", "E", "W", "I", "B", "UP", "RUF"]
 # and add a one-shot autofix commit.
 select = ["F", "I", "W", "UP", "E", "B"]
-ignore = ["E501"]  # the formatter owns line length
+# B905 (zip strict=) became active with target-version py310; auditing the 30 zip() calls for strict=True is a follow-up.
+ignore = ["E501", "B905"]  # the formatter owns line length
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["F401", "F811"]
@@ -185,16 +187,28 @@ ignore = ["E501"]  # the formatter owns line length
 known-first-party = ["epykit"]
 
 [tool.mypy]
-# Runtime supports 3.9+ via __future__ annotations; mypy itself dropped
-# its 3.9 target option in recent versions, so we type-check against 3.10.
-python_version = "3.10"
+# Type-check against the pinned dev interpreter (.python-version). Runtime
+# still supports 3.10+ via __future__ annotations and the 3.10 CI leg catches
+# runtime-only breakage. The target cannot be lower: numpy >= 2.5 ships
+# PEP 695 `type` aliases in its stubs, which mypy only parses at >= 3.12.
+python_version = "3.12"
 follow_imports = "silent"
 ignore_missing_imports = true
 no_strict_optional = true
 warn_unused_ignores = true
 
 [dependency-groups]
+# Contributor tooling, not a user-facing extra (nothing in epykit imports
+# these). `uv sync` installs `dev` by default; pip >= 25.1 installs it with
+# `pip install -e . --group dev`.
 dev = [
+    "pytest>=8.4.2",
+    "pytest-cov",
     "mypy>=1.19.1",
     "ruff>=0.15.14",
+]
+# Docs toolchain: `uv run --only-group docs mkdocs build --strict`.
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
 ]

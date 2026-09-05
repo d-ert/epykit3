@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Use `uv` (matches CI in `.github/workflows/test.yml`). Plain `pip` works too.
 
 ```bash
-uv sync --extra dev --extra all          # install dev + all optional extras
+uv sync --group dev --extra all          # install dev tooling + all optional extras
 uv run pytest -m "not slow" --strict-markers -ra   # the CI invocation
 uv run pytest tests/test_dmc_multigroup.py::test_name   # single test
 uv run pytest -m slow                    # the slow tier (>~5s tests, opt-in)
@@ -20,7 +20,7 @@ uv run mypy src/epykit                   # configured in pyproject.toml
 uv run epykit <subcommand> --help        # CLI entry point (epykit.cli:main)
 ```
 
-CI matrix is `{ubuntu-latest, windows-latest} × {py3.9, py3.12}` — Windows compatibility is load-bearing (some extras like `pyBigWig`, `pysam`-based `methylkit`/`bam` are Linux/macOS only and gated in `pyproject.toml`).
+CI matrix is `{ubuntu-latest, windows-latest} × {py3.10, py3.12, py3.13}` — Windows compatibility is load-bearing (some extras like `pyBigWig`, `pysam`-based `methylkit`/`bam` are Linux/macOS only and gated in `pyproject.toml`).
 
 Tests rely on a `slow` marker registered in `pyproject.toml`; `--strict-markers` is enabled so any unregistered marker fails. `epykit`'s own DeprecationWarnings / UserWarnings are surfaced via `filterwarnings` so tests can assert on them — do not silence them globally.
 

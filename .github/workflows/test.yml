@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main, master]
 
+env:
+  # Pinned uv release. Bump deliberately, together with Dockerfile.python,
+  # and re-run `uv lock` so the lockfile is written by the same version CI
+  # checks it with.
+  UV_VERSION: "0.12.10"
+
 jobs:
   test:
     name: pytest (${{ matrix.os }}, py${{ matrix.python-version }})
@@ -14,14 +20,15 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.9", "3.12"]
+        python-version: ["3.10", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v10.0.1
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
           # uv.lock is committed (reproducibility), so key the cache off it.
           cache-dependency-glob: "uv.lock"
@@ -30,7 +37,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install epykit + test deps
-        run: uv sync --python ${{ matrix.python-version }} --extra dev --extra all
+        run: uv sync --locked --python ${{ matrix.python-version }} --group dev --extra all
 
       - name: Run pytest (skip slow, with coverage)
         env:
@@ -51,8 +58,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v10.0.1
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
@@ -60,7 +68,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install epykit + test deps
-        run: uv sync --python 3.12 --extra dev --extra all
+        run: uv sync --locked --python 3.12 --group dev --extra all
 
       - name: Run pytest (slow tier)
         env:
@@ -74,16 +82,23 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v10.0.1
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
       - name: Set up Python
         run: uv python install 3.12
 
+      - name: Lockfile is in sync with pyproject.toml
+        # `--locked` on the sync steps only proves the lock is *usable*; this
+        # proves it also matches pyproject.toml, so a dependency edit that
+        # forgot `uv lock` fails here instead of silently re-resolving.
+        run: uv lock --check
+
       - name: Install epykit + dev tools
-        run: uv sync --python 3.12 --extra dev --extra all
+        run: uv sync --locked --python 3.12 --group dev --extra all
 
       - name: Ruff
         run: uv run --python 3.12 ruff check src/
@@ -103,8 +118,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v10.0.1
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
@@ -112,7 +128,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install epykit + benchmark deps
-        run: uv sync --python 3.12 --extra dev --extra all
+        run: uv sync --locked --python 3.12 --group dev --extra all
 
       - name: Run the engine-regression slice (~30s)
         env:
@@ -129,8 +145,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v10.0.1
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
