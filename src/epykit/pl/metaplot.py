@@ -412,4 +412,4 @@ def gene_body_metaplot(
     return fig, ax
 
 
-__all__ = ["tss_metaplot", "gene_body_metaplot"]
+__all__ = ["gene_body_metaplot", "tss_metaplot"]

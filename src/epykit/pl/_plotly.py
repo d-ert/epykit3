@@ -605,18 +605,18 @@ def feature_direction_stacked_plotly(md: MethylData):
 
 
 __all__ = [
-    "volcano_plotly",
+    "coverage_histogram_plotly",
+    "cpg_island_pie_plotly",
+    "dmr_size_hist_plotly",
+    "feature_direction_stacked_plotly",
+    "feature_pie_plotly",
+    "global_methylation_bar_plotly",
     "ma_plot_plotly",
     "manhattan_plotly",
-    "coverage_histogram_plotly",
     "pca_plotly",
-    "feature_pie_plotly",
-    "cpg_island_pie_plotly",
-    "tss_metaplot_plotly",
     "pvalue_histogram_plotly",
-    "dmr_size_hist_plotly",
-    "global_methylation_bar_plotly",
     "sample_correlation_plotly",
     "scree_plotly",
-    "feature_direction_stacked_plotly",
+    "tss_metaplot_plotly",
+    "volcano_plotly",
 ]

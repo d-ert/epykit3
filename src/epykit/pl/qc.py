@@ -203,4 +203,4 @@ def mbias_plot(
     return fig, ax
 
 
-__all__ = ["coverage_histogram", "methylation_heatmap", "mbias_plot"]
+__all__ = ["coverage_histogram", "mbias_plot", "methylation_heatmap"]

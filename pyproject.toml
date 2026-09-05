@@ -170,18 +170,22 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-# Start minimal: pyflakes (undefined names, unused imports) only. Once the
-# baseline is green in CI, ratchet up to ["F", "E", "W", "I", "B", "UP", "RUF"]
-# and add a one-shot autofix commit.
-select = ["F", "I", "W", "UP", "E", "B"]
+# Ratchet history: F, I, W, UP, E, B landed with a one-shot format (#3); RUF
+# landed with the zip() strictness audit.
+select = ["F", "I", "W", "UP", "E", "B", "RUF"]
 # B905 (zip strict=) became active with target-version py310; auditing the 30 zip() calls for strict=True is a follow-up.
 ignore = ["E501", "B905"]  # the formatter owns line length
+# The multiplication sign is the coverage-fold notation in report text ("10x" is
+# rendered as "10×"). Every other flagged character was a typo and was replaced.
+allowed-confusables = ["×"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["F401", "F811"]
 "src/epykit/__init__.py" = ["F401"]  # re-exports
 # re-exports; E402 because _apply_theme() must run before the plot modules import
 "src/epykit/pl/__init__.py" = ["F401", "E402"]
+# pending the tl.dmc refactor (PR 1): one en dash comment, one unused unpack, one stale noqa
+"src/epykit/tl.py" = ["RUF003", "RUF059", "RUF100"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["epykit"]

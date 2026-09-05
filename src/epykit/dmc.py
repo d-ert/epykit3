@@ -1944,7 +1944,7 @@ def _process_one_chromosome(
         "mean_beta_control": pl.Series(mean_beta_ctrl),
         "pvalue": pl.Series(pvals),
         _log2_col: pl.Series(log2_ors),
-        # Transitional alias – NaN-filled; emits FutureWarning in tl.dmc.
+        # Transitional alias -- NaN-filled; emits FutureWarning in tl.dmc.
         "log2_odds_ratio": pl.Series(np.full(n_sites, np.nan, dtype=np.float64)),
         "meth_diff": pl.Series(meth_diff),
         "meth_diff_ci_lo": pl.Series(ci_lo),

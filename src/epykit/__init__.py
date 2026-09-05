@@ -70,7 +70,7 @@ from .dmr import (
     smooth_methylation_bsmooth,
     smooth_methylation_gaussian,
 )
-from .dvc import call_dvr_density, process_chromosomes_dvc  # noqa: F401
+from .dvc import call_dvr_density, process_chromosomes_dvc
 
 # Export / interop (lazy heavy deps inside)
 from .export import dmcs_to_bed, dmrs_to_bed, export_tables, to_bedgraph, to_bigwig
@@ -102,72 +102,58 @@ from .qc import (
 from .report import generate_report
 
 __all__ = [
-    # version
-    "__version__",
-    # data object
-    "MethylData",
-    # I/O
-    "read_bismark",
-    "read_methyldackel",
-    "read_combined_strand_bed",
-    "read_nfcore_methylseq",
-    "load",
-    # namespaces (scanpy-style)
-    "pp",
-    "tl",
-    "pl",
-    "query",
-    # runtime config
-    "set_tmp_dir",
-    "get_tmp_dir",
-    # ingestion
-    "convert_sample",
+    "DMR_PRESETS",
+    "HOMER_FEATURES",
     # DMCStore is the streaming-store handle returned by tl.dmc(..., return_store=True).
     # The lower-level dmc engine functions (process_chromosomes_dmc, apply_multiple_testing_correction,
     # empirical_fdr_for_dmc, fisher_exact_vectorized, shrink_meth_diff) moved to
     # epykit.dmc submodule in 1.0. Import them via `from epykit.dmc import ...`.
     "DMCStore",
-    # DMR engines
-    "call_dmr_sliding_window",
-    "call_dmr_chain_merge",
-    "DMR_PRESETS",
-    "smooth_methylation_gaussian",
-    "smooth_methylation_bsmooth",
-    # DVC / DVR engines
-    "process_chromosomes_dvc",
-    "call_dvr_density",
-    # Imputation
-    "impute_knn_beta",
-    "impute_knn_anndata",
-    # Clocks / deconvolution
+    "MethylData",
+    "__version__",
     "age_clock",
-    "deconvolve",
-    # annotation
-    "annotate_features",
-    "HOMER_FEATURES",
     "annotate_cpg_islands",
-    # QC
+    "annotate_features",
     "bisulfite_conversion_rate",
-    "global_methylation_report",
-    "coverage_uniformity",
-    "sex_check",
-    "contamination_estimate",
-    "sample_correlation_qc",
-    "power_calc",
-    # GLM design
     "build_design",
-    # Exports / interop
-    "to_bedgraph",
-    "to_bigwig",
+    "call_dmr_chain_merge",
+    "call_dmr_sliding_window",
+    "call_dvr_density",
+    "contamination_estimate",
+    "convert_sample",
+    "coverage_uniformity",
+    "deconvolve",
     "dmcs_to_bed",
     "dmrs_to_bed",
     "export_tables",
-    "to_anndata",
-    "to_mudata",
-    "to_methylkit_tabix",
-    "report_multiqc",
-    "read_nfcore_methylseq_qc",
     "generate_report",
+    "get_tmp_dir",
+    "global_methylation_report",
+    "impute_knn_anndata",
+    "impute_knn_beta",
+    "load",
+    "pl",
+    "power_calc",
+    "pp",
+    "process_chromosomes_dvc",
+    "query",
+    "read_bismark",
+    "read_combined_strand_bed",
+    "read_methyldackel",
+    "read_nfcore_methylseq",
+    "read_nfcore_methylseq_qc",
+    "report_multiqc",
+    "sample_correlation_qc",
+    "set_tmp_dir",
+    "sex_check",
+    "smooth_methylation_bsmooth",
+    "smooth_methylation_gaussian",
+    "tl",
+    "to_anndata",
+    "to_bedgraph",
+    "to_bigwig",
+    "to_methylkit_tabix",
+    "to_mudata",
 ]
 
 # --- Deprecation shim for demoted top-level names (1.0; removed in 1.2) ---
