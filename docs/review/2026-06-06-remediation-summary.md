@@ -2,7 +2,7 @@
 
 **Branch:** `review-remediation` (off `main` @ `7e51dc4`). Nothing pushed; `main` untouched.
 **Date:** 2026-06-06 (overnight autonomous run).
-**Inputs:** [peer-review report](2026-06-06-epykit-peer-review.md) · [design spec](../superpowers/specs/2026-06-06-epykit-review-fixes-design.md) · [Tier 1 plan](../superpowers/plans/2026-06-06-epykit-review-tier1.md).
+**Inputs:** [peer-review report](2026-06-06-epykit-peer-review.md) · [design spec](../history/superpowers/specs/2026-06-06-epykit-review-fixes-design.md) · [Tier 1 plan](../history/superpowers/plans/2026-06-06-epykit-review-tier1.md).
 
 ## TL;DR
 
