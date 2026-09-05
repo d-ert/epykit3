@@ -30,7 +30,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install epykit + test deps
-        run: uv sync --python ${{ matrix.python-version }} --extra dev --extra all
+        run: uv sync --locked --python ${{ matrix.python-version }} --extra dev --extra all
 
       - name: Run pytest (skip slow, with coverage)
         env:
@@ -60,7 +60,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install epykit + test deps
-        run: uv sync --python 3.12 --extra dev --extra all
+        run: uv sync --locked --python 3.12 --extra dev --extra all
 
       - name: Run pytest (slow tier)
         env:
@@ -82,8 +82,14 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
+      - name: Lockfile is in sync with pyproject.toml
+        # `--locked` on the sync steps only proves the lock is *usable*; this
+        # proves it also matches pyproject.toml, so a dependency edit that
+        # forgot `uv lock` fails here instead of silently re-resolving.
+        run: uv lock --check
+
       - name: Install epykit + dev tools
-        run: uv sync --python 3.12 --extra dev --extra all
+        run: uv sync --locked --python 3.12 --extra dev --extra all
 
       - name: Ruff
         run: uv run --python 3.12 ruff check src/
@@ -112,7 +118,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install epykit + benchmark deps
-        run: uv sync --python 3.12 --extra dev --extra all
+        run: uv sync --locked --python 3.12 --extra dev --extra all
 
       - name: Run the engine-regression slice (~30s)
         env:
