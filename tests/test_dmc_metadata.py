@@ -269,7 +269,7 @@ def _expected_columns(engine: str) -> list[str]:
     ]
     if engine == "glm":
         cols += ["coef_treatment", "coef_se"]
-    return cols + ["qvalue", "reject"]
+    return [*cols, "qvalue", "reject"]
 
 
 @pytest.mark.parametrize(

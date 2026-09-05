@@ -53,7 +53,7 @@ def _read_sample(store: Path, sample: str) -> pl.DataFrame:
 
 
 def _sites(df: pl.DataFrame) -> set[tuple[str, int]]:
-    return set(zip(df["chrom"].to_list(), df["pos"].to_list()))
+    return set(zip(df["chrom"].to_list(), df["pos"].to_list(), strict=True))
 
 
 # Identity coverage bounds: every synthetic site has coverage >= 1, and
@@ -101,7 +101,7 @@ def test_blacklist_drops_exactly_the_sites_inside_bed_intervals(raw_store, tmp_p
 
 
 def _sites_ordered(df: pl.DataFrame) -> list[tuple[str, int]]:
-    return list(zip(df["chrom"].to_list(), df["pos"].to_list()))
+    return list(zip(df["chrom"].to_list(), df["pos"].to_list(), strict=True))
 
 
 def test_normalize_coverage_store_aligns_medians_and_rescales_counts(raw_store, tmp_path):
