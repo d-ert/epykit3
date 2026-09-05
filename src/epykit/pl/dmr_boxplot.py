@@ -14,7 +14,6 @@ import polars as pl
 from .._style import PALETTE
 from ._utils import _save_fig
 
-
 _MAX_PANELS = 25  # hard cap; see plan Sec.6 implementation notes
 
 
@@ -40,24 +39,24 @@ def dmr_boxplot(
         ``md.obs`` column used to colour samples.
     figsize, save : matplotlib plumbing.
     """
-    import matplotlib.pyplot as plt
     import matplotlib.gridspec as gridspec
+    import matplotlib.pyplot as plt
 
     dmr_df = md.uns.get("dmr")
     if not isinstance(dmr_df, pl.DataFrame) or len(dmr_df) == 0:
-        raise ValueError(
-            "No DMR table on md.uns['dmr']. Run ep.tl.dmr(md) first."
-        )
+        raise ValueError("No DMR table on md.uns['dmr']. Run ep.tl.dmr(md) first.")
     rank_col = by if by in dmr_df.columns else "pvalue"
     if rank_col not in dmr_df.columns:
         rank_col = dmr_df.columns[0]
     n = min(int(top_n), _MAX_PANELS, len(dmr_df))
     if n < int(top_n):
         import warnings
+
         warnings.warn(
             f"top_n capped at {n} (asked for {top_n}); maximum is "
             f"{_MAX_PANELS} or len(dmr) = {len(dmr_df)}.",
-            UserWarning, stacklevel=2,
+            UserWarning,
+            stacklevel=2,
         )
     top = dmr_df.sort(rank_col, descending=False).head(n)
 
@@ -71,9 +70,7 @@ def dmr_boxplot(
 
     obs = md.obs
     groups_per_sample = (
-        obs.get_column(group_by).to_list()
-        if group_by in obs.columns else
-        ["sample"] * len(obs)
+        obs.get_column(group_by).to_list() if group_by in obs.columns else ["sample"] * len(obs)
     )
     samples_obs = obs.get_column("sample_id").to_list()
     rng = np.random.default_rng(0)
@@ -86,10 +83,7 @@ def dmr_boxplot(
         axes.append(ax)
         beta_df = md.region_beta(chrom, start, end)
         # Align beta_df ordering to obs sample order
-        beta_lookup = {
-            r["sample"]: r["mean_beta"]
-            for r in beta_df.iter_rows(named=True)
-        }
+        beta_lookup = {r["sample"]: r["mean_beta"] for r in beta_df.iter_rows(named=True)}
         unique_groups = sorted(set(groups_per_sample))
         x_positions = {g: pos for pos, g in enumerate(unique_groups)}
         for sample, g in zip(samples_obs, groups_per_sample):
@@ -98,8 +92,10 @@ def dmr_boxplot(
                 continue
             x = x_positions[g] + rng.uniform(-0.15, 0.15)
             color = (
-                PALETTE.get("treatment") if g == "treatment"
-                else PALETTE.get("control") if g == "control"
+                PALETTE.get("treatment")
+                if g == "treatment"
+                else PALETTE.get("control")
+                if g == "control"
                 else PALETTE.get("neutral", "#888")
             )
             ax.scatter(x, y, color=color, s=30, alpha=0.85)

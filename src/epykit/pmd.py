@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import polars as pl
@@ -37,12 +36,12 @@ logger = logging.getLogger(__name__)
 
 _PMD_SCHEMA = {
     "sample_id": pl.Utf8,
-    "chrom":     pl.Utf8,
-    "start":     pl.Int32,
-    "end":       pl.Int32,
+    "chrom": pl.Utf8,
+    "start": pl.Int32,
+    "end": pl.Int32,
     "length_bp": pl.Int32,
     "mean_beta": pl.Float32,
-    "n_cpgs":    pl.Int32,
+    "n_cpgs": pl.Int32,
 }
 
 
@@ -84,13 +83,13 @@ def call_pmd_one_sample(
     store: Path,
     sample: str,
     *,
-    chromosomes: Optional[list[str]] = None,
+    chromosomes: list[str] | None = None,
     bandwidth_bp: float = 10_000,
     beta_threshold: float = 0.55,
     min_pmd_bp: int = 100_000,
     self_loop: float = 0.999,
     backend: str = "sequential",
-    n_workers: Optional[int] = None,
+    n_workers: int | None = None,
 ) -> pl.DataFrame:
     """Call PMDs for a single sample across all detected chromosomes."""
     store = Path(store)
@@ -99,7 +98,7 @@ def call_pmd_one_sample(
 
     state_means = np.array([beta_threshold * 0.5, min(beta_threshold + 0.25, 0.95)])
 
-    def _pmd_chrom_handler(chrom: str) -> Optional[pl.DataFrame]:
+    def _pmd_chrom_handler(chrom: str) -> pl.DataFrame | None:
         # Build a canonical sorted (pos, strand) frame from the sample's
         # partition. PMDs are per-sample so we don't need an intersect.
         part = store / f"sample={sample}" / f"chrom={chrom}" / "part-0.parquet"
@@ -114,10 +113,16 @@ def call_pmd_one_sample(
         beta = np.where(cov > 0, n_meth / np.maximum(cov, 1.0), np.nan)
 
         beta_smooth = _gaussian_smooth_beta(
-            positions.astype(np.float64), beta, cov, bandwidth_bp=bandwidth_bp,
+            positions.astype(np.float64),
+            beta,
+            cov,
+            bandwidth_bp=bandwidth_bp,
         )
         viterbi = segment(
-            beta_smooth, n_states=2, state_means=state_means, self_loop=self_loop,
+            beta_smooth,
+            n_states=2,
+            state_means=state_means,
+            self_loop=self_loop,
         )
         # State 0 is the PMD (low beta) state.
         runs = runs_of_state(viterbi, target_state=0, positions=positions)
@@ -136,14 +141,16 @@ def call_pmd_one_sample(
             if valid.sum() == 0:
                 continue
             mean_beta = float(np.average(sel[valid], weights=np.maximum(sel_cov[valid], 1.0)))
-            rows.append({
-                "chrom": chrom,
-                "start": int(run_start),
-                "end": int(run_end),
-                "length_bp": int(length_bp),
-                "mean_beta": float(mean_beta),
-                "n_cpgs": int(run_len_sites),
-            })
+            rows.append(
+                {
+                    "chrom": chrom,
+                    "start": int(run_start),
+                    "end": int(run_end),
+                    "length_bp": int(length_bp),
+                    "mean_beta": float(mean_beta),
+                    "n_cpgs": int(run_len_sites),
+                }
+            )
         if not rows:
             return None
         return pl.DataFrame(
@@ -152,9 +159,12 @@ def call_pmd_one_sample(
         )
 
     parts: list[pl.DataFrame] = []
-    for chrom, chrom_result in run_chrom_pipeline(
-        chromosomes, _pmd_chrom_handler,
-        backend=backend, n_workers=n_workers, label=f"PMD[{sample}]",
+    for _chrom, chrom_result in run_chrom_pipeline(
+        chromosomes,
+        _pmd_chrom_handler,
+        backend=backend,
+        n_workers=n_workers,
+        label=f"PMD[{sample}]",
     ):
         parts.append(chrom_result)
     if not parts:
@@ -165,13 +175,13 @@ def call_pmd_one_sample(
 def pmd(
     md,
     *,
-    samples: Optional[list[str]] = None,
+    samples: list[str] | None = None,
     bandwidth_bp: float = 10_000,
     beta_threshold: float = 0.55,
     min_pmd_bp: int = 100_000,
-    chromosomes: Optional[list[str]] = None,
+    chromosomes: list[str] | None = None,
     backend: str = "sequential",
-    n_workers: Optional[int] = None,
+    n_workers: int | None = None,
 ) -> None:
     """Call PMDs across all (or specified) samples; store in ``md.uns["pmd"]``."""
     md_samples = md.obs.get_column("sample_id").to_list()
@@ -184,12 +194,14 @@ def pmd(
     parts: list[pl.DataFrame] = []
     for sample in samples:
         df = call_pmd_one_sample(
-            md.store, sample,
+            md.store,
+            sample,
             chromosomes=chromosomes,
             bandwidth_bp=bandwidth_bp,
             beta_threshold=beta_threshold,
             min_pmd_bp=min_pmd_bp,
-            backend=backend, n_workers=n_workers,
+            backend=backend,
+            n_workers=n_workers,
         )
         if df.height > 0:
             df = df.with_columns(pl.lit(sample).alias("sample_id"))

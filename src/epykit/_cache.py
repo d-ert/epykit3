@@ -25,11 +25,12 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 
-def count_store_rows(store_dir: str) -> Optional[int]:
+def count_store_rows(store_dir: str) -> int | None:
     """Total row count across all ``part-*.parquet`` files under a store.
 
     Returns ``None`` if the count cannot be determined (e.g. pyarrow is
@@ -104,6 +105,7 @@ def manifest_read(analysis_root: Path | str) -> dict[str, Any]:
     mp = pipeline_manifest_path(analysis_root)
     if not mp.exists():
         from epykit import __version__  # local to avoid circular import at import time
+
         return {"epykit_version": __version__, "stages": []}
     with mp.open() as handle:
         return json.load(handle)
@@ -125,7 +127,7 @@ def manifest_append(
     params: dict[str, Any],
     input_sig: str,
     output_path: str,
-    extra: Optional[dict[str, Any]] = None,
+    extra: dict[str, Any] | None = None,
 ) -> None:
     """Record one completed stage in the pipeline manifest.
 
@@ -152,7 +154,7 @@ def manifest_append(
 def manifest_find(
     analysis_root: Path | str,
     stage: str,
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Return the manifest entry for ``stage`` if present, else None."""
     for entry in manifest_read(analysis_root).get("stages", []):
         if entry.get("name") == stage:
@@ -182,6 +184,22 @@ def input_signature(*items: Any) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def fingerprint(fields: Iterable[tuple[str, str]]) -> str:
+    """SHA-256 hex digest of ordered ``(key, value)`` pairs.
+
+    Each pair enters the hash as ``b"|<key>="`` followed by the UTF-8
+    bytes of ``value``, so the digest depends on field order and on every
+    byte of every value. Callers format numbers themselves (``str(int(x))``,
+    ``f"{x:.10g}"``) so the byte layout stays under their control. Used for
+    the DMC input signature and the DMR cache keys.
+    """
+    h = hashlib.sha256()
+    for key, value in fields:
+        h.update(f"|{key}=".encode())
+        h.update(value.encode())
+    return h.hexdigest()
+
+
 def upstream_sample_signature(input_sample_dir: Path) -> dict[str, Any]:
     """Fingerprint of an upstream sample directory in a partitioned store.
 
@@ -204,8 +222,7 @@ def upstream_sample_signature(input_sample_dir: Path) -> dict[str, Any]:
         "chroms": chroms,
         "parts": {
             chrom: [
-                file_signature(p)
-                for p in sorted((input_sample_dir / chrom).glob("part-*.parquet"))
+                file_signature(p) for p in sorted((input_sample_dir / chrom).glob("part-*.parquet"))
             ]
             for chrom in chroms
         },

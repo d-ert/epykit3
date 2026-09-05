@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 import numpy as np
 import polars as pl
 
+from ..methyldata import MethylData
 from ._compute import _resolve_annotated_table, compute_annotation_counts
 from ._utils import _get_ax, _save_fig
-from ..methyldata import MethylData
-
 
 # Natural chrom sort: chr1 .. chr22, chrX, chrY, chrM. Falls back to
 # lexicographic on anything outside the standard human set so the
 # karyogram doesn't barf on non-human assemblies or random contigs.
+
 
 def _chrom_sort_key(name: str) -> tuple:
     raw = name[3:] if name.lower().startswith("chr") else name
@@ -25,8 +25,9 @@ def _chrom_sort_key(name: str) -> tuple:
     return (1, raw)
 
 
-def genomic_context_bar(md: MethylData, ax=None, figsize=(7, 4), save: str | None = None,
-                        *, level: str = "dmc"):
+def genomic_context_bar(
+    md: MethylData, ax=None, figsize=(7, 4), save: str | None = None, *, level: str = "dmc"
+):
     """Bar chart of ``feature_type`` counts on the annotated DMC or DMR table.
 
     ``level="dmc"`` (default) reads the per-CpG annotated table on ``md.dmc``
@@ -56,8 +57,9 @@ def genomic_context_bar(md: MethylData, ax=None, figsize=(7, 4), save: str | Non
     return fig, ax
 
 
-def cpg_island_pie(md: MethylData, ax=None, figsize=(5, 5), save: str | None = None,
-                   *, level: str = "dmc"):
+def cpg_island_pie(
+    md: MethylData, ax=None, figsize=(5, 5), save: str | None = None, *, level: str = "dmc"
+):
     """Pie chart of ``cpg_context`` on the annotated DMC or DMR table.
 
     See :func:`genomic_context_bar` for the ``level`` semantics.
@@ -84,7 +86,7 @@ def karyogram(
     value: str = "meth_diff",
     *,
     bin_size_bp: int = 1_000_000,
-    chromosomes: Optional[Sequence[str]] = None,
+    chromosomes: Sequence[str] | None = None,
     cmap: str = "RdBu_r",
     vmin: float | None = None,
     vmax: float | None = None,
@@ -136,19 +138,13 @@ def karyogram(
     """
     dmc = md.dmc
     if dmc is None:
-        raise ValueError(
-            "md.dmc is None -- run ep.tl.dmc(md) before plotting a karyogram."
-        )
+        raise ValueError("md.dmc is None -- run ep.tl.dmc(md) before plotting a karyogram.")
     if only_significant:
         if "qvalue" not in dmc.columns:
-            raise ValueError(
-                "only_significant=True requires a 'qvalue' column on md.dmc."
-            )
+            raise ValueError("only_significant=True requires a 'qvalue' column on md.dmc.")
         dmc = dmc.filter(pl.col("qvalue") < alpha)
         if dmc.is_empty():
-            raise ValueError(
-                f"No DMCs pass qvalue<{alpha}; nothing to plot."
-            )
+            raise ValueError(f"No DMCs pass qvalue<{alpha}; nothing to plot.")
 
     # Auto-compute -log10_qvalue if the user asked for it but it's absent.
     if value == "-log10_qvalue" and "-log10_qvalue" not in dmc.columns:
@@ -157,21 +153,19 @@ def karyogram(
                 "value='-log10_qvalue' needs either that column or 'qvalue' "
                 "on md.dmc to derive it from."
             )
-        dmc = dmc.with_columns(
-            (-pl.col("qvalue").log10()).alias("-log10_qvalue")
-        )
+        dmc = dmc.with_columns((-pl.col("qvalue").log10()).alias("-log10_qvalue"))
 
     if value not in dmc.columns:
         raise ValueError(
-            f"value={value!r} is not a column on md.dmc. "
-            f"Available: {sorted(dmc.columns)[:15]}..."
+            f"value={value!r} is not a column on md.dmc. Available: {sorted(dmc.columns)[:15]}..."
         )
     if "chrom" not in dmc.columns or "pos" not in dmc.columns:
         raise ValueError("md.dmc must carry 'chrom' and 'pos' columns.")
 
     if chromosomes is None:
         chromosomes = sorted(
-            set(dmc.get_column("chrom").to_list()), key=_chrom_sort_key,
+            set(dmc.get_column("chrom").to_list()),
+            key=_chrom_sort_key,
         )
     else:
         chromosomes = list(chromosomes)
@@ -193,9 +187,8 @@ def karyogram(
 
     # Per-chrom max bin for the heatmap width.
     chrom_max_bin = {
-        row["chrom"]: int(row["_max"]) for row in
-        binned.group_by("chrom").agg(pl.col("_bin").max().alias("_max"))
-        .to_dicts()
+        row["chrom"]: int(row["_max"])
+        for row in binned.group_by("chrom").agg(pl.col("_bin").max().alias("_max")).to_dicts()
     }
     n_bins = max(chrom_max_bin.values()) + 1
 
@@ -224,8 +217,13 @@ def karyogram(
 
     fig, ax = _get_ax(ax, figsize)
     im = ax.imshow(
-        grid, aspect="auto", cmap=cmap, vmin=vmin, vmax=vmax,
-        interpolation="nearest", origin="upper",
+        grid,
+        aspect="auto",
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        interpolation="nearest",
+        origin="upper",
     )
     ax.set_yticks(np.arange(len(chromosomes)))
     ax.set_yticklabels(chromosomes)

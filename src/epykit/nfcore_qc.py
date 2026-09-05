@@ -14,7 +14,7 @@ import csv
 import logging
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import polars as pl
 
@@ -29,27 +29,15 @@ _BISMARK_PATTERNS = {
         r"Number of paired-end alignments with a unique best hit:\s*(\d+)",
         re.MULTILINE,
     ),
-    "bismark_mapping_efficiency": re.compile(
-        r"Mapping efficiency:\s*([0-9.]+)%", re.MULTILINE
-    ),
-    "bismark_pct_meth_cpg": re.compile(
-        r"C methylated in CpG context:\s*([0-9.]+)%", re.MULTILINE
-    ),
-    "bismark_pct_meth_chg": re.compile(
-        r"C methylated in CHG context:\s*([0-9.]+)%", re.MULTILINE
-    ),
-    "bismark_pct_meth_chh": re.compile(
-        r"C methylated in CHH context:\s*([0-9.]+)%", re.MULTILINE
-    ),
+    "bismark_mapping_efficiency": re.compile(r"Mapping efficiency:\s*([0-9.]+)%", re.MULTILINE),
+    "bismark_pct_meth_cpg": re.compile(r"C methylated in CpG context:\s*([0-9.]+)%", re.MULTILINE),
+    "bismark_pct_meth_chg": re.compile(r"C methylated in CHG context:\s*([0-9.]+)%", re.MULTILINE),
+    "bismark_pct_meth_chh": re.compile(r"C methylated in CHH context:\s*([0-9.]+)%", re.MULTILINE),
 }
 
 _QUALIMAP_PATTERNS = {
-    "qualimap_mean_coverage": re.compile(
-        r"mean coverageData =\s*([0-9.]+)X", re.MULTILINE
-    ),
-    "qualimap_std_coverage": re.compile(
-        r"std coverageData =\s*([0-9.]+)X", re.MULTILINE
-    ),
+    "qualimap_mean_coverage": re.compile(r"mean coverageData =\s*([0-9.]+)X", re.MULTILINE),
+    "qualimap_std_coverage": re.compile(r"std coverageData =\s*([0-9.]+)X", re.MULTILINE),
 }
 
 
@@ -94,9 +82,7 @@ def parse_bismark_mbias(path: str) -> pl.DataFrame:
         ``percent`` (Float64), ``coverage`` (Int64). Sorted by
         (context, read, position).
     """
-    header_re = re.compile(
-        r"^(CpG|CHG|CHH)\s+context\s*(?:\(R(\d)\))?\s*$", re.IGNORECASE
-    )
+    header_re = re.compile(r"^(CpG|CHG|CHH)\s+context\s*(?:\(R(\d)\))?\s*$", re.IGNORECASE)
     txt = Path(path).read_text(errors="replace")
     lines = txt.splitlines()
     rows: list[dict] = []
@@ -134,22 +120,30 @@ def parse_bismark_mbias(path: str) -> pl.DataFrame:
             except ValueError:
                 i += 1
                 continue
-            rows.append({
-                "position": pos,
-                "context": context,
-                "read": read,
-                "n_meth": n_meth,
-                "n_unmeth": n_unmeth,
-                "percent": pct,
-                "coverage": cov,
-            })
+            rows.append(
+                {
+                    "position": pos,
+                    "context": context,
+                    "read": read,
+                    "n_meth": n_meth,
+                    "n_unmeth": n_unmeth,
+                    "percent": pct,
+                    "coverage": cov,
+                }
+            )
             i += 1
     if not rows:
-        return pl.DataFrame(schema={
-            "position": pl.Int64, "context": pl.Utf8, "read": pl.Utf8,
-            "n_meth": pl.Int64, "n_unmeth": pl.Int64,
-            "percent": pl.Float64, "coverage": pl.Int64,
-        })
+        return pl.DataFrame(
+            schema={
+                "position": pl.Int64,
+                "context": pl.Utf8,
+                "read": pl.Utf8,
+                "n_meth": pl.Int64,
+                "n_unmeth": pl.Int64,
+                "percent": pl.Float64,
+                "coverage": pl.Int64,
+            }
+        )
     return pl.DataFrame(rows).sort(["context", "read", "position"])
 
 
@@ -172,10 +166,10 @@ def _resolve_sample_ids(samplesheet: str) -> list[str]:
 
 
 def read_nfcore_methylseq_qc(
-    samplesheet: Optional[str],
+    samplesheet: str | None,
     run_dir: str,
     *,
-    sample_ids: Optional[list[str]] = None,
+    sample_ids: list[str] | None = None,
 ) -> pl.DataFrame:
     """Walk an nf-core/methylseq run dir and pull per-sample QC metrics.
 
@@ -210,17 +204,13 @@ def read_nfcore_methylseq_qc(
     for sample in sample_ids:
         record: dict = {"sample_id": sample}
         # Bismark report(s)
-        for pattern in (
-            f"**/{sample}*_PE_report.txt", f"**/{sample}*_SE_report.txt"
-        ):
+        for pattern in (f"**/{sample}*_PE_report.txt", f"**/{sample}*_SE_report.txt"):
             for hit in run.glob(pattern):
                 try:
                     record.update(_parse_bismark_report(hit))
                     break
                 except Exception as exc:
-                    logger.warning(
-                        "failed to parse Bismark report %s: %s", hit, exc
-                    )
+                    logger.warning("failed to parse Bismark report %s: %s", hit, exc)
             if any(k.startswith("bismark_") for k in record):
                 break
         # Qualimap
@@ -229,9 +219,7 @@ def read_nfcore_methylseq_qc(
                 record.update(_parse_qualimap(hit))
                 break
             except Exception as exc:
-                logger.warning(
-                    "failed to parse Qualimap output %s: %s", hit, exc
-                )
+                logger.warning("failed to parse Qualimap output %s: %s", hit, exc)
         rows.append(record)
     return pl.DataFrame(rows)
 

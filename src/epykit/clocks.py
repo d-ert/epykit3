@@ -29,7 +29,6 @@ table" and a "reference matrix" through the same plumbing:
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import numpy as np
 import polars as pl
@@ -70,11 +69,13 @@ def _build_sample_beta_at_clock_cpgs(
         )
 
     # Materialise the target site set as a polars table for join.
-    target = coords.select([
-        pl.col(coord_cpg_col).alias("cpg_id"),
-        pl.col(chrom_col).cast(pl.Utf8).alias("chrom"),
-        pl.col(pos_col).cast(pl.Int64).alias("pos"),
-    ])
+    target = coords.select(
+        [
+            pl.col(coord_cpg_col).alias("cpg_id"),
+            pl.col(chrom_col).cast(pl.Utf8).alias("chrom"),
+            pl.col(pos_col).cast(pl.Int64).alias("pos"),
+        ]
+    )
     cpg_ids = target.get_column("cpg_id").to_list()
     n_cpgs = target.height
 
@@ -86,16 +87,16 @@ def _build_sample_beta_at_clock_cpgs(
     target_keyed = target.with_columns(pl.arange(0, n_cpgs).alias("_row"))
     for s_idx, sample in enumerate(sample_ids):
         sample_df = (
-            pl.scan_parquet(
-                f"{md.store}/sample={sample}/chrom=*/part-*.parquet"
-            )
+            pl.scan_parquet(f"{md.store}/sample={sample}/chrom=*/part-*.parquet")
             .select(["chrom", "pos", "N_meth", "coverage"])
             .filter(pl.col("coverage") > 0)
             .with_columns(pl.col("pos").cast(pl.Int64))
             .collect()
         )
         joined = target_keyed.join(
-            sample_df, on=["chrom", "pos"], how="inner",
+            sample_df,
+            on=["chrom", "pos"],
+            how="inner",
         )
         if joined.is_empty():
             continue
@@ -133,7 +134,7 @@ def age_clock(
     manifest: pl.DataFrame,
     *,
     intercept: float = 0.0,
-    transform: Optional[str] = None,
+    transform: str | None = None,
     coef_cpg_col: str = "cpg_id",
     coef_value_col: str = "coefficient",
     manifest_cpg_col: str = "cpg_id",
@@ -198,21 +199,26 @@ def age_clock(
     """
     if coef_cpg_col not in coefficients.columns or coef_value_col not in coefficients.columns:
         raise ValueError(
-            f"coefficients table must carry '{coef_cpg_col}' and "
-            f"'{coef_value_col}' columns."
+            f"coefficients table must carry '{coef_cpg_col}' and '{coef_value_col}' columns."
         )
     # Resolve probe -> genomic coordinates.
     coords = (
-        manifest.select([
-            pl.col(manifest_cpg_col).alias("cpg_id"),
-            pl.col("chrom"), pl.col("pos"),
-        ])
+        manifest.select(
+            [
+                pl.col(manifest_cpg_col).alias("cpg_id"),
+                pl.col("chrom"),
+                pl.col("pos"),
+            ]
+        )
         .join(
-            coefficients.select([
-                pl.col(coef_cpg_col).alias("cpg_id"),
-                pl.col(coef_value_col).alias("coefficient"),
-            ]),
-            on="cpg_id", how="inner",
+            coefficients.select(
+                [
+                    pl.col(coef_cpg_col).alias("cpg_id"),
+                    pl.col(coef_value_col).alias("coefficient"),
+                ]
+            ),
+            on="cpg_id",
+            how="inner",
         )
         .drop_nulls(subset=["chrom", "pos"])
     )
@@ -224,11 +230,13 @@ def age_clock(
         )
     logger.info(
         "age_clock: resolved %d / %d clock CpGs to coordinates.",
-        coords.height, coefficients.height,
+        coords.height,
+        coefficients.height,
     )
 
     beta, sample_ids, _cpg_ids, missing_frac = _build_sample_beta_at_clock_cpgs(
-        md, coords,
+        md,
+        coords,
     )
     coefs = coords.get_column("coefficient").to_numpy().astype(np.float64)
 
@@ -256,6 +264,7 @@ def age_clock(
         per_sample_missing = np.isnan(beta) & cpg_has_any[None, :]
         if bool(per_sample_missing.any()):
             import warnings
+
             warnings.warn(
                 "age_clock(impute_missing=False): some clock CpGs are missing "
                 "in individual samples and contribute 0 to those samples' "
@@ -265,7 +274,8 @@ def age_clock(
                 "impute_missing=True (imputes to the per-CpG cohort mean), and "
                 "prefer a clock with complete coverage; treat ages as "
                 "unreliable when missing_frac is non-trivial.",
-                UserWarning, stacklevel=2,
+                UserWarning,
+                stacklevel=2,
             )
 
     # Replace NaN coefficientxbeta products with 0 for the sum (post-impute
@@ -281,13 +291,15 @@ def age_clock(
     else:
         raise ValueError(f"Unknown transform {transform!r}; use None or 'horvath'.")
 
-    out = pl.DataFrame({
-        "sample_id": sample_ids,
-        name: age,
-        "n_cpgs_used": [n_cpgs_used] * len(sample_ids),
-        "n_cpgs_missing": [n_cpgs_missing] * len(sample_ids),
-        "missing_frac": missing_frac,
-    })
+    out = pl.DataFrame(
+        {
+            "sample_id": sample_ids,
+            name: age,
+            "n_cpgs_used": [n_cpgs_used] * len(sample_ids),
+            "n_cpgs_missing": [n_cpgs_missing] * len(sample_ids),
+            "missing_frac": missing_frac,
+        }
+    )
     return out
 
 
@@ -297,7 +309,7 @@ def deconvolve(
     manifest: pl.DataFrame,
     *,
     method: str = "nnls",
-    cell_types: Optional[list[str]] = None,
+    cell_types: list[str] | None = None,
     manifest_cpg_col: str = "cpg_id",
     ref_cpg_col: str = "cpg_id",
 ) -> pl.DataFrame:
@@ -354,9 +366,7 @@ def deconvolve(
             "estimator) is available."
         )
     if ref_cpg_col not in reference.columns:
-        raise ValueError(
-            f"reference table missing CpG column '{ref_cpg_col}'."
-        )
+        raise ValueError(f"reference table missing CpG column '{ref_cpg_col}'.")
     if cell_types is None:
         cell_types = [c for c in reference.columns if c != ref_cpg_col]
     if not cell_types:
@@ -368,32 +378,37 @@ def deconvolve(
     # Resolve probe -> coords. Inner join on CpG ID then on manifest
     # coords; rows where any join misses are dropped.
     coords = (
-        manifest.select([
-            pl.col(manifest_cpg_col).alias("cpg_id"),
-            pl.col("chrom"), pl.col("pos"),
-        ])
+        manifest.select(
+            [
+                pl.col(manifest_cpg_col).alias("cpg_id"),
+                pl.col("chrom"),
+                pl.col("pos"),
+            ]
+        )
         .join(
             reference.rename({ref_cpg_col: "cpg_id"}),
-            on="cpg_id", how="inner",
+            on="cpg_id",
+            how="inner",
         )
         .drop_nulls(subset=["chrom", "pos"])
     )
     if coords.is_empty():
-        raise ValueError(
-            "No reference CpGs resolved to genomic coordinates."
-        )
+        raise ValueError("No reference CpGs resolved to genomic coordinates.")
     logger.info(
         "deconvolve: resolved %d reference CpGs across %d cell types.",
-        coords.height, len(cell_types),
+        coords.height,
+        len(cell_types),
     )
 
     beta, sample_ids, _cpg_ids, _miss = _build_sample_beta_at_clock_cpgs(
-        md, coords.select(["cpg_id", "chrom", "pos"]),
+        md,
+        coords.select(["cpg_id", "chrom", "pos"]),
     )
     R = coords.select(cell_types).to_numpy().astype(np.float64)  # (n_cpgs, K)
 
     # Per-sample NNLS. Drop CpGs the sample doesn't cover.
     from scipy.optimize import nnls
+
     rows = []
     for s_idx, sample in enumerate(sample_ids):
         sample_beta = beta[s_idx]
@@ -402,7 +417,9 @@ def deconvolve(
             logger.warning(
                 "deconvolve: sample %s has only %d usable CpGs for %d cell "
                 "types; result will be unreliable.",
-                sample, int(mask.sum()), R.shape[1],
+                sample,
+                int(mask.sum()),
+                R.shape[1],
             )
         if mask.sum() == 0:
             pi = np.full(R.shape[1], np.nan, dtype=np.float64)
@@ -417,15 +434,18 @@ def deconvolve(
             except Exception as exc:
                 logger.warning(
                     "deconvolve: NNLS failed for sample %s: %s",
-                    sample, exc,
+                    sample,
+                    exc,
                 )
                 pi = np.full(R.shape[1], np.nan, dtype=np.float64)
         for ct, p in zip(cell_types, pi):
-            rows.append({
-                "sample_id": sample,
-                "cell_type": ct,
-                "proportion": float(p),
-            })
+            rows.append(
+                {
+                    "sample_id": sample,
+                    "cell_type": ct,
+                    "proportion": float(p),
+                }
+            )
     return pl.DataFrame(rows)
 
 
