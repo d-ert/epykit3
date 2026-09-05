@@ -4,6 +4,32 @@ The full version history is maintained in the project's
 [`CHANGELOG.md`](https://github.com/d-ert/epykit3/blob/main/CHANGELOG.md)
 at the repository root.
 
+## 1.1.0 highlights (2026-09-05)
+
+1.1 is a maintenance release: the pre-submission review fixes, a redesigned
+HTML report, and a tighter build. No public API was removed.
+
+- **Python >= 3.10.** Python 3.9 reached end of life; the CI matrix is
+  `{ubuntu, windows} × {3.10, 3.12, 3.13}`.
+- **The `dev` extra is gone.** Contributor tooling lives in
+  `[dependency-groups]`: `uv sync --group dev` or
+  `pip install -e . --group dev` (pip >= 25.1). The user-facing extras
+  (`all`, `report`, `export`, ...) are unchanged, and `uv.lock` is enforced
+  in CI.
+- **Bismark `.cov` coordinates.** Standard 1-based Bismark coverage is now
+  shifted onto the 0-based store correctly. The raw-store manifest moved to
+  version 2, so a store built from real `.cov` files is rebuilt on the next
+  `read_bismark`.
+- **Redesigned HTML report.** `md.report()` / `epykit report` render a
+  MultiQC-style dashboard; `self_contained=True` (the default) embeds Plotly
+  so the file works offline.
+- **Region-level annotation.** `tl.annotate()` applies gene features and
+  CpG-island context to the DMR table; `pl.genomic_context_bar()` and
+  `pl.cpg_island_pie()` accept `level="dmr"`.
+- **Deprecations deferred.** The `log2_odds_ratio` column and the
+  `epykit.dmr_hmm` shim, announced for removal in 1.1, are retained and now
+  scheduled for 1.2.
+
 ## 1.0.0 highlights (2026-06-02)
 
 1.0 is the SemVer-stable release. Three targeted breaking changes shipped at

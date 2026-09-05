@@ -6,9 +6,22 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-09-05
+
 Post-1.0 correctness and reproducibility fixes from a pre-submission code
 review (Tier 1: paper-blockers + silent-wrong-science criticals), plus a
 redesigned HTML report.
+
+Upgrading from 1.0.0: epykit now requires Python 3.10 or newer. The `dev`
+extra is gone and contributor tooling lives in `[dependency-groups]`, so
+install it with `uv sync --group dev` or `pip install -e . --group dev`
+rather than `.[dev]`. CI installs with `--locked` and runs `uv lock --check`,
+so a dependency edit must land together with its `uv.lock` update. The
+Bismark `.cov` coordinate fix bumps the raw-store manifest to version 2, and
+a store that 1.0.0 built from real `.cov` files is rebuilt on the next
+`read_bismark` (see the C1 entry under Fixed). The deprecated surfaces that
+were scheduled for removal in 1.1 are retained in this release and are now
+scheduled for removal in 1.2 (see Changed).
 
 ### Added
 
@@ -206,6 +219,14 @@ redesigned HTML report.
   intersect explicitly via the API, so published numbers are unaffected.
   Bare `epykit convert` now merges CpG dyads by default, matching the API
   `merge_strands=True` (D10).
+- **Deprecation schedule: the 1.1 removals move to 1.2.** The transitional
+  `log2_odds_ratio` column and the `epykit.dmr_hmm` import shim were
+  announced as "removed in 1.1"; both are retained in 1.1.0 and their
+  warnings now say 1.2. Removing a deprecated surface is a behaviour change
+  and gets its own release with the owner's sign-off rather than riding on a
+  version bump. The `pp.unite()` alias (scheduled for 2.0) and the `csv*`
+  keyword aliases (scheduled for a future release) are also retained; their
+  schedules are unchanged.
 
 ### Documentation
 
