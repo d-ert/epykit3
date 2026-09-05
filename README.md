@@ -43,9 +43,9 @@ The WGBS analysis ecosystem is fragmented across R/Bioconductor (methylKit, DSS,
 ## Highlights
 
 - **Partitioned Parquet methylstore.** Per-chromosome, per-sample columnar storage — never load a whole genome into RAM. DMC results follow the same convention: `tl.dmc` writes per-chromosome parquet files under `<methylstore>/.cache/dmc/<test>/` and exposes a streaming `DMCStore` handle (`md.dmc_store`), so DMC computation and the downstream sliding-window DMR caller stay at O(largest chromosome) on whole-genome inputs (~22 M CpGs). By default the per-CpG table is then materialised onto `md.varm` for plotting/report/export; pass `tl.dmc(md, materialize=False)` to keep peak memory O(largest chromosome) end-to-end (`md.dmc` then materialises on demand). Advanced users can drive the streaming engines directly via `from epykit.dmc import process_chromosomes_dmc, apply_multiple_testing_correction`.
-- **Statistical engines.** Four per-CpG DMC backends: `lr` (quasi-binomial likelihood-ratio, the default at n ≥ 2; closed-form with McCullagh-Nelder dispersion), `welch_t` (Welch t on raw β), `fisher` (pooled Fisher exact, n = 1 fallback), and `glm` (full IRLS binomial GLM with covariates). `auto` resolves to `fisher` at n < 2 and `lr` at n ≥ 2. Every test surfaces 95 % Wald CIs on `meth_diff`. Permutation empirical FDR is available end-to-end: `tl.dmc(..., empirical_fdr=True)` and `tl.dmr(..., empirical_fdr=True)` shuffle labels, re-run the engine, and add `empirical_pvalue` / `empirical_qvalue` columns.
+- **Statistical engines.** Four per-CpG DMC backends: `lr` (quasi-binomial likelihood-ratio, the default at n ≥ 2; closed-form with McCullagh-Nelder dispersion), `welch_t` (Welch t on raw β), `fisher` (pooled Fisher exact, n = 1 fallback), and `glm` (full IRLS binomial GLM with covariates). `auto` resolves to `fisher` at n < 2 and `lr` at n ≥ 2. Every test surfaces 95 % Wald CIs on `meth_diff`. Permutation empirical FDR shuffles labels, re-runs the engine, and adds `empirical_pvalue` / `empirical_qvalue` columns: `tl.dmc(..., empirical_fdr=True)` on the binary treatment/control path, and `tl.dmr(method="tile", empirical_fdr=True)` for regions (the tile caller is the only DMR method with the permutation harness wired in; the others raise `NotImplementedError`).
 - **Multi-group & covariate contrasts.** `tl.dmc(formula="~ group + age", contrast="group")` runs a joint F-test across factor levels; `contrast="age"` runs a Wald test on a continuous covariate as the primary effect.
-- **Four DMR engines plus permutation FDR.** A DSS-compatible **chain-merge** caller (`tl.dmr(method="chain_merge", preset="strict" | "default" | "permissive")`, the default) that mirrors DSS `callDMR` semantics, plus tile-based (read-pooled) aggregation, per-CpG sliding-window with signed Stouffer's combining, and rule-based 3-state segmentation over `meth_diff` (`method="segment"`). `tl.dmr(..., empirical_fdr=True, n_perm=100)` re-runs the engine on shuffled labels and reports empirical p- and q-values. `tl.diagnose_dmr_calling(md, reference_dmrs)` buckets unrecovered reference DMRs into actionable categories (coverage loss vs. weak test vs. structural filter) for triage.
+- **Four DMR engines plus permutation FDR.** A DSS-compatible **chain-merge** caller (`tl.dmr(method="chain_merge", preset="strict" | "default" | "permissive")`, the default) that mirrors DSS `callDMR` semantics, plus tile-based (read-pooled) aggregation, per-CpG sliding-window with signed Stouffer's combining, and rule-based 3-state segmentation over `meth_diff` (`method="segment"`). `tl.dmr(method="tile", empirical_fdr=True, n_perm=100)` re-runs the tile engine on shuffled labels and reports empirical p- and q-values (tile only). `tl.diagnose_dmr_calling(md, reference_dmrs)` buckets unrecovered reference DMRs into actionable categories (coverage loss vs. weak test vs. structural filter) for triage.
 - **Differential variability.** `tl.dvc(md)` finds CpGs whose between-replicate variance differs between groups even when the means don't — the iEVORA signal that mean-based DMC misses.
 - **Clinical / cohort QC.** Opt-in `qc.sex_check` (chrX mean β), `qc.contamination_estimate` (β-distribution bimodality), `qc.sample_correlation` (sample-swap detection), and `qc.power` (sample-size calculator). Bisulfite conversion rate is reported (CHH context, dashboard + MultiQC) but **not applied** to per-CpG counts — matching `bsseq` / `methylKit` defaults. A poorly converted library should be re-prepped, not papered over with a multiplicative count adjustment.
 - **Replicate-aware throughout.** Per-site `min_samples_treatment` / `min_samples_control` guards, per-site or chromosome-level McCullagh-Nelder dispersion, optional covariate design matrices via Wilkinson formulas.
@@ -179,7 +179,7 @@ ep.tl.dmr(md, method="tile", empirical_fdr=True, n_perm=100, perm_seed=42)
 # md.uns["dmr"] now carries empirical_pvalue / empirical_qvalue columns
 ```
 
-### 6. Clinical / cohort QC
+### 5. Clinical / cohort QC
 
 ```python
 ep.tl.qc(
@@ -203,7 +203,7 @@ The `epykit` script mirrors the Python pipeline. Every subcommand takes `--methy
 | `filter`            | Coverage / blacklist filtering |
 | `summary`           | Per-sample summary statistics |
 | `dmc`               | Per-CpG differential methylation. `--test {auto,lr,glm,welch_t,fisher}`, plus `--formula` / `--contrast` / `--covariates` for covariate-adjusted and multi-group designs. The `lr+` power-stack knobs (`power_stack`, `fdr_method`, `neighbour_combine`, `sep_fallback`, `dispersion`) are Python-API-only; CLI flags are deferred to 1.1. |
-| `dmr`               | DMR calling — `--method tile` (default) or `--method sliding_window`. Supports `--empirical-fdr --n-perm N`. |
+| `dmr`               | DMR calling — `--method chain_merge` (default), `tile`, `sliding_window` or `segment`. `--empirical-fdr --n-perm N` is supported with `--method tile`. |
 | `annotate`          | Add gene-feature (`--gtf`) and CpG-island (`--cpg-islands`) annotation. |
 | `qc-report`         | QC + coverage uniformity report. |
 | `smooth`            | Gaussian-kernel β smoothing along the genome. |
@@ -260,6 +260,8 @@ DMC frames carry: `chrom`, `pos`, `strand`, `n_case`, `n_control`, `mean_beta_ca
 
 ## Module map
 
+The canonical architecture reference is [`docs/advanced/architecture.md`](docs/advanced/architecture.md); this table is a summary.
+
 | Module             | Role |
 |--------------------|------|
 | `methyldata.py`    | `MethylData` dataclass — `obs`, `store`, `varm`, `uns`; `.dmc` / `.treatment_ids` / `.control_ids` properties; `save()` / `load()`; `region_beta()` per-region query |
@@ -269,7 +271,7 @@ DMC frames carry: `chrom`, `pos`, `strand`, `n_case`, `n_control`, `mean_beta_ca
 | `pp.py`            | Preprocessing wrappers (`filter_coverage`, `normalize_coverage`, `unite`, `smooth`, `aggregate_regions`) |
 | `dmc.py`           | Streaming per-CpG accumulators + statistical engines (`lr`, `glm`, `welch_t`, `fisher`), BH correction |
 | `_dmc_store.py`    | `DMCStore` handle — persistent per-chromosome DMC parquet directory + manifest; lets BH and sliding-window DMR stream from disk so peak memory is O(largest chrom), not O(genome) |
-| `dmr.py`           | `call_dmr_tile_based`, `call_dmr_sliding_window`, `empirical_fdr_for_dmr`, `smooth_methylation_gaussian` |
+| `dmr.py`           | `call_dmr_chain_merge` (default, DSS-style), `call_dmr_tile_based`, `call_dmr_sliding_window`, `empirical_fdr_for_dmr`, `smooth_methylation_gaussian`, `smooth_methylation_bsmooth` |
 | `dvc.py`           | Differentially Variable CpG calling (iEVORA-style) |
 | `annotate.py`      | `annotate_features` (GTF), `annotate_cpg_islands` (island / shore / shelf / open-sea) |
 | `qc.py`            | `bisulfite_conversion_rate`, `global_methylation_report`, `coverage_uniformity`, `sex_check`, `contamination_estimate`, `sample_correlation`, `power` |
@@ -292,7 +294,7 @@ DMC frames carry: `chrom`, `pos`, `strand`, `n_case`, `n_control`, `mean_beta_ca
 
 `benchmark/` reproduces a head-to-head against eight published DMC/DMR tools on the Piao et al. 2021 simulated dataset, plus a real-data cohort (GSE263850). The canonical TPR / FPR / F1 record is [`benchmark/paper/report/REPORT.md`](benchmark/paper/report/REPORT.md); the manuscript lives in [`benchmark/paper/paper.md`](benchmark/paper/paper.md). Raw simulated data and run caches are not bundled — see [`benchmark/README.md`](benchmark/README.md) for the bootstrap.
 
-The headline claims are made around the bare `lr` engine (the 1.0 default). The `lr+` power stack is positioned as an exploratory research knob — see [Quickstart §5](#5-the-lr-power-stack-opt-in-research-knob).
+The headline claims are made around the bare `lr` engine (the 1.0 default). The `lr+` power stack is positioned as an exploratory research knob — see [`docs/analysis/lr-plus.md`](docs/analysis/lr-plus.md) and the [engine architecture map](docs/advanced/architecture.md).
 
 ---
 

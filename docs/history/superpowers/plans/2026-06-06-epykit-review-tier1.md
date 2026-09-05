@@ -1,6 +1,6 @@
 # epykit Review Remediation — Tier 1 Implementation Plan
 
-> **For agentic workers:** Use TDD where a behavioral oracle exists. Each task = atomic commit with its test. Steps use checkbox (`- [ ]`) syntax. Full finding detail: [docs/review/2026-06-06-epykit-peer-review.md](../../review/2026-06-06-epykit-peer-review.md). Design rationale + decisions: [docs/superpowers/specs/2026-06-06-epykit-review-fixes-design.md](../specs/2026-06-06-epykit-review-fixes-design.md).
+> **For agentic workers:** Use TDD where a behavioral oracle exists. Each task = atomic commit with its test. Steps use checkbox (`- [ ]`) syntax. Full finding detail: [docs/review/2026-06-06-epykit-peer-review.md](../../review/2026-06-06-epykit-peer-review.md). Design rationale + decisions: [docs/history/superpowers/specs/2026-06-06-epykit-review-fixes-design.md](../specs/2026-06-06-epykit-review-fixes-design.md).
 
 **Goal:** Remediate the paper-blocking + silent-wrong-science Critical findings (repro cluster + C1/C2/C3) without disturbing the benchmark paper's numbers.
 

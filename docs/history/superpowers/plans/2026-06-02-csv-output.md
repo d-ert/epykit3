@@ -8,7 +8,7 @@
 
 **Tech Stack:** Polars `write_csv`, argparse, pytest. The `synth_md_filtered` fixture in `tests/conftest.py` provides a ready-to-DMC MethylData.
 
-**Spec:** [docs/superpowers/specs/2026-06-02-csv-output-design.md](../specs/2026-06-02-csv-output-design.md)
+**Spec:** [docs/history/superpowers/specs/2026-06-02-csv-output-design.md](../specs/2026-06-02-csv-output-design.md)
 
 ### Spec refinements applied here
 

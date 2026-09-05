@@ -27,7 +27,7 @@ Outputs:
       engine, scenario, k_shuffle, pvalue).
   ``--ks-out`` KS test result JSON (statistic, p-value, n).
 
-See ``docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md``
+See ``docs/history/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md``
 sec 2.2 for the upstream design intent. The Q-Q + KS additions land
 under Phase 1.2 of the GB resubmission plan.
 """

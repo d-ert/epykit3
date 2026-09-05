@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python, polars, numpy, jinja2, plotly; vanilla JS/CSS (no framework).
 
-**Spec:** `docs/superpowers/specs/2026-06-06-html-report-redesign-design.md`
+**Spec:** `docs/history/superpowers/specs/2026-06-06-html-report-redesign-design.md`
 
 **Compatibility contract (existing `tests/test_report.py` must keep passing):** the rendered HTML must still contain the substrings `ep.tl.dmc` and `ep.tl.dmr` (skip hints), `Provenance`, a case-insensitive `volcano`, `plotly`, the report title, and each sample_id. Size > 30 kB for a full report.
 

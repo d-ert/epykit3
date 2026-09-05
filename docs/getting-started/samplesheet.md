@@ -21,6 +21,10 @@ normal_1,normal,/data/bismark/normal_1.cov.gz
 normal_2,normal,/data/bismark/normal_2.cov.gz
 ```
 
+A larger example with relative paths is checked in as
+[`samplesheet.example.csv`](samplesheet.example.csv). Column order does not
+matter; columns are matched by header name.
+
 ## Extra columns (covariates)
 
 Any column beyond the three required ones is preserved on `md.obs` and can be

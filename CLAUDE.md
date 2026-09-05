@@ -52,11 +52,13 @@ Four per-CpG engines survive post-0.7.5: `"lr"` (quasi-binomial likelihood-ratio
 **`lr+` power stack — exploratory opt-in tunable, NOT a headline contribution.**
 `power_stack` is a `tl.dmc` kwarg that bundles four research components
 (`neighbour_combine`, `fdr_method="fdr_tsbh"`, `sep_fallback`,
-`dispersion="eb"`) into one switch. The components are implemented and
-dispatched in `tl.py:498–532`; individual implementations live at
-`dmc.py:2322–2470` (neighbour Stouffer combine), `dmc.py:2567–2649`
-(TSBH via statsmodels), `dmc.py:947–983` (separation fallback) and
-`dmc.py:775–820` (EB dispersion shrinkage).
+`dispersion="eb"`) into one switch. The components are dispatched in
+the `power_stack` block of `tl.dmc`; the implementations are
+`combine_neighbour_pvalues` (neighbour Stouffer combine) and
+`apply_multiple_testing_correction` (TSBH via statsmodels) in `dmc.py`,
+plus the `sep_fallback` and dispersion blocks of `_score_finalize`
+(separation fallback, EB shrinkage). `docs/advanced/architecture.md` is
+the canonical engine map.
 
 `lr+` is **not validated as universally superior to bare `lr`** on real
 WGBS. On GSE263850 at q=0.05, `power_stack="lr+"` inflates the DMC call

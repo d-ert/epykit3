@@ -572,7 +572,7 @@ Commits as you go. Reference the spec §6 sections in commit messages.
 
 ### Task 11: P2 hygiene items (parallel with paper writing)
 
-Spec §3 P2 items can be tackled in parallel. List in `docs/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md` §3 P2 table. Each is small, low-risk:
+Spec §3 P2 items can be tackled in parallel. List in `docs/history/superpowers/specs/2026-05-27-paper-defendable-benchmark-design.md` §3 P2 table. Each is small, low-risk:
 
 - P2-1: split `_BETA_EPSILON` into three named constants
 - P2-2: drop `pct_sig` knob (deprecation warning route)

@@ -588,7 +588,7 @@ git push -u origin paper
 ```powershell
 gh pr create --title "epykit benchmark paper finish (claims.yaml + paper.md rewrite)" --body "$(cat <<'EOF'
 ## Summary
-- Implements paper-track work from [1.0 + paper-finish design spec](docs/superpowers/specs/2026-06-01-library-1.0-and-paper-finish-design.md) section 3
+- Implements paper-track work from [1.0 + paper-finish design spec](docs/history/superpowers/specs/2026-06-01-library-1.0-and-paper-finish-design.md) section 3
 - paper.md rewritten per parent spec section 6: abstract, methods, results, discussion, limitations
 - claims.yaml populated with paper headline cells; regen_all.py --verify gating in place
 - benchmark/idk_if_needed/ renamed to benchmark/docs/historical/ with README
