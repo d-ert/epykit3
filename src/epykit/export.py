@@ -128,7 +128,7 @@ def to_bedgraph(
         for chrom, df in _iter_sample_chrom_value(md, sample, value):
             starts = df["pos"].to_list()
             vals = df["value"].to_list()
-            for s, v in zip(starts, vals):
+            for s, v in zip(starts, vals, strict=True):
                 if v is None:
                     continue
                 f.write(f"{chrom}\t{s}\t{s + 1}\t{v:.6g}\n")

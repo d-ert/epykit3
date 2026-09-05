@@ -281,7 +281,7 @@ def _extract_methyldackel(read, *, min_baseq: int) -> list[dict[str, object]]:
     aligned = dict(read.get_aligned_pairs(matches_only=True))
 
     out: list[dict[str, object]] = []
-    for q_idx, prob in zip(target_query_idx, ml[: len(target_query_idx)]):
+    for q_idx, prob in zip(target_query_idx, ml[: len(target_query_idx)], strict=True):
         ref_pos = aligned.get(q_idx)
         if ref_pos is None:
             continue

@@ -238,7 +238,7 @@ def pca_plotly(md: MethylData, *, n_sites: int = 10_000):
                 x=res.coords[mask, 0],
                 y=res.coords[mask, 1],
                 mode="markers+text",
-                text=[s for s, m in zip(res.samples, mask) if m],
+                text=[s for s, m in zip(res.samples, mask, strict=False) if m],
                 textposition="top center",
                 marker=dict(size=12, color=palette_cycle[i % len(palette_cycle)]),
                 name=str(g),
@@ -581,7 +581,7 @@ def feature_direction_stacked_plotly(md: MethylData):
     fig = go.Figure()
     for direction, color in (("hyper", PALETTE["hyper"]), ("hypo", PALETTE["hypo"])):
         sub = prop.filter(_pl.col("dmr_type") == direction)
-        ymap = dict(zip(sub["feature_type"].to_list(), sub["proportion"].to_list()))
+        ymap = dict(zip(sub["feature_type"].to_list(), sub["proportion"].to_list(), strict=True))
         fig.add_trace(
             go.Bar(
                 x=feats,

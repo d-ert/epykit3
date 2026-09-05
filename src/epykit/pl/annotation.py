@@ -101,7 +101,9 @@ def plot_annotation_counts(
     else:
         # Don't crowd small slices with text -- only label slices >=3%.
         total = sum(values) or 1
-        slice_labels = [lbl if (v / total) >= 0.03 else "" for lbl, v in zip(labels, values)]
+        slice_labels = [
+            lbl if (v / total) >= 0.03 else "" for lbl, v in zip(labels, values, strict=True)
+        ]
         wedges, _texts, _autotexts = ax.pie(
             values,
             labels=slice_labels,
@@ -115,7 +117,7 @@ def plot_annotation_counts(
         # readable in print.
         ax.legend(
             wedges,
-            [f"{lbl} ({v:,})" for lbl, v in zip(labels, values)],
+            [f"{lbl} ({v:,})" for lbl, v in zip(labels, values, strict=True)],
             title=annot_col,
             loc="center left",
             bbox_to_anchor=(1.02, 0.5),

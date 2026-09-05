@@ -571,7 +571,7 @@ def _parse_refgene_streaming(refgene_path: str) -> tuple[pd.DataFrame, pd.DataFr
                         "gene_type": gene_type,
                     }
                 )
-                for es, ee in zip(ex_starts, ex_ends):
+                for es, ee in zip(ex_starts, ex_ends, strict=False):
                     exon_rows.append(
                         {
                             "Chromosome": chrom,
