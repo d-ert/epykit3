@@ -50,6 +50,11 @@ dependencies = [
   # numba>=0.60 is the first release with numpy 2.0 support.
   "numba>=0.60",
   "bioframe>=0.7",
+  # Imported directly by annotate.py, filter.py and pl/composer.py; it used to
+  # arrive only transitively through bioframe / statsmodels / seaborn. 2.0 is
+  # the oldest line exercised (nullable Int64 + to_numpy(na_value=...) in
+  # annotate.py); see tests/test_deps_floor.py.
+  "pandas>=2.0",
   "pyfaidx>=0.7",
   "statsmodels>=0.14",
   "patsy>=0.5",
