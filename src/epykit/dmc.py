@@ -32,7 +32,6 @@ Tests
 from __future__ import annotations
 
 import gc
-import hashlib
 import logging
 import tempfile
 import time
@@ -118,54 +117,38 @@ def _dmc_input_signature(
     after a genuine upstream change, delete the ``.cache/dmc/<test>/``
     directory.
     """
-    h = hashlib.sha256()
     msp = Path(methylstore_path).resolve()
-    h.update(b"|store=")
-    h.update(str(msp).encode())
-    h.update(b"|case=")
-    h.update(",".join(samples_case).encode())
-    h.update(b"|ctrl=")
-    h.update(",".join(samples_control).encode())
-    h.update(b"|test=")
-    h.update(test.encode())
-    h.update(b"|chroms=")
-    h.update(",".join(chromosomes).encode())
-    h.update(b"|unite=")
-    h.update(str(bool(unite)).encode())
-    h.update(b"|min_case=")
-    h.update(str(min_samples_case).encode())
-    h.update(b"|min_ctrl=")
-    h.update(str(min_samples_control).encode())
-    h.update(b"|disp=")
-    h.update(str(dispersion).encode())
-    h.update(b"|ref=")
-    h.update(str(reference).encode())
+    fields: list[tuple[str, str]] = [
+        ("store", str(msp)),
+        ("case", ",".join(samples_case)),
+        ("ctrl", ",".join(samples_control)),
+        ("test", test),
+        ("chroms", ",".join(chromosomes)),
+        ("unite", str(bool(unite))),
+        ("min_case", str(min_samples_case)),
+        ("min_ctrl", str(min_samples_control)),
+        ("disp", str(dispersion)),
+        ("ref", str(reference)),
+    ]
     if samples_all_ordered is not None:
-        h.update(b"|all=")
-        h.update(",".join(samples_all_ordered).encode())
+        fields.append(("all", ",".join(samples_all_ordered)))
     if group_labels_per_sample is not None:
-        h.update(b"|grp=")
-        h.update(",".join(group_labels_per_sample).encode())
+        fields.append(("grp", ",".join(group_labels_per_sample)))
     if contrast_label is not None:
-        h.update(b"|contrast=")
-        h.update(contrast_label.encode())
+        fields.append(("contrast", contrast_label))
     # DSS-style count-smoothing tunables. The flag itself is always
     # hashed so a False->True toggle invalidates the cache. The span is
     # only hashed when smoothing is on (when off, the span has no effect
     # and should not invalidate the cache).
-    h.update(b"|sm=")
-    h.update(b"1" if smoothing else b"0")
+    fields.append(("sm", "1" if smoothing else "0"))
     if smoothing:
-        h.update(b"|span=")
-        h.update(str(int(smoothing_span_bp)).encode())
+        fields.append(("span", str(int(smoothing_span_bp))))
     # Separation-aware fallback (since 0.7.1) -- ON/OFF and threshold change
     # the per-site p-values, so they must be part of the cache key.
-    h.update(b"|sep=")
-    h.update(b"1" if sep_fallback else b"0")
+    fields.append(("sep", "1" if sep_fallback else "0"))
     if sep_fallback:
-        h.update(b"|sept=")
-        h.update(f"{sep_threshold:.6f}".encode())
-    return h.hexdigest()
+        fields.append(("sept", f"{sep_threshold:.6f}"))
+    return _cache.fingerprint(fields)
 
 
 def _resolve_dmc_store_dir(
@@ -2619,7 +2602,7 @@ def combine_neighbour_pvalues(
     out_n_chunks: list[np.ndarray] = []
     keys: list[pl.DataFrame] = []
 
-    for chrom, sub in dmc_df.group_by(chrom_col, maintain_order=True):
+    for _chrom, sub in dmc_df.group_by(chrom_col, maintain_order=True):
         sub_sorted = sub.sort(pos_col)
         positions = sub_sorted[pos_col].to_numpy()
         pvals = sub_sorted[pvalue_col].to_numpy().astype(np.float64)

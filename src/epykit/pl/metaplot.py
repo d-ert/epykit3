@@ -113,7 +113,7 @@ def tss_metaplot(
             g: PALETTE.get("treatment" if i else "control", PALETTE["neutral"])
             for i, g in enumerate(unique_groups)
         }
-        for i, samp in enumerate(samples):
+        for i in range(len(samples)):
             ax.plot(
                 x,
                 mean_beta[i],
@@ -358,7 +358,7 @@ def gene_body_metaplot(
             )
             for i, g in enumerate(unique_groups)
         }
-        for i, samp in enumerate(samples):
+        for i in range(len(samples)):
             ax.plot(
                 x,
                 mean_beta[i],

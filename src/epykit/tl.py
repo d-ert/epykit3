@@ -15,8 +15,6 @@ from typing import Any, Literal
 
 import polars as pl
 
-logger = logging.getLogger(__name__)
-
 from .annotate import _GTF_CACHE, annotate_cpg_islands, annotate_features
 from .dmc import (
     apply_multiple_testing_correction,
@@ -35,6 +33,8 @@ from .dmr import (
 )
 from .methyldata import MethylData
 from .qc import bisulfite_conversion_rate, coverage_uniformity, global_methylation_report
+
+logger = logging.getLogger(__name__)
 
 
 def _auto_test(

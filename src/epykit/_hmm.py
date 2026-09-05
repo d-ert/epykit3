@@ -281,9 +281,9 @@ def runs_of_state(
 
     if positions is not None:
         translated: list[tuple[int, int, int]] = []
-        for s, e, l in runs:
+        for s, e, length in runs:
             # +1 on end so range is inclusive of the last site
-            translated.append((int(positions[s]), int(positions[e - 1]) + 1, l))
+            translated.append((int(positions[s]), int(positions[e - 1]) + 1, length))
         return translated
     return runs
 

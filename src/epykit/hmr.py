@@ -147,7 +147,7 @@ def call_hmr_one_sample(
         )
 
     parts: list[pl.DataFrame] = []
-    for chrom, chrom_result in run_chrom_pipeline(
+    for _chrom, chrom_result in run_chrom_pipeline(
         chromosomes,
         _hmr_chrom_handler,
         backend=backend,

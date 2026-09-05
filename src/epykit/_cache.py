@@ -25,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -181,6 +182,22 @@ def input_signature(*items: Any) -> str:
                 parts.append(repr(item))
     raw = "\n".join(parts).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+def fingerprint(fields: Iterable[tuple[str, str]]) -> str:
+    """SHA-256 hex digest of ordered ``(key, value)`` pairs.
+
+    Each pair enters the hash as ``b"|<key>="`` followed by the UTF-8
+    bytes of ``value``, so the digest depends on field order and on every
+    byte of every value. Callers format numbers themselves (``str(int(x))``,
+    ``f"{x:.10g}"``) so the byte layout stays under their control. Used for
+    the DMC input signature and the DMR cache keys.
+    """
+    h = hashlib.sha256()
+    for key, value in fields:
+        h.update(f"|{key}=".encode())
+        h.update(value.encode())
+    return h.hexdigest()
 
 
 def upstream_sample_signature(input_sample_dir: Path) -> dict[str, Any]:

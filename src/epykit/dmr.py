@@ -24,7 +24,6 @@ smoother -- see its own docstring.
 from __future__ import annotations
 
 import gc
-import hashlib
 import logging
 import math
 import tempfile
@@ -35,6 +34,7 @@ import numpy as np
 import polars as pl
 from scipy import stats as sp_stats
 
+from . import _cache
 from ._dmc_store import DMCStore
 
 logger = logging.getLogger(__name__)
@@ -56,22 +56,17 @@ def _dmr_sliding_cache_key(
     deliberately omitted -- the new two-pointer sweep ignores it.
     """
     base_sig = store.manifest.get("input_sig", "")
-    h = hashlib.sha256()
-    h.update(b"|base=")
-    h.update(base_sig.encode())
-    h.update(b"|win=")
-    h.update(str(int(window_bp)).encode())
-    h.update(b"|mincp=")
-    h.update(str(int(min_cpgs)).encode())
-    h.update(b"|minsig=")
-    h.update(str(int(min_sites_significant)).encode())
-    h.update(b"|alpha=")
-    h.update(f"{float(alpha):.10g}".encode())
-    h.update(b"|delta=")
-    h.update(f"{float(min_abs_meth_diff):.10g}".encode())
-    h.update(b"|pcol=")
-    h.update(p_col.encode())
-    return h.hexdigest()
+    return _cache.fingerprint(
+        [
+            ("base", base_sig),
+            ("win", str(int(window_bp))),
+            ("mincp", str(int(min_cpgs))),
+            ("minsig", str(int(min_sites_significant))),
+            ("alpha", f"{float(alpha):.10g}"),
+            ("delta", f"{float(min_abs_meth_diff):.10g}"),
+            ("pcol", p_col),
+        ]
+    )
 
 
 def _dmr_chain_merge_cache_key(
@@ -89,24 +84,18 @@ def _dmr_chain_merge_cache_key(
     Mirrors :func:`_dmr_sliding_cache_key` for the chain-merge caller.
     """
     base_sig = store.manifest.get("input_sig", "")
-    h = hashlib.sha256()
-    h.update(b"|base=")
-    h.update(base_sig.encode())
-    h.update(b"|alpha=")
-    h.update(f"{float(alpha):.10g}".encode())
-    h.update(b"|delta=")
-    h.update(f"{float(min_abs_meth_diff):.10g}".encode())
-    h.update(b"|dismerge=")
-    h.update(str(int(dis_merge_bp)).encode())
-    h.update(b"|mincp=")
-    h.update(str(int(min_cpgs)).encode())
-    h.update(b"|pctsig=")
-    h.update(f"{float(pct_sig):.10g}".encode())
-    h.update(b"|minlen=")
-    h.update(str(int(minlen_bp)).encode())
-    h.update(b"|pcol=")
-    h.update(p_col.encode())
-    return h.hexdigest()
+    return _cache.fingerprint(
+        [
+            ("base", base_sig),
+            ("alpha", f"{float(alpha):.10g}"),
+            ("delta", f"{float(min_abs_meth_diff):.10g}"),
+            ("dismerge", str(int(dis_merge_bp))),
+            ("mincp", str(int(min_cpgs))),
+            ("pctsig", f"{float(pct_sig):.10g}"),
+            ("minlen", str(int(minlen_bp))),
+            ("pcol", p_col),
+        ]
+    )
 
 
 _DMR_EMPTY_SCHEMA = {

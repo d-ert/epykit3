@@ -1291,7 +1291,7 @@ def main():
     try:
         args.func(args)
     except FileNotFoundError as exc:
-        raise SystemExit(f"error: {exc}")
+        raise SystemExit(f"error: {exc}") from exc
 
 
 if __name__ == "__main__":

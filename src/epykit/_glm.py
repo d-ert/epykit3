@@ -370,7 +370,7 @@ def irls_binomial_batch(
     converged = np.zeros(n_sites, dtype=bool)
 
     # ---- IRLS iterations ---------------------------------------------------
-    for it in range(max_iter):
+    for _it in range(max_iter):
         eta = beta @ X.T  # (n_sites, n_samples)
         # clip eta to avoid sigmoid saturation breaking the weights
         eta = np.clip(eta, -30.0, 30.0)

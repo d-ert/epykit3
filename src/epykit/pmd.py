@@ -159,7 +159,7 @@ def call_pmd_one_sample(
         )
 
     parts: list[pl.DataFrame] = []
-    for chrom, chrom_result in run_chrom_pipeline(
+    for _chrom, chrom_result in run_chrom_pipeline(
         chromosomes,
         _pmd_chrom_handler,
         backend=backend,
