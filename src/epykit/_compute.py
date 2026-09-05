@@ -24,7 +24,8 @@ closure or :func:`functools.partial`; both work under
 from __future__ import annotations
 
 import logging
-from typing import Callable, Iterable, Iterator, Optional
+from collections.abc import Iterable, Iterator
+from typing import Callable, Optional
 
 import polars as pl
 
@@ -39,7 +40,7 @@ def run_chrom_pipeline(
     handler: ChromHandler,
     *,
     backend: str = "sequential",
-    n_workers: Optional[int] = None,
+    n_workers: int | None = None,
     label: str = "chrom",
 ) -> Iterator[tuple[str, pl.DataFrame]]:
     """Run one handler invocation per chromosome through the chosen backend.
@@ -81,12 +82,11 @@ def run_chrom_pipeline(
         yield from _run_ray(chromosomes, handler, n_workers, label)
     else:
         raise ValueError(
-            f"Unknown compute backend {backend!r}. "
-            "Use 'sequential' (default), 'dask', or 'ray'."
+            f"Unknown compute backend {backend!r}. Use 'sequential' (default), 'dask', or 'ray'."
         )
 
 
-def _emit(chrom: str, result: Optional[pl.DataFrame]) -> Optional[tuple[str, pl.DataFrame]]:
+def _emit(chrom: str, result: pl.DataFrame | None) -> tuple[str, pl.DataFrame] | None:
     """Filter empty / None results; return None to signal 'skip'."""
     if result is None:
         return None
@@ -112,27 +112,28 @@ def _run_sequential(
 def _run_dask(
     chromosomes: list[str],
     handler: ChromHandler,
-    n_workers: Optional[int],
+    n_workers: int | None,
     label: str,
 ) -> Iterator[tuple[str, pl.DataFrame]]:
     try:
         from dask.distributed import Client, LocalCluster, get_client
     except ImportError as exc:
         raise ImportError(
-            "Dask is required for backend='dask'. "
-            "Install with: pip install 'epykit[distributed]'"
+            "Dask is required for backend='dask'. Install with: pip install 'epykit[distributed]'"
         ) from exc
 
     # Reuse an active client if the caller already opened one; otherwise
     # spin up a LocalCluster sized to n_workers.
-    owned_cluster: Optional[LocalCluster] = None
-    owned_client: Optional[Client] = None
+    owned_cluster: LocalCluster | None = None
+    owned_client: Client | None = None
     try:
         try:
             client = get_client()
             logger.info(
                 "[%s] Using existing Dask client at %s for %d chrom(s)",
-                label, client.scheduler.address, len(chromosomes),
+                label,
+                client.scheduler.address,
+                len(chromosomes),
             )
         except (ValueError, RuntimeError):
             owned_cluster = LocalCluster(n_workers=n_workers or None, processes=True)
@@ -140,7 +141,9 @@ def _run_dask(
             client = owned_client
             logger.info(
                 "[%s] Spun up LocalCluster (%d worker(s)) for %d chrom(s)",
-                label, len(client.scheduler_info().get("workers", {})), len(chromosomes),
+                label,
+                len(client.scheduler_info().get("workers", {})),
+                len(chromosomes),
             )
 
         # Submit one future per chromosome. `pure=False` so Dask doesn't
@@ -170,15 +173,14 @@ def _run_dask(
 def _run_ray(
     chromosomes: list[str],
     handler: ChromHandler,
-    n_workers: Optional[int],
+    n_workers: int | None,
     label: str,
 ) -> Iterator[tuple[str, pl.DataFrame]]:
     try:
         import ray
     except ImportError as exc:
         raise ImportError(
-            "Ray is required for backend='ray'. "
-            "Install with: pip install 'epykit[ray]'"
+            "Ray is required for backend='ray'. Install with: pip install 'epykit[ray]'"
         ) from exc
 
     owned_init = False
@@ -187,12 +189,15 @@ def _run_ray(
         owned_init = True
         logger.info(
             "[%s] Initialised Ray (%s CPUs) for %d chrom(s)",
-            label, n_workers or "auto", len(chromosomes),
+            label,
+            n_workers or "auto",
+            len(chromosomes),
         )
     else:
         logger.info(
             "[%s] Using existing Ray runtime for %d chrom(s)",
-            label, len(chromosomes),
+            label,
+            len(chromosomes),
         )
 
     try:

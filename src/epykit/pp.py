@@ -15,8 +15,17 @@ logger = logging.getLogger(__name__)
 
 
 _BED_BASE_COLS = ["chrom", "start", "end"]
-_BED_EXTRA_NAMES = ["name", "score", "strand", "thickStart", "thickEnd",
-                    "itemRgb", "blockCount", "blockSizes", "blockStarts"]
+_BED_EXTRA_NAMES = [
+    "name",
+    "score",
+    "strand",
+    "thickStart",
+    "thickEnd",
+    "itemRgb",
+    "blockCount",
+    "blockSizes",
+    "blockStarts",
+]
 
 
 def _append_store_history(md: MethylData, step: str, path: str, n_sites: int | None) -> None:
@@ -46,7 +55,7 @@ def filter_coverage(
         out = str(Path(md.analysis_root) / ".cache" / "filtered")
     else:
         out = f"{md.store}_filtered"
-    
+
     filter_mod.filter_sites(
         methylstore_path=md.store,
         output_dir=out,
@@ -112,9 +121,7 @@ def normalize_coverage(md: MethylData, method: str = "median") -> None:
         If ``filter_coverage`` has not been called yet.
     """
     if not md._filtered:
-        raise ValueError(
-            "Run ep.pp.filter_coverage(md) before ep.pp.normalize_coverage(md)."
-        )
+        raise ValueError("Run ep.pp.filter_coverage(md) before ep.pp.normalize_coverage(md).")
     if md._united:
         logger.warning(
             "normalize_coverage called after unite(); the recommended order "
@@ -220,16 +227,16 @@ def _read_bed(regions_bed: str, region_id_col: str | None = None) -> pl.DataFram
     )
     n_cols = raw.width
     if n_cols < 3:
-        raise ValueError(
-            f"BED file {regions_bed} has only {n_cols} column(s); need at least 3."
-        )
+        raise ValueError(f"BED file {regions_bed} has only {n_cols} column(s); need at least 3.")
     new_names = _BED_BASE_COLS + _BED_EXTRA_NAMES[: max(0, n_cols - 3)]
-    raw = raw.rename({f"column_{i+1}": new_names[i] for i in range(min(n_cols, len(new_names)))})
+    raw = raw.rename({f"column_{i + 1}": new_names[i] for i in range(min(n_cols, len(new_names)))})
 
-    raw = raw.with_columns([
-        pl.col("start").cast(pl.Int64),
-        pl.col("end").cast(pl.Int64),
-    ])
+    raw = raw.with_columns(
+        [
+            pl.col("start").cast(pl.Int64),
+            pl.col("end").cast(pl.Int64),
+        ]
+    )
 
     if region_id_col and region_id_col in raw.columns:
         raw = raw.with_columns(pl.col(region_id_col).cast(pl.Utf8).alias("region_id"))
@@ -237,11 +244,12 @@ def _read_bed(regions_bed: str, region_id_col: str | None = None) -> pl.DataFram
         raw = raw.with_columns(pl.col("name").cast(pl.Utf8).alias("region_id"))
     else:
         raw = raw.with_columns(
-            (pl.col("chrom").cast(pl.Utf8)
-             + pl.lit(":")
-             + pl.col("start").cast(pl.Utf8)
-             + pl.lit("-")
-             + pl.col("end").cast(pl.Utf8)
+            (
+                pl.col("chrom").cast(pl.Utf8)
+                + pl.lit(":")
+                + pl.col("start").cast(pl.Utf8)
+                + pl.lit("-")
+                + pl.col("end").cast(pl.Utf8)
             ).alias("region_id")
         )
 
@@ -338,8 +346,7 @@ def aggregate_regions(
 
     # Per-chromosome bed dict for fast lookup
     bed_by_chrom: dict[str, pl.DataFrame] = {
-        c: bed.filter(pl.col("chrom") == c).sort("start")
-        for c in bed["chrom"].unique().to_list()
+        c: bed.filter(pl.col("chrom") == c).sort("start") for c in bed["chrom"].unique().to_list()
     }
 
     for sample_dir in sample_dirs:
@@ -365,34 +372,53 @@ def aggregate_regions(
                 continue
 
             agg = (
-                assigned
-                .group_by("region_id", maintain_order=True)
-                .agg([
-                    pl.col("start").first(),
-                    pl.col("end").first(),
-                    pl.sum("N_meth").alias("N_meth"),
-                    pl.sum("N_unmeth").alias("N_unmeth"),
-                    pl.len().alias("n_cpgs"),
-                ])
+                assigned.group_by("region_id", maintain_order=True)
+                .agg(
+                    [
+                        pl.col("start").first(),
+                        pl.col("end").first(),
+                        pl.sum("N_meth").alias("N_meth"),
+                        pl.sum("N_unmeth").alias("N_unmeth"),
+                        pl.len().alias("n_cpgs"),
+                    ]
+                )
                 .filter(pl.col("n_cpgs") >= min_cpgs_per_region)
             )
             if len(agg) == 0:
                 continue
 
-            agg = agg.with_columns([
-                pl.lit(chrom).alias("chrom"),
-                ((pl.col("start") + pl.col("end")) // 2).cast(pl.Int32).alias("pos"),
-                pl.lit("*").alias("strand"),
-                pl.lit(context_value).alias("context"),
-                (pl.col("N_meth") + pl.col("N_unmeth")).cast(pl.Int32).alias("coverage"),
-                pl.lit(sample).alias("sample"),
-                pl.col("N_meth").cast(pl.Int32),
-                pl.col("N_unmeth").cast(pl.Int32),
-                pl.col("n_cpgs").cast(pl.Int32),
-            ]).select([
-                "chrom", "pos", "strand", "context", "N_meth", "N_unmeth",
-                "coverage", "sample", "region_id", "start", "end", "n_cpgs",
-            ]).sort("pos")
+            agg = (
+                agg.with_columns(
+                    [
+                        pl.lit(chrom).alias("chrom"),
+                        ((pl.col("start") + pl.col("end")) // 2).cast(pl.Int32).alias("pos"),
+                        pl.lit("*").alias("strand"),
+                        pl.lit(context_value).alias("context"),
+                        (pl.col("N_meth") + pl.col("N_unmeth")).cast(pl.Int32).alias("coverage"),
+                        pl.lit(sample).alias("sample"),
+                        pl.col("N_meth").cast(pl.Int32),
+                        pl.col("N_unmeth").cast(pl.Int32),
+                        pl.col("n_cpgs").cast(pl.Int32),
+                    ]
+                )
+                .select(
+                    [
+                        "chrom",
+                        "pos",
+                        "strand",
+                        "context",
+                        "N_meth",
+                        "N_unmeth",
+                        "coverage",
+                        "sample",
+                        "region_id",
+                        "start",
+                        "end",
+                        "n_cpgs",
+                    ]
+                )
+                .sort("pos")
+            )
 
             out_chrom_dir = out_path / f"sample={sample}" / f"chrom={chrom}"
             out_chrom_dir.mkdir(parents=True, exist_ok=True)
@@ -412,14 +438,10 @@ def aggregate_regions(
     if n_rows is not None:
         md.uns["n_sites_regions"] = n_rows
         _append_store_history(md, "regions", str(out_path), n_rows)
-    logger.info(
-        "aggregate_regions: %d region(s) defined, store at %s", n_regions, out_path
-    )
+    logger.info("aggregate_regions: %d region(s) defined, store at %s", n_regions, out_path)
 
 
-def _assign_cpgs_to_regions(
-    cpgs: pl.DataFrame, regions_chrom: pl.DataFrame
-) -> pl.DataFrame | None:
+def _assign_cpgs_to_regions(cpgs: pl.DataFrame, regions_chrom: pl.DataFrame) -> pl.DataFrame | None:
     """Assign each CpG to EVERY region it overlaps (half-open intervals).
 
     Returns a DataFrame with the CpG columns plus ``region_id``, ``start``,
@@ -493,15 +515,11 @@ def smooth(
         BSmooth fit; ``degree=1`` is a faster linear fallback.
     """
     if not md._filtered:
-        raise ValueError(
-            "Run ep.pp.filter_coverage(md) before ep.pp.smooth(md)."
-        )
+        raise ValueError("Run ep.pp.filter_coverage(md) before ep.pp.smooth(md).")
 
     method = method.lower()
     if method not in ("gaussian", "bsmooth"):
-        raise ValueError(
-            f"Unknown smoothing method {method!r}. Use 'gaussian' or 'bsmooth'."
-        )
+        raise ValueError(f"Unknown smoothing method {method!r}. Use 'gaussian' or 'bsmooth'.")
 
     samples = md.obs.get_column("sample_id").to_list()
 
@@ -514,6 +532,7 @@ def smooth(
 
     if method == "gaussian":
         from .dmr import smooth_methylation_gaussian
+
         smooth_methylation_gaussian(
             methylstore_path=md.store,
             samples=samples,
@@ -528,6 +547,7 @@ def smooth(
         }
     else:  # bsmooth
         from .dmr import smooth_methylation_bsmooth
+
         smooth_methylation_bsmooth(
             methylstore_path=md.store,
             samples=samples,
@@ -551,5 +571,7 @@ def smooth(
 
     logger.info(
         "Smoothing complete (%d samples, method=%s). Results in %s",
-        len(samples), method, smooth_path,
+        len(samples),
+        method,
+        smooth_path,
     )

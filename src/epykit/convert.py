@@ -31,7 +31,6 @@ import polars as pl
 
 from . import _cache
 
-
 RAW_MANIFEST_NAME = ".epykit_raw_manifest.json"
 
 logger = logging.getLogger(__name__)
@@ -70,28 +69,37 @@ _FORMAT_SKIP_ROWS: dict[str, int] = {
 # Wider schema for the 12-col combined-strand BED. We read the full 12
 # columns then project to the canonical 6-col Bismark-equivalent layout.
 _COMBINED_BED_COLUMNS = [
-    "chrom", "start", "end",
-    "fwd_M", "fwd_T", "fwd_pct",
-    "rev_M", "rev_T", "rev_pct",
-    "M", "T", "methyl_percent",
+    "chrom",
+    "start",
+    "end",
+    "fwd_M",
+    "fwd_T",
+    "fwd_pct",
+    "rev_M",
+    "rev_T",
+    "rev_pct",
+    "M",
+    "T",
+    "methyl_percent",
 ]
 _COMBINED_BED_SCHEMA: dict[str, type[pl.DataType]] = {
-    "chrom":         pl.Utf8,
-    "start":         pl.Int32,
-    "end":           pl.Int32,
-    "fwd_M":         pl.Int32,
-    "fwd_T":         pl.Int32,
-    "fwd_pct":       pl.Float32,
-    "rev_M":         pl.Int32,
-    "rev_T":         pl.Int32,
-    "rev_pct":       pl.Float32,
-    "M":             pl.Int32,
-    "T":             pl.Int32,
+    "chrom": pl.Utf8,
+    "start": pl.Int32,
+    "end": pl.Int32,
+    "fwd_M": pl.Int32,
+    "fwd_T": pl.Int32,
+    "fwd_pct": pl.Float32,
+    "rev_M": pl.Int32,
+    "rev_T": pl.Int32,
+    "rev_pct": pl.Float32,
+    "M": pl.Int32,
+    "T": pl.Int32,
     "methyl_percent": pl.Float32,
 }
 
 
 # Manifest helpers
+
 
 @dataclass(frozen=True)
 class _SampleManifest:
@@ -100,7 +108,7 @@ class _SampleManifest:
     chroms: list[str]
     row_group_size: int
     format: str = "bismark"
-    coordinate_base: str = "auto"            # requested convention
+    coordinate_base: str = "auto"  # requested convention
     resolved_coordinate_base: str = "zero_based"  # convention actually applied
 
 
@@ -130,7 +138,9 @@ def _manifest_payload(manifest: _SampleManifest) -> dict[str, object]:
 
 
 def _can_reuse_sample(
-    input_path: Path, sample_dir: Path, row_group_size: int,
+    input_path: Path,
+    sample_dir: Path,
+    row_group_size: int,
     format: str = "bismark",
     coordinate_base: str = "auto",
 ) -> bool:
@@ -153,9 +163,7 @@ def _can_reuse_sample(
     if manifest.get("format", "bismark") != format:
         return False
     chroms = manifest.get("chroms")
-    if not isinstance(chroms, list) or not all(
-        isinstance(c, str) for c in chroms
-    ):
+    if not isinstance(chroms, list) or not all(isinstance(c, str) for c in chroms):
         return False
     return _sample_is_complete(sample_dir, chroms)
 
@@ -179,41 +187,40 @@ def _promote_sample_dir(temp_sample_dir: Path, final_sample_dir: Path) -> None:
 
 # CpG strand merging
 
+
 def _merge_cpg_pairs(df: pl.DataFrame) -> pl.DataFrame:
     """Merge + and - strand CpG pairs into single sites at the + strand position.
-    
+
     When Bismark .cov files contain both strands, a CpG dinucleotide appears as:
       - + strand at position N (C position)
       - - strand at position N+1 (G position on reverse strand)
-    
+
     This function merges them by:
       1. Shifting - strand positions back by 1 (N+1 -> N)
       2. Grouping by (chrom, pos) and summing counts
       3. Setting all merged sites to + strand
-    
+
     Validates pairing and warns if unpaired sites are found (may indicate
     incomplete bisulfite conversion or quality issues).
-    
+
     If the input already has strand-merged data (e.g., from bismark2bedGraph),
     this function is a no-op.
     """
     if "strand" not in df.columns:
         # No strand information, return as-is
         return df
-    
+
     # Separate + and - strands
     plus = df.filter(pl.col("strand") == "+")
     minus = df.filter(pl.col("strand") == "-")
-    
+
     if len(minus) == 0:
         # No - strand data, already merged or only + strand present
         return df
-    
+
     # Shift - strand positions to + strand coordinate (N+1 -> N)
-    minus = minus.with_columns(
-        (pl.col("pos") - 1).alias("pos")
-    )
-    
+    minus = minus.with_columns((pl.col("pos") - 1).alias("pos"))
+
     # VALIDATION: Check for proper pairing. Polars semi-join on
     # (chrom, pos) is cheaper than materialising two Python int sets
     # and is also correct in the (rare) multi-chrom case where the
@@ -228,6 +235,7 @@ def _merge_cpg_pairs(df: pl.DataFrame) -> pl.DataFrame:
 
     if n_unpaired_plus or n_unpaired_minus:
         import logging
+
         logger = logging.getLogger(__name__)
         logger.warning(
             f"CpG strand pairing incomplete:\n"
@@ -237,21 +245,25 @@ def _merge_cpg_pairs(df: pl.DataFrame) -> pl.DataFrame:
             f"  Merging will sum paired sites and keep unpaired sites as-is.\n"
             f"  This may indicate incomplete bisulfite conversion or data quality issues."
         )
-    
+
     # Combine and merge by position
     combined = pl.concat([plus, minus])
-    
+
     # Group by chrom and pos, summing methylation counts
-    merged = combined.group_by(["chrom", "pos"], maintain_order=True).agg([
-        pl.sum("N_meth").alias("N_meth"),
-        pl.sum("N_unmeth").alias("N_unmeth"),
-        pl.sum("coverage").alias("coverage"),
-        pl.first("sample").alias("sample"),
-        pl.first("context").alias("context"),
-    ]).with_columns(
-        pl.lit("+").alias("strand")
+    merged = (
+        combined.group_by(["chrom", "pos"], maintain_order=True)
+        .agg(
+            [
+                pl.sum("N_meth").alias("N_meth"),
+                pl.sum("N_unmeth").alias("N_unmeth"),
+                pl.sum("coverage").alias("coverage"),
+                pl.first("sample").alias("sample"),
+                pl.first("context").alias("context"),
+            ]
+        )
+        .with_columns(pl.lit("+").alias("strand"))
     )
-    
+
     return merged.sort("pos")
 
 
@@ -355,15 +367,16 @@ def _merge_cpg_pairs_by_position(df: pl.DataFrame) -> pl.DataFrame:
         )
 
         merged = (
-            chrom_df
-            .group_by(["chrom", "_group_pos"], maintain_order=True)
-            .agg([
-                pl.sum("N_meth").alias("N_meth"),
-                pl.sum("N_unmeth").alias("N_unmeth"),
-                pl.sum("coverage").alias("coverage"),
-                pl.first("context").alias("context"),
-                pl.first("sample").alias("sample"),
-            ])
+            chrom_df.group_by(["chrom", "_group_pos"], maintain_order=True)
+            .agg(
+                [
+                    pl.sum("N_meth").alias("N_meth"),
+                    pl.sum("N_unmeth").alias("N_unmeth"),
+                    pl.sum("coverage").alias("coverage"),
+                    pl.first("context").alias("context"),
+                    pl.first("sample").alias("sample"),
+                ]
+            )
             .rename({"_group_pos": "pos"})
             .with_columns(
                 pl.lit("*").alias("strand"),
@@ -373,8 +386,9 @@ def _merge_cpg_pairs_by_position(df: pl.DataFrame) -> pl.DataFrame:
                 pl.col("coverage").cast(pl.Int32),
             )
             # Restore canonical column order.
-            .select(["chrom", "pos", "strand", "context",
-                     "N_meth", "N_unmeth", "coverage", "sample"])
+            .select(
+                ["chrom", "pos", "strand", "context", "N_meth", "N_unmeth", "coverage", "sample"]
+            )
             .sort("pos")
         )
         per_chrom_frames.append(merged)
@@ -395,6 +409,7 @@ def _merge_cpg_pairs_by_position(df: pl.DataFrame) -> pl.DataFrame:
 
 
 # Optional strand inference
+
 
 def _infer_strand(df: pl.DataFrame, reference_fasta: str) -> pl.Series:
     """Infer strand from reference sequence for each CpG position.
@@ -432,8 +447,7 @@ def _infer_strand(df: pl.DataFrame, reference_fasta: str) -> pl.Series:
         from pyfaidx import Fasta  # optional dependency
     except ImportError as exc:
         raise ImportError(
-            "pyfaidx is required for strand inference. "
-            "Install it with: pip install pyfaidx"
+            "pyfaidx is required for strand inference. Install it with: pip install pyfaidx"
         ) from exc
 
     import numpy as np
@@ -459,8 +473,7 @@ def _infer_strand(df: pl.DataFrame, reference_fasta: str) -> pl.Series:
             continue
         # ``as_raw=True`` makes pyfaidx return either ``str`` or ``bytes``
         # depending on version; normalise to bytes for numpy.
-        seq_bytes = seq_obj.encode("ascii") if isinstance(seq_obj, str) \
-            else bytes(seq_obj)
+        seq_bytes = seq_obj.encode("ascii") if isinstance(seq_obj, str) else bytes(seq_obj)
         seq = np.frombuffer(seq_bytes, dtype=np.uint8)
 
         mask = chrom_arr == chrom
@@ -483,6 +496,7 @@ def _infer_strand(df: pl.DataFrame, reference_fasta: str) -> pl.Series:
 
 # Public API
 
+
 def _resolve_coordinate_offset(
     raw_lf: pl.LazyFrame, format: str, coordinate_base: str
 ) -> tuple[int, str]:
@@ -500,8 +514,7 @@ def _resolve_coordinate_offset(
         return 0, "zero_based"
     if coordinate_base != "auto":
         raise ValueError(
-            "coordinate_base must be 'auto', 'one_based' or 'zero_based', "
-            f"got {coordinate_base!r}"
+            f"coordinate_base must be 'auto', 'one_based' or 'zero_based', got {coordinate_base!r}"
         )
     # auto-detect
     if format != "bismark":
@@ -516,20 +529,23 @@ def _resolve_coordinate_offset(
     if frac_eq >= 0.9:
         logger.info(
             "convert: detected 1-based Bismark .cov (start == end in %.0f%% "
-            "of sampled rows); shifting pos by -1.", 100 * frac_eq,
+            "of sampled rows); shifting pos by -1.",
+            100 * frac_eq,
         )
         return -1, "one_based"
     if frac_half >= 0.9:
         logger.info(
             "convert: detected 0-based input (end == start + 1 in %.0f%% of "
-            "sampled rows); no shift.", 100 * frac_half,
+            "sampled rows); no shift.",
+            100 * frac_half,
         )
         return 0, "zero_based"
     logger.warning(
         "convert: ambiguous coordinate convention (%.0f%% start==end, "
         "%.0f%% end==start+1); assuming 0-based (no shift). Pass "
         "coordinate_base='one_based' or 'zero_based' to override.",
-        100 * frac_eq, 100 * frac_half,
+        100 * frac_eq,
+        100 * frac_half,
     )
     return 0, "zero_based"
 
@@ -598,10 +614,7 @@ def convert_sample(
     sample  Utf8
     """
     if format not in _FORMAT_SKIP_ROWS:
-        raise ValueError(
-            f"Unknown format {format!r}; expected one of "
-            f"{sorted(_FORMAT_SKIP_ROWS)}"
-        )
+        raise ValueError(f"Unknown format {format!r}; expected one of {sorted(_FORMAT_SKIP_ROWS)}")
 
     p = Path(input_path)
     out = Path(output_dir)
@@ -621,16 +634,19 @@ def convert_sample(
                 new_columns=_COMBINED_BED_COLUMNS,
                 schema_overrides=_COMBINED_BED_SCHEMA,
             )
-            .with_columns([
-                pl.col("M").alias("N_meth"),
-                (pl.col("T") - pl.col("M")).cast(pl.Int32).alias("N_unmeth"),
-                pl.col("T").alias("coverage"),
-                pl.lit(sample_name).alias("sample"),
-                pl.col("start").alias("pos"),
-                pl.lit(context).alias("context"),
-            ])
-            .select(["chrom", "pos", "context", "N_meth", "N_unmeth",
-                     "coverage", "sample", "start"])
+            .with_columns(
+                [
+                    pl.col("M").alias("N_meth"),
+                    (pl.col("T") - pl.col("M")).cast(pl.Int32).alias("N_unmeth"),
+                    pl.col("T").alias("coverage"),
+                    pl.lit(sample_name).alias("sample"),
+                    pl.col("start").alias("pos"),
+                    pl.lit(context).alias("context"),
+                ]
+            )
+            .select(
+                ["chrom", "pos", "context", "N_meth", "N_unmeth", "coverage", "sample", "start"]
+            )
         )
     else:
         raw_lf = pl.scan_csv(
@@ -643,9 +659,7 @@ def convert_sample(
         )
         # Bismark .cov is 1-based (start == end); MethylDackel bedGraph is
         # 0-based. Resolve the offset so pos is always 0-based. (C1)
-        offset, resolved_base = _resolve_coordinate_offset(
-            raw_lf, format, coordinate_base
-        )
+        offset, resolved_base = _resolve_coordinate_offset(raw_lf, format, coordinate_base)
         lf = raw_lf.with_columns(
             [
                 (pl.col("N_meth") + pl.col("N_unmeth")).alias("coverage"),
@@ -654,9 +668,17 @@ def convert_sample(
                 pl.lit(context).alias("context"),
             ]
         ).select(
-            ["chrom", "pos", "context", "N_meth", "N_unmeth", "coverage", "sample",
-             "start"]   # start retained only to be dropped below; strand
-                        # inference uses the 0-based `pos` column
+            [
+                "chrom",
+                "pos",
+                "context",
+                "N_meth",
+                "N_unmeth",
+                "coverage",
+                "sample",
+                "start",
+            ]  # start retained only to be dropped below; strand
+            # inference uses the 0-based `pos` column
         )
 
     df = lf.collect()
@@ -667,9 +689,10 @@ def convert_sample(
     else:
         strand_series = pl.Series("strand", ["*"] * len(df), dtype=pl.Utf8)
 
-    df = df.with_columns(strand_series).drop("start").select(
-        ["chrom", "pos", "strand", "context", "N_meth", "N_unmeth", "coverage",
-         "sample"]
+    df = (
+        df.with_columns(strand_series)
+        .drop("start")
+        .select(["chrom", "pos", "strand", "context", "N_meth", "N_unmeth", "coverage", "sample"])
     )
 
     # CpG strand merging : merge + and - strand pairs if requested.
@@ -687,9 +710,7 @@ def convert_sample(
     # Write one Parquet file per chromosome. partition_by is a single
     # hash-partition pass; the prior unique()+filter() loop scanned the
     # frame once per chromosome.
-    for key, sub in df.partition_by(
-        "chrom", as_dict=True, maintain_order=False
-    ).items():
+    for key, sub in df.partition_by("chrom", as_dict=True, maintain_order=False).items():
         chrom = key[0] if isinstance(key, tuple) else key
         part_dir = out / f"sample={sample_name}" / f"chrom={chrom}"
         part_dir.mkdir(parents=True, exist_ok=True)
@@ -723,7 +744,10 @@ def ensure_converted_sample(
 
     final_sample_dir = _sample_dir(output_root, sample_name)
     if _can_reuse_sample(
-        source_path, final_sample_dir, row_group_size, format=format,
+        source_path,
+        final_sample_dir,
+        row_group_size,
+        format=format,
         coordinate_base=coordinate_base,
     ):
         return False
@@ -766,9 +790,7 @@ def ensure_converted_sample(
 if __name__ == "__main__":
     import argparse
 
-    ap = argparse.ArgumentParser(
-        description="Convert Bismark .cov to partitioned Parquet"
-    )
+    ap = argparse.ArgumentParser(description="Convert Bismark .cov to partitioned Parquet")
     ap.add_argument("--input", required=True)
     ap.add_argument("--sample-id", required=True)
     ap.add_argument("--output-dir", required=True)

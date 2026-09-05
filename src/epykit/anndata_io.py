@@ -40,7 +40,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -87,13 +86,12 @@ def _site_index(store: str, *, unite_type: str):
         ``var[start_idx:start_idx + len(positions_int64)]`` is the
         chromosome's contiguous block. Empty chromosomes are dropped.
     """
-    import numpy as np
     from functools import reduce
 
+    import numpy as np
+
     if unite_type not in {"union", "intersect"}:
-        raise ValueError(
-            f"unite_type must be 'union' or 'intersect'; got {unite_type!r}"
-        )
+        raise ValueError(f"unite_type must be 'union' or 'intersect'; got {unite_type!r}")
 
     store_p = Path(store)
     sample_dirs = sorted(d for d in store_p.glob("sample=*") if d.is_dir())
@@ -115,12 +113,14 @@ def _site_index(store: str, *, unite_type: str):
 
     logger.info(
         "_site_index: %d sample(s), %d chromosome(s), unite=%s",
-        len(sample_dirs), len(chroms_sorted), unite_type,
+        len(sample_dirs),
+        len(chroms_sorted),
+        unite_type,
     )
     per_chrom_log = logger.debug if len(chroms_sorted) > 50 else logger.info
 
-    chrom_index: dict[str, tuple[int, "np.ndarray"]] = {}
-    chrom_arrays: list[tuple[str, "np.ndarray"]] = []
+    chrom_index: dict[str, tuple[int, np.ndarray]] = {}
+    chrom_arrays: list[tuple[str, np.ndarray]] = []
     running_start = 0
 
     for chrom in chroms_sorted:
@@ -163,7 +163,9 @@ def _site_index(store: str, *, unite_type: str):
         n = int(positions.size)
         per_chrom_log(
             "_site_index: chrom=%s n_sites=%d (start_idx=%d)",
-            chrom, n, running_start,
+            chrom,
+            n,
+            running_start,
         )
         if n == 0:
             continue
@@ -181,10 +183,7 @@ def _site_index(store: str, *, unite_type: str):
     else:
         all_pos = np.concatenate([a for _, a in chrom_arrays])
         chrom_col = pl.concat(
-            [
-                pl.Series("chrom", [c] * len(a), dtype=pl.Utf8)
-                for c, a in chrom_arrays
-            ]
+            [pl.Series("chrom", [c] * len(a), dtype=pl.Utf8) for c, a in chrom_arrays]
         )
         var = pl.DataFrame(
             {
@@ -197,12 +196,12 @@ def _site_index(store: str, *, unite_type: str):
 
 
 def _value_lazyframe(
-    lf: "pl.LazyFrame",
+    lf: pl.LazyFrame,
     chrom: str,
     layer: str,
     *,
-    pl_value_dtype: "pl.DataType",
-) -> "pl.LazyFrame":
+    pl_value_dtype: pl.DataType,
+) -> pl.LazyFrame:
     """Return a lazy frame with columns (pos: Int64, value: pl_value_dtype) for one chromosome.
 
     The value dtype is pinned in polars so the downstream
@@ -215,8 +214,9 @@ def _value_lazyframe(
             lf.select(["pos", "N_meth", "coverage"])
             .filter(pl.col("coverage") > 0)
             .with_columns(
-                (pl.col("N_meth").cast(pl_value_dtype) / pl.col("coverage").cast(pl_value_dtype))
-                .alias("value")
+                (
+                    pl.col("N_meth").cast(pl_value_dtype) / pl.col("coverage").cast(pl_value_dtype)
+                ).alias("value")
             )
             .select([pos, pl.col("value").cast(pl_value_dtype)])
         )
@@ -238,7 +238,7 @@ def _fill_layer(
     samples: list[str],
     n_sites: int,
     layer: str,
-    chrom_index: dict[str, tuple[int, "np.ndarray"]],
+    chrom_index: dict[str, tuple[int, np.ndarray]],
     dtype,
 ):
     """Stream sample x chromosome, filling a (n_samples x n_sites) array.
@@ -288,8 +288,7 @@ def _fill_layer(
             values = df["value"].to_numpy(zero_copy_only=False)
             if values.dtype != np_dtype:
                 raise AssertionError(
-                    f"_fill_layer: expected {np_dtype} values on {chrom!r}, "
-                    f"got {values.dtype}"
+                    f"_fill_layer: expected {np_dtype} values on {chrom!r}, got {values.dtype}"
                 )
 
             # Look up the column index of each sample CpG inside the
@@ -353,8 +352,7 @@ def to_anndata(
         import anndata as ad
     except ImportError as exc:
         raise ImportError(
-            "anndata is required for to_anndata(). "
-            "Install it with: pip install 'epykit[anndata]'"
+            "anndata is required for to_anndata(). Install it with: pip install 'epykit[anndata]'"
         ) from exc
 
     if not md._united:
@@ -366,9 +364,7 @@ def to_anndata(
         )
 
     if layer not in _VALID_LAYERS:
-        raise ValueError(
-            f"layer must be one of {sorted(_VALID_LAYERS)}; got {layer!r}"
-        )
+        raise ValueError(f"layer must be one of {sorted(_VALID_LAYERS)}; got {layer!r}")
 
     import numpy as np
 
@@ -378,14 +374,17 @@ def to_anndata(
     unite_type = md.uns["unite"]["type"]
     logger.info(
         "to_anndata: building site index from %s (unite=%s)",
-        md.store, unite_type,
+        md.store,
+        unite_type,
     )
     var, chrom_index = _site_index(md.store, unite_type=unite_type)
     n_sites = len(var)
-    dense_gib = len(samples) * n_sites * np_dtype.itemsize / (1024 ** 3)
+    dense_gib = len(samples) * n_sites * np_dtype.itemsize / (1024**3)
     logger.info(
         "to_anndata: %d sample(s) x %d site(s) -- estimated dense size %.2f GiB per layer",
-        len(samples), n_sites, dense_gib,
+        len(samples),
+        n_sites,
+        dense_gib,
     )
     # Loud warning if the user is about to allocate something huge. 4 GiB
     # crosses the threshold where even 32 GiB workstations start swapping
@@ -418,7 +417,12 @@ def to_anndata(
                 continue
             logger.info("to_anndata: filling layer %r", extra)
             adata.layers[extra] = _fill_layer(
-                md.store, samples, n_sites, extra, chrom_index, np_dtype,
+                md.store,
+                samples,
+                n_sites,
+                extra,
+                chrom_index,
+                np_dtype,
             )
 
     adata.uns["epykit_assembly"] = md.assembly
@@ -427,7 +431,8 @@ def to_anndata(
 
     logger.info(
         "to_anndata: built AnnData shape=%s layers=%s",
-        adata.shape, list(adata.layers.keys()),
+        adata.shape,
+        list(adata.layers.keys()),
     )
     return adata
 
@@ -454,8 +459,7 @@ def to_mudata(
         import mudata as md_lib
     except ImportError as exc:
         raise ImportError(
-            "mudata is required for to_mudata. "
-            "Install with: pip install 'epykit[anndata]'"
+            "mudata is required for to_mudata. Install with: pip install 'epykit[anndata]'"
         ) from exc
 
     adata = to_anndata(md, layer=layer)

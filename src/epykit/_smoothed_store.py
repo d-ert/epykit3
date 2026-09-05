@@ -94,13 +94,12 @@ def build_smoothed_pseudo_count_store(
                 # chrom (with the raw signal, not smoothed).
                 logger.debug(
                     "[smoothed-store] %s/%s missing in smooth sidecar; using raw",
-                    sample, chrom,
+                    sample,
+                    chrom,
                 )
                 out_chunk = raw_df
             else:
-                smooth_df = pl.read_parquet(
-                    str(smooth_part), columns=["pos", "beta_smooth"]
-                )
+                smooth_df = pl.read_parquet(str(smooth_part), columns=["pos", "beta_smooth"])
                 # Left-join: every raw site keeps its strand / context /
                 # coverage; beta_smooth comes from the sidecar.
                 joined = raw_df.join(smooth_df, on="pos", how="left")
@@ -124,10 +123,16 @@ def build_smoothed_pseudo_count_store(
                 pseudo_n_meth = np.clip(pseudo_n_meth, 0, cov)
                 pseudo_n_unmeth = cov - pseudo_n_meth
 
-                out_chunk = joined.with_columns([
-                    pl.Series("N_meth", pseudo_n_meth.astype(np.int32)),
-                    pl.Series("N_unmeth", pseudo_n_unmeth.astype(np.int32)),
-                ]).drop("beta_smooth").select(raw_df.columns)
+                out_chunk = (
+                    joined.with_columns(
+                        [
+                            pl.Series("N_meth", pseudo_n_meth.astype(np.int32)),
+                            pl.Series("N_unmeth", pseudo_n_unmeth.astype(np.int32)),
+                        ]
+                    )
+                    .drop("beta_smooth")
+                    .select(raw_df.columns)
+                )
 
             out_part = out_dir / f"sample={sample}" / f"chrom={chrom}"
             out_part.mkdir(parents=True, exist_ok=True)

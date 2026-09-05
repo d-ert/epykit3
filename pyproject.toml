@@ -172,13 +172,14 @@ extend-exclude = [
 # Start minimal: pyflakes (undefined names, unused imports) only. Once the
 # baseline is green in CI, ratchet up to ["F", "E", "W", "I", "B", "UP", "RUF"]
 # and add a one-shot autofix commit.
-select = ["F"]
-ignore = []
+select = ["F", "I", "W", "UP", "E", "B"]
+ignore = ["E501"]  # the formatter owns line length
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["F401", "F811"]
 "src/epykit/__init__.py" = ["F401"]  # re-exports
-"src/epykit/pl/__init__.py" = ["F401"]  # re-exports
+# re-exports; E402 because _apply_theme() must run before the plot modules import
+"src/epykit/pl/__init__.py" = ["F401", "E402"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["epykit"]

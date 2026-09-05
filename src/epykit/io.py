@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 def _epykit_version() -> str:
     try:
         from . import __version__
+
         return __version__
     except ImportError:
         return "0.0.0+unknown"
@@ -76,8 +77,7 @@ def _build_obs_from_samplesheet(
 
     if not obs_rows:
         raise ValueError(
-            "No samples matched the requested groups from samplesheet. "
-            f"groups={sorted(allowed)}"
+            f"No samples matched the requested groups from samplesheet. groups={sorted(allowed)}"
         )
     return obs_rows, files
 
@@ -98,7 +98,10 @@ def _read_methylation_samplesheet(
 ) -> MethylData:
     """Backend shared by ``read_bismark`` and ``read_methyldackel``."""
     obs_rows, files = _build_obs_from_samplesheet(
-        samplesheet, treatment_group, control_group, groups,
+        samplesheet,
+        treatment_group,
+        control_group,
+        groups,
     )
 
     analysis_root = Path(store_dir)
@@ -126,9 +129,7 @@ def _read_methylation_samplesheet(
     }
     if n_sites_raw is not None:
         uns["n_sites_raw"] = n_sites_raw
-    uns["_store_history"] = [
-        {"step": "raw", "path": cache_store_dir, "n_sites": n_sites_raw}
-    ]
+    uns["_store_history"] = [{"step": "raw", "path": cache_store_dir, "n_sites": n_sites_raw}]
 
     md = MethylData(
         obs=pl.DataFrame(obs_rows),
@@ -326,13 +327,9 @@ def read_nfcore_methylseq(
     samplesheet_path = run / samplesheet_name
 
     if not cov_dir.exists():
-        raise FileNotFoundError(
-            f"Expected nf-core/methylseq bismark directory at: {cov_dir}"
-        )
+        raise FileNotFoundError(f"Expected nf-core/methylseq bismark directory at: {cov_dir}")
     if not samplesheet_path.exists():
-        raise FileNotFoundError(
-            f"Expected samplesheet at: {samplesheet_path}"
-        )
+        raise FileNotFoundError(f"Expected samplesheet at: {samplesheet_path}")
 
     cov_files = sorted(cov_dir.glob("*.cov.gz")) + sorted(cov_dir.glob("*.cov"))
     if not cov_files:
@@ -350,9 +347,7 @@ def read_nfcore_methylseq(
         raise ValueError(f"Samplesheet '{samplesheet_path}' is empty")
 
     if "sample_id" not in rows[0].keys() or "group" not in rows[0].keys():
-        raise ValueError(
-            "nf-core samplesheet requires at least 'sample_id' and 'group' columns"
-        )
+        raise ValueError("nf-core samplesheet requires at least 'sample_id' and 'group' columns")
 
     obs_rows: list[dict] = []
     # Organize stores under a .cache subdirectory for a cleaner output layout

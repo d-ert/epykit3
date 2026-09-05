@@ -13,7 +13,6 @@ PALETTE: dict = {
     "open_sea": "#d3d3d3",
     "treatment": "#e05263",
     "control": "#4a90d9",
-
     # Okabe-Ito derived: colour-blind safe across the eight common types
     # of CVD; common choice for genomics figures.
     "promoter": "#0072B2",
@@ -61,9 +60,7 @@ def set_palette(name: str) -> None:
         >>> PALETTE.update(hyper="#440154", hypo="#fde725")
     """
     if name not in _PALETTES:
-        raise ValueError(
-            f"unknown palette {name!r}; choose from {sorted(_PALETTES)}"
-        )
+        raise ValueError(f"unknown palette {name!r}; choose from {sorted(_PALETTES)}")
     PALETTE.clear()
     PALETTE.update(_PALETTES[name])
 

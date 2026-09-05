@@ -31,9 +31,9 @@ from __future__ import annotations
 
 import logging
 import shutil
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterator, Optional
 
 import polars as pl
 
@@ -72,7 +72,7 @@ class DMCStore:
     _manifest: dict = field(default_factory=dict, repr=False, compare=False)
 
     @classmethod
-    def open(cls, path: str | Path) -> "DMCStore":
+    def open(cls, path: str | Path) -> DMCStore:
         """Re-open an existing store directory by reading its manifest."""
         p = Path(path)
         manifest_path = p / _MANIFEST_NAME
@@ -114,7 +114,7 @@ class DMCStore:
     def read_chrom(
         self,
         chrom: str,
-        columns: Optional[list[str]] = None,
+        columns: list[str] | None = None,
     ) -> pl.DataFrame:
         """Read one chromosome's parquet eagerly."""
         return pl.read_parquet(str(self._chrom_path(chrom)), columns=columns)
@@ -125,7 +125,7 @@ class DMCStore:
 
     def iter_chroms(
         self,
-        columns: Optional[list[str]] = None,
+        columns: list[str] | None = None,
     ) -> Iterator[tuple[str, pl.DataFrame]]:
         """Yield ``(chrom, per-chrom DataFrame)`` in manifest order."""
         for entry in self._manifest.get("chroms", []):
@@ -134,7 +134,7 @@ class DMCStore:
 
     def to_dataframe(
         self,
-        columns: Optional[list[str]] = None,
+        columns: list[str] | None = None,
         *,
         preserve_enum_dtypes: bool = False,
     ) -> pl.DataFrame:
@@ -212,13 +212,11 @@ class DMCStore:
             shutil.rmtree(self.path, ignore_errors=True)
 
 
-def has_qvalue(store_or_df: "DMCStore | pl.DataFrame") -> bool:
+def has_qvalue(store_or_df: DMCStore | pl.DataFrame) -> bool:
     """Return True if ``store_or_df`` carries a ``qvalue`` column."""
     if isinstance(store_or_df, DMCStore):
         for entry in store_or_df.manifest.get("chroms", []):
-            schema = pl.read_parquet_schema(
-                str(store_or_df.path / _chrom_filename(entry["name"]))
-            )
+            schema = pl.read_parquet_schema(str(store_or_df.path / _chrom_filename(entry["name"])))
             return "qvalue" in schema
         return False
     return "qvalue" in store_or_df.columns

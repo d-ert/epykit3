@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
 import logging
 import os
 import shutil
-from pathlib import Path
-from typing import Literal, Optional
 import warnings
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Literal
 
 import polars as pl
 
@@ -33,12 +33,12 @@ class MethylData:
     varm: dict[str, pl.DataFrame] = field(default_factory=dict)
     uns: dict = field(default_factory=dict)
 
-    analysis_root: Optional[str] = field(default=None, repr=False)
+    analysis_root: str | None = field(default=None, repr=False)
 
     # --- Deprecated alias -------------------------------------------
 
     @property
-    def _analysis_root(self) -> Optional[str]:
+    def _analysis_root(self) -> str | None:
         """Deprecated; use ``analysis_root`` (the public name).
 
         Removed in 2.0.
@@ -46,16 +46,18 @@ class MethylData:
         warnings.warn(
             "MethylData._analysis_root is deprecated; use the public name "
             "MethylData.analysis_root. _analysis_root will be removed in 2.0.",
-            DeprecationWarning, stacklevel=2,
+            DeprecationWarning,
+            stacklevel=2,
         )
         return self.analysis_root
 
     @_analysis_root.setter
-    def _analysis_root(self, value: Optional[str]) -> None:
+    def _analysis_root(self, value: str | None) -> None:
         warnings.warn(
             "MethylData._analysis_root is deprecated; use the public name "
             "MethylData.analysis_root. _analysis_root will be removed in 2.0.",
-            DeprecationWarning, stacklevel=2,
+            DeprecationWarning,
+            stacklevel=2,
         )
         self.analysis_root = value
 
@@ -97,23 +99,13 @@ class MethylData:
     def treatment_ids(self) -> list[str]:
         if "treatment" not in self.obs.columns:
             return []
-        return (
-            self.obs
-            .filter(pl.col("treatment") == 1)
-            .get_column("sample_id")
-            .to_list()
-        )
+        return self.obs.filter(pl.col("treatment") == 1).get_column("sample_id").to_list()
 
     @property
     def control_ids(self) -> list[str]:
         if "treatment" not in self.obs.columns:
             return []
-        return (
-            self.obs
-            .filter(pl.col("treatment") == 0)
-            .get_column("sample_id")
-            .to_list()
-        )
+        return self.obs.filter(pl.col("treatment") == 0).get_column("sample_id").to_list()
 
     @property
     def n_samples(self) -> int:
@@ -133,6 +125,7 @@ class MethylData:
         the ``store_dir`` argument).
         """
         from ._cache import manifest_read
+
         root = self.analysis_root or self.store
         if not root:
             return []
@@ -154,8 +147,10 @@ class MethylData:
         write side is each ``pp.*`` / ``tl.*`` function appending to the
         manifest when invoked with ``resumable=True``.
         """
-        from ._cache import manifest_find
         from pathlib import Path
+
+        from ._cache import manifest_find
+
         root = self.analysis_root or self.store
         if not root:
             return False
@@ -169,11 +164,19 @@ class MethylData:
         if not op.is_absolute():
             op = Path(root) / op
         # varm/<key>.parquet -> re-load into varm
-        if op.exists() and op.suffix == ".parquet" and stage.startswith(("dmc_", "dvc", "asm", "entropy")):
+        if (
+            op.exists()
+            and op.suffix == ".parquet"
+            and stage.startswith(("dmc_", "dvc", "asm", "entropy"))
+        ):
             self.varm[stage] = pl.read_parquet(str(op))
             return True
         # uns/<key>.parquet -> re-load into uns
-        if op.exists() and op.suffix == ".parquet" and stage.startswith(("dmr_", "dvr", "pmd", "hmr", "lmr", "smooth")):
+        if (
+            op.exists()
+            and op.suffix == ".parquet"
+            and stage.startswith(("dmr_", "dvr", "pmd", "hmr", "lmr", "smooth"))
+        ):
             self.uns[stage] = pl.read_parquet(str(op))
             return True
         # Stage references a directory (filtered/normalized stores etc.) --
@@ -185,9 +188,9 @@ class MethylData:
 
     def get_dmc(
         self,
-        test: Optional[str] = None,
+        test: str | None = None,
         annotated: bool = True,
-    ) -> Optional[pl.DataFrame]:
+    ) -> pl.DataFrame | None:
         """Look up a DMC table by test name (explicit, recommended).
 
         Parameters
@@ -231,16 +234,19 @@ class MethylData:
             store_dir = Path(dmc_meta["store_path"])
             if (store_dir / ".epykit_dmc_manifest.json").exists():
                 from ._dmc_store import DMCStore
+
                 logger.info(
                     "get_dmc: materializing %s from the streaming DMCStore at "
                     "%s (materialize=False was used; this assembles the full "
-                    "table in memory).", key, store_dir,
+                    "table in memory).",
+                    key,
+                    store_dir,
                 )
                 return DMCStore.open(store_dir).to_dataframe()
         return None
 
     @property
-    def dmc(self) -> Optional[pl.DataFrame]:
+    def dmc(self) -> pl.DataFrame | None:
         """Most-recently-written DMC table (annotated if available).
 
         Equivalent to ``self.get_dmc(test=None, annotated=True)``. Use
@@ -286,10 +292,11 @@ class MethylData:
         if not (store_dir / ".epykit_dmc_manifest.json").exists():
             return None
         from ._dmc_store import DMCStore
+
         return DMCStore.open(store_dir)
 
     @property
-    def significant_dmcs(self) -> Optional[pl.DataFrame]:
+    def significant_dmcs(self) -> pl.DataFrame | None:
         df = self.dmc
         if df is None:
             return None
@@ -334,9 +341,9 @@ class MethylData:
         # Encoding a 22M-row Polars DataFrame to a single parquet allocates
         # a second-copy buffer the same size as the table (~3 GB) -- that's
         # what makes naive `df.write_parquet(...)` OOM the host.
-        dmc_meta       = self.uns.get("dmc", {}) if isinstance(self.uns.get("dmc"), dict) else {}
+        dmc_meta = self.uns.get("dmc", {}) if isinstance(self.uns.get("dmc"), dict) else {}
         dmc_store_path = dmc_meta.get("store_path")
-        dmc_last_key   = dmc_meta.get("last_key")
+        dmc_last_key = dmc_meta.get("last_key")
 
         varm_format: dict[str, str] = {}
         for name, df in self.varm.items():
@@ -381,7 +388,8 @@ class MethylData:
                 varm_format[name] = "dmcstore"
                 logger.info(
                     "save: %s linked from DMCStore at %s (no materialization)",
-                    name, store_dir,
+                    name,
+                    store_dir,
                 )
                 continue
 
@@ -420,7 +428,7 @@ class MethylData:
         (out / "methyldata.json").write_text(json.dumps(meta, indent=2, default=str))
 
     @classmethod
-    def load(cls, path: str) -> "MethylData":
+    def load(cls, path: str) -> MethylData:
         out = Path(path)
         meta = json.loads((out / "methyldata.json").read_text())
         obs = pl.read_parquet(str(out / "obs.parquet"))
@@ -436,10 +444,7 @@ class MethylData:
                 # back-compat with all the code that expects md.varm[key]
                 # to be a pl.DataFrame.
                 varm_dir = out / f"varm_{key}"
-                varm[key] = (
-                    pl.scan_parquet(str(varm_dir / "chrom=*.parquet"))
-                    .collect()
-                )
+                varm[key] = pl.scan_parquet(str(varm_dir / "chrom=*.parquet")).collect()
             else:
                 varm[key] = pl.read_parquet(str(out / f"varm_{key}.parquet"))
 
@@ -471,33 +476,47 @@ class MethylData:
         docstring for ``title``, ``gtf_path``, ``alpha`` etc.
         """
         from .report import generate_report
+
         return generate_report(self, output, **kwargs)
 
     def to_bedgraph(
-        self, sample: str, output: str,
-        *, value: Literal["beta", "coverage", "N_meth"] = "beta",
+        self,
+        sample: str,
+        output: str,
+        *,
+        value: Literal["beta", "coverage", "N_meth"] = "beta",
     ) -> str:
         from .export import to_bedgraph
+
         return to_bedgraph(self, sample, output, value=value)
 
     def to_bigwig(
-        self, sample: str, output: str,
-        *, value: Literal["beta", "coverage", "N_meth"] = "beta",
-        chrom_sizes: Optional[dict] = None,
+        self,
+        sample: str,
+        output: str,
+        *,
+        value: Literal["beta", "coverage", "N_meth"] = "beta",
+        chrom_sizes: dict | None = None,
     ) -> str:
         from .export import to_bigwig
+
         return to_bigwig(self, sample, output, value=value, chrom_sizes=chrom_sizes)
 
     def dmcs_to_bed(
-        self, output: str, *, alpha: float = 0.05,
-        min_abs_diff: float = 0.0, test: Optional[str] = None,
+        self,
+        output: str,
+        *,
+        alpha: float = 0.05,
+        min_abs_diff: float = 0.0,
+        test: str | None = None,
     ) -> str:
         from .export import dmcs_to_bed
-        return dmcs_to_bed(self, output, alpha=alpha,
-                           min_abs_diff=min_abs_diff, test=test)
+
+        return dmcs_to_bed(self, output, alpha=alpha, min_abs_diff=min_abs_diff, test=test)
 
     def dmrs_to_bed(self, output: str) -> str:
         from .export import dmrs_to_bed
+
         return dmrs_to_bed(self, output)
 
     def export_tables(
@@ -526,24 +545,35 @@ class MethylData:
         >>> md.export_tables("results/tables", full=True)  # + full DMC/DVC
         """
         from .export import export_tables
+
         return export_tables(
-            self, out_dir, alpha=alpha, full=full, fmt=fmt,
-            dmc=dmc, dmr=dmr, dvc=dvc, qc=qc,
+            self,
+            out_dir,
+            alpha=alpha,
+            full=full,
+            fmt=fmt,
+            dmc=dmc,
+            dmr=dmr,
+            dvc=dvc,
+            qc=qc,
         )
 
     def to_anndata(self, **kwargs):
         """Return an AnnData of this MethylData (requires `pp.unite` first)."""
         from .anndata_io import to_anndata
+
         return to_anndata(self, **kwargs)
 
     def to_mudata(self, **kwargs):
         """Return a MuData with methylation as the ``'meth'`` modality."""
         from .anndata_io import to_mudata
+
         return to_mudata(self, **kwargs)
 
     def to_methylkit_tabix(self, output_dir: str, samples=None):
         """Export per-sample methylKit tabix-friendly tables."""
         from .methylkit_io import to_methylkit_tabix
+
         return to_methylkit_tabix(self, output_dir, samples=samples)
 
     def region_beta(
@@ -562,29 +592,38 @@ class MethylData:
         for s in samples:
             part = store_root / f"sample={s}" / f"chrom={chrom}" / "part-0.parquet"
             if not part.exists():
-                rows.append({
-                    "sample": s, "mean_beta": float("nan"),
-                    "n_cpgs": 0, "mean_coverage": float("nan"),
-                })
+                rows.append(
+                    {
+                        "sample": s,
+                        "mean_beta": float("nan"),
+                        "n_cpgs": 0,
+                        "mean_coverage": float("nan"),
+                    }
+                )
                 continue
-            df = (
-                pl.read_parquet(str(part), columns=["pos", "N_meth", "coverage"])
-                .filter((pl.col("pos") >= start) & (pl.col("pos") <= end))
+            df = pl.read_parquet(str(part), columns=["pos", "N_meth", "coverage"]).filter(
+                (pl.col("pos") >= start) & (pl.col("pos") <= end)
             )
             if len(df) == 0:
-                rows.append({
-                    "sample": s, "mean_beta": float("nan"),
-                    "n_cpgs": 0, "mean_coverage": float("nan"),
-                })
+                rows.append(
+                    {
+                        "sample": s,
+                        "mean_beta": float("nan"),
+                        "n_cpgs": 0,
+                        "mean_coverage": float("nan"),
+                    }
+                )
                 continue
             cov_sum = int(df.get_column("coverage").sum())
             meth_sum = int(df.get_column("N_meth").sum())
-            rows.append({
-                "sample": s,
-                "mean_beta": float(meth_sum / max(cov_sum, 1)),
-                "n_cpgs": int(len(df)),
-                "mean_coverage": float(cov_sum / max(len(df), 1)),
-            })
+            rows.append(
+                {
+                    "sample": s,
+                    "mean_beta": float(meth_sum / max(cov_sum, 1)),
+                    "n_cpgs": int(len(df)),
+                    "mean_coverage": float(cov_sum / max(len(df), 1)),
+                }
+            )
         return pl.DataFrame(rows)
 
     def __repr__(self) -> str:
@@ -593,8 +632,7 @@ class MethylData:
         if "group" in self.obs.columns:
             grouped = self.obs.group_by("group").len().sort("group")
             groups = "  ".join(
-                f"{r['group']} (n={r['len']})"
-                for r in grouped.iter_rows(named=True)
+                f"{r['group']} (n={r['len']})" for r in grouped.iter_rows(named=True)
             )
 
         status_str = ", ".join(self.state) if self.state else "raw"
@@ -648,8 +686,8 @@ class MethylData:
         <b>MethylData</b> [{status}] | assembly: {self.assembly} | context: {self.context}<br>
         <table border="1" style="border-collapse:collapse;margin:8px 0">
           <tr>{header_html}</tr>
-          {''.join(rows_html)}
+          {"".join(rows_html)}
         </table>
-        Results: {', '.join(self.varm.keys()) or 'none yet'}
+        Results: {", ".join(self.varm.keys()) or "none yet"}
         </div>
         """
