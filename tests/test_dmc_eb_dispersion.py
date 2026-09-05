@@ -1,13 +1,21 @@
-"""P0-4: adaptive F reference in eb mode must floor df_phi so that
-F(1, df_phi) does not collapse to F(1, ~4) when the EB weight is small.
-We verify the floor two ways:
+"""The ``dispersion="eb"`` default and its adaptive-F reference.
+
+The adaptive F reference in eb mode must floor df_phi so that F(1, df_phi)
+does not collapse to F(1, ~4) when the EB weight is small. We verify the
+floor two ways:
 1. A direct math test that constructs chi2_stat/phi_eff/df_phi arrays
    and verifies F(1, floor(df_phi)) differs from F(1, 4) as expected
    (no epykit import needed beyond confirming the constant is present).
 2. An end-to-end integration test confirming that lr/eb does not produce
    p-values collapsed near 1.0 under realistic dispersion.
+
+The code default and the ``tl.dmc`` docstring must also agree that ``eb``
+is the default.
 """
 from __future__ import annotations
+
+import inspect
+import re
 
 import numpy as np
 import scipy.stats as sp_stats
@@ -29,7 +37,7 @@ def small_md_under_dispersed(tmp_path):
         n_scattered_dmcs=120,
         seed=13,
     )
-    out_dir = tmp_path / "p0_4"
+    out_dir = tmp_path / "eb_floor"
     out_dir.mkdir()
     result = generate(cfg, out_dir)
     md = ep.read_bismark(
@@ -52,7 +60,7 @@ def test_score_finalize_floor_applies_at_small_w_eb():
     - F(1, max(df_phi, 50)) at chi2_stat=6 is < 0.025 (close to chi^2)
     """
     chi2_stat = np.array([6.0])
-    phi_eff = np.array([1.5])  # > 1, so F branch fires
+    # phi_eff > 1 in this regime, so the F branch (not chi^2) is the one that fires.
     df_phi = np.array([4.0])   # the eb-with-tiny-w_eb regime
 
     # Without floor: F(1, 4) at stat=6
@@ -101,4 +109,28 @@ def test_eb_default_does_not_crush_pvalues_at_modest_statistics(small_md_under_d
         f"frac(p<0.05) = {frac_sig:.4f} -- looks like F(1, small df) "
         f"collapsed the p-value distribution. After the floor, this "
         f"should be well above 1% on a fixture with seeded DMCs."
+    )
+
+
+# --- Default and docstring agree -------------------------------------------
+
+
+def test_dispersion_default_is_eb():
+    sig = inspect.signature(ep.tl.dmc)
+    assert sig.parameters["dispersion"].default == "eb", (
+        "Code default for `dispersion` changed. If intentional, "
+        "update the benchmark protocol and executive summary as well."
+    )
+
+
+def test_dispersion_docstring_mentions_eb_as_default():
+    doc = ep.tl.dmc.__doc__ or ""
+    assert "eb" in doc, "Docstring no longer mentions the 'eb' option."
+    assert re.search(r'default\s+``"eb"``', doc, re.IGNORECASE), (
+        "Docstring must state 'eb' is the default (looking for "
+        "'default ``\"eb\"``' case-insensitively)."
+    )
+    # The old wrong claim must be gone.
+    assert not re.search(r'default\s+``"site"``', doc, re.IGNORECASE), (
+        "Docstring still says default is 'site'; should be 'eb'."
     )
