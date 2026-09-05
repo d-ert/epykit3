@@ -24,10 +24,9 @@ import pytest
 from scipy import stats
 
 from epykit.dmc import (
-    DF_PHI_FLOOR,
     _DF_PHI_FLOOR_F_VS_CHI2_TOL_AT_P05,
+    DF_PHI_FLOOR,
 )
-
 
 # Critical statistic where chi^2(1) returns p = 0.05.
 _CHI2_CRIT = stats.chi2.ppf(0.95, df=1)

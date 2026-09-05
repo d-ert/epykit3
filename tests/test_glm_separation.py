@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from epykit._glm import irls_binomial_batch, compute_dispersion_phi
+from epykit._glm import compute_dispersion_phi, irls_binomial_batch
 
 
 def _make_design_treatment_donor() -> np.ndarray:
@@ -69,7 +69,7 @@ def test_separated_site_is_nan():
     # control (samples 0-2): 0/20 methylated; treated (3-5): 20/20.
     meth = np.array([[0, 0, 0, 20, 20, 20]], dtype=np.int32)
     cov = np.full((1, 6), 20, dtype=np.int32)
-    beta, se, deviance, pearson, n_eff = irls_binomial_batch(meth, cov, X)
+    beta, se, deviance, pearson, _n_eff = irls_binomial_batch(meth, cov, X)
     assert np.isnan(deviance[0]), "separated site must NaN deviance"
     assert np.isnan(pearson[0]), "separated site must NaN Pearson"
     assert np.all(np.isnan(beta[0])), "separated site must NaN beta"

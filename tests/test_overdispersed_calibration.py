@@ -19,7 +19,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from epykit.dmc import _score_finalize, _beta_binom_mom_from_welford
+from epykit.dmc import _beta_binom_mom_from_welford, _score_finalize
 
 
 def _betabinom_group(p, n_rep, cov, kappa, rng):

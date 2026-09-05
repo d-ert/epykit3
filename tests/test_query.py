@@ -109,7 +109,7 @@ def test_query_regions_matches_loop(synth_md_filtered):
     batched = query_regions(md.store, regions).sort(["region_id", "sample_id", "pos"])
     looped_parts = []
     for region_id, (chrom, start, end) in enumerate(zip(
-        regions["chrom"], regions["start"], regions["end"]
+        regions["chrom"], regions["start"], regions["end"], strict=True
     )):
         df = query_region(md.store, chrom, int(start), int(end))
         if df.height:

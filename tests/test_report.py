@@ -7,7 +7,6 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-
 pytest.importorskip("jinja2")
 pytest.importorskip("plotly")
 
@@ -34,8 +33,9 @@ def test_report_partial_pipeline(synth_md_filtered, tmp_path):
 
 def test_report_full_pipeline(synth_md_filtered, tmp_path):
     """Full pipeline (dmc + dmr + injected annotation) yields all sections."""
-    import epykit as ep
     import numpy as np
+
+    import epykit as ep
 
     md = synth_md_filtered
     ep.tl.dmc(md, test="lr")

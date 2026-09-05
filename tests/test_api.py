@@ -22,8 +22,6 @@ import pytest
 
 from epykit import MethylData
 
-
-
 # read_bismark + obs schema
 
 
@@ -363,7 +361,7 @@ def test_assign_cpgs_to_regions_handles_nested_and_overlapping():
     }).sort("start")
 
     assigned = _assign_cpgs_to_regions(cpgs, regions)
-    pairs = set(zip(assigned["pos"].to_list(), assigned["region_id"].to_list()))
+    pairs = set(zip(assigned["pos"].to_list(), assigned["region_id"].to_list(), strict=True))
 
     assert (12, "outer") in pairs and (12, "inner") in pairs   # nested: both
     assert (20, "outer") in pairs                              # outer, past inner end
@@ -500,6 +498,7 @@ def test_methyldata_analysis_root_kwarg_constructor():
     """analysis_root is accepted as a constructor keyword argument
     (the motivation for promoting it from underscore-prefixed to public)."""
     import polars as pl
+
     from epykit import MethylData
 
     md = MethylData(
@@ -559,11 +558,11 @@ def test_demoted_dmc_names_importable_via_submodule_without_warning():
     """Documented post-1.0 import path emits no warning."""
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        from epykit.dmc import (  # noqa: F401
-            process_chromosomes_dmc,
+        from epykit.dmc import (
             apply_multiple_testing_correction,
             empirical_fdr_for_dmc,
             fisher_exact_vectorized,
+            process_chromosomes_dmc,
             shrink_meth_diff,
         )
     deprecation_warnings = [
@@ -609,8 +608,9 @@ def test_aggregate_regions_then_dmc(synth_md_filtered, tmp_path):
 def test_pp_set_unite_type_records_state():
     """set_unite_type writes md.uns['unite']['type'] without materializing."""
     import polars as pl
-    from epykit import MethylData
+
     import epykit as ep
+    from epykit import MethylData
 
     md = MethylData(
         obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
@@ -623,8 +623,9 @@ def test_pp_set_unite_type_records_state():
 def test_pp_set_unite_type_rejects_unknown_type():
     """type must be 'intersect' or 'union'."""
     import polars as pl
-    from epykit import MethylData
+
     import epykit as ep
+    from epykit import MethylData
 
     md = MethylData(
         obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),
@@ -637,8 +638,9 @@ def test_pp_set_unite_type_rejects_unknown_type():
 def test_pp_unite_is_deprecated_alias():
     """pp.unite still works but emits DeprecationWarning."""
     import polars as pl
-    from epykit import MethylData
+
     import epykit as ep
+    from epykit import MethylData
 
     md = MethylData(
         obs=pl.DataFrame({"sample_id": ["s1"], "group": ["treated"]}),

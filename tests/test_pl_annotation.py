@@ -16,7 +16,6 @@ import numpy as np
 import polars as pl
 import pytest
 
-
 matplotlib.use("Agg", force=True)
 
 pytestmark = pytest.mark.slow
@@ -160,7 +159,8 @@ def test_compute_annotation_counts_list_col_dedupes(annotated_md):
 
 def test_compute_coannotation_matrix_diagonal_matches_counts(annotated_md):
     from epykit.pl._compute import (
-        compute_annotation_counts, compute_coannotation_matrix,
+        compute_annotation_counts,
+        compute_coannotation_matrix,
     )
     counts = compute_annotation_counts(
         annotated_md.uns["dmr"], annot_col="all_overlapping_features",
@@ -263,7 +263,7 @@ def test_plot_categorical(annotated_md, tmp_path):
 
 def test_figure_grid_panel_letters(annotated_md, tmp_path):
     import epykit as ep
-    fig, axd = ep.pl.figure_grid(
+    _fig, axd = ep.pl.figure_grid(
         panels={
             "A": (ep.pl.plot_annotation_counts, dict(md=annotated_md)),
             "B": (ep.pl.plot_categorical, dict(md=annotated_md)),
@@ -284,7 +284,8 @@ def test_figure_grid_panel_letters(annotated_md, tmp_path):
 
 def test_apply_theme_publication_sets_truetype():
     import matplotlib as mpl
-    from epykit._style import apply_theme, set_palette, PALETTE
+
+    from epykit._style import PALETTE, apply_theme, set_palette
 
     apply_theme("publication")
     assert mpl.rcParams["pdf.fonttype"] == 42

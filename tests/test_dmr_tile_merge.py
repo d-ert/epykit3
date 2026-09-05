@@ -4,8 +4,8 @@ import math
 import numpy as np
 import polars as pl
 import scipy.stats as sp_stats
-from epykit.dmr import _merge_adjacent_tiles
 
+from epykit.dmr import _merge_adjacent_tiles
 
 _SCHEMA = {
     "chrom": pl.Utf8,

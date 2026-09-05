@@ -23,7 +23,7 @@ def md_with_dmc(synth_md_filtered):
 
 @pytest.mark.parametrize("method", ["chain_merge", "sliding_window", "segment"])
 def test_non_tile_empirical_fdr_raises_notimplemented(md_with_dmc, method):
-    with pytest.raises(NotImplementedError, match="empirical_fdr.*tile"):
+    with pytest.raises(NotImplementedError, match=r"empirical_fdr.*tile"):
         ep.tl.dmr(md_with_dmc, method=method, empirical_fdr=True, n_perm=10)
 
 
@@ -40,6 +40,7 @@ def test_cli_dmr_non_tile_empirical_fdr_raises_notimplemented(method):
     against any --method and silently dropped it on non-tile callers; users
     were left thresholding combined_qvalue as if it were FDR-controlled."""
     import argparse
+
     from epykit.cli import _cmd_dmr
     args = argparse.Namespace(method=method, empirical_fdr=True)
     with pytest.raises(NotImplementedError, match=r"empirical[-_]fdr.*tile"):
@@ -54,10 +55,10 @@ def test_tile_empirical_fdr_propagates_merge_adjacent_and_backend(
     are computed under different region definitions, producing a distorted
     empirical_pvalue. Mirrors Task 1.3's M3 fix for DMC."""
     import polars as pl
+
     import epykit.dmr as ep_dmr
 
     captured: list[dict] = []
-    original = ep_dmr.call_dmr_tile_based
 
     def _fake_call_dmr_tile_based(*args, **kwargs):
         captured.append(dict(kwargs))

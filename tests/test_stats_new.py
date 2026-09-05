@@ -8,8 +8,7 @@ import pytest
 
 import epykit as ep
 from epykit.dmc import shrink_meth_diff
-from epykit.impute import impute_knn_beta, impute_knn_anndata
-
+from epykit.impute import impute_knn_anndata, impute_knn_beta
 
 # Empirical-Bayes shrinkage of meth_diff
 

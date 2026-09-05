@@ -21,8 +21,8 @@ import pytest
 # CI machine will print a skip line and move on.
 cp = pytest.importorskip("cupy", reason="CuPy required for GPU IRLS parity tests")
 
-from epykit import _glm
-from epykit._glm_gpu import irls_binomial_batch_gpu
+from epykit import _glm  # noqa: E402 -- must follow importorskip
+from epykit._glm_gpu import irls_binomial_batch_gpu  # noqa: E402 -- must follow importorskip
 
 
 def _make_glm_inputs(n_sites=512, n_samples=8, p=3, seed=42):
@@ -84,7 +84,7 @@ def test_irls_dispatch_routes_to_gpu():
     meth, cov, X = _make_glm_inputs(n_sites=64)
     out_gpu_direct = irls_binomial_batch_gpu(meth, cov, X)
     out_dispatch = _glm.irls_dispatch(meth, cov, X, backend="gpu")
-    for a, b in zip(out_gpu_direct, out_dispatch):
+    for a, b in zip(out_gpu_direct, out_dispatch, strict=False):
         np.testing.assert_array_equal(a, b)
 
 

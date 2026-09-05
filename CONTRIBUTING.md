@@ -24,7 +24,7 @@ Every pull request must pass all of these locally before review:
 |---|---|---|
 | Fast tier | `uv run --frozen pytest -m "not slow" --strict-markers -ra` | The CI matrix. About two minutes. |
 | Slow tier | `uv run --frozen pytest -m slow --strict-markers -ra` | Null calibration and accuracy tests against a synthetic truth table. About one minute. |
-| Lint and types | `uv run --frozen ruff check src/` and `uv run --frozen mypy src/epykit` | Baseline is pyflakes plus mypy; see `pyproject.toml` for the ratchet plan. |
+| Lint and types | `uv run --frozen ruff check src/ tests/` and `uv run --frozen mypy src/epykit` | Baseline is pyflakes plus mypy; see `pyproject.toml` for the ratchet plan. |
 | Engine hashes | `uv run --frozen python benchmark/scripts/regen_small.py` | Hashes `lr` and `lr+` output on a fixed simulator slice and diffs against the committed reference. Any change to a p-value, q-value or `meth_diff` at eight decimals fails it. |
 
 If a change is *meant* to move engine output, re-snapshot with

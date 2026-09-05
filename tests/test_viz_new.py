@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 import pytest
-
-import matplotlib
-import matplotlib.pyplot as plt
 
 import epykit as ep
 
@@ -23,7 +22,7 @@ def test_karyogram_basic(synth_md_filtered):
     """karyogram() runs on a small DMC table and produces a figure with
     one row per chromosome."""
     ep.tl.dmc(synth_md_filtered, test="lr")
-    fig, ax = ep.pl.karyogram(
+    _fig, ax = ep.pl.karyogram(
         synth_md_filtered, value="meth_diff", bin_size_bp=50_000,
     )
     n_chroms = (
@@ -36,7 +35,7 @@ def test_karyogram_basic(synth_md_filtered):
 def test_karyogram_log10_qvalue_autocomputes(synth_md_filtered):
     """Asking for -log10_qvalue when it's absent derives it from qvalue."""
     ep.tl.dmc(synth_md_filtered, test="lr")
-    fig, ax = ep.pl.karyogram(
+    _fig, ax = ep.pl.karyogram(
         synth_md_filtered, value="-log10_qvalue", bin_size_bp=100_000,
         cmap="viridis",
     )
@@ -46,7 +45,7 @@ def test_karyogram_log10_qvalue_autocomputes(synth_md_filtered):
 
 def test_karyogram_only_significant(synth_md_filtered):
     ep.tl.dmc(synth_md_filtered, test="lr")
-    fig, ax = ep.pl.karyogram(
+    _fig, ax = ep.pl.karyogram(
         synth_md_filtered, only_significant=True, alpha=0.05,
         bin_size_bp=100_000,
     )
@@ -76,7 +75,7 @@ def test_dmr_overlap_venn_2_sets():
         ("chr1", 300, 400),   # shared with a
         ("chr1", 700, 800),   # unique to b
     ])
-    fig, ax = ep.pl.dmr_overlap({"A": a, "B": b})
+    _fig, ax = ep.pl.dmr_overlap({"A": a, "B": b})
     # Just confirm a figure was produced and 5 text annotations exist
     # (set labels + 3 counts).
     texts = ax.texts
@@ -87,7 +86,7 @@ def test_dmr_overlap_upset_3_sets():
     a = _toy_dmr_table([("chr1", i*100, i*100+50) for i in range(10)])
     b = _toy_dmr_table([("chr1", i*100, i*100+50) for i in range(5, 12)])
     c = _toy_dmr_table([("chr1", i*100, i*100+50) for i in range(3, 8)])
-    fig, axes = ep.pl.dmr_overlap({"early": a, "mid": b, "late": c})
+    _fig, axes = ep.pl.dmr_overlap({"early": a, "mid": b, "late": c})
     # Returned axes for UpSet is a 3-tuple (bar, matrix, totals).
     assert isinstance(axes, tuple) and len(axes) == 3
     ax_bar = axes[0]
@@ -128,7 +127,7 @@ def _write_tiny_gtf(path: Path) -> None:
 def test_gene_body_metaplot_runs(synth_md_filtered, tmp_path):
     gtf = tmp_path / "tiny.gtf"
     _write_tiny_gtf(gtf)
-    fig, ax = ep.pl.gene_body_metaplot(
+    _fig, ax = ep.pl.gene_body_metaplot(
         synth_md_filtered, str(gtf),
         flank_bp=2000, n_bins_flank=10, n_bins_body=20,
         min_gene_bp=500, group_by="group",
@@ -145,13 +144,13 @@ def test_gene_body_metaplot_runs(synth_md_filtered, tmp_path):
 def test_pl_umap_returns_axes_or_skips(synth_md_filtered):
     pytest.importorskip("umap")
     md = synth_md_filtered
-    fig, ax = ep.pl.umap(md, n_neighbors=4, min_dist=0.3)
+    _fig, ax = ep.pl.umap(md, n_neighbors=4, min_dist=0.3)
     assert ax is not None
 
 
 def test_pl_sample_correlation_renders(synth_md_filtered):
     md = synth_md_filtered
-    fig, ax = ep.pl.sample_correlation(md, method="spearman", cluster=False)
+    _fig, ax = ep.pl.sample_correlation(md, method="spearman", cluster=False)
     assert ax is not None
     assert "qc_sample_correlation" in md.uns
 
@@ -159,7 +158,7 @@ def test_pl_sample_correlation_renders(synth_md_filtered):
 def test_pl_qc_dashboard_renders(synth_md_filtered):
     md = synth_md_filtered
     ep.tl.qc(md, run_sample_correlation=True)
-    fig, axes = ep.pl.qc_dashboard(md)
+    _fig, axes = ep.pl.qc_dashboard(md)
     assert len(axes) >= 5
 
 
@@ -169,7 +168,7 @@ def test_pl_dmr_boxplot_needs_dmr(synth_md_filtered):
         ep.pl.dmr_boxplot(md, top_n=3)
     ep.tl.dmr(md, method="tile", chromosomes=["chr1"])
     if len(md.uns.get("dmr", pl.DataFrame())) > 0:
-        fig, axes = ep.pl.dmr_boxplot(md, top_n=3)
+        _fig, axes = ep.pl.dmr_boxplot(md, top_n=3)
         assert len(axes) >= 1
 
 

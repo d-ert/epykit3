@@ -261,7 +261,7 @@ def test_schema_matches_sliding_window():
     # is added by the BH-correction post-step; tolerate either Float32 or
     # Float64 for it since dmc's apply_multiple_testing_correction picks
     # the type).
-    for col, dtype in _DMR_EMPTY_SCHEMA.items():
+    for col in _DMR_EMPTY_SCHEMA:
         assert col in out.columns, f"missing column {col}"
 
 
