@@ -104,6 +104,7 @@ Don't change `lr+` knob defaults without re-running the relevant ablations (and 
 - `io.py` / `convert.py` — Bismark / MethylDackel / combined-strand BED / nf-core methylseq ingestion → partitioned Parquet.
 - `pp.py` — preprocessing wrappers; each function appends to `uns["_store_history"]` and repoints `md.store`.
 - `dmc.py` + `_dmc_store.py` — per-CpG engines + streaming store handle.
+- `_dmc_config.py` — `DMCConfig`, the `tl.dmc` knobs as one frozen record: removed-engine and `materialize` validation, `lr+` power-stack resolution, the resume fingerprint params, and the single writer of `md.uns["dmc"]`.
 - `_glm.py` — Wilkinson formula → design matrix, batched IRLS binomial GLM, Wald/F contrasts. `_glm_gpu.py` is a CuPy/JAX backend gated behind extras.
 - `dmr.py` + `_hmm.py` + `dmr_hmm.py` — tile / sliding-window / HMM / chain-merge DMR callers + permutation FDR.
 - `dvc.py` — iEVORA-style differentially variable CpG calling.

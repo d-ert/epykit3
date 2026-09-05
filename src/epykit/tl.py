@@ -15,6 +15,7 @@ from typing import Any, Literal
 
 import polars as pl
 
+from ._dmc_config import DMCConfig
 from .annotate import _GTF_CACHE, annotate_cpg_islands, annotate_features
 from .dmc import (
     apply_multiple_testing_correction,
@@ -597,55 +598,61 @@ def dmc(
         observations.
 
     """
-    if min_samples_treatment is None:
-        min_samples_treatment = 0
-
-    tsv, tsv_full, tsv_alpha, _tsv_is_auto = _resolve_auto_tsv(
-        md,
-        tsv,
-        csv,
-        default_name="dmc.significant.tsv",
+    cfg = DMCConfig(
+        test=test,
+        chromosomes=chromosomes,
+        min_samples_treatment=min_samples_treatment,
+        min_samples_control=min_samples_control,
+        dispersion=dispersion,
+        reference=reference,
+        allow_n1=allow_n1,
+        formula=formula,
+        contrast=contrast,
+        covariates=covariates,
+        treatment_col=treatment_col,
+        empirical_fdr=empirical_fdr,
+        n_perm=n_perm,
+        perm_seed=perm_seed,
+        perm_n_jobs=perm_n_jobs,
+        backend=backend,
+        n_workers=n_workers,
+        glm_backend=glm_backend,
+        resumable=resumable,
+        materialize=materialize,
+        use_smoothed=use_smoothed,
+        smoothing=smoothing,
+        smoothing_span_bp=smoothing_span_bp,
+        fdr_method=fdr_method,
+        neighbour_combine=neighbour_combine,
+        neighbour_bp=neighbour_bp,
+        sep_fallback=sep_fallback,
+        sep_threshold=sep_threshold,
+        power_stack=power_stack,
+        reference_level=reference_level,
+        tsv=tsv,
         tsv_full=tsv_full,
-        csv_full=csv_full,
         tsv_alpha=tsv_alpha,
+        csv=csv,
+        csv_full=csv_full,
         csv_alpha=csv_alpha,
     )
 
-    if test == "logit_t":
-        raise ValueError(
-            "test='logit_t' was removed in 0.7.5 (miscalibrated near β=0/1). "
-            "Use test='welch_t' for the replicate-aware β-mean test or "
-            "test='lr' for the recommended default."
-        )
+    tsv, tsv_full, tsv_alpha, _tsv_is_auto = _resolve_auto_tsv(
+        md,
+        cfg.tsv,
+        cfg.csv,
+        default_name="dmc.significant.tsv",
+        tsv_full=cfg.tsv_full,
+        csv_full=cfg.csv_full,
+        tsv_alpha=cfg.tsv_alpha,
+        csv_alpha=cfg.csv_alpha,
+    )
 
-    if test == "bb_lr":
-        raise ValueError(
-            "test='bb_lr' was removed in 0.7.5 (TPR < 8% at n ≤ 4 + a "
-            "dispersion-df bug). Use test='lr' (recommended) which uses "
-            "the same quasi-binomial dispersion but pools counts per group "
-            "for higher power at small n."
-        )
-
-    if test == "score":
-        raise ValueError(
-            "test='score' was removed in 0.7.5 (strictly dominated by "
-            "test='lr' in finite samples; asymptotically equivalent under "
-            "H0). Switch test='score' -> test='lr'; output schema is "
-            "identical."
-        )
-
-    if test == "cmh":
-        raise ValueError(
-            "test='cmh' was removed in 0.7.5 (stratification semantics "
-            "confusing; dominated by GLM with batch covariate). For "
-            "stratified analysis use tl.dmc(formula='~ group + batch'), "
-            "which gives proper dispersion correction and handles "
-            "continuous covariates."
-        )
+    cfg.validate()
 
     # --- New contrast / multi-group path -------------------------------------
-    if formula is not None or contrast is not None:
-        if empirical_fdr:
+    if cfg.formula is not None or cfg.contrast is not None:
+        if cfg.empirical_fdr:
             # Same refusal as the DMR path: label shuffling invalidates
             # the stratified design that formula= encodes.
             raise ValueError(
@@ -654,21 +661,7 @@ def dmc(
                 "stratified design). Use the binary treatment / control "
                 "path or implement a custom stratified permutation."
             )
-        _run_dmc_contrast(
-            md,
-            test=test,
-            formula=formula,
-            contrast=contrast,
-            covariates=covariates,
-            treatment_col=treatment_col,
-            chromosomes=chromosomes,
-            min_samples_treatment=min_samples_treatment,
-            min_samples_control=min_samples_control,
-            dispersion=dispersion,
-            reference=reference,
-            fdr_method=fdr_method,
-            reference_level=reference_level,
-        )
+        _run_dmc_contrast(md, cfg)
         # P1-11 deprecation notice for GLM / contrast path.
         import warnings as _warnings
 
@@ -696,92 +689,31 @@ def dmc(
     # caught instead of silently running on degenerate data.
     _check_n1_and_union_footgun(
         md,
-        allow_n1,
-        min_samples_treatment,
-        min_samples_control,
+        cfg.allow_n1,
+        cfg.min_samples_treatment,
+        cfg.min_samples_control,
     )
-    selected_test = _auto_test(md, allow_n1=allow_n1) if test == "auto" else test
+    selected_test = _auto_test(md, allow_n1=cfg.allow_n1) if cfg.test == "auto" else cfg.test
 
     # --- lr+ power-stack dispatch (1.0) ---
-    # The four knobs the stack controls:
-    #   neighbour_combine, fdr_method, sep_fallback, dispersion ("eb"
-    #   is already the default in this function).
-    # power_stack values:
-    #   "lr+" / True / "auto"  -> engage all four at any n
-    #   "conservative"          -> engage only at n <= 2 (pre-1.0 behavior)
-    #   "off" / False           -> leave knobs at user-passed values
-    if isinstance(power_stack, bool):
-        power_stack = "lr+" if power_stack else "off"
-    if power_stack not in {"auto", "lr+", "conservative", "off"}:
-        raise ValueError(
-            f"power_stack must be one of {{'auto','lr+','conservative','off'}} "
-            f"or a bool; got {power_stack!r}"
-        )
-
-    if selected_test == "lr" and power_stack in {"auto", "lr+", "conservative"}:
-        _min_n = min(len(md.treatment_ids), len(md.control_ids))
-        engage = (power_stack != "conservative") or (_min_n <= 2)
-        if engage:
-            if not neighbour_combine:
-                neighbour_combine = True
-                logger.info(
-                    "Auto-enabling neighbour_combine (lr+ stack, "
-                    "power_stack=%s, n=%d). Pass power_stack='off' to "
-                    "disable.",
-                    power_stack,
-                    _min_n,
-                )
-            if fdr_method == "fdr_bh":
-                fdr_method = "fdr_tsbh"
-                logger.info(
-                    "Auto-switching fdr_method 'fdr_bh' -> 'fdr_tsbh' (lr+ stack, power_stack=%s).",
-                    power_stack,
-                )
-            if not sep_fallback:
-                sep_fallback = True
-                logger.info(
-                    "Auto-enabling sep_fallback (lr+ stack, power_stack=%s).",
-                    power_stack,
-                )
+    # Resolves power_stack into neighbour_combine / fdr_method / sep_fallback
+    # (dispersion="eb" is already the default), then checks the knobs that
+    # only make sense once the stack is applied.
+    cfg = cfg.apply_power_stack(selected_test, min(len(md.treatment_ids), len(md.control_ids)))
+    cfg.validate_resolved()
 
     if selected_test == "fisher":
         _warn_fisher_once()
     unite_info = md.uns.get("unite")
     unite = (unite_info is not None) and (unite_info.get("type") == "intersect")
-
-    # materialize=False keeps only the streaming DMCStore handle, so it
-    # cannot run the eager-only post-processors that need the full in-memory
-    # result table. Reject the combination explicitly rather than silently
-    # producing different output. (neighbour_combine may have been
-    # auto-enabled just above by power_stack='lr+'; use_smoothed routes
-    # through a temp store that is cleaned up on return, so its DMCStore
-    # would not survive.)
-    if not materialize:
-        _incompat = [
-            name
-            for name, on in (
-                ("neighbour_combine", neighbour_combine),
-                ("empirical_fdr", empirical_fdr),
-                ("use_smoothed", use_smoothed),
-            )
-            if on
-        ]
-        if _incompat:
-            raise ValueError(
-                "materialize=False keeps only the streaming DMCStore handle "
-                "and cannot run features that post-process the full in-memory "
-                f"result table: {', '.join(_incompat)}. Re-run with "
-                "materialize=True (the default) for these, or disable them "
-                "(neighbour_combine may have been auto-enabled by "
-                "power_stack='lr+')."
-            )
+    smooth_method = md.uns.get("smooth_params", {}).get("method") if cfg.use_smoothed else None
 
     # 0.4.0 checkpoint/resume: when resumable=True, fingerprint the input
     # + params and look up a prior matching run in the pipeline manifest.
     resume_root = None
     resume_sig = None
     resume_stage_name = None
-    if resumable:
+    if cfg.resumable:
         from pathlib import Path
 
         from ._cache import input_signature, manifest_append, manifest_find
@@ -794,28 +726,7 @@ def dmc(
             md.store,
             sorted(md.treatment_ids),
             sorted(md.control_ids),
-            {
-                "test": selected_test,
-                "chromosomes": chromosomes,
-                "unite": unite,
-                "min_samples_treatment": min_samples_treatment,
-                "min_samples_control": min_samples_control,
-                "dispersion": dispersion,
-                "reference": reference,
-                "empirical_fdr": empirical_fdr,
-                "n_perm": n_perm if empirical_fdr else None,
-                "perm_seed": perm_seed if empirical_fdr else None,
-                # lr+ stack knobs: changing any of these changes engine
-                # output, so a cached result computed at different values
-                # must NOT be reused. Omitting any of these from the
-                # signature causes silent cache hits in parameter sweeps.
-                "power_stack": power_stack,
-                "sep_fallback": sep_fallback,
-                "sep_threshold": sep_threshold,
-                "neighbour_combine": neighbour_combine,
-                "neighbour_bp": neighbour_bp,
-                "fdr_method": fdr_method,
-            },
+            cfg.resume_signature_params(selected_test=selected_test, unite=unite),
         )
         if resume_root:
             prior = manifest_find(resume_root, resume_stage_name)
@@ -832,27 +743,18 @@ def dmc(
                         sidecar,
                     )
                     md.varm[resume_stage_name] = pl.read_parquet(str(sidecar))
-                    md.uns["dmc"] = {
-                        "test_requested": test,
-                        "test_used": canonical_for_key,
-                        "n_sites": len(md.varm[resume_stage_name]),
-                        "unite": unite,
-                        "min_samples_treatment": min_samples_treatment,
-                        "min_samples_control": min_samples_control,
-                        "dispersion": dispersion,
-                        "reference": reference,
-                        "empirical_fdr": empirical_fdr,
-                        "n_perm": n_perm if empirical_fdr else None,
-                        "perm_seed": perm_seed if empirical_fdr else None,
-                        "power_stack": power_stack,
-                        "sep_fallback": sep_fallback,
-                        "sep_threshold": sep_threshold,
-                        "neighbour_combine": neighbour_combine,
-                        "neighbour_bp": neighbour_bp,
-                        "fdr_method": fdr_method,
-                        "last_key": resume_stage_name,
-                        "resumed": True,
-                    }
+                    # The sidecar lands on md.varm, so the result is
+                    # materialized; no DMCStore is opened on this path.
+                    md.uns["dmc"] = cfg.to_uns(
+                        test_used=canonical_for_key,
+                        n_sites=len(md.varm[resume_stage_name]),
+                        materialized=True,
+                        unite=unite,
+                        last_key=resume_stage_name,
+                        store_path=None,
+                        resumed=True,
+                        smooth_method=smooth_method,
+                    )
                     if tsv is not None:
                         from .export import dmc_to_tsv
 
@@ -869,7 +771,7 @@ def dmc(
     import tempfile as _tempfile
     from pathlib import Path as _Path
 
-    if use_smoothed:
+    if cfg.use_smoothed:
         import warnings as _warnings
 
         _warnings.warn(
@@ -918,24 +820,24 @@ def dmc(
             samples_treatment=md.treatment_ids,
             samples_control=md.control_ids,
             test=selected_test,
-            chromosomes=chromosomes,
+            chromosomes=cfg.chromosomes,
             unite=unite,
-            min_samples_treatment=min_samples_treatment,
-            min_samples_control=min_samples_control,
-            dispersion=dispersion,
-            reference=reference,
-            backend=backend,
-            n_workers=n_workers,
-            glm_backend=glm_backend,
+            min_samples_treatment=cfg.min_samples_treatment,
+            min_samples_control=cfg.min_samples_control,
+            dispersion=cfg.dispersion,
+            reference=cfg.reference,
+            backend=cfg.backend,
+            n_workers=cfg.n_workers,
+            glm_backend=cfg.glm_backend,
             return_store=True,
-            smoothing=smoothing,
-            smoothing_span_bp=smoothing_span_bp,
-            sep_fallback=sep_fallback,
-            sep_threshold=sep_threshold,
+            smoothing=cfg.smoothing,
+            smoothing_span_bp=cfg.smoothing_span_bp,
+            sep_fallback=cfg.sep_fallback,
+            sep_threshold=cfg.sep_threshold,
         )
-        dmc_store = apply_multiple_testing_correction(dmc_store, method=fdr_method)
+        dmc_store = apply_multiple_testing_correction(dmc_store, method=cfg.fdr_method)
 
-        if materialize:
+        if cfg.materialize:
             # Materialise the full DataFrame for md.varm back-compat
             # (plot.py / report.py / pl modules consume md.dmc as a
             # DataFrame). With chrom/strand stored as pl.Enum this is
@@ -960,10 +862,10 @@ def dmc(
         # downstream consumers that want the combined values must opt in
         # by reading the `_combined` columns explicitly. Sites without
         # enough neighbours fall back to their raw p-value identity.
-        if neighbour_combine and len(result) > 0:
+        if cfg.neighbour_combine and len(result) > 0:
             from .dmc import combine_neighbour_pvalues
 
-            result = combine_neighbour_pvalues(result, neighbour_bp=neighbour_bp)
+            result = combine_neighbour_pvalues(result, neighbour_bp=cfg.neighbour_bp)
             # Keep `pvalue` / `qvalue` as the raw per-CpG values.
             # `combine_neighbour_pvalues` already added a `pvalue_combined`
             # column; produce `qvalue_combined` next to it via BH on the
@@ -972,35 +874,35 @@ def dmc(
             # `qvalue_combined`.
             result = apply_multiple_testing_correction(
                 result,
-                method=fdr_method,
+                method=cfg.fdr_method,
                 pvalue_col="pvalue_combined",
                 qvalue_col="qvalue_combined",
             )
 
-        if empirical_fdr and len(result) > 0:
+        if cfg.empirical_fdr and len(result) > 0:
             result = empirical_fdr_for_dmc(
                 methylstore_path=_dmc_store,
                 samples_treatment=md.treatment_ids,
                 samples_control=md.control_ids,
                 observed_dmc=result,
-                n_perm=n_perm,
-                seed=perm_seed,
-                n_jobs=perm_n_jobs,
+                n_perm=cfg.n_perm,
+                seed=cfg.perm_seed,
+                n_jobs=cfg.perm_n_jobs,
                 test=selected_test,
-                chromosomes=chromosomes,
+                chromosomes=cfg.chromosomes,
                 unite=unite,
-                min_samples_treatment=min_samples_treatment,
-                min_samples_control=min_samples_control,
-                dispersion=dispersion,
-                reference=reference,
+                min_samples_treatment=cfg.min_samples_treatment,
+                min_samples_control=cfg.min_samples_control,
+                dispersion=cfg.dispersion,
+                reference=cfg.reference,
                 # M3: engine knobs that can overwrite the per-site p-value
                 # MUST be applied identically in observed and null runs,
                 # otherwise the Westfall-Young statistic compares deflated
                 # observed p-values against an un-deflated null pool.
-                sep_fallback=sep_fallback,
-                sep_threshold=sep_threshold,
-                smoothing=smoothing,
-                smoothing_span_bp=smoothing_span_bp,
+                sep_fallback=cfg.sep_fallback,
+                sep_threshold=cfg.sep_threshold,
+                smoothing=cfg.smoothing,
+                smoothing_span_bp=cfg.smoothing_span_bp,
             )
     finally:
         if _smoothed_tmp is not None:
@@ -1010,58 +912,29 @@ def dmc(
     from .dmc import _canonicalise_test_name
 
     canonical_used = _canonicalise_test_name(selected_test)
-    key = f"dmc_{canonical_used}_smoothed" if use_smoothed else f"dmc_{canonical_used}"
-    if materialize:
+    key = f"dmc_{canonical_used}_smoothed" if cfg.use_smoothed else f"dmc_{canonical_used}"
+    if cfg.materialize:
         md.varm[key] = result
         n_sites = len(result)
     else:
         # No eager table on varm; the DMCStore is the source of truth.
         # md.get_dmc() / md.dmc resolve it on demand from store_path.
         n_sites = dmc_store.total_sites if dmc_store is not None else 0
-    md.uns["dmc"] = {
-        "test_requested": test,
-        "test_used": canonical_used,
-        "n_sites": n_sites,
-        "materialized": bool(materialize),
-        "unite": unite,
-        "min_samples_treatment": min_samples_treatment,
-        "min_samples_control": min_samples_control,
-        "dispersion": dispersion,
-        "reference": reference,
-        "empirical_fdr": empirical_fdr,
-        "n_perm": n_perm if empirical_fdr else None,
-        "perm_seed": perm_seed if empirical_fdr else None,
-        "power_stack": power_stack,
-        "sep_fallback": sep_fallback,
-        "sep_threshold": sep_threshold,
-        "neighbour_combine": neighbour_combine,
-        "neighbour_bp": neighbour_bp,
-        "fdr_method": fdr_method,
-        # explicit pointer so MethylData.get_dmc() / .dmc resolve to the
-        # table the user just wrote, regardless of which other tests have
-        # been run in the same session.
-        "last_key": key,
-        "use_smoothed": use_smoothed,
-        "smooth_method": (md.uns.get("smooth_params", {}).get("method") if use_smoothed else None),
-        # DSS-style count smoothing (DMLfit.multiFactor(smoothing=TRUE)
-        # analogue). Surface params for both modes so the metadata
-        # round-trips through save / report consistently; the span is
-        # only meaningful when smoothing == True.
-        "smoothing": bool(smoothing),
-        "smoothing_span_bp": int(smoothing_span_bp) if smoothing else None,
-        # Path to the persistent per-chrom DMC store. Lets downstream
-        # tools (esp. tl.dmr(method='sliding_window')) stream
-        # chromosomes from disk instead of holding the materialised
-        # DataFrame plus a per-chrom working set in memory at the
-        # same time.
-        "store_path": str(dmc_store.path) if dmc_store is not None else None,
-    }
+    md.uns["dmc"] = cfg.to_uns(
+        test_used=canonical_used,
+        n_sites=n_sites,
+        materialized=bool(cfg.materialize),
+        unite=unite,
+        last_key=key,
+        store_path=str(dmc_store.path) if dmc_store is not None else None,
+        smooth_method=smooth_method,
+    )
 
     # 0.4.0 checkpoint/resume: persist a sidecar parquet + manifest entry
     # so a subsequent resumable=True call with the same fingerprint can
     # skip the computation entirely. Best-effort: a failed write logs but
     # does not propagate (the in-memory result is still valid).
-    if resumable and resume_root and resume_sig and resume_stage_name and result is not None:
+    if cfg.resumable and resume_root and resume_sig and resume_stage_name and result is not None:
         try:
             from pathlib import Path
 
@@ -1077,11 +950,11 @@ def dmc(
                 params={
                     "test": canonical_used,
                     "unite": unite,
-                    "min_samples_treatment": min_samples_treatment,
-                    "min_samples_control": min_samples_control,
-                    "dispersion": dispersion,
-                    "reference": reference,
-                    "empirical_fdr": empirical_fdr,
+                    "min_samples_treatment": cfg.min_samples_treatment,
+                    "min_samples_control": cfg.min_samples_control,
+                    "dispersion": cfg.dispersion,
+                    "reference": cfg.reference,
+                    "empirical_fdr": cfg.empirical_fdr,
                 },
                 input_sig=resume_sig,
                 output_path=str(sidecar),
@@ -1111,7 +984,7 @@ def dmc(
     )
 
     if tsv is not None:
-        if materialize:
+        if cfg.materialize:
             from .export import dmc_to_tsv
 
             _emit_result_tsv(
@@ -1127,27 +1000,15 @@ def dmc(
             )
 
 
-def _run_dmc_contrast(
-    md: MethylData,
-    *,
-    test: str,
-    formula: str | None,
-    contrast,
-    covariates: list[str] | None,
-    treatment_col: str,
-    chromosomes: list[str] | None,
-    min_samples_treatment: int,
-    min_samples_control: int,
-    dispersion: str,
-    reference: str,
-    fdr_method: str = "fdr_bh",
-    reference_level: str | None = None,
-) -> None:
+def _run_dmc_contrast(md: MethylData, cfg: DMCConfig) -> None:
     """Internal: multi-group / continuous-covariate primary-effect DMC.
 
     Always uses test='glm_contrast' internally. Uses ALL samples in
     md.obs order (not the binary case/control split), so the design
-    matrix matches md.obs row-for-row.
+    matrix matches md.obs row-for-row. Reads ``formula``, ``contrast``,
+    ``covariates``, ``treatment_col``, ``reference_level``,
+    ``chromosomes``, ``min_samples_*``, ``dispersion``, ``reference`` and
+    ``fdr_method`` from ``cfg``; the other knobs are not consumed here.
     """
     from ._glm import build_design, resolve_contrast
     from .dmc import process_chromosomes_dmc
@@ -1155,26 +1016,28 @@ def _run_dmc_contrast(
     if not md.obs.height:
         raise ValueError("md.obs is empty; cannot build a design matrix.")
     samples_all = md.obs.get_column("sample_id").to_list()
+    treatment_col = cfg.treatment_col
 
     # Build design -- without requiring a treatment column if we have a
     # formula that doesn't reference one. The user's `treatment_col`
     # default ("treatment") is *only* required when the existing binary
     # path would have used it; here we let the formula speak.
     need_treatment = (treatment_col in md.obs.columns) and (
-        formula is None or treatment_col in formula
+        cfg.formula is None or treatment_col in cfg.formula
     )
     design_full, _design_reduced, coef_idx, term_names, formula_used, design_info = build_design(
         md.obs,
         samples_ordered=samples_all,
-        formula=formula,
-        covariates=covariates,
+        formula=cfg.formula,
+        covariates=cfg.covariates,
         treatment_col=treatment_col,
         require_treatment_col=need_treatment,
         return_design_info=True,
-        reference_level=reference_level,
+        reference_level=cfg.reference_level,
     )
 
     # Resolve the contrast against the design.
+    contrast = cfg.contrast
     if contrast is None:
         # Default: a single-coef contrast on `treatment_col` (this happens
         # when the user supplies a `formula=` for covariate adjustment but
@@ -1223,12 +1086,12 @@ def _run_dmc_contrast(
         samples_treatment=samples_case_local,
         samples_control=samples_control_local,
         test="glm_contrast",
-        chromosomes=chromosomes,
+        chromosomes=cfg.chromosomes,
         unite=unite,
-        min_samples_treatment=min_samples_treatment,
-        min_samples_control=min_samples_control,
-        dispersion=dispersion,
-        reference=reference,
+        min_samples_treatment=cfg.min_samples_treatment,
+        min_samples_control=cfg.min_samples_control,
+        dispersion=cfg.dispersion,
+        reference=cfg.reference,
         design_full=design_full,
         contrast_matrix=C,
         contrast_label=contrast_label,
@@ -1236,29 +1099,24 @@ def _run_dmc_contrast(
         group_labels_per_sample=group_labels,
         return_store=True,
     )
-    dmc_store_contrast = apply_multiple_testing_correction(dmc_store_contrast, method=fdr_method)
+    dmc_store_contrast = apply_multiple_testing_correction(
+        dmc_store_contrast, method=cfg.fdr_method
+    )
     result = dmc_store_contrast.to_dataframe()
 
     key = "dmc_glm_contrast"
     md.varm[key] = result
-    md.uns["dmc"] = {
-        "test_requested": test,
-        "test_used": "glm_contrast",
-        "n_sites": len(result),
-        "unite": unite,
-        "formula": formula_used,
-        "contrast": contrast_label,
-        "design_terms": term_names,
-        "covariates": list(covariates) if covariates else None,
-        "treatment_col": treatment_col,
-        "min_samples_treatment": min_samples_treatment,
-        "min_samples_control": min_samples_control,
-        "dispersion": dispersion,
-        "reference": reference,
-        "fdr_method": fdr_method,
-        "last_key": key,
-        "store_path": str(dmc_store_contrast.path),
-    }
+    md.uns["dmc"] = cfg.to_uns(
+        test_used="glm_contrast",
+        n_sites=len(result),
+        materialized=True,
+        unite=unite,
+        last_key=key,
+        store_path=str(dmc_store_contrast.path),
+        formula=formula_used,
+        contrast=contrast_label,
+        design_terms=term_names,
+    )
 
 
 def dmr(
