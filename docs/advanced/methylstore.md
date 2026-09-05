@@ -91,10 +91,12 @@ chromosome and tracks them through a manifest.
 
 The manifest (`.epykit_dmc_manifest.json`) records:
 
-- Test name and parameters
-- List of completed chromosomes
-- Row counts per chromosome
-- Timestamp of each chromosome's completion
+- `test`: the engine name
+- `chroms`: one entry per chromosome with `name` and `n_sites`, in submission order
+- `total_sites`
+- `input_sig`: SHA-256 of the inputs that affect the result (store path, sample lists, test, parameters). A rerun with the same signature reuses the store instead of recomputing.
+- `bh_qvalues_applied`, `bh_qvalue_col`, `bh_method`: set once `apply_multiple_testing_correction` has written q-values back into the per-chromosome files
+- `epykit_version`, `completed_at`
 
 ### Key Methods and Properties
 
@@ -102,46 +104,60 @@ The manifest (`.epykit_dmc_manifest.json`) records:
 |--------|-------------|
 | `path` | Root directory of the DMCStore |
 | `manifest` | Parsed manifest dict |
-| `to_dataframe()` | Concatenate all chromosomes into a single Polars DataFrame |
-| `iter_chromosomes()` | Yield one DataFrame per chromosome (streaming) |
+| `chroms()` | Chromosome names in manifest order |
+| `total_sites`, `bh_applied` | Row count across all chromosomes; whether q-values have been written back |
+| `iter_chroms(columns=None)` | Yield `(chrom, DataFrame)` pairs one chromosome at a time (streaming) |
+| `read_chrom(chrom)`, `scan_chrom(chrom)` | Eager read or lazy scan of one chromosome |
+| `update_chrom(chrom, df)` | Atomically rewrite one chromosome file (used by BH correction) |
+| `to_dataframe()` | Concatenate all chromosomes into a single Polars DataFrame (whole-genome eager load; use sparingly) |
 
 ### Why DMCStore Exists
 
 The per-chromosome layout enables two operations at O(largest chromosome) memory
 instead of O(genome):
 
-1. **Streaming BH correction** -- `ep.apply_multiple_testing_correction()` can
+1. **Streaming BH correction** -- `epykit.dmc.apply_multiple_testing_correction()` can
    scan all chromosome files in a first pass to count total tests, then apply
    BH in a second streaming pass without holding the full result in memory.
 
 2. **DMR calling** -- `ep.call_dmr_chain_merge()` processes one chromosome at a
    time. It never needs more than one chromosome's DMC results in memory.
 
-## Manifest
+## Manifests
 
-The top-level `.epykit_manifest.json` file tracks the overall state of the
-methylstore:
+Two manifest layers live next to the data. Both are written through the
+helpers in `_cache.py`.
+
+**Per-sample, per-step manifests** (`.epykit_raw_manifest.json`,
+`.epykit_filter_manifest.json`, `.epykit_normalize_manifest.json` inside each
+`sample=<id>/` directory) fingerprint the upstream input and the step
+parameters. `read_bismark`, `pp.filter_coverage` and `pp.normalize_coverage`
+skip a sample whose manifest already matches.
+
+**The pipeline manifest** (`.epykit_manifest.json` at the analysis root)
+records completed stages for the checkpoint/resume API:
 
 ```json
 {
-  "version": "0.7.1",
-  "assembly": "hg38",
-  "samples": ["tumor_1", "tumor_2", "normal_1", "normal_2"],
-  "chromosomes": ["chr1", "chr2", "...", "chrX"],
-  "stages_completed": ["ingest", "filter", "normalize", "unite"],
-  "current_stage": "unite",
-  "parameters": {
-    "filter": {"lo_count": 10, "hi_perc": 99.9},
-    "normalize": {"method": "median"},
-    "unite": {"type": "union"}
-  }
+  "epykit_version": "1.0.0",
+  "stages": [
+    {
+      "name": "dmc_lr",
+      "params": {"test": "lr", "unite": true, "dispersion": "eb"},
+      "input_sig": "<sha256 of the store fingerprint, sample lists and parameters>",
+      "output_path": ".epykit_results/dmc_lr.parquet",
+      "completed_at": "2026-06-09T12:00:00Z",
+      "extra": {"n_sites": 21873452}
+    }
+  ]
 }
 ```
 
-This manifest enables **checkpoint/resume**: if a long-running pipeline is
-interrupted, the next run reads the manifest, identifies which stages and
-chromosomes have already been processed, and continues from where it left off.
-The `resumable=True` parameter on `ep.tl.dmc()` uses this mechanism.
+`ep.tl.dmc(md, resumable=True)` hashes its inputs, looks for a stage with the
+same name and `input_sig`, and loads the sidecar Parquet instead of
+recomputing. `MethylData.completed_stages` lists the recorded stages and
+`MethylData.resume_from(stage)` re-hydrates one. Without `resumable=True` the
+pipeline manifest is neither read nor written.
 
 ## Design Principles
 
