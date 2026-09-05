@@ -497,4 +497,4 @@ def dmr_heatmap(
     }
 
 
-__all__ = ["dmr_violin", "dmr_heatmap"]
+__all__ = ["dmr_heatmap", "dmr_violin"]

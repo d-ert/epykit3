@@ -469,7 +469,7 @@ def _classify_sex_from_values(
         try:
             import diptest  # optional extra
 
-            dip_stat, dip_p = diptest.diptest(np.asarray(values, dtype=float))
+            _dip_stat, dip_p = diptest.diptest(np.asarray(values, dtype=float))
             if dip_p > dip_p_threshold:
                 warnings.warn(
                     f"single-sex cohort detected (Hartigan dip test p={dip_p:.3f}); "

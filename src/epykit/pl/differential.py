@@ -132,4 +132,4 @@ def manhattan(
     return fig, ax
 
 
-__all__ = ["volcano", "ma_plot", "manhattan"]
+__all__ = ["ma_plot", "manhattan", "volcano"]

@@ -620,7 +620,7 @@ class MethylData:
                 {
                     "sample": s,
                     "mean_beta": float(meth_sum / max(cov_sum, 1)),
-                    "n_cpgs": int(len(df)),
+                    "n_cpgs": len(df),
                     "mean_coverage": float(cov_sum / max(len(df), 1)),
                 }
             )

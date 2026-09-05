@@ -216,4 +216,4 @@ def _run_ray(
             ray.shutdown()
 
 
-__all__ = ["run_chrom_pipeline", "ChromHandler"]
+__all__ = ["ChromHandler", "run_chrom_pipeline"]

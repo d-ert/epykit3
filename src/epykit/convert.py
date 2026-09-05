@@ -271,7 +271,7 @@ def _merge_cpg_pairs_by_position(df: pl.DataFrame) -> pl.DataFrame:
     """Merge CpG dyad rows by position when strand labels are unavailable.
 
     A two-strand Bismark ``.cov`` emits two rows per CpG dinucleotide — the
-    + strand cytosine at position P and the − strand cytosine at position P+1.
+    + strand cytosine at position P and the - strand cytosine at position P+1.
     When no reference FASTA was supplied, all rows carry ``strand='*'`` and
     ``_merge_cpg_pairs`` cannot be used (it needs explicit +/- labels).
 
@@ -286,7 +286,7 @@ def _merge_cpg_pairs_by_position(df: pl.DataFrame) -> pl.DataFrame:
        lower position as the site coordinate; set ``strand='*'`` (genuinely
        unknown without a reference).
 
-    This is **heuristic** — a leading unpaired − strand site (where the +
+    This is **heuristic** — a leading unpaired - strand site (where the +
     strand row is absent or zero-coverage) can cause a mis-pair.  A one-time
     warning advises users to pass ``reference_fasta=`` for guaranteed accuracy.
 

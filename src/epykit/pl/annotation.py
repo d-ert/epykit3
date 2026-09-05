@@ -102,7 +102,7 @@ def plot_annotation_counts(
         # Don't crowd small slices with text -- only label slices >=3%.
         total = sum(values) or 1
         slice_labels = [lbl if (v / total) >= 0.03 else "" for lbl, v in zip(labels, values)]
-        wedges, texts, autotexts = ax.pie(
+        wedges, _texts, _autotexts = ax.pie(
             values,
             labels=slice_labels,
             colors=colors,
@@ -373,7 +373,7 @@ def plot_categorical(
     groups_present = props.get_column(resolved_group).unique().to_list()
     # Put "all" first when included, then sorted remainder.
     if "all" in groups_present:
-        ordered_groups = ["all"] + sorted(g for g in groups_present if g != "all")
+        ordered_groups = ["all", *sorted(g for g in groups_present if g != "all")]
     else:
         ordered_groups = sorted(groups_present, key=str)
 
@@ -426,7 +426,7 @@ def plot_categorical(
 
 __all__ = [
     "plot_annotation_counts",
-    "plot_numerical_by_annotation",
-    "plot_coannotations",
     "plot_categorical",
+    "plot_coannotations",
+    "plot_numerical_by_annotation",
 ]

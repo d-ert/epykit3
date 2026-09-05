@@ -549,13 +549,13 @@ def export_tables(
 
 
 __all__ = [
+    "dmc_to_tsv",
+    "dmcs_to_bed",
+    "dmr_to_tsv",
+    "dmrs_to_bed",
+    "dvc_to_tsv",
+    "export_tables",
+    "qc_to_tsv",
     "to_bedgraph",
     "to_bigwig",
-    "dmcs_to_bed",
-    "dmrs_to_bed",
-    "dmr_to_tsv",
-    "dmc_to_tsv",
-    "dvc_to_tsv",
-    "qc_to_tsv",
-    "export_tables",
 ]
