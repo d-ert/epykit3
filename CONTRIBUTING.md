@@ -7,11 +7,11 @@ before it can merge. `CLAUDE.md` holds the architecture rules in more depth;
 ## Set up
 
 ```bash
-uv sync --frozen --extra dev --extra all     # matches CI; --frozen keeps uv.lock untouched
+uv sync --locked --group dev --extra all     # matches CI; --locked fails instead of rewriting uv.lock
 uv run --frozen pytest -m "not slow" --strict-markers -ra
 ```
 
-Plain `pip install -e ".[dev,all]"` works too. Python 3.9 to 3.12 on Linux,
+Plain `pip install -e ".[all]" --group dev` (pip 25.1 or newer) works too. Python 3.10 to 3.13 on Linux,
 macOS and Windows are all CI targets; `pysam`-based extras (`bam`,
 `methylkit`) and `pyBigWig` (`export`) have no Windows wheels and are gated
 in `pyproject.toml`.
@@ -24,7 +24,7 @@ Every pull request must pass all of these locally before review:
 |---|---|---|
 | Fast tier | `uv run --frozen pytest -m "not slow" --strict-markers -ra` | The CI matrix. About two minutes. |
 | Slow tier | `uv run --frozen pytest -m slow --strict-markers -ra` | Null calibration and accuracy tests against a synthetic truth table. About one minute. |
-| Lint and types | `uv run --frozen ruff check src/ tests/` and `uv run --frozen mypy src/epykit` | Baseline is pyflakes plus mypy; see `pyproject.toml` for the ratchet plan. |
+| Lint and types | `uv run --frozen ruff check src/ tests/` and `uv run --frozen mypy src/epykit` | Rules F, I, W, UP, E, B and RUF plus a C901 complexity ceiling of 38; see `[tool.ruff.lint]` in `pyproject.toml`. |
 | Engine hashes | `uv run --frozen python benchmark/scripts/regen_small.py` | Hashes `lr` and `lr+` output on a fixed simulator slice and diffs against the committed reference. Any change to a p-value, q-value or `meth_diff` at eight decimals fails it. |
 
 If a change is *meant* to move engine output, re-snapshot with
