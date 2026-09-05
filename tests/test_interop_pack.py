@@ -121,7 +121,8 @@ def test_to_anndata_shape_default(synth_md_filtered):
     adata = synth_md_filtered.to_anndata(layer="beta")
     assert adata.shape[0] == synth_md_filtered.n_samples
     assert adata.shape[1] > 0
-    assert list(adata.layers.keys()) == []
+    # anndata >= 0.13 exposes X as ``layers[None]``; only named layers count.
+    assert [k for k in adata.layers.keys() if k is not None] == []
     assert adata.uns.get("epykit_assembly") == synth_md_filtered.assembly
     assert adata.uns.get("epykit_context") == synth_md_filtered.context
 
