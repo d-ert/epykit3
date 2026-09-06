@@ -39,6 +39,7 @@ derives `count_methylated` and `count_unmethylated` from the coverage and percen
 | `assembly` | `str` | required | Genome assembly name (e.g. `"hg38"`, `"mm10"`) |
 | `store_dir` | `str` | `"methylstore"` | Directory for the partitioned Parquet store |
 | `context` | `str` | `"CpG"` | Cytosine context to retain |
+| `canonical_only` | `bool` | `False` | Keep only the fixed human-style chromosome set at conversion time; see [read_bismark](read-bismark.md#canonical-chromosomes-only) |
 
 ## Usage
 
