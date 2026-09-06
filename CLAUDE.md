@@ -98,6 +98,10 @@ Library code (everything under `epykit.*` except `epykit.cli`) emits progress th
 
 Don't change `lr+` knob defaults without re-running the relevant ablations (and remember `lr+` is now positioned as a research knob, not a recommended default — see "lr+ power stack" above).
 
+### Deprecated names stay until a maintainer decides otherwise
+
+1.2 retains every deprecated surface: `pp.unite` (replacement `pp.set_unite_type`, warning names 2.0), the `epykit.dmr_hmm` shim (replacement `epykit.dmr_segment.call_dmr_rule_segment`), the NaN-filled `log2_odds_ratio` DMC column (replacements `log2_odds_ratio_pooled` for pooled-count engines and `coef_treatment_log2` for the GLM; the `FutureWarning` lives in the `finish` stage of `_dmc_stages.py`), the `csv` / `csv_full` / `csv_alpha` keyword aliases on `tl.qc`, `tl.dmc`, `tl.dmr`, `tl.dvc` and `tl.annotate` (replacements `tsv` / `tsv_full` / `tsv_alpha`, resolved by `_resolve_tsv_output` and `_resolve_auto_tsv` in `tl.py`), and the `__getattr__` shim for the demoted top-level DMC names in `__init__.py`. Warnings that name no version say "a future major release". Removing any of these needs an explicit maintainer decision on version and migration; do not treat the warning text as that decision. `docs/reference/deprecations.md` is the user-facing table.
+
 ## Module map (when to look where)
 
 - `methyldata.py` — `MethylData` dataclass, save/load, `.dmc` / `.treatment_ids` / `.control_ids` properties, `region_beta()`.
@@ -108,7 +112,7 @@ Don't change `lr+` knob defaults without re-running the relevant ablations (and 
 - `_dmc_stages.py` — the nine stages `tl.dmc` runs in order (`plan_run` through `finish`) and the frozen plan / outcome records they hand each other; `publish` is the only writer of `md.uns["dmc"]`.
 - `_dmc_engines.py` — the engine registry: one frozen `EngineSpec` per engine (`name`, `public`, `power_stack_applies`, `effect_column`), `PUBLIC_ENGINES` (the CLI `--test` choice list) and `REMOVED_ENGINES` (the 0.7.5 migration hints). Stdlib-only, so config, stages and CLI import it without `dmc.py`.
 - `_glm.py` — Wilkinson formula → design matrix, batched IRLS binomial GLM, Wald/F contrasts. `_glm_gpu.py` is a CuPy/JAX backend gated behind extras.
-- `dmr.py` + `_hmm.py` + `dmr_hmm.py` — tile / sliding-window / HMM / chain-merge DMR callers + permutation FDR.
+- `dmr.py` + `dmr_segment.py` + `_hmm.py` — tile / sliding-window / segment / chain-merge DMR callers + permutation FDR. `dmr_hmm.py` is the deprecated import shim for `dmr_segment.py`.
 - `dvc.py` — iEVORA-style differentially variable CpG calling.
 - `annotate.py` — GTF + UCSC `refGene.txt` gene features and CpG-island/shore/shelf/open-sea context.
 - `qc.py` — bisulfite conversion rate, coverage uniformity, sex check, contamination estimate, sample correlation, power calc.
