@@ -26,6 +26,17 @@ SemVer (`MAJOR.MINOR.PATCH`).
   `test_bam_io.py` and `test_entropy.py` execute instead of skipping.
   Windows legs are unchanged (`pysam` has no Windows wheel).
 
+### Fixed
+
+- **`read_methylation_calls(regions=...)` reported calls past the region
+  end.** `bam_io.read_methylation_calls` fetched every read overlapping a
+  requested `(chrom, start, end)` window but kept all of the read's calls, so
+  positions beyond `end` (and duplicate calls for a read spanning two
+  adjacent windows) leaked into the result. Calls are now clipped to the
+  half-open `[start, end)` span. The existing region test in
+  `tests/test_bam_io.py` catches this; CI never executed it before because
+  `pysam` was not installed.
+
 ## [1.1.0] — 2026-09-05
 
 Post-1.0 correctness and reproducibility fixes from a pre-submission code
