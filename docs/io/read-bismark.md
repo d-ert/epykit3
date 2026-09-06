@@ -119,8 +119,12 @@ md = ep.read_bismark(
 ```
 
 The same option exists on `ep.read_methyldackel()`,
-`ep.read_combined_strand_bed()`, and `ep.convert_sample()`. The tile DMR
-caller has its own `canonical_only`; see [DMR calling](../analysis/dmr.md#tile).
+`ep.read_combined_strand_bed()`, `ep.convert_sample()` and, on the command
+line, `epykit convert --canonical-only`. For a store that already holds
+every contig, `ep.tl.dmc(canonical_only=True)` and the tile DMR caller
+filter at analysis time instead; see
+[DMC calling](../analysis/dmc.md#canonical-chromosomes-only) and
+[DMR calling](../analysis/dmr.md#tile).
 
 ## Next Steps
 

@@ -469,6 +469,8 @@ def dmc(
     use_smoothed: bool = False,
     smoothing: bool = False,
     smoothing_span_bp: int = 500,
+    # Opt-in canonical chromosome filter (since 1.2) ----------------------
+    canonical_only: bool = False,
     # FDR procedure (since 0.7.1) ----------------------------------------
     fdr_method: str = "fdr_bh",
     # Neighbour-aware p-value combining (since 0.7.1) --------------------
@@ -612,7 +614,28 @@ def dmc(
         chromosome estimates with a fixed pseudo-df weight. See
         :func:`_score_finalize` in ``dmc.py`` for the math.
     chromosomes : list[str], optional
-        Restrict to a subset of chromosomes. Auto-detected when None.
+        Restrict to a subset of chromosomes. Auto-detected when None. An
+        explicit list, including an empty one, takes precedence over
+        ``canonical_only``.
+    canonical_only : bool, keyword-only
+        When ``chromosomes`` is None, keep only the fixed human-style
+        chromosome set (``1``-``22``, ``X``, ``Y``, ``M``/``MT``, with or
+        without ``chr``; see :mod:`epykit._chroms`) of the auto-detected
+        store partitions. The filter runs before the engine and before the
+        multiple-testing correction, on the binary and the formula /
+        contrast path alike, and the same resolved list is handed to every
+        ``empirical_fdr`` permutation. One INFO line names the dropped
+        contigs. Recorded in ``md.uns["dmc"]["canonical_only"]`` and part
+        of the ``resumable=True`` fingerprint. Default False keeps every
+        partition; the contigs the store holds are unchanged either way.
+    smoothing, smoothing_span_bp : bool, int
+        DSS-style per-sample count smoothing, an ``"lr"`` engine option:
+        each sample's raw counts are replaced by a uniform-box average over
+        the CpGs within ``+/-smoothing_span_bp // 2`` bp before the test.
+        Both are recorded in ``md.uns["dmc"]`` and part of the
+        ``resumable=True`` fingerprint (the span only while smoothing is
+        on). The other engines and the formula / contrast path do not read
+        them.
     min_samples_treatment, min_samples_control : int
         per-site minimum number of samples with non-zero coverage in
         each group. Sites that fail are NaN'd out before FDR correction.
@@ -645,6 +668,7 @@ def dmc(
         use_smoothed=use_smoothed,
         smoothing=smoothing,
         smoothing_span_bp=smoothing_span_bp,
+        canonical_only=canonical_only,
         fdr_method=fdr_method,
         neighbour_combine=neighbour_combine,
         neighbour_bp=neighbour_bp,
@@ -1059,10 +1083,9 @@ def dmr(
         raise ValueError(
             f"canonical_only=True applies to method='tile' only; got method={method!r}. "
             "The DMC-derived callers use the chromosome universe of the upstream "
-            "DMC run, so filter there: ingest with canonical_only=True, or run "
-            "ep.tl.dmc(md, chromosomes=...) restricted to the canonical set "
-            "(epykit._chroms.filter_canonical), then call tl.dmr without "
-            "canonical_only."
+            "DMC run, so filter there: run ep.tl.dmc(md, canonical_only=True), "
+            "ingest with canonical_only=True, or restrict ep.tl.dmc(md, "
+            "chromosomes=...), then call tl.dmr without canonical_only."
         )
     # Asymptotic DMR q-values are a ranking signal, not a calibrated
     # region-level FDR under CpG spatial correlation (M5). Point users at

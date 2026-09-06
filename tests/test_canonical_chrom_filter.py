@@ -1,11 +1,13 @@
-"""Opt-in canonical chromosome filtering at ingestion and in tile DMR calling.
+"""Opt-in canonical chromosome filtering at ingestion, in DMC and in tile DMR.
 
 The session ``synth`` fixture is canonical-only (chr1..chr5), so it cannot
 prove the filter. These tests hand-build a tiny 2 + 2 cohort with CpGs on
 ``chr1`` plus one real GRCh38 unplaced contig (``chrUn_KI270742v1``, the
 contig that topped the GSE263850 DMR list before the filter existed) and pin
-the ``canonical_only`` contract of ``read_*`` / ``convert`` and of
-``tl.dmr(method="tile")``. The DMC cases are R6's.
+the ``canonical_only`` contract of ``read_*`` / ``convert``, of ``tl.dmc`` /
+``process_chromosomes_dmc`` on the binary and the contrast path, and of
+``tl.dmr(method="tile")``. The CLI flags are covered in
+``test_cli_canonical_smoothing.py`` on the same cohort.
 """
 
 from __future__ import annotations
@@ -20,13 +22,17 @@ import polars as pl
 import pytest
 
 import epykit as ep
+from epykit import _dmc_stages as stages_mod
+from epykit import dmc as dmc_mod
 from epykit import dmr as dmr_mod
 from epykit import tl as tl_mod
 from epykit.convert import _can_reuse_sample, _manifest_path, ensure_converted_sample
+from epykit.dmc import process_chromosomes_dmc
 from epykit.dmr import _DMR_TILE_SCHEMA, call_dmr_tile_based
 from epykit.pl._compute import compute_manhattan_data
 
 SCAFFOLD = "chrUn_KI270742v1"
+_CHROMS = ("chr1", SCAFFOLD)
 _CHROMS_LOGGER = "epykit._chroms"
 
 # Two treatment + two control samples with a clear hyper-vs-hypo difference
@@ -37,33 +43,39 @@ _POSITIONS = list(range(1001, 1001 + 60 * 20, 20))  # 60 CpGs/chrom, 20 bp apart
 _TILE_KW = {"tile_size_bp": 200, "min_cpgs_per_tile": 2}
 
 
-def _cov_lines(counts: tuple[int, int], *, one_based: bool) -> list[str]:
+def _cov_lines(
+    counts: tuple[int, int], *, one_based: bool, chroms: tuple[str, ...] = _CHROMS
+) -> list[str]:
     m, u = counts
     pct = 100.0 * m / (m + u)
     return [
         f"{chrom}\t{pos if one_based else pos - 1}\t{pos}\t{pct:.2f}\t{m}\t{u}"
-        for chrom in ("chr1", SCAFFOLD)
+        for chrom in chroms
         for pos in _POSITIONS
     ]
 
 
-def _write_bismark(path: Path, counts: tuple[int, int]) -> None:
-    path.write_text("\n".join(_cov_lines(counts, one_based=True)) + "\n")
+def _write_bismark(path: Path, counts: tuple[int, int], chroms: tuple[str, ...] = _CHROMS) -> None:
+    path.write_text("\n".join(_cov_lines(counts, one_based=True, chroms=chroms)) + "\n")
 
 
-def _write_methyldackel(path: Path, counts: tuple[int, int]) -> None:
+def _write_methyldackel(
+    path: Path, counts: tuple[int, int], chroms: tuple[str, ...] = _CHROMS
+) -> None:
     with gzip.open(path, "wt", newline="") as fh:
         fh.write('track type="bedGraph" description="CpG methylation levels"\n')
-        fh.write("\n".join(_cov_lines(counts, one_based=False)) + "\n")
+        fh.write("\n".join(_cov_lines(counts, one_based=False, chroms=chroms)) + "\n")
 
 
-def _write_combined_bed(path: Path, counts: tuple[int, int]) -> None:
+def _write_combined_bed(
+    path: Path, counts: tuple[int, int], chroms: tuple[str, ...] = _CHROMS
+) -> None:
     m, u = counts
     t = m + u
     pct = 100.0 * m / t
     rows = [
         f"{chrom}\t{pos - 1}\t{pos}\t{m}\t{t}\t{pct:.2f}\t0\t0\t0.00\t{m}\t{t}\t{pct:.2f}"
-        for chrom in ("chr1", SCAFFOLD)
+        for chrom in chroms
         for pos in _POSITIONS
     ]
     path.write_text("\n".join(rows) + "\n")
@@ -76,7 +88,7 @@ _FORMATS = {
 }
 
 
-def _write_cohort(tmp_path: Path, fmt: str = "bismark") -> str:
+def _write_cohort(tmp_path: Path, fmt: str = "bismark", chroms: tuple[str, ...] = _CHROMS) -> str:
     """Write the 2 + 2 cohort in ``fmt`` and return the samplesheet path."""
     writer, suffix, _ = _FORMATS[fmt]
     src_dir = tmp_path / f"src_{fmt}"
@@ -85,7 +97,7 @@ def _write_cohort(tmp_path: Path, fmt: str = "bismark") -> str:
     for group, counts_list in (("treatment", _TREAT_COUNTS), ("control", _CTRL_COUNTS)):
         for i, counts in enumerate(counts_list):
             f = src_dir / f"{group[0]}{i}{suffix}"
-            writer(f, counts)
+            writer(f, counts, chroms)
             sheet.append(f"{group[0]}{i},{group},{f}")
     sheet_path = tmp_path / f"samplesheet_{fmt}.csv"
     sheet_path.write_text("\n".join(sheet) + "\n")
@@ -126,6 +138,15 @@ def _chroms_records(caplog) -> list[logging.LogRecord]:
 def _dmr_chroms(md) -> set[str]:
     dmr = md.uns["dmr"]
     return set(dmr["chrom"].unique().to_list()) if dmr.height else set()
+
+
+def _dmc_chroms(md) -> set[str]:
+    dmc = md.dmc
+    return set(dmc["chrom"].cast(pl.Utf8).unique().to_list()) if dmc.height else set()
+
+
+def _frame_chroms(df: pl.DataFrame) -> set[str]:
+    return set(df["chrom"].cast(pl.Utf8).unique().to_list()) if df.height else set()
 
 
 @pytest.fixture
@@ -318,6 +339,150 @@ def test_tile_permutations_use_the_observed_universe(scaffold_md, monkeypatch, c
     dmr = scaffold_md.uns["dmr"]
     assert dmr.height > 0, "the fixture must yield observed tiles for permutations to run"
     assert "empirical_qvalue" in dmr.columns
+    assert len(seen) == 1 + n_perm
+    assert seen == [["chr1"]] * (1 + n_perm)
+    assert len(_chroms_records(caplog)) == 1, caplog.text
+
+
+# DMC
+
+
+def test_dmc_canonical_only_is_keyword_only():
+    for fn in (process_chromosomes_dmc, ep.tl.dmc):
+        param = inspect.signature(fn).parameters["canonical_only"]
+        assert param.kind is inspect.Parameter.KEYWORD_ONLY, fn.__name__
+        assert param.default is False, fn.__name__
+
+
+def test_dmc_default_keeps_scaffold(scaffold_md, caplog):
+    with caplog.at_level(logging.INFO, logger=_CHROMS_LOGGER):
+        ep.tl.dmc(scaffold_md, test="lr", tsv=False)
+
+    assert _dmc_chroms(scaffold_md) == {"chr1", SCAFFOLD}
+    assert scaffold_md.uns["dmc"]["canonical_only"] is False
+    assert _chroms_records(caplog) == []
+
+
+def test_dmc_canonical_only_drops_scaffold_and_logs_once(scaffold_md, caplog):
+    """The filter shapes the store the engine writes, so the q-values are
+    corrected over chr1 alone; one audit line names the dropped contig."""
+    with caplog.at_level(logging.INFO, logger=_CHROMS_LOGGER):
+        ep.tl.dmc(scaffold_md, test="lr", canonical_only=True, tsv=False)
+
+    assert _dmc_chroms(scaffold_md) == {"chr1"}
+    assert scaffold_md.uns["dmc"]["canonical_only"] is True
+    assert set(scaffold_md.dmc_store.chroms()) == {"chr1"}
+    records = _chroms_records(caplog)
+    assert len(records) == 1, caplog.text
+    msg = records[0].getMessage()
+    assert "[dmc]" in msg and SCAFFOLD in msg
+
+
+def test_dmc_explicit_chromosomes_take_precedence(scaffold_md, caplog):
+    with caplog.at_level(logging.INFO, logger=_CHROMS_LOGGER):
+        ep.tl.dmc(scaffold_md, test="lr", chromosomes=[SCAFFOLD], canonical_only=True, tsv=False)
+    assert _dmc_chroms(scaffold_md) == {SCAFFOLD}
+    assert _chroms_records(caplog) == []
+
+
+def test_dmc_explicit_empty_list_takes_precedence(scaffold_md, caplog):
+    with caplog.at_level(logging.INFO, logger=_CHROMS_LOGGER):
+        ep.tl.dmc(scaffold_md, test="lr", chromosomes=[], canonical_only=True, tsv=False)
+    assert scaffold_md.uns["dmc"]["n_sites"] == 0
+    assert scaffold_md.dmc.height == 0
+    assert _chroms_records(caplog) == []
+
+
+def test_dmc_canonical_only_with_no_canonical_contig_is_a_valid_empty_run(tmp_path):
+    """A store holding only the scaffold filters down to nothing: the run
+    completes with an empty result rather than failing."""
+    sheet = _write_cohort(tmp_path, chroms=(SCAFFOLD,))
+    md = _read(sheet, tmp_path / "store")
+    ep.pp.set_unite_type(md, type="intersect")
+
+    ep.tl.dmc(md, test="lr", canonical_only=True, tsv=False)
+
+    assert md.uns["dmc"]["n_sites"] == 0
+    assert md.dmc.height == 0
+    assert md.dmc_store.chroms() == []
+
+
+def test_dmc_contrast_path_honours_canonical_only(scaffold_md, caplog):
+    with caplog.at_level(logging.INFO, logger=_CHROMS_LOGGER):
+        ep.tl.dmc(scaffold_md, formula="~ group", contrast="group", canonical_only=True, tsv=False)
+
+    assert scaffold_md.uns["dmc"]["last_key"] == "dmc_glm_contrast"
+    assert _dmc_chroms(scaffold_md) == {"chr1"}
+    assert scaffold_md.uns["dmc"]["canonical_only"] is True
+    assert len(_chroms_records(caplog)) == 1
+
+
+def test_dmc_engine_filters_auto_detected_chromosomes_only(scaffold_md):
+    """``process_chromosomes_dmc`` honours the option for direct callers, and
+    the resolved list is part of the low-level cache identity: the default
+    run after a filtered one recomputes instead of serving the chr1-only
+    store."""
+    kwargs = dict(
+        methylstore_path=scaffold_md.store,
+        samples_treatment=scaffold_md.treatment_ids,
+        samples_control=scaffold_md.control_ids,
+        test="lr",
+    )
+    auto = process_chromosomes_dmc(**kwargs, canonical_only=True)
+    assert _frame_chroms(auto) == {"chr1"}
+    explicit = process_chromosomes_dmc(**kwargs, chromosomes=[SCAFFOLD], canonical_only=True)
+    assert _frame_chroms(explicit) == {SCAFFOLD}
+    default = process_chromosomes_dmc(**kwargs)
+    assert _frame_chroms(default) == {"chr1", SCAFFOLD}
+
+
+def test_dmc_resume_false_true_false_invalidates_and_identical_call_resumes(scaffold_md):
+    md = scaffold_md
+    ep.tl.dmc(md, test="lr", resumable=True, tsv=False)
+    assert md.uns["dmc"]["resumed"] is False
+    assert _dmc_chroms(md) == {"chr1", SCAFFOLD}
+
+    ep.tl.dmc(md, test="lr", resumable=True, canonical_only=True, tsv=False)
+    assert md.uns["dmc"]["resumed"] is False
+    assert _dmc_chroms(md) == {"chr1"}
+
+    ep.tl.dmc(md, test="lr", resumable=True, canonical_only=False, tsv=False)
+    assert md.uns["dmc"]["resumed"] is False
+    assert _dmc_chroms(md) == {"chr1", SCAFFOLD}
+
+    ep.tl.dmc(md, test="lr", resumable=True, canonical_only=False, tsv=False)
+    assert md.uns["dmc"]["resumed"] is True
+    assert md.uns["dmc"]["canonical_only"] is False
+    assert _dmc_chroms(md) == {"chr1", SCAFFOLD}
+
+
+def test_dmc_permutations_use_the_observed_universe(scaffold_md, monkeypatch, caplog):
+    """The observed engine run and every ``empirical_fdr`` permutation
+    receive the same resolved chromosome list; the audit line fires once."""
+    seen: list[list[str] | None] = []
+    real = dmc_mod.process_chromosomes_dmc
+
+    def recording(*args, **kwargs):
+        seen.append(kwargs.get("chromosomes"))
+        return real(*args, **kwargs)
+
+    # The stage binds the engine name at import; the permutation harness in
+    # dmc.py calls the module global.
+    monkeypatch.setattr(stages_mod, "process_chromosomes_dmc", recording)
+    monkeypatch.setattr(dmc_mod, "process_chromosomes_dmc", recording)
+
+    n_perm = 3
+    with caplog.at_level(logging.INFO, logger=_CHROMS_LOGGER):
+        ep.tl.dmc(
+            scaffold_md,
+            test="lr",
+            canonical_only=True,
+            empirical_fdr=True,
+            n_perm=n_perm,
+            tsv=False,
+        )
+
+    assert "empirical_qvalue" in scaffold_md.dmc.columns
     assert len(seen) == 1 + n_perm
     assert seen == [["chr1"]] * (1 + n_perm)
     assert len(_chroms_records(caplog)) == 1, caplog.text

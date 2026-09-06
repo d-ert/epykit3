@@ -88,6 +88,40 @@ SemVer (`MAJOR.MINOR.PATCH`).
   `pysam` was not installed.
 ### Added
 
+- **Opt-in canonical chromosome filtering in DMC calling, and the
+  supported options on the CLI.** `tl.dmc` and both overloads of
+  `process_chromosomes_dmc` accept keyword-only `canonical_only=False`.
+  `True` keeps only the fixed human-style set of the `epykit._chroms`
+  helper from the auto-detected partitions, before the engine and before
+  the multiple-testing correction, on the binary and the `formula=` /
+  `contrast=` path; one INFO line names the dropped contigs. The new
+  `dmc.resolve_dmc_chromosomes` resolves the universe once, `plan_run`
+  carries it on the `DMCPlan`, and the engine run and every
+  `empirical_fdr` permutation receive the same explicit list. The resolved
+  list stays part of the low-level cache signature, `canonical_only` joins
+  the `resumable=True` fingerprint and is recorded as a bool in
+  `md.uns["dmc"]` on the binary, resume-hit and contrast paths. An explicit
+  `chromosomes=` list, including an empty one, is used verbatim, and a
+  store without canonical contigs yields the usual empty result. The
+  `tl.dmr` rejection for non-tile methods now points at
+  `tl.dmc(canonical_only=True)`. On the CLI, `convert`, `dmc` and `dmr`
+  take `--canonical-only` (default off): `convert` forwards it to
+  `convert_sample`, the binary `dmc` path to `process_chromosomes_dmc` and
+  the `--formula` / `--contrast` path to `tl.dmc`, and `dmr --method tile`
+  resolves the list once for the tile caller and every `--empirical-fdr`
+  permutation; the DMC-derived `dmr` methods exit with an error that points
+  at `epykit dmc --canonical-only`. `dmc` also takes `--smoothing` (default
+  off) and `--smoothing-span-bp` (default 500), forwarded to the binary
+  engine; the span must be positive while smoothing is on, and because only
+  the `lr` engine reads the knobs, `--smoothing` with another engine, with
+  the `--allow-n1` Fisher fallback, or on the `--formula` / `--contrast`
+  path exits with an error instead of being ignored. No DMR smoothing,
+  `--all-contigs` or lr+ flags are added. Defaults and numerical output are
+  unchanged; the engine hash gate holds. The CLI reference now documents
+  the `--tsv` flags as the primary names with the `--csv` flags as
+  deprecated aliases, and its examples use the flags the commands accept.
+  See `docs/analysis/dmc.md`, `docs/cli/index.md` and
+  `docs/advanced/architecture.md`.
 - **Opt-in count-ratio region FDR and chain_merge permutations.**
   `tl.dmr(..., empirical_fdr=True)` and `empirical_fdr_for_dmr` accept
   `fdr_method`. `"max_t"` (the default) keeps the Westfall-Young min-P
@@ -136,6 +170,12 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ### Fixed
 
+- **`resumable=True` now keys on count smoothing.** The resume fingerprint
+  did not include `smoothing` or `smoothing_span_bp`, so
+  `tl.dmc(smoothing=True, resumable=True)` after an unsmoothed resumable
+  run, or a span change between two smoothed runs, returned the earlier
+  sidecar. Both join the fingerprint; the span is keyed only while
+  smoothing is on. Existing resume sidecars recompute once.
 - **Documented permissive DMR preset.** The `tl.dmr` docstring listed
   `dis_merge_bp=200` for `preset="permissive"`; the `DMR_PRESETS` bundle has
   used 1000 since the chain_merge gap defaults were widened. The chain_merge

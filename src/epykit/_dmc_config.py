@@ -54,6 +54,7 @@ class DMCConfig:
     use_smoothed: bool = False
     smoothing: bool = False
     smoothing_span_bp: int = 500
+    canonical_only: bool = False
     fdr_method: str = "fdr_bh"
     neighbour_combine: bool = False
     neighbour_bp: int = 500
@@ -166,12 +167,16 @@ class DMCConfig:
         """The params half of the ``resumable=True`` fingerprint.
 
         Every knob that changes engine output is listed, including the
-        ``lr+`` stack knobs: leaving one out would let a parameter sweep
-        silently reuse a cached result computed at different values.
+        ``lr+`` stack knobs, ``canonical_only`` and the DSS-style count
+        smoothing: leaving one out would let a parameter sweep silently
+        reuse a cached result computed at different values. The smoothing
+        span is keyed only while smoothing is on, so changing an unused
+        span does not invalidate a cache.
         """
         return {
             "test": selected_test,
             "chromosomes": self.chromosomes,
+            "canonical_only": self.canonical_only,
             "unite": unite,
             "min_samples_treatment": self.min_samples_treatment,
             "min_samples_control": self.min_samples_control,
@@ -186,6 +191,8 @@ class DMCConfig:
             "neighbour_combine": self.neighbour_combine,
             "neighbour_bp": self.neighbour_bp,
             "fdr_method": self.fdr_method,
+            "smoothing": self.smoothing,
+            "smoothing_span_bp": self.smoothing_span_bp if self.smoothing else None,
         }
 
     def to_uns(
@@ -215,8 +222,10 @@ class DMCConfig:
         the resolved ``formula`` and ``contrast`` label. That path does not
         consume the power stack, permutation FDR or smoothing knobs, so
         they are recorded as ``None`` there; the binary path records the
-        contrast fields as ``None``. ``store_path`` is ``None`` when no
-        DMCStore was opened (the resume cache hit).
+        contrast fields as ``None``. ``canonical_only`` shapes the
+        chromosome universe on every path and is recorded as a bool on all
+        three. ``store_path`` is ``None`` when no DMCStore was opened (the
+        resume cache hit).
         """
         binary = design_terms is None
 
@@ -253,6 +262,9 @@ class DMCConfig:
             "smoothing_span_bp": binary_only(
                 int(self.smoothing_span_bp) if self.smoothing else None
             ),
+            # Opt-in canonical chromosome filter of the auto-detected
+            # partitions; applies to the binary and the contrast run alike.
+            "canonical_only": bool(self.canonical_only),
             # Persistent per-chromosome DMCStore, so tl.dmr can stream
             # chromosomes from disk instead of holding the full table.
             "store_path": store_path,

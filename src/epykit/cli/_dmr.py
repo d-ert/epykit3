@@ -20,12 +20,26 @@ def _cmd_dmr(args: argparse.Namespace):
 
     from ..dmr import (
         _DMR_DEFAULT_MIN_CPGS,
+        _resolve_tile_chromosomes,
         apply_region_qfilter,
         call_dmr_chain_merge,
         call_dmr_sliding_window,
         call_dmr_tile_based,
         resolve_layer_min_cpgs,
     )
+
+    # Mirror of tl.dmr: canonical_only is tile-only. The DMC-derived methods
+    # inherit the chromosome universe of the DMC parquet, so the filter
+    # belongs upstream; refuse rather than filter a finished q-value table.
+    canonical_only = bool(getattr(args, "canonical_only", False))
+    if canonical_only and args.method != "tile":
+        raise SystemExit(
+            f"error: --canonical-only applies to --method tile only; got "
+            f"--method {args.method}. The DMC-derived methods use the chromosome "
+            f"universe of the DMC parquet, so filter there: run epykit dmc "
+            f"--canonical-only (or epykit convert --canonical-only), then call "
+            f"epykit dmr without --canonical-only."
+        )
 
     # M2 gate (mirror of tl.dmr): empirical_fdr is wired only for method=tile.
     # Pre-fix the CLI accepted --empirical-fdr against any method and silently
@@ -87,13 +101,21 @@ def _cmd_dmr(args: argparse.Namespace):
         print(f"Control samples:   {control_samples}")
         print(f"Tile size:         {args.tile_size_bp} bp")
         print(f"Test:              {args.test}")
+        if canonical_only:
+            print("Chromosomes:       canonical set only (--canonical-only)")
 
+        # Resolve the chromosome universe once, as tl.dmr does, and hand the
+        # same explicit list to the observed run and every permutation.
+        tile_chromosomes = _resolve_tile_chromosomes(
+            args.methylstore, None, canonical_only=canonical_only
+        )
         dmr_results = call_dmr_tile_based(
             methylstore_path=args.methylstore,
             samples_treatment=treatment_samples,
             samples_control=control_samples,
             tile_size_bp=args.tile_size_bp,
             test=args.test,
+            chromosomes=tile_chromosomes,
             min_cpgs_per_tile=args.min_cpgs_per_tile,
             alpha=args.alpha,
             min_abs_meth_diff=args.min_abs_meth_diff,
@@ -125,6 +147,7 @@ def _cmd_dmr(args: argparse.Namespace):
                 seed=args.perm_seed,
                 tile_size_bp=args.tile_size_bp,
                 test=args.test,
+                chromosomes=tile_chromosomes,
                 min_cpgs_per_tile=args.min_cpgs_per_tile,
                 alpha=args.alpha,
                 min_abs_meth_diff=args.min_abs_meth_diff,
@@ -250,6 +273,19 @@ def register(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
         type=int,
         default=42,
         help="(tile only) Seed for permutation RNG.",
+    )
+    p_dmr.add_argument(
+        "--canonical-only",
+        dest="canonical_only",
+        action="store_true",
+        default=False,
+        help=(
+            "(tile only) Test only the fixed human-style chromosome set (1-22, X, "
+            "Y, M/MT, with or without a chr prefix) of the store's partitions; the "
+            "same set is used by every --empirical-fdr permutation. The other "
+            "methods inherit the DMC parquet's chromosomes and reject the flag: "
+            "run epykit dmc --canonical-only instead. Default: every partition."
+        ),
     )
     # Default is union, matching ep.tl.dmr (no pp.unite step). --unite forces
     # intersect (tiles covered in ALL samples); --no-unite explicitly selects

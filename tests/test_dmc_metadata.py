@@ -67,6 +67,8 @@ CANONICAL_UNS_KEYS = [
     "smooth_method",
     "smoothing",
     "smoothing_span_bp",
+    # opt-in canonical chromosome filter (1.2), a bool on every path
+    "canonical_only",
     "store_path",
     # resume-hit path
     "resumed",
@@ -158,6 +160,7 @@ def test_main_path_writes_canonical_record(md):
     assert rec["materialized"] is True
     assert rec["unite"] is True
     assert rec["resumed"] is False
+    assert rec["canonical_only"] is False
     for key in ("formula", "contrast", "design_terms", "covariates", "treatment_col"):
         assert rec[key] is None, key
 
@@ -197,6 +200,9 @@ def test_resume_hit_path_writes_canonical_record(md):
         "neighbour_combine",
         "neighbour_bp",
         "fdr_method",
+        "smoothing",
+        "smoothing_span_bp",
+        "canonical_only",
     ):
         assert rec[key] == computed[key], key
 
@@ -221,6 +227,7 @@ def test_contrast_path_writes_canonical_record(md):
     assert rec["covariates"] is None
     assert rec["treatment_col"] == "treatment"
     assert rec["fdr_method"] == "fdr_bh"
+    assert rec["canonical_only"] is False
     # Knobs the contrast path does not consume are recorded as not applicable.
     for key in (
         "empirical_fdr",

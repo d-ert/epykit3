@@ -23,6 +23,7 @@ def _cmd_convert(args: argparse.Namespace):
         reference_fasta=args.reference_fasta,
         merge_strands=merge_strands,  # CLI flag is --merge-cpg; param is merge_strands
         format=args.format,
+        canonical_only=getattr(args, "canonical_only", False),
     )
 
 
@@ -88,6 +89,18 @@ def register(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
         dest="merge_cpg",
         action="store_false",
         help="Disable CpG-dyad merging; keep per-strand records.",
+    )
+    p_conv.add_argument(
+        "--canonical-only",
+        dest="canonical_only",
+        action="store_true",
+        default=False,
+        help=(
+            "Keep only the fixed human-style chromosome set (1-22, X, Y, M/MT, "
+            "with or without a chr prefix) and drop every other contig before "
+            "the partition write. The setting is part of the per-sample "
+            "conversion cache. Default: keep every contig."
+        ),
     )
     p_conv.set_defaults(merge_cpg=None, func=_cmd_convert)
 
