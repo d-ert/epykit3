@@ -1839,13 +1839,17 @@ def _aggregate_region_perm_results(
                 UserWarning,
                 stacklevel=3,
             )
-        emp_p, emp_q, fdr_set = _region_count_ratio_fdr(
-            observed_pvalues=obs_safe,
+        finite_p, finite_q, fdr_set = _region_count_ratio_fdr(
+            observed_pvalues=obs_p[obs_finite_mask],
             null_pools=null_pools,
             n_perm_used=n_perm_used,
         )
-        emp_p = np.where(obs_finite_mask, emp_p, np.nan)
-        emp_q = np.where(obs_finite_mask, emp_q, np.nan)
+        # Missing statistics must not count as observed survivors or lower
+        # finite regions' q-values through the suffix minimum.
+        emp_p = np.full_like(obs_p, np.nan)
+        emp_q = np.full_like(obs_p, np.nan)
+        emp_p[obs_finite_mask] = finite_p
+        emp_q[obs_finite_mask] = finite_q
         logger.info("%s[region]: set-level FDR=%.4f", label, fdr_set)
         return emp_p, emp_q, fdr_set
 

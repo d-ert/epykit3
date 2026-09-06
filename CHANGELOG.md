@@ -6,6 +6,12 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+### Fixed
+
+- Region permutation FDR excludes missing and non-finite observed p-values
+  from survivor counts. Such rows retain NaN estimates and cannot lower
+  valid regions' q-values or the set-level FDR.
+
 ### Added
 
 - **Opt-in count-ratio region FDR and chain_merge permutations.**
