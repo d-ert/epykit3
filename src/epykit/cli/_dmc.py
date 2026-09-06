@@ -14,15 +14,53 @@ from ._common import (
     _read_samplesheet_groups,
 )
 
+# The engine that reads the DSS-style count smoothing; every other engine
+# ignores the knobs, so the CLI refuses the combination instead.
+_SMOOTHING_ENGINE = "lr"
+
+
+def _smoothing_opts(args: argparse.Namespace) -> tuple[bool, int]:
+    """``(smoothing, smoothing_span_bp)`` from the parsed flags.
+
+    Exits with a usage error when smoothing is on with a non-positive span.
+    The engine check runs separately, after ``--allow-n1`` may have
+    resolved ``--test`` to ``fisher``.
+    """
+    smoothing = bool(getattr(args, "smoothing", False))
+    span = int(getattr(args, "smoothing_span_bp", 500))
+    if smoothing and span <= 0:
+        raise SystemExit(
+            f"error: --smoothing-span-bp must be a positive number of base pairs "
+            f"when --smoothing is set (got {span})."
+        )
+    return smoothing, span
+
+
+def _refuse_unconsumed_smoothing(args: argparse.Namespace, *, reason: str) -> None:
+    """Exit when ``--smoothing`` was given to a path that does not read it."""
+    if getattr(args, "smoothing", False):
+        raise SystemExit(
+            f"error: --smoothing is an option of the {_SMOOTHING_ENGINE} engine and "
+            f"{reason}. Drop --smoothing, or run the binary treatment / control path "
+            f"with --test {_SMOOTHING_ENGINE}."
+        )
+
 
 def _cmd_dmc(args: argparse.Namespace):
     """Handler for 'dmc' subcommand."""
+    canonical_only = bool(getattr(args, "canonical_only", False))
+    smoothing, smoothing_span_bp = _smoothing_opts(args)
 
     # formula/contrast path uses ALL samples from the
     # samplesheet rather than binary case/control. We build a tiny
     # MethylData on the fly so tl.dmc can resolve the contrast against
     # md.obs.
     if args.formula is not None or args.contrast is not None:
+        # The GLM contrast engine never reads the smoothing knobs; refuse
+        # before any store is opened rather than silently drop the flag.
+        _refuse_unconsumed_smoothing(
+            args, reason="the --formula / --contrast path does not consume it"
+        )
         from .. import read_bismark
         from .. import tl as _tl
 
@@ -50,6 +88,7 @@ def _cmd_dmc(args: argparse.Namespace):
             dispersion=args.dispersion,
             reference=args.reference,
             fdr_method=args.fdr_method,
+            canonical_only=canonical_only,
         )
         key = md.uns.get("dmc", {}).get("last_key", "dmc_glm_contrast")
         results = md.varm.get(key)
@@ -64,6 +103,10 @@ def _cmd_dmc(args: argparse.Namespace):
     )
     args._samples = (treatment_samples, control_samples)
     _cli_n1_and_footgun_checks(args, unit="sites")
+    # After the n=1 check: --allow-n1 may have resolved --test to fisher,
+    # which does not read the smoothing knobs either.
+    if args.test != _SMOOTHING_ENGINE:
+        _refuse_unconsumed_smoothing(args, reason=f"--test {args.test} does not consume it")
 
     print(f"Treatment samples: {treatment_samples}")
     print(f"Control samples:   {control_samples}")
@@ -74,6 +117,10 @@ def _cmd_dmc(args: argparse.Namespace):
             f"Per-site guards:   min_samples_treatment={args.min_samples_treatment}, "
             f"min_samples_control={args.min_samples_control}"
         )
+    if smoothing:
+        print(f"Smoothing:         DSS-style box, span {smoothing_span_bp} bp")
+    if canonical_only:
+        print("Chromosomes:       canonical set only (--canonical-only)")
 
     # Stream through a DMCStore so BH never holds the full DataFrame in
     # memory alongside its own pvalue/qvalue arrays. Materialise once
@@ -89,6 +136,9 @@ def _cmd_dmc(args: argparse.Namespace):
         dispersion=args.dispersion,
         reference=args.reference,
         return_store=True,
+        smoothing=smoothing,
+        smoothing_span_bp=smoothing_span_bp,
+        canonical_only=canonical_only,
     )
     dmc_store = dmc.apply_multiple_testing_correction(dmc_store, method=args.fdr_method)
     results = dmc_store.to_dataframe()
@@ -222,6 +272,43 @@ def register(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
         dest="fdr_method",
         default="fdr_bh",
         help="Multiple-testing correction method (default: fdr_bh).",
+    )
+    # DSS-style count smoothing (an lr engine option, matching
+    # ep.tl.dmc(smoothing=..., smoothing_span_bp=...)). Refused for the
+    # other engines and for the --formula / --contrast path, which do not
+    # read it, so the flag is never silently ignored.
+    p_dmc.add_argument(
+        "--smoothing",
+        dest="smoothing",
+        action="store_true",
+        default=False,
+        help=(
+            "DSS-style per-sample count smoothing for --test lr: replace each "
+            "sample's raw counts by a uniform-box average over the CpGs within "
+            "+/- half the span before the test (DMLfit.multiFactor(smoothing=TRUE)). "
+            "Default: off. Not accepted with the other engines or with --formula / "
+            "--contrast."
+        ),
+    )
+    p_dmc.add_argument(
+        "--smoothing-span-bp",
+        dest="smoothing_span_bp",
+        type=int,
+        default=500,
+        help="Full smoothing window in bp for --smoothing (default: 500, the DSS default).",
+    )
+    p_dmc.add_argument(
+        "--canonical-only",
+        dest="canonical_only",
+        action="store_true",
+        default=False,
+        help=(
+            "Test only the fixed human-style chromosome set (1-22, X, Y, M/MT, "
+            "with or without a chr prefix) of the store's partitions; other "
+            "contigs are dropped before the test and the FDR correction. "
+            "Applies to the binary and the --formula / --contrast path. "
+            "Default: test every partition."
+        ),
     )
     p_dmc.add_argument(
         "--no-tsv",
