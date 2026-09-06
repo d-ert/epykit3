@@ -3084,8 +3084,11 @@ def empirical_fdr_for_dmc(
     **conservative at genome scale** (low power across millions of CpGs); it
     is NOT a pooled-null per-site FDR despite the function name.
     ``empirical_qvalue`` is a subsequent BH transform of those FWER p-values,
-    provided for convenience. For a less conservative region-level empirical
-    FDR, prefer :func:`epykit.dmr.empirical_fdr_for_dmr` on DMRs.
+    provided for convenience. This function has no ``fdr_method`` knob: it
+    is always this max-T style statistic. The less conservative count-ratio
+    mode, ``fdr_method="region"``, exists only on the DMR side
+    (:func:`epykit.dmr.empirical_fdr_for_dmr` and ``tl.dmr``), which
+    estimates FDR at the region level.
 
     Parallels :func:`epykit.dmr.empirical_fdr_for_dmr`; same caveats apply:
 
