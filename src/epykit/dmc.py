@@ -36,6 +36,8 @@ import logging
 import tempfile
 import time
 import warnings
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, overload
 
@@ -1324,6 +1326,526 @@ def _load_sample_chrom(
     )
 
 
+_Welford = tuple[np.ndarray, np.ndarray, np.ndarray]
+"""Per-site ``(mean, M2, n_valid)`` from ``_welford_init`` / ``_welford_update``."""
+
+_PooledCounts = tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+"""Per-site ``(meth_case, cov_case, meth_ctrl, cov_ctrl)`` summed over replicates."""
+
+
+@dataclass(frozen=True)
+class EngineInput:
+    """One chromosome's inputs to an engine runner and the finalizer.
+
+    ``canonical_df`` is the (pos, strand) site frame every sample is aligned
+    to; ``canonical_pos`` and ``n_sites`` derive from it. The sample split,
+    the selected ``test``, the minimum-sample thresholds and every engine and
+    design knob travel together so a runner reads one record.
+    """
+
+    methylstore_path: Path
+    chrom: str
+    canonical_df: pl.DataFrame
+    samples_case: list[str]
+    samples_control: list[str]
+    test: str
+    min_samples_case: int
+    min_samples_control: int
+    dispersion: str
+    reference: str
+    design_full: np.ndarray | None
+    design_reduced: np.ndarray | None
+    coef_idx: int | None
+    contrast_matrix: np.ndarray | None
+    samples_all_ordered: list[str] | None
+    group_labels_per_sample: list[str] | None
+    glm_backend: str
+    smoothing: bool
+    smoothing_span_bp: int
+    sep_fallback: bool
+    sep_threshold: float
+
+    @property
+    def canonical_pos(self) -> pl.DataFrame:
+        """The ``pos`` column alone: the key ``_load_sample_chrom`` aligns on."""
+        return self.canonical_df.select("pos")
+
+    @property
+    def n_sites(self) -> int:
+        return len(self.canonical_df)
+
+
+@dataclass(frozen=True)
+class MultigroupResult:
+    """The joint-contrast (k > 1) outputs that replace the scalar effect."""
+
+    f_stat: np.ndarray
+    df1: int
+    df2: np.ndarray
+    level_mean_beta: dict[str, np.ndarray]
+
+
+@dataclass(frozen=True)
+class EngineResult:
+    """The reduced per-site output of one runner, one entry per canonical site.
+
+    A runner returns only these arrays. Per-sample stacks and streaming
+    accumulators end with the runner's scope, so nothing sample-shaped
+    outlives one chromosome.
+    """
+
+    pvals: np.ndarray
+    log2_ors: np.ndarray
+    """The registry's ``effect_column``: a pooled log2 odds ratio, or the GLM
+    coefficient in log2 units."""
+    welford_case: _Welford
+    welford_ctrl: _Welford
+    extras: dict[str, np.ndarray] = field(default_factory=dict)
+    """Engine-specific columns: ``coef_treatment`` and ``coef_se`` on the
+    single-coefficient GLM paths."""
+    pooled_counts: _PooledCounts | None = None
+    """Set by fisher and lr, which take the Newcombe interval on them."""
+    phi_eff: np.ndarray | None = None
+    """Per-site dispersion. lr shares it with the Newcombe interval and the
+    GLM paths with the delta-method interval; None for fisher (binomial
+    interval) and welch_t."""
+    df_phi: np.ndarray | None = None
+    """The df behind ``phi_eff``, floored to ``DF_PHI_FLOOR``: the Newcombe
+    reference on the lr path."""
+    multigroup: MultigroupResult | None = None
+
+
+def _run_fisher(inp: EngineInput) -> EngineResult:
+    """Fisher exact on per-group pooled read counts.
+
+    Ignores between-replicate variability. The user-facing warning fires
+    once per call from ``_validate_sample_size_and_warn``, not here, to
+    avoid per-chromosome warning spam. Welford accumulators still supply the
+    per-replicate mean_beta_* columns.
+    """
+    n_sites = inp.n_sites
+    canonical_pos = inp.canonical_pos
+    w_case = _welford_init(n_sites)
+    w_ctrl = _welford_init(n_sites)
+
+    meth_case_sum = np.zeros(n_sites, dtype=np.int64)
+    cov_case_sum = np.zeros(n_sites, dtype=np.int64)
+    meth_ctrl_sum = np.zeros(n_sites, dtype=np.int64)
+    cov_ctrl_sum = np.zeros(n_sites, dtype=np.int64)
+
+    for sample in inp.samples_case:
+        meth, cov = _load_sample_chrom(inp.methylstore_path, inp.chrom, sample, canonical_pos)
+        meth_case_sum += meth.astype(np.int64)
+        cov_case_sum += cov.astype(np.int64)
+        _welford_update(*w_case, meth, cov)
+        del meth, cov
+
+    for sample in inp.samples_control:
+        meth, cov = _load_sample_chrom(inp.methylstore_path, inp.chrom, sample, canonical_pos)
+        meth_ctrl_sum += meth.astype(np.int64)
+        cov_ctrl_sum += cov.astype(np.int64)
+        _welford_update(*w_ctrl, meth, cov)
+        del meth, cov
+
+    unmeth_case_sum = cov_case_sum - meth_case_sum
+    unmeth_ctrl_sum = cov_ctrl_sum - meth_ctrl_sum
+    pvals, log2_ors = fisher_exact_vectorized(
+        meth_case_sum, unmeth_case_sum, meth_ctrl_sum, unmeth_ctrl_sum
+    )
+    return EngineResult(
+        pvals=pvals,
+        log2_ors=log2_ors,
+        welford_case=w_case,
+        welford_ctrl=w_ctrl,
+        # Newcombe CI on the pooled counts (P1-3); no dispersion, so the
+        # interval stays binomial.
+        pooled_counts=(
+            meth_case_sum.astype(np.float64),
+            cov_case_sum.astype(np.float64),
+            meth_ctrl_sum.astype(np.float64),
+            cov_ctrl_sum.astype(np.float64),
+        ),
+    )
+
+
+def _run_lr(inp: EngineInput) -> EngineResult:
+    """Quasi-binomial likelihood-ratio test with McCullagh-Nelder overdispersion.
+
+    Streams the (sn, sm, sm^2/n, nv) accumulators per group and hands them
+    to ``_score_finalize`` with ``statistic="lr"``.
+
+    DSS-style smoothing (``smoothing=True``) replicates
+    ``DMLfit.multiFactor(smoothing=TRUE)``: for each sample, the raw
+    (meth, cov) counts are replaced by a uniform-box moving average over
+    CpGs within +/-smoothing_span_bp//2 bp before they hit the accumulators.
+    The kernel matches DSS's smooth.chr / nitem_bin / windowFilter exactly.
+    Counts stay float for accumulator precision.
+    """
+    n_sites = inp.n_sites
+    canonical_pos = inp.canonical_pos
+    w_case = _welford_init(n_sites)
+    w_ctrl = _welford_init(n_sites)
+    sn_case, sm_case, sm2n_case, nv_case = _score_init(n_sites)
+    sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl = _score_init(n_sites)
+    chrom_positions = canonical_pos.to_series().to_numpy() if inp.smoothing else None
+
+    for sample in inp.samples_case:
+        meth, cov = _load_sample_chrom(inp.methylstore_path, inp.chrom, sample, canonical_pos)
+        if inp.smoothing:
+            meth, cov = _smooth_sample_counts_box(
+                meth,
+                cov,
+                chrom_positions,
+                inp.smoothing_span_bp,
+            )
+        _score_update(sn_case, sm_case, sm2n_case, nv_case, meth, cov)
+        # Welford accumulators are also updated so that the finalizer's
+        # n_valid_case guard sees the same per-site sample count. The Welford
+        # mean is overwritten below with the coverage-weighted score-test
+        # equivalent, so its post-update value is irrelevant.
+        _welford_update(*w_case, meth, cov)
+        del meth, cov
+
+    for sample in inp.samples_control:
+        meth, cov = _load_sample_chrom(inp.methylstore_path, inp.chrom, sample, canonical_pos)
+        if inp.smoothing:
+            meth, cov = _smooth_sample_counts_box(
+                meth,
+                cov,
+                chrom_positions,
+                inp.smoothing_span_bp,
+            )
+        _score_update(sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl, meth, cov)
+        _welford_update(*w_ctrl, meth, cov)
+        del meth, cov
+
+    pvals, log2_ors, pi_case, pi_ctrl, _phi_hat, phi_eff, df_phi = _score_finalize(
+        sn_case,
+        sm_case,
+        sm2n_case,
+        nv_case,
+        sn_ctrl,
+        sm_ctrl,
+        sm2n_ctrl,
+        nv_ctrl,
+        chrom_name=inp.chrom,
+        dispersion=inp.dispersion,
+        statistic="lr",
+        reference=inp.reference,
+        sep_fallback=inp.sep_fallback,
+        sep_threshold=inp.sep_threshold,
+    )
+
+    # Coverage-weighted (= pooled MLE) group methylation for output.
+    # Overwrite Welford's unweighted means with the score-test equivalents
+    # so the finalizer reports the values consistent with the test's math.
+    # nv_case / nv_ctrl from the score path agree with Welford's n_valid by
+    # construction, so those are not overwritten.
+    mean_case, mean_ctrl = w_case[0], w_ctrl[0]
+    mean_case[:] = np.where(np.isnan(pi_case), 0.0, pi_case)
+    mean_ctrl[:] = np.where(np.isnan(pi_ctrl), 0.0, pi_ctrl)
+
+    return EngineResult(
+        pvals=pvals,
+        log2_ors=log2_ors,
+        welford_case=w_case,
+        welford_ctrl=w_ctrl,
+        # Pooled counts for the Newcombe CI (P1-3): sn = pooled coverage,
+        # sm = pooled methylated reads, summed across samples.
+        pooled_counts=(sm_case, sn_case, sm_ctrl, sn_ctrl),
+        # Share the test's variance model with the CI: per-site dispersion
+        # and its df (pre-floored to DF_PHI_FLOOR, matching the adaptive
+        # F(1, df_phi) reference the p-value uses). Without this the CI is
+        # an anti-conservatively narrow binomial interval next to an
+        # overdispersion-aware p-value (M1).
+        phi_eff=phi_eff,
+        df_phi=np.maximum(df_phi, DF_PHI_FLOOR),
+    )
+
+
+def _run_welch_t(inp: EngineInput) -> EngineResult:
+    """Welch t-test on per-replicate beta values.
+
+    Welford accumulators give per-site variance without materialising the
+    (n_sites x n_replicates) matrix.
+    """
+    n_sites = inp.n_sites
+    canonical_pos = inp.canonical_pos
+    w_case = _welford_init(n_sites)
+    w_ctrl = _welford_init(n_sites)
+
+    for sample in inp.samples_case:
+        meth, cov = _load_sample_chrom(inp.methylstore_path, inp.chrom, sample, canonical_pos)
+        _welford_update(*w_case, meth, cov)
+        del meth, cov
+
+    for sample in inp.samples_control:
+        meth, cov = _load_sample_chrom(inp.methylstore_path, inp.chrom, sample, canonical_pos)
+        _welford_update(*w_ctrl, meth, cov)
+        del meth, cov
+
+    pvals, log2_ors = _beta_binom_mom_from_welford(*w_case, *w_ctrl)
+    return EngineResult(pvals=pvals, log2_ors=log2_ors, welford_case=w_case, welford_ctrl=w_ctrl)
+
+
+def _run_glm(inp: EngineInput) -> EngineResult:
+    """Covariate-aware binomial GLM with a deviance LR test.
+
+    Loads every sample's (meth, cov) for this chromosome into an
+    (n_sites, n_samples) stack so the batched IRLS can fit one GLM per site
+    against the shared design matrix. n_sites is the whole chromosome, so
+    the stacks are O(chrom_sites x n_samples) int32 (about 120 MB at 2.5M
+    CpGs x 6 samples on chr1) plus the (n_sites, p, p) einsum arrays in
+    ``_glm``. Still per-chromosome, but with an (n_samples + p^2) multiplier
+    the lr path does not carry. The stacks end with this function.
+    """
+    if inp.design_full is None or inp.design_reduced is None or inp.coef_idx is None:
+        raise ValueError(
+            "test='glm' requires design_full, design_reduced, and "
+            "coef_idx. Build them via epykit._glm.build_design(md.obs, "
+            "samples_ordered=samples_case+samples_control, formula=...)."
+        )
+    design_full, design_reduced, coef_idx = inp.design_full, inp.design_reduced, inp.coef_idx
+
+    all_samples = inp.samples_case + inp.samples_control
+    n_samples = len(all_samples)
+    if design_full.shape[0] != n_samples:
+        raise ValueError(
+            f"design_full has {design_full.shape[0]} rows but "
+            f"{n_samples} samples were passed. Rows must follow "
+            "samples_case + samples_control order."
+        )
+
+    n_sites = inp.n_sites
+    canonical_pos = inp.canonical_pos
+    w_case = _welford_init(n_sites)
+    w_ctrl = _welford_init(n_sites)
+    meth_stack = np.zeros((n_sites, n_samples), dtype=np.int32)
+    cov_stack = np.zeros((n_sites, n_samples), dtype=np.int32)
+    for j, sample in enumerate(all_samples):
+        meth, cov = _load_sample_chrom(inp.methylstore_path, inp.chrom, sample, canonical_pos)
+        meth_stack[:, j] = meth
+        cov_stack[:, j] = cov
+        # Welford accumulators for the unadjusted mean_beta_* columns.
+        if j < len(inp.samples_case):
+            _welford_update(*w_case, meth, cov)
+        else:
+            _welford_update(*w_ctrl, meth, cov)
+        del meth, cov
+
+    from . import _glm
+
+    beta_full, se_full, dev_full, pearson_full, n_eff = _glm.irls_dispatch(
+        meth_stack,
+        cov_stack,
+        design_full,
+        backend=inp.glm_backend,
+    )
+    _beta_red, _se_red, dev_red, _pearson_red, _ne_red = _glm.irls_dispatch(
+        meth_stack,
+        cov_stack,
+        design_reduced,
+        backend=inp.glm_backend,
+    )
+
+    # df_resid_i = n_eff_i - p_full   (per-site, since coverage gates samples)
+    p_full = design_full.shape[1]
+    df_resid_per_site = n_eff.astype(np.float64) - float(p_full)
+
+    phi_eff, _phi_hat, df_phi = _glm.compute_dispersion_phi(
+        pearson_per_site=pearson_full,
+        df_per_site=df_resid_per_site,
+        dispersion=inp.dispersion,
+        chrom_name=inp.chrom,
+    )
+
+    # LR statistic with dispersion correction. Reduced model drops the
+    # treatment column => 1 df contrast.
+    with np.errstate(invalid="ignore", divide="ignore"):
+        lr_raw = dev_red - dev_full
+        # tiny negative excursions can happen at numerical machine eps
+        lr_raw = np.where(lr_raw < 0, 0.0, lr_raw)
+        chi2_stat = np.where(phi_eff > 0, lr_raw / phi_eff, np.nan)
+
+    # F-reference uses df_phi (df backing the phi estimate), NOT the per-site
+    # residual df. Identical for dispersion="site"; for "chrom"/"shrink"/"eb"
+    # it's the chrom-pool or shrinkage-effective df. Same bug-fix as in
+    # _score_finalize.
+    pvals = _glm.reference_pvalues(
+        chi2_stat,
+        phi_eff,
+        df_phi,
+        reference=inp.reference,
+        df_floor=DF_PHI_FLOOR,
+    )
+
+    # Effect-size columns from the GLM coefficient (log-odds) and its SE.
+    coef_treatment = beta_full[:, coef_idx].astype(np.float64)
+    coef_se = se_full[:, coef_idx].astype(np.float64)
+
+    log2_ors = coef_treatment / np.log(2.0)  # log-odds -> log2 odds
+    degenerate = np.isnan(chi2_stat) | np.isnan(pvals) | (n_eff < 2)
+    pvals = np.where(degenerate, np.nan, pvals)
+    log2_ors = np.where(degenerate, np.nan, log2_ors)
+
+    return EngineResult(
+        pvals=pvals,
+        log2_ors=log2_ors,
+        welford_case=w_case,
+        welford_ctrl=w_ctrl,
+        extras={"coef_treatment": coef_treatment, "coef_se": coef_se},
+        phi_eff=phi_eff,
+    )
+
+
+def _run_glm_contrast(inp: EngineInput) -> EngineResult:
+    """Multi-group / continuous-covariate primary-effect path.
+
+    The caller supplies a shared design matrix ``design_full``, a
+    ``contrast_matrix`` C of shape (k, p), and an ordered
+    ``samples_all_ordered`` whose row order matches ``design_full``. A
+    single-row contrast emits the binary schema with ``coef_*`` extras; a
+    joint contrast (k > 1) emits the multigroup block instead. Carries the
+    same per-chromosome sample stack as ``_run_glm``.
+    """
+    if inp.design_full is None or inp.contrast_matrix is None or inp.samples_all_ordered is None:
+        raise ValueError(
+            "test='glm_contrast' requires design_full, contrast_matrix, and samples_all_ordered."
+        )
+    design_full, contrast_matrix = inp.design_full, inp.contrast_matrix
+    samples_all_ordered = inp.samples_all_ordered
+    group_labels_per_sample = inp.group_labels_per_sample
+    n_samples = len(samples_all_ordered)
+    if design_full.shape[0] != n_samples:
+        raise ValueError(
+            f"design_full has {design_full.shape[0]} rows but "
+            f"{n_samples} samples were supplied via samples_all_ordered."
+        )
+
+    n_sites = inp.n_sites
+    canonical_pos = inp.canonical_pos
+    w_case = _welford_init(n_sites)
+    w_ctrl = _welford_init(n_sites)
+    meth_stack = np.zeros((n_sites, n_samples), dtype=np.int32)
+    cov_stack = np.zeros((n_sites, n_samples), dtype=np.int32)
+    # Welford per-level accumulators. mean_case/mean_ctrl are "all samples
+    # that map to label 'case'" vs "all samples that don't", so the
+    # binary-case columns of the schema still carry interpretable values.
+    # With group_labels_per_sample, one more Welford accumulator per level
+    # feeds the multi-group output schema.
+    level_mean: dict[str, _Welford] = {}
+    if group_labels_per_sample is not None:
+        for lvl in set(group_labels_per_sample):
+            level_mean[lvl] = _welford_init(n_sites)
+
+    for j, sample in enumerate(samples_all_ordered):
+        meth, cov = _load_sample_chrom(inp.methylstore_path, inp.chrom, sample, canonical_pos)
+        meth_stack[:, j] = meth
+        cov_stack[:, j] = cov
+        # Backwards-compat columns: split on whether sample is in samples_case.
+        if sample in inp.samples_case:
+            _welford_update(*w_case, meth, cov)
+        elif sample in inp.samples_control:
+            _welford_update(*w_ctrl, meth, cov)
+        if group_labels_per_sample is not None:
+            lvl = group_labels_per_sample[j]
+            _welford_update(*level_mean[lvl], meth, cov)
+        del meth, cov
+
+    from . import _glm
+
+    beta_full, _se_full, _dev_full, pearson_full, n_eff, cov_beta = _glm.irls_dispatch(
+        meth_stack,
+        cov_stack,
+        design_full,
+        return_cov=True,
+        backend=inp.glm_backend,
+    )
+
+    p_full = design_full.shape[1]
+    df_resid_per_site = n_eff.astype(np.float64) - float(p_full)
+    phi_eff, _phi_hat, df_phi = _glm.compute_dispersion_phi(
+        pearson_per_site=pearson_full,
+        df_per_site=df_resid_per_site,
+        dispersion=inp.dispersion,
+        chrom_name=inp.chrom,
+    )
+    df_resid_safe = np.maximum(df_resid_per_site, 1.0)
+
+    # F-reference uses df_phi (see the note in _run_glm).
+    stat, pvals, k_rank_np = _glm.wald_test(
+        beta_full,
+        cov_beta,
+        contrast_matrix,
+        phi_eff=phi_eff,
+        df_resid=df_phi,
+        reference=inp.reference,
+        df_floor=DF_PHI_FLOOR,
+    )
+    k_rank = int(k_rank_np)
+
+    degenerate = np.isnan(stat) | np.isnan(pvals) | (n_eff < p_full + 1)
+    pvals = np.where(degenerate, np.nan, pvals)
+
+    if k_rank == 1:
+        # Single-coef contrast: surface coef + coef_se on the contrast axis
+        # (Cbeta and sqrt(C cov_beta CT)). Emits the standard binary schema.
+        Cb = (beta_full @ contrast_matrix.T)[:, 0]
+        with np.errstate(invalid="ignore"):
+            var_Cb = np.einsum(
+                "kp,ipq,lq->ikl",
+                contrast_matrix,
+                cov_beta * phi_eff[:, None, None],
+                contrast_matrix,
+            )[:, 0, 0]
+            cse = np.sqrt(np.where(var_Cb > 0, var_Cb, np.nan))
+        log2_ors = Cb / np.log(2.0)
+        log2_ors = np.where(degenerate, np.nan, log2_ors)
+        return EngineResult(
+            pvals=pvals,
+            log2_ors=log2_ors,
+            welford_case=w_case,
+            welford_ctrl=w_ctrl,
+            extras={"coef_treatment": Cb, "coef_se": cse},
+            phi_eff=phi_eff,
+        )
+
+    # Joint contrast: emit the multi-group schema. The binary
+    # mean_beta_case/control columns are not meaningful here; the finalizer
+    # NaN-fills the scalar effect and speaks through f_stat / df1 / df2 and
+    # the per-level mean betas. coef_* extras are not meaningful either.
+    f_stat = (stat / k_rank).astype(np.float64)
+    f_stat = np.where(degenerate, np.nan, f_stat)
+    level_mean_beta: dict[str, np.ndarray] = {}
+    for lvl, (mu_l, _M2_l, nv_l) in level_mean.items():
+        arr = mu_l.astype(np.float32)
+        arr[nv_l == 0] = np.nan
+        level_mean_beta[lvl] = arr
+    return EngineResult(
+        pvals=pvals,
+        log2_ors=np.full(n_sites, np.nan, dtype=np.float64),
+        welford_case=w_case,
+        welford_ctrl=w_ctrl,
+        phi_eff=phi_eff,
+        multigroup=MultigroupResult(
+            f_stat=f_stat,
+            df1=k_rank,
+            df2=df_resid_safe.astype(np.float64),
+            level_mean_beta=level_mean_beta,
+        ),
+    )
+
+
+# One runner per registry engine; a test asserts the key sets match.
+_ENGINE_RUNNERS: dict[str, Callable[[EngineInput], EngineResult]] = {
+    "fisher": _run_fisher,
+    "lr": _run_lr,
+    "welch_t": _run_welch_t,
+    "glm": _run_glm,
+    "glm_contrast": _run_glm_contrast,
+}
+
+
 def _process_one_chromosome(
     methylstore_path: Path,
     chrom: str,
@@ -1350,441 +1872,60 @@ def _process_one_chromosome(
 ) -> pl.DataFrame:
     """Run DMC for one chromosome, loading one sample at a time.
 
-    Memory design
-    -------------
-    Peak memory is O(n_sites) regardless of sample count for the
-    Fisher and Welford paths:
-
-        fisher / logit_t / welch_t:
-            4 int64 running sums (Fisher) OR
-            6 arrays per group (Welford: float64 mean, float64 M2, int32 n_valid)
-
-    Statistical paths
-    -----------------
-    fisher
-        Fisher exact on reads pooled across replicates. Emits a warning;
-        anti-conservative because between-replicate variance is ignored.
-        Provided for parity with single-rep tools and aggregate reporting.
-
-    logit_t / welch_t
-        Welch t-test on per-replicate beta values (logit-transformed for
-        `logit_t`). Welford accumulators give per-site variance without
-        materialising the count matrix.
+    Dispatches to the engine's runner in ``_ENGINE_RUNNERS`` and hands its
+    reduced arrays to :func:`_finalise_chromosome`. Peak memory is
+    O(n_sites) regardless of sample count on the fisher, lr and welch_t
+    paths; the GLM paths add one (n_sites, n_samples) int32 stack per
+    chromosome. ``contrast_label`` is accepted for call-site symmetry and
+    recorded by the stage; no engine reads it.
     """
-    n_sites = len(canonical_df)
-    if n_sites == 0:
+    if len(canonical_df) == 0:
         return pl.DataFrame(schema=_EMPTY_SCHEMA)
-
-    canonical_pos = canonical_df.select("pos")
-
-    # Welford accumulators provide mean_beta_case / mean_beta_ctrl and
-    # n_valid_* for every code path. They are always populated even when
-    # the chosen test (e.g. fisher) does not use the variance.
-    mean_case, M2_case, n_valid_case = _welford_init(n_sites)
-    mean_ctrl, M2_ctrl, n_valid_ctrl = _welford_init(n_sites)
-
-    # Optional extras populated by individual branches. Surfaced into the
-    # output schema at the bottom of this function when present.
-    extras: dict[str, np.ndarray] = {}
-    # When contrast_matrix produces a joint test (k>1) we emit a different
-    # schema (per-level mean_beta_* + f_stat/df1/df2); detected by checking
-    # `multigroup_mode` at the end.
-    multigroup_mode = False
-    level_mean_beta: dict[str, np.ndarray] = {}
-    f_stat_out: np.ndarray | None = None
-    df1_out: int | None = None
-    df2_out: np.ndarray | None = None
-
-    # Pooled counts retained for Newcombe CI (lr and fisher paths only).
-    # Set to non-None by those branches before the del statements below so
-    # the unified CI block can use newcombe_diff_ci instead of Wald.
-    _newcombe_meth_a: np.ndarray | None = None
-    _newcombe_cov_a: np.ndarray | None = None
-    _newcombe_meth_b: np.ndarray | None = None
-    _newcombe_cov_b: np.ndarray | None = None
-    # Per-site dispersion for a phi-aware Newcombe CI (lr only). Left None for
-    # fisher (no dispersion estimate -> binomial CI, byte-identical).
-    _newcombe_phi: np.ndarray | None = None
-    _newcombe_df: np.ndarray | None = None
-
-    # --- Statistical test ---
-    if test == "fisher":
-        # Fisher exact on per-group POOLED read counts.
-        #
-        # Fisher exact on per-group POOLED read counts. The corrected code
-        # below makes the pooling explicit and routes it through the
-        # well-tested fisher_exact_vectorized() helper.
-        #
-        # NOTE: this test ignores between-replicate variability. The user
-        # facing warning fires once per call from
-        # ``_validate_sample_size_and_warn`` -- not here, to avoid the
-        # per-chromosome warning spam this used to produce.
-        meth_case_sum = np.zeros(n_sites, dtype=np.int64)
-        cov_case_sum = np.zeros(n_sites, dtype=np.int64)
-        meth_ctrl_sum = np.zeros(n_sites, dtype=np.int64)
-        cov_ctrl_sum = np.zeros(n_sites, dtype=np.int64)
-
-        for sample in samples_case:
-            meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
-            meth_case_sum += meth.astype(np.int64)
-            cov_case_sum += cov.astype(np.int64)
-            _welford_update(mean_case, M2_case, n_valid_case, meth, cov)
-            del meth, cov
-
-        for sample in samples_control:
-            meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
-            meth_ctrl_sum += meth.astype(np.int64)
-            cov_ctrl_sum += cov.astype(np.int64)
-            _welford_update(mean_ctrl, M2_ctrl, n_valid_ctrl, meth, cov)
-            del meth, cov
-
-        unmeth_case_sum = cov_case_sum - meth_case_sum
-        unmeth_ctrl_sum = cov_ctrl_sum - meth_ctrl_sum
-        pvals, log2_ors = fisher_exact_vectorized(
-            meth_case_sum, unmeth_case_sum, meth_ctrl_sum, unmeth_ctrl_sum
-        )
-        # Save for Newcombe CI (P1-3).
-        _newcombe_meth_a = meth_case_sum.astype(np.float64)
-        _newcombe_cov_a = cov_case_sum.astype(np.float64)
-        _newcombe_meth_b = meth_ctrl_sum.astype(np.float64)
-        _newcombe_cov_b = cov_ctrl_sum.astype(np.float64)
-        del meth_case_sum, cov_case_sum, unmeth_case_sum
-        del meth_ctrl_sum, cov_ctrl_sum, unmeth_ctrl_sum
-
-    elif test == "lr":
-        # Quasi-binomial likelihood-ratio test with McCullagh-Nelder overdispersion.
-        # Uses streaming accumulators (sn, sm, sm^2/n, nv per group) and the same
-        # dispersion machinery; ``_score_finalize`` is called with statistic="lr".
-        sn_case, sm_case, sm2n_case, nv_case = _score_init(n_sites)
-        sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl = _score_init(n_sites)
-
-        # DSS-style smoothing (smoothing=True) replicates
-        # DMLfit.multiFactor(smoothing=TRUE): for each sample, replace the
-        # raw (meth, cov) counts with a uniform-box moving average over
-        # CpGs within +/-smoothing_span_bp//2 bp before they hit the score
-        # accumulators. The kernel matches DSS's smooth.chr / nitem_bin /
-        # windowFilter exactly. Counts stay float for accumulator precision.
-        chrom_positions = canonical_pos.to_series().to_numpy() if smoothing else None
-
-        for sample in samples_case:
-            meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
-            if smoothing:
-                meth, cov = _smooth_sample_counts_box(
-                    meth,
-                    cov,
-                    chrom_positions,
-                    smoothing_span_bp,
-                )
-            _score_update(sn_case, sm_case, sm2n_case, nv_case, meth, cov)
-            # Welford accumulators are also updated so that downstream code
-            # which reads ``n_valid_case`` for the guard sees the
-            # same per-site sample count.  ``mean_case`` from Welford is
-            # overwritten below with the coverage-weighted score-test
-            # equivalent, so its post-update value is irrelevant.
-            _welford_update(mean_case, M2_case, n_valid_case, meth, cov)
-            del meth, cov
-
-        for sample in samples_control:
-            meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
-            if smoothing:
-                meth, cov = _smooth_sample_counts_box(
-                    meth,
-                    cov,
-                    chrom_positions,
-                    smoothing_span_bp,
-                )
-            _score_update(sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl, meth, cov)
-            _welford_update(mean_ctrl, M2_ctrl, n_valid_ctrl, meth, cov)
-            del meth, cov
-
-        pvals, log2_ors, pi_case, pi_ctrl, _phi_hat, _phi_eff, _df_phi = _score_finalize(
-            sn_case,
-            sm_case,
-            sm2n_case,
-            nv_case,
-            sn_ctrl,
-            sm_ctrl,
-            sm2n_ctrl,
-            nv_ctrl,
-            chrom_name=chrom,
-            dispersion=dispersion,
-            statistic="lr",
-            reference=reference,
-            sep_fallback=sep_fallback,
-            sep_threshold=sep_threshold,
-        )
-
-        # Coverage-weighted (= pooled MLE) group methylation for output.
-        # Overwrite Welford's unweighted means with the score-test
-        # equivalents so the unified output block at the bottom of this
-        # function reports the values consistent with the test's math.
-        mean_case[:] = np.where(np.isnan(pi_case), 0.0, pi_case)
-        mean_ctrl[:] = np.where(np.isnan(pi_ctrl), 0.0, pi_ctrl)
-        # nv_case / nv_ctrl from the score path agree with n_valid_case /
-        # n_valid_ctrl from Welford by construction, so we don't overwrite.
-
-        # Save pooled counts for Newcombe CI (P1-3). sn_case = pooled coverage
-        # (sum across samples), sm_case = pooled methylated-read count.
-        _newcombe_meth_a = sm_case.copy()
-        _newcombe_cov_a = sn_case.copy()
-        _newcombe_meth_b = sm_ctrl.copy()
-        _newcombe_cov_b = sn_ctrl.copy()
-        # Share the test's variance model with the CI: per-site dispersion
-        # and its df (pre-floored to DF_PHI_FLOOR, matching the adaptive
-        # F(1, df_phi) reference the p-value uses). Without this the CI is an
-        # anti-conservatively narrow binomial interval next to an
-        # overdispersion-aware p-value (M1).
-        _newcombe_phi = _phi_eff
-        _newcombe_df = np.maximum(_df_phi, DF_PHI_FLOOR)
-
-        del sn_case, sm_case, sm2n_case, nv_case
-        del sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl
-
-    elif test == "welch_t":
-        # Load all samples for Welford accumulators
-        for sample in samples_case:
-            meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
-            _welford_update(mean_case, M2_case, n_valid_case, meth, cov)
-            del meth, cov
-
-        for sample in samples_control:
-            meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
-            _welford_update(mean_ctrl, M2_ctrl, n_valid_ctrl, meth, cov)
-            del meth, cov
-
-        # Welford path: no (n_sites x n_replicates) matrix ever built.
-        pvals, log2_ors = _beta_binom_mom_from_welford(
-            mean_case,
-            M2_case,
-            n_valid_case,
-            mean_ctrl,
-            M2_ctrl,
-            n_valid_ctrl,
-        )
-
-    elif test == "glm":
-        # Covariate-aware binomial GLM with deviance LR test.
-        #
-        # We load every sample's (meth, cov) for this chromosome into an
-        # (n_sites, n_samples) stack so the batched IRLS can fit one GLM
-        # per site against the shared design matrix. n_sites here is the
-        # WHOLE chromosome (this function is not tiled), so the stacks are
-        # O(chrom_sites x n_samples) int32 -- e.g. ~120 MB at 2.5M CpGs x 6
-        # samples on chr1, plus the (n_sites, p, p) einsum arrays in _glm.
-        # Still per-chromosome (within the O(largest-chrom) budget), but with
-        # an (n_samples + p^2) multiplier the lr path does not carry.
-        if design_full is None or design_reduced is None or coef_idx is None:
-            raise ValueError(
-                "test='glm' requires design_full, design_reduced, and "
-                "coef_idx. Build them via epykit._glm.build_design(md.obs, "
-                "samples_ordered=samples_case+samples_control, formula=...)."
-            )
-
-        all_samples = samples_case + samples_control
-        n_samples = len(all_samples)
-        if design_full.shape[0] != n_samples:
-            raise ValueError(
-                f"design_full has {design_full.shape[0]} rows but "
-                f"{n_samples} samples were passed. Rows must follow "
-                "samples_case + samples_control order."
-            )
-
-        meth_stack = np.zeros((n_sites, n_samples), dtype=np.int32)
-        cov_stack = np.zeros((n_sites, n_samples), dtype=np.int32)
-        for j, sample in enumerate(all_samples):
-            meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
-            meth_stack[:, j] = meth
-            cov_stack[:, j] = cov
-            # Welford accumulators for the unadjusted mean_beta_* columns.
-            if j < len(samples_case):
-                _welford_update(mean_case, M2_case, n_valid_case, meth, cov)
-            else:
-                _welford_update(mean_ctrl, M2_ctrl, n_valid_ctrl, meth, cov)
-            del meth, cov
-
-        from . import _glm
-
-        beta_full, se_full, dev_full, pearson_full, n_eff = _glm.irls_dispatch(
-            meth_stack,
-            cov_stack,
-            design_full,
-            backend=glm_backend,
-        )
-        _beta_red, _se_red, dev_red, _pearson_red, _ne_red = _glm.irls_dispatch(
-            meth_stack,
-            cov_stack,
-            design_reduced,
-            backend=glm_backend,
-        )
-
-        # df_resid_i = n_eff_i - p_full   (per-site, since coverage gates samples)
-        p_full = design_full.shape[1]
-        df_resid_per_site = n_eff.astype(np.float64) - float(p_full)
-        df_resid_safe = np.maximum(df_resid_per_site, 1.0)
-
-        phi_eff, _phi_hat, df_phi = _glm.compute_dispersion_phi(
-            pearson_per_site=pearson_full,
-            df_per_site=df_resid_per_site,
-            dispersion=dispersion,
-            chrom_name=chrom,
-        )
-
-        # LR statistic with dispersion correction. Reduced model drops the
-        # treatment column => 1 df contrast.
-        with np.errstate(invalid="ignore", divide="ignore"):
-            lr_raw = dev_red - dev_full
-            # tiny negative excursions can happen at numerical machine eps
-            lr_raw = np.where(lr_raw < 0, 0.0, lr_raw)
-            chi2_stat = np.where(phi_eff > 0, lr_raw / phi_eff, np.nan)
-
-        # F-reference uses df_phi (df backing the phi estimate), NOT
-        # df_resid_safe (per-site residual df). Identical to df_resid_safe for
-        # dispersion="site"; for "chrom"/"shrink"/"eb" it's the chrom-pool or
-        # shrinkage-effective df. Same bug-fix as in _score_finalize.
-        pvals = _glm.reference_pvalues(
-            chi2_stat,
-            phi_eff,
-            df_phi,
-            reference=reference,
-            df_floor=DF_PHI_FLOOR,
-        )
-
-        # Effect-size columns from the GLM coefficient (log-odds) and its SE.
-        coef_treatment = beta_full[:, coef_idx].astype(np.float64)
-        coef_se = se_full[:, coef_idx].astype(np.float64)
-
-        # Bookkeeping for the unified output block at the bottom.
-        log2_ors = coef_treatment / np.log(2.0)  # log-odds -> log2 odds
-        degenerate = np.isnan(chi2_stat) | np.isnan(pvals) | (n_eff < 2)
-        pvals = np.where(degenerate, np.nan, pvals)
-        log2_ors = np.where(degenerate, np.nan, log2_ors)
-
-        # Stash for the schema additions below.
-        extras["coef_treatment"] = coef_treatment
-        extras["coef_se"] = coef_se
-        del meth_stack, cov_stack, beta_full, se_full, dev_full, dev_red
-        del pearson_full, n_eff
-
-    elif test == "glm_contrast":
-        # Multi-group / continuous-covariate primary-effect path.
-        # The caller supplies (a) a shared design matrix `design_full`,
-        # (b) a `contrast_matrix` C of shape (k, p), and (c) an ordered
-        # list `samples_all_ordered` whose row order matches design_full.
-        if design_full is None or contrast_matrix is None or samples_all_ordered is None:
-            raise ValueError(
-                "test='glm_contrast' requires design_full, contrast_matrix, "
-                "and samples_all_ordered."
-            )
-        n_samples = len(samples_all_ordered)
-        if design_full.shape[0] != n_samples:
-            raise ValueError(
-                f"design_full has {design_full.shape[0]} rows but "
-                f"{n_samples} samples were supplied via samples_all_ordered."
-            )
-
-        meth_stack = np.zeros((n_sites, n_samples), dtype=np.int32)
-        cov_stack = np.zeros((n_sites, n_samples), dtype=np.int32)
-        # Welford per-level accumulators. We keep mean_case/mean_ctrl as
-        # "all samples that map to label 'case'" vs "all samples that
-        # don't" -- chosen so the binary-case columns of the schema still
-        # carry interpretable values. If group_labels_per_sample is given,
-        # we additionally keep one Welford accumulator per level for the
-        # multi-group output schema.
-        level_mean: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
-        if group_labels_per_sample is not None:
-            for lvl in set(group_labels_per_sample):
-                level_mean[lvl] = _welford_init(n_sites)
-
-        for j, sample in enumerate(samples_all_ordered):
-            meth, cov = _load_sample_chrom(methylstore_path, chrom, sample, canonical_pos)
-            meth_stack[:, j] = meth
-            cov_stack[:, j] = cov
-            # Backwards-compat columns: split on whether sample is in samples_case.
-            if sample in samples_case:
-                _welford_update(mean_case, M2_case, n_valid_case, meth, cov)
-            elif sample in samples_control:
-                _welford_update(mean_ctrl, M2_ctrl, n_valid_ctrl, meth, cov)
-            if group_labels_per_sample is not None:
-                lvl = group_labels_per_sample[j]
-                _welford_update(*level_mean[lvl], meth, cov)
-            del meth, cov
-
-        from . import _glm
-
-        beta_full, se_full, dev_full, pearson_full, n_eff, cov_beta = _glm.irls_dispatch(
-            meth_stack,
-            cov_stack,
-            design_full,
-            return_cov=True,
-            backend=glm_backend,
-        )
-
-        p_full = design_full.shape[1]
-        df_resid_per_site = n_eff.astype(np.float64) - float(p_full)
-        phi_eff, _phi_hat, df_phi = _glm.compute_dispersion_phi(
-            pearson_per_site=pearson_full,
-            df_per_site=df_resid_per_site,
-            dispersion=dispersion,
-            chrom_name=chrom,
-        )
-        df_resid_safe = np.maximum(df_resid_per_site, 1.0)
-
-        # F-reference uses df_phi (see comment in glm path above).
-        stat, pvals, k_rank_np = _glm.wald_test(
-            beta_full,
-            cov_beta,
-            contrast_matrix,
-            phi_eff=phi_eff,
-            df_resid=df_phi,
-            reference=reference,
-            df_floor=DF_PHI_FLOOR,
-        )
-        k_rank = int(k_rank_np)
-
-        degenerate = np.isnan(stat) | np.isnan(pvals) | (n_eff < p_full + 1)
-        pvals = np.where(degenerate, np.nan, pvals)
-
-        if k_rank == 1:
-            # Single-coef contrast: surface coef + coef_se on the contrast
-            # axis (Cbeta and sqrt(C cov_beta CT)).
-            Cb = (beta_full @ contrast_matrix.T)[:, 0]
-            with np.errstate(invalid="ignore"):
-                var_Cb = np.einsum(
-                    "kp,ipq,lq->ikl",
-                    contrast_matrix,
-                    cov_beta * phi_eff[:, None, None],
-                    contrast_matrix,
-                )[:, 0, 0]
-                cse = np.sqrt(np.where(var_Cb > 0, var_Cb, np.nan))
-            log2_ors = Cb / np.log(2.0)
-            log2_ors = np.where(degenerate, np.nan, log2_ors)
-            extras["coef_treatment"] = Cb
-            extras["coef_se"] = cse
-            # Single-coef path still emits the standard binary schema.
-        else:
-            # Joint contrast: emit multi-group schema. We do NOT populate
-            # the binary mean_beta_case/control columns meaningfully --
-            # they're filled with NaN downstream. F-stat and per-level
-            # mean betas are stored for the unified output block.
-            multigroup_mode = True
-            f_stat_out = (stat / k_rank).astype(np.float64)
-            f_stat_out = np.where(degenerate, np.nan, f_stat_out)
-            df1_out = k_rank
-            df2_out = df_resid_safe.astype(np.float64)
-            for lvl, (mu_l, _M2_l, nv_l) in level_mean.items():
-                arr = mu_l.astype(np.float32)
-                arr[nv_l == 0] = np.nan
-                level_mean_beta[lvl] = arr
-            log2_ors = np.full(n_sites, np.nan, dtype=np.float64)
-            extras.clear()  # coef_* not meaningful for joint test
-
-        del meth_stack, cov_stack, beta_full, se_full, dev_full
-        del pearson_full, n_eff, cov_beta
-
-    else:
+    runner = _ENGINE_RUNNERS.get(test)
+    if runner is None:
         raise NotImplementedError(
             f"Test '{test}' not implemented. Choose 'lr', 'fisher', 'welch_t', or 'glm'."
         )
+    inp = EngineInput(
+        methylstore_path=methylstore_path,
+        chrom=chrom,
+        canonical_df=canonical_df,
+        samples_case=samples_case,
+        samples_control=samples_control,
+        test=test,
+        min_samples_case=min_samples_case,
+        min_samples_control=min_samples_control,
+        dispersion=dispersion,
+        reference=reference,
+        design_full=design_full,
+        design_reduced=design_reduced,
+        coef_idx=coef_idx,
+        contrast_matrix=contrast_matrix,
+        samples_all_ordered=samples_all_ordered,
+        group_labels_per_sample=group_labels_per_sample,
+        glm_backend=glm_backend,
+        smoothing=smoothing,
+        smoothing_span_bp=smoothing_span_bp,
+        sep_fallback=sep_fallback,
+        sep_threshold=sep_threshold,
+    )
+    return _finalise_chromosome(inp, runner(inp))
+
+
+def _finalise_chromosome(inp: EngineInput, res: EngineResult) -> pl.DataFrame:
+    """Turn a runner's reduced arrays into the canonical per-site frame.
+
+    In order: the per-replicate mean betas and their difference, the
+    effect interval (Newcombe on pooled counts, delta method on the GLM
+    coefficient, Welch otherwise, NaN for a joint contrast), the
+    minimum-sample mask, column assembly and the sort on ``pos``.
+    """
+    n_sites = inp.n_sites
+    chrom = inp.chrom
+    mean_case, M2_case, n_valid_case = res.welford_case
+    mean_ctrl, M2_ctrl, n_valid_ctrl = res.welford_ctrl
+    pvals, log2_ors = res.pvals, res.log2_ors
+    extras = dict(res.extras)
 
     # --- equal-weight per-replicate mean beta ---
     # Welford mean IS the equal-weight nanmean -- no extra storage needed.
@@ -1806,18 +1947,15 @@ def _process_one_chromosome(
     # welch_t: Welch-normal Wald CI from the Welford accumulators.
     from . import _glm as _glm_for_ci
 
-    if not multigroup_mode:
-        if _newcombe_meth_a is not None:
+    if res.multigroup is None:
+        if res.pooled_counts is not None:
             # P1-3: lr and fisher paths -- use Newcombe CI on pooled counts.
             # lr passes per-site phi/df so the interval shares the test's
             # overdispersion model (M1); fisher passes None (binomial).
             ci_lo, ci_hi = _glm_for_ci.newcombe_diff_ci(
-                _newcombe_meth_a,
-                _newcombe_cov_a,
-                _newcombe_meth_b,
-                _newcombe_cov_b,
-                phi=_newcombe_phi,
-                df=_newcombe_df,
+                *res.pooled_counts,
+                phi=res.phi_eff,
+                df=res.df_phi,
             )
         elif "coef_treatment" in extras:
             # M2: covariate-ADJUSTED effect + CI for the single-coef GLM paths
@@ -1829,15 +1967,13 @@ def _process_one_chromosome(
             # coefficient reflected the adjustment. Map that logit coefficient
             # to the meth scale via the delta method, evaluated at the control
             # group's fitted mean, and phi-scale its SE so the CI shares the
-            # quasi-binomial variance model the p-value uses. Read from
-            # `extras` (the contrast branch stores Cb/cse there under different
-            # local names).
+            # quasi-binomial variance model the p-value uses.
             coef_t = np.asarray(extras["coef_treatment"], dtype=np.float64)
             coef_s = np.asarray(extras["coef_se"], dtype=np.float64)
             eps = _BETA_EPSILON
             ctrl_clip = np.clip(mean_ctrl.astype(np.float64), eps, 1.0 - eps)
             ref_eta = np.log(ctrl_clip / (1.0 - ctrl_clip))  # logit(control mean)
-            se_disp = np.sqrt(np.maximum(phi_eff, 0.0)) * coef_s
+            se_disp = np.sqrt(np.maximum(res.phi_eff, 0.0)) * coef_s
             ci_lo, ci_hi = _glm_for_ci.delta_method_meth_diff_ci(
                 coef_t,
                 se_disp,
@@ -1865,7 +2001,7 @@ def _process_one_chromosome(
             # GLM-only coef_se column).
             extras["coef_se"] = se_disp
         else:
-            # welch_t (and glm_contrast single-coef) -- Wald CI from Welford.
+            # welch_t -- Wald CI from Welford.
             vm_case = _welford_var_mean(M2_case, n_valid_case)
             vm_ctrl = _welford_var_mean(M2_ctrl, n_valid_ctrl)
             # Welch-Satterthwaite df, identical to the welch_t p-value path
@@ -1895,9 +2031,9 @@ def _process_one_chromosome(
     # have their p-value masked to NaN. apply_multiple_testing_correction
     # passes NaNs through, so these sites are effectively excluded from
     # genome-wide FDR control without disturbing site-position alignment.
-    if min_samples_case > 0 or min_samples_control > 0:
-        keep_mask = (n_valid_case >= max(min_samples_case, 0)) & (
-            n_valid_ctrl >= max(min_samples_control, 0)
+    if inp.min_samples_case > 0 or inp.min_samples_control > 0:
+        keep_mask = (n_valid_case >= max(inp.min_samples_case, 0)) & (
+            n_valid_ctrl >= max(inp.min_samples_control, 0)
         )
         n_dropped = int((~keep_mask).sum())
         if n_dropped > 0:
@@ -1906,8 +2042,8 @@ def _process_one_chromosome(
                 chrom,
                 f"{n_dropped:,}",
                 f"{n_sites:,}",
-                min_samples_case,
-                min_samples_control,
+                inp.min_samples_case,
+                inp.min_samples_control,
             )
             pvals = np.where(keep_mask, pvals, np.nan)
             log2_ors = np.where(keep_mask, log2_ors, np.nan)
@@ -1917,8 +2053,6 @@ def _process_one_chromosome(
             ci_lo = np.where(keep_mask, ci_lo, np.float32(np.nan))
             ci_hi = np.where(keep_mask, ci_hi, np.float32(np.nan))
 
-    del mean_case, M2_case, n_valid_case, mean_ctrl, M2_ctrl, n_valid_ctrl
-
     # P1-11: column name is backend-specific, recorded on the engine's
     # registry entry.
     #   glm / glm_contrast: the value is the logit coefficient in log2 units
@@ -1926,13 +2060,13 @@ def _process_one_chromosome(
     #   all other backends: genuine pooled log2 odds ratio => log2_odds_ratio_pooled.
     # A transitional log2_odds_ratio column is NaN-filled so existing code
     # doesn't silently break; it is slated for removal in 1.2.
-    _log2_col = ENGINES[test].effect_column
+    _log2_col = ENGINES[inp.test].effect_column
     out_cols = {
         "chrom": pl.Series([chrom] * n_sites, dtype=pl.Utf8),
-        "pos": canonical_df["pos"],
-        "strand": canonical_df["strand"],
-        "n_case": pl.Series(np.full(n_sites, len(samples_case), dtype=np.int32)),
-        "n_control": pl.Series(np.full(n_sites, len(samples_control), dtype=np.int32)),
+        "pos": inp.canonical_df["pos"],
+        "strand": inp.canonical_df["strand"],
+        "n_case": pl.Series(np.full(n_sites, len(inp.samples_case), dtype=np.int32)),
+        "n_control": pl.Series(np.full(n_sites, len(inp.samples_control), dtype=np.int32)),
         "mean_beta_case": pl.Series(mean_beta_case),
         "mean_beta_control": pl.Series(mean_beta_ctrl),
         "pvalue": pl.Series(pvals),
@@ -1946,17 +2080,18 @@ def _process_one_chromosome(
     if "coef_treatment" in extras and "coef_se" in extras:
         out_cols["coef_treatment"] = pl.Series(extras["coef_treatment"])
         out_cols["coef_se"] = pl.Series(extras["coef_se"])
-    if multigroup_mode and f_stat_out is not None and df2_out is not None:
-        out_cols["f_stat"] = pl.Series(f_stat_out)
-        out_cols["df1"] = pl.Series(np.full(n_sites, int(df1_out), dtype=np.int32))
-        out_cols["df2"] = pl.Series(df2_out)
+    if res.multigroup is not None:
+        mg = res.multigroup
+        out_cols["f_stat"] = pl.Series(mg.f_stat)
+        out_cols["df1"] = pl.Series(np.full(n_sites, mg.df1, dtype=np.int32))
+        out_cols["df2"] = pl.Series(mg.df2)
         # Per-level mean beta columns (stable sort for deterministic schema).
-        for lvl in sorted(level_mean_beta.keys()):
-            out_cols[f"mean_beta_{lvl}"] = pl.Series(level_mean_beta[lvl])
+        for lvl in sorted(mg.level_mean_beta):
+            out_cols[f"mean_beta_{lvl}"] = pl.Series(mg.level_mean_beta[lvl])
         # meth_diff_max = max |mean_beta_i - mean_beta_j| across all level pairs
-        if level_mean_beta:
+        if mg.level_mean_beta:
             stacked = np.stack(
-                [level_mean_beta[lvl] for lvl in sorted(level_mean_beta)],
+                [mg.level_mean_beta[lvl] for lvl in sorted(mg.level_mean_beta)],
                 axis=1,
             )
             max_diff = np.nanmax(stacked, axis=1) - np.nanmin(stacked, axis=1)
