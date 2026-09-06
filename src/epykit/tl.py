@@ -1142,6 +1142,55 @@ def _run_dmc_contrast(md: MethylData, cfg: DMCConfig) -> None:
     )
 
 
+def _empirical_strata_map(md: MethylData, column: str | None) -> dict[str, list[str]] | None:
+    """Stratum label -> sample ids for within-stratum label shuffles.
+
+    ``None`` when no strata column was requested. A column that is missing
+    from ``md.obs`` or that leaves any treatment / control sample without a
+    label raises, so a typo can never fall back to an unrestricted shuffle.
+    """
+    if column is None:
+        return None
+    if column not in md.obs.columns:
+        raise ValueError(
+            f"empirical_strata={column!r} is not a column of md.obs "
+            f"(columns: {md.obs.columns}). Add the stratum column or omit "
+            f"empirical_strata."
+        )
+    all_samples = list(md.treatment_ids) + list(md.control_ids)
+    strata_map: dict[str, list[str]] = {}
+    unlabelled: list[str] = []
+    rows = md.obs.filter(pl.col("sample_id").is_in(all_samples))
+    for row in rows.iter_rows(named=True):
+        label = row[column]
+        if label is None:
+            unlabelled.append(row["sample_id"])
+            continue
+        strata_map.setdefault(label, []).append(row["sample_id"])
+    covered = {s for members in strata_map.values() for s in members}
+    unlabelled.extend(s for s in all_samples if s not in covered and s not in unlabelled)
+    if unlabelled:
+        raise ValueError(
+            f"empirical_strata={column!r} does not cover every treatment / "
+            f"control sample; unlabelled: {sorted(unlabelled)}."
+        )
+    return strata_map
+
+
+def _empirical_fdr_set_value(dmr_df: pl.DataFrame) -> float | None:
+    """The constant ``empirical_fdr_set`` column as a scalar, or ``None``.
+
+    NaN (``max_t`` mode, or an undefined region estimate) maps to ``None``
+    so ``md.uns["dmr_params"]`` stays JSON-clean on save.
+    """
+    if "empirical_fdr_set" not in dmr_df.columns or len(dmr_df) == 0:
+        return None
+    value = dmr_df.get_column("empirical_fdr_set")[0]
+    if value is None or value != value:
+        return None
+    return float(value)
+
+
 def dmr(
     md: MethylData,
     method: str = "chain_merge",
@@ -1186,6 +1235,8 @@ def dmr(
     backend: str = "sequential",
     n_workers: int | None = None,
     merge_adjacent: bool = True,
+    # Permutation FDR construction (tile method) -----------------------
+    fdr_method: Literal["max_t", "region"] = "max_t",
     # Auto-emits the DMR table to <analysis_root>/results/dmr.tsv by default;
     # tsv=False disables, tsv="path" overrides. csv= is a deprecated alias.
     tsv: str | bool | None = None,
@@ -1230,9 +1281,13 @@ def dmr(
     *ranking* signal, **not** a calibrated region-level FDR. For trustworthy
     region-level inference pass ``empirical_fdr=True`` with ``method="tile"``,
     which re-runs the engine on shuffled labels and adds permutation
-    ``empirical_pvalue`` / ``empirical_qvalue`` columns; threshold
-    ``empirical_qvalue`` instead of ``combined_qvalue`` for FDR control.
-    Every ``tl.dmr`` call logs a one-time INFO note about this caveat.
+    ``empirical_pvalue`` / ``empirical_qvalue`` / ``empirical_fdr_set``
+    columns; threshold ``empirical_qvalue`` instead of
+    ``combined_qvalue`` for FDR control. ``fdr_method="max_t"`` (default)
+    keeps the Westfall-Young min-P construction; ``fdr_method="region"``
+    selects the count-ratio target-decoy FDR and records the set-level
+    estimate in ``md.uns["dmr_params"]["empirical_fdr_set"]``. Every
+    ``tl.dmr`` call logs a one-time INFO note about this caveat.
 
     Parameters
     ----------
@@ -1286,6 +1341,24 @@ def dmr(
         This parameter was previously named ``min_mean_pvalue`` and applied
         to the uncorrected p-value, which was not FDR-controlled across the
         DMR set.
+    empirical_fdr : bool
+        Run the permutation FDR after the observed call. Implemented for
+        ``method="tile"``; the other methods raise ``NotImplementedError``.
+    n_perm, perm_seed, perm_n_jobs : int
+        Permutation count (positive), seed and joblib worker count.
+    empirical_strata : str or None
+        ``md.obs`` column whose labels define shuffle strata (paired
+        designs). The column must exist and cover every treatment /
+        control sample; otherwise ``tl.dmr`` raises instead of falling
+        back to an unrestricted shuffle.
+    fdr_method : {"max_t", "region"}
+        Permutation FDR construction. ``"max_t"`` (default) is the
+        Westfall-Young min-P statistic with a BH transform.
+        ``"region"`` is the count-ratio target-decoy FDR: the mean decoy
+        survivor count divided by the observed survivor count at each
+        threshold, made monotone; ``empirical_pvalue`` is then the
+        pooled-null tail fraction, a diagnostic. Self / mirror
+        assignments and failed permutations are excluded in this mode.
     """
     if min_samples_treatment is None:
         min_samples_treatment = 0
@@ -1392,14 +1465,9 @@ def dmr(
                     "designs (label-shuffling invalidates stratification). "
                     "Use a stratified-permutation scheme manually if needed."
                 )
-            # Build strata map from obs column when empirical_strata= supplied.
-            strata_map: dict[str, list[str]] | None = None
-            if empirical_strata is not None and empirical_strata in md.obs.columns:
-                all_samples = list(md.treatment_ids) + list(md.control_ids)
-                obs_indexed = md.obs.filter(pl.col("sample_id").is_in(all_samples))
-                strata_map = {}
-                for row in obs_indexed.iter_rows(named=True):
-                    strata_map.setdefault(row[empirical_strata], []).append(row["sample_id"])
+            # Build strata map from obs column when empirical_strata= supplied;
+            # a missing or incomplete column raises before any permutation.
+            strata_map = _empirical_strata_map(md, empirical_strata)
             if len(dmr_df) > 0:
                 dmr_df = empirical_fdr_for_dmr(
                     methylstore_path=md.store,
@@ -1423,6 +1491,7 @@ def dmr(
                     reference=reference,
                     merge_adjacent=merge_adjacent,
                     backend=backend,
+                    fdr_method=fdr_method,
                 )
 
         md.uns["dmr"] = dmr_df
@@ -1447,6 +1516,8 @@ def dmr(
             "empirical_fdr": empirical_fdr,
             "n_perm": n_perm if empirical_fdr else None,
             "perm_seed": perm_seed if empirical_fdr else None,
+            "fdr_method": fdr_method if empirical_fdr else None,
+            "empirical_fdr_set": _empirical_fdr_set_value(dmr_df) if empirical_fdr else None,
         }
         if tsv is not None:
             from .export import dmr_to_tsv

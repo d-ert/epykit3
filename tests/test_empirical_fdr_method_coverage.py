@@ -1,9 +1,11 @@
 """M2: empirical_fdr=True was silently a no-op for chain_merge (the
 default), sliding_window, and segment. The calibration-warning note was
 also suppressed in those branches, leaving users with no signal that
-combined_qvalue is anti-conservative. Batch-1 contract: empirical_fdr=True
-must produce columns (tile) OR raise NotImplementedError (others); never
-silently no-op."""
+combined_qvalue is anti-conservative. Contract: empirical_fdr=True must
+produce columns OR raise NotImplementedError; never silently no-op.
+
+The API (``tl.dmr``) supports empirical_fdr for ``tile`` only; the other
+methods raise. The CLI (``_cmd_dmr``) is tile-only as well."""
 from __future__ import annotations
 
 import pytest
@@ -32,6 +34,27 @@ def test_tile_empirical_fdr_still_works(md_with_dmc):
     dmr = md_with_dmc.uns["dmr"]
     assert "empirical_pvalue" in dmr.columns
     assert "empirical_qvalue" in dmr.columns
+    assert "empirical_fdr_set" in dmr.columns
+    params = md_with_dmc.uns["dmr_params"]
+    assert params["fdr_method"] == "max_t"
+    assert params["empirical_fdr_set"] is None
+
+
+def test_tile_region_mode_records_set_estimate(md_with_dmc):
+    ep.tl.dmr(
+        md_with_dmc,
+        method="tile",
+        empirical_fdr=True,
+        n_perm=5,
+        perm_seed=0,
+        fdr_method="region",
+    )
+    params = md_with_dmc.uns["dmr_params"]
+    assert params["fdr_method"] == "region"
+    assert params["empirical_fdr_set"] is None or 0.0 <= params["empirical_fdr_set"] <= 1.0
+    dmr = md_with_dmc.uns["dmr"]
+    if dmr.height > 0:
+        assert params["empirical_fdr_set"] == pytest.approx(dmr["empirical_fdr_set"][0])
 
 
 @pytest.mark.parametrize("method", ["chain_merge", "sliding_window", "segment"])
