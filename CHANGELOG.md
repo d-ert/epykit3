@@ -36,6 +36,25 @@ SemVer (`MAJOR.MINOR.PATCH`).
   half-open `[start, end)` span. The existing region test in
   `tests/test_bam_io.py` catches this; CI never executed it before because
   `pysam` was not installed.
+- **ASM phasing anchors confounded allele with methylation state.**
+  `call_asm` / `tl.asm` assigned a read to an allele by its raw base at a
+  heterozygous SNV. In a Bismark BAM that base is bisulfite-converted: an
+  unmethylated C reads as T on `XG:Z:CT` reads and an unmethylated G reads
+  as A on `XG:Z:GA` reads, so at any anchor other than A/T the allele a
+  read landed in tracked its methylation state and ASM was fabricated. A
+  null C/T anchor with 50% methylation on both alleles came out as 10/0
+  versus 10/20 reads (Fisher p = 4.4e-4). Each read is now phased only
+  when its `XG` conversion strand cannot convert either allele: A/T on
+  both strands; A/G and G/T on CT reads; C/T and A/C on GA reads; C/G
+  never. Reads without a recognised `XG` tag (MethylDackel / bwa-meth
+  BAMs, or a Bismark BAM with the tag stripped) phase A/T anchors only.
+  ASM results change wherever such anchors contributed: fabricated sites
+  disappear, and because the rule is deliberately conservative some
+  genuine anchors and reads are dropped too, so anchor counts fall and
+  sites reported by earlier releases can vanish. One INFO line per sample
+  now reports the anchors that phased at least one read, the anchors
+  rejected by class before any read was fetched, and the read-anchor
+  observations the strand rule rejected. The public API is unchanged.
 
 ## [1.1.0] — 2026-09-05
 
