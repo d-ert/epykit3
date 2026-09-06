@@ -6,6 +6,22 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+### Changed
+
+- **`tl.dmc` orchestration split into stages.** The body of `ep.tl.dmc` now
+  runs nine stages from `src/epykit/_dmc_stages.py` (`plan_run`,
+  `run_contrast`, `lookup_resume`, `open_input_store`, `run_engine`,
+  `post_process`, `publish`, `persist_resume`, `finish`), each handing a
+  frozen plan or outcome record to the next; `publish` is the only writer of
+  `md.uns["dmc"]`. The public signature, defaults, result keys, metadata
+  record and engine output are unchanged (the engine hash gate holds). One
+  observable difference: the `log2_odds_ratio` FutureWarning is now emitted
+  on the `resumable=True` cache hit too, where it was silent before.
+  Warnings raised by the DMC stages, including the n<2 Fisher fallback
+  notice that previously pointed inside `tl.py`, now point at the caller of
+  `tl.dmc`. The private `tl._run_dmc_contrast` helper is gone; its body is
+  the `run_contrast` stage.
+
 ## [1.1.0] — 2026-09-05
 
 Post-1.0 correctness and reproducibility fixes from a pre-submission code
