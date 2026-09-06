@@ -11,6 +11,9 @@ SemVer (`MAJOR.MINOR.PATCH`).
 - Region permutation FDR excludes missing and non-finite observed p-values
   from survivor counts. Such rows retain NaN estimates and cannot lower
   valid regions' q-values or the set-level FDR.
+- Tile permutation FDR applies the same `min_mean_qvalue` post-filter to
+  observed and null regions. The Python API and CLI forward the cutoff,
+  so excluded null regions cannot inflate the estimated FDR.
 
 ### Added
 

@@ -1919,6 +1919,7 @@ def empirical_fdr_for_dmr(
     merge_adjacent: bool = True,
     backend: str = "sequential",
     fdr_method: Literal["max_t", "region"] = "max_t",
+    min_mean_qvalue: float | None = None,
     **dmr_kwargs,
 ) -> pl.DataFrame:
     """Empirical (permutation) FDR for tile-based DMRs.
@@ -1951,6 +1952,10 @@ def empirical_fdr_for_dmr(
     observed_dmr
         The DMR DataFrame returned by the observed (unpermuted) run.
         Empirical columns are appended to a copy of this frame.
+    min_mean_qvalue
+        The q-value post-filter applied to the observed tiles. Each
+        permutation applies the same cutoff before counting survivors.
+        None disables this extra filter.
     n_perm
         Number of permutations. Must be positive.
     seed
@@ -2034,6 +2039,9 @@ def empirical_fdr_for_dmr(
                 merge_adjacent=merge_adjacent,
                 backend=backend,
                 **kwargs,
+            )
+            null_df = apply_region_qfilter(
+                null_df, min_mean_qvalue, candidate_cols=("qvalue",)
             )
         except Exception as exc:
             logger.warning("permutation %d failed: %s", perm_idx, exc)
