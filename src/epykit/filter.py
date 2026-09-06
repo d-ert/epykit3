@@ -469,9 +469,11 @@ def normalize_coverage_store(
 
             chrom_df = pl.concat([pl.read_parquet(str(p)) for p in parts])
 
-            # Capture original N_unmeth before either column is overwritten,
-            # so the two scaled counts remain consistent and coverage is
-            # rebuilt from them exactly.
+            # Scale both counts from the source's coverage - N_meth (its
+            # N_unmeth, by the store invariant) before either column is
+            # overwritten, write the scaled unmethylated count back as
+            # N_unmeth, and rebuild coverage from the two scaled counts so
+            # coverage == N_meth + N_unmeth holds exactly after rounding.
             scaled = (
                 chrom_df.with_columns(
                     (pl.col("coverage") - pl.col("N_meth")).alias("_N_unmeth_orig")
@@ -485,13 +487,13 @@ def normalize_coverage_store(
                         (pl.col("_N_unmeth_orig").cast(pl.Float64) * s)
                         .round()
                         .cast(pl.Int32)
-                        .alias("_N_unmeth"),
+                        .alias("N_unmeth"),
                     ]
                 )
                 .with_columns(
-                    (pl.col("N_meth") + pl.col("_N_unmeth")).cast(pl.Int32).alias("coverage")
+                    (pl.col("N_meth") + pl.col("N_unmeth")).cast(pl.Int32).alias("coverage")
                 )
-                .drop(["_N_unmeth_orig", "_N_unmeth"])
+                .drop("_N_unmeth_orig")
             )
 
             out_chrom_dir = out / f"sample={samp}" / f"chrom={chrom}"

@@ -178,6 +178,20 @@ scheduled for removal in 1.2 (see Changed).
 - **Export streaming (M12).** `to_bedgraph`/`to_bigwig` stream the methylstore
   one chromosome at a time instead of materializing the whole sample as
   full-genome Python lists; peak memory is now O(largest chromosome).
+- **Normalised store `N_unmeth` broke the coverage invariant.**
+  `pp.normalize_coverage` scaled `N_meth` and rebuilt `coverage` from the
+  scaled counts but wrote the unscaled `N_unmeth` back, so
+  `coverage == N_meth + N_unmeth` did not hold on the `.cache/normalized`
+  store. `N_unmeth` is now the scaled count. `N_meth` and `coverage` are
+  unchanged, so every per-CpG engine (which reads only those two columns)
+  returns exactly what it returned before. The one reader of the store's
+  `N_unmeth` column is `pp.aggregate_regions` (and `epykit
+  aggregate-regions`): on a normalised store it summed the stale column, so
+  region-level `N_unmeth` and `coverage` were wrong, and so was any
+  `tl.dmc` run on that regions store. Pipelines that call
+  `pp.normalize_coverage` and then `pp.aggregate_regions` are affected; the
+  tile DMR caller and the AnnData `N_unmeth` layer derive the count as
+  `coverage - N_meth` and were correct before.
 
 ### Changed
 

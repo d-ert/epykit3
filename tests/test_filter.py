@@ -130,17 +130,6 @@ def test_normalize_coverage_store_aligns_medians_and_rescales_counts(raw_store, 
         assert after.select("chrom", "pos").equals(before.select("chrom", "pos")), sample
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "normalize_coverage_store rebuilds coverage from the scaled parts but "
-        "leaves the store's N_unmeth column at its original value, so the "
-        "documented invariant coverage == N_meth + N_unmeth does not hold on "
-        "the normalised store. Fixing that is a behaviour change (out of scope "
-        "for the tl.dmc refactor series); this xfail turns into a failure when "
-        "it is fixed, so the marker gets removed with the fix."
-    ),
-)
 def test_normalize_keeps_n_unmeth_consistent_with_coverage(raw_store, tmp_path):
     out = tmp_path / "normalized"
     normalize_coverage_store(str(raw_store), str(out), method="median")
