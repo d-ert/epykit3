@@ -17,7 +17,8 @@ SemVer (`MAJOR.MINOR.PATCH`).
   minimum-sample mask and column assembly. Per-sample stacks and streaming
   accumulators end with the runner's scope. Engine output is unchanged: the
   engine hash gate holds, and every engine path compares bit-identical on a
-  fixed fixture.
+  fixed fixture. The C901 complexity ceiling in `pyproject.toml` drops from
+  38 to 32, the highest remaining function in the source tree.
 - **DMC engine facts live in one registry.** `src/epykit/_dmc_engines.py`
   holds one frozen `EngineSpec` per engine (`lr`, `glm`, `welch_t`,
   `fisher` and the internal `glm_contrast`) with the facts the rest of the
