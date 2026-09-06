@@ -135,6 +135,34 @@ def test_dmc_resume_invalidated_when_params_change(synth_md_filtered):
     assert md.uns["dmc"]["test_used"] == "welch_t"
 
 
+def test_dmc_resume_keys_count_smoothing_and_span(synth_md_filtered):
+    """``smoothing`` and, while it is on, ``smoothing_span_bp`` are part of
+    the fingerprint: a span change or a smoothing toggle recomputes, and only
+    an identical call resumes. The stage key is ``dmc_lr`` throughout."""
+    md = synth_md_filtered
+    ep.tl.dmc(md, test="lr", resumable=True)
+    assert md.uns["dmc"]["resumed"] is False
+
+    ep.tl.dmc(md, test="lr", resumable=True, smoothing=True, smoothing_span_bp=200)
+    assert md.uns["dmc"]["resumed"] is False
+    assert md.uns["dmc"]["smoothing_span_bp"] == 200
+
+    ep.tl.dmc(md, test="lr", resumable=True, smoothing=True, smoothing_span_bp=400)
+    assert md.uns["dmc"]["resumed"] is False
+    assert md.uns["dmc"]["smoothing_span_bp"] == 400
+
+    ep.tl.dmc(md, test="lr", resumable=True, smoothing=True, smoothing_span_bp=400)
+    assert md.uns["dmc"]["resumed"] is True
+    assert md.uns["dmc"]["smoothing"] is True
+    assert md.uns["dmc"]["smoothing_span_bp"] == 400
+
+    # Back to the unsmoothed engine: the smoothed sidecar must not be served.
+    ep.tl.dmc(md, test="lr", resumable=True, smoothing=False, smoothing_span_bp=400)
+    assert md.uns["dmc"]["resumed"] is False
+    assert md.uns["dmc"]["smoothing"] is False
+    assert md.uns["dmc"]["smoothing_span_bp"] is None
+
+
 # ---- 3. MethylData.resume_from -----------------------------------------
 
 

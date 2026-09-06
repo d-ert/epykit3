@@ -167,9 +167,11 @@ class DMCConfig:
         """The params half of the ``resumable=True`` fingerprint.
 
         Every knob that changes engine output is listed, including the
-        ``lr+`` stack knobs and ``canonical_only``: leaving one out would
-        let a parameter sweep silently reuse a cached result computed at
-        different values.
+        ``lr+`` stack knobs, ``canonical_only`` and the DSS-style count
+        smoothing: leaving one out would let a parameter sweep silently
+        reuse a cached result computed at different values. The smoothing
+        span is keyed only while smoothing is on, so changing an unused
+        span does not invalidate a cache.
         """
         return {
             "test": selected_test,
@@ -189,6 +191,8 @@ class DMCConfig:
             "neighbour_combine": self.neighbour_combine,
             "neighbour_bp": self.neighbour_bp,
             "fdr_method": self.fdr_method,
+            "smoothing": self.smoothing,
+            "smoothing_span_bp": self.smoothing_span_bp if self.smoothing else None,
         }
 
     def to_uns(
