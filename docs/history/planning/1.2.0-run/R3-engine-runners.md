@@ -1,27 +1,30 @@
-# R3: decompose _process_one_chromosome and set the ceiling
+# R3: extract the chromosome engine runners
 
-Branch `refactor-3-engine-runners` from `refactor-2-engine-registry`. PR against it. Decision: map ticket 15. Read `_process_one_chromosome` in `dmc.py` end to end before editing; it is about 600 lines, complexity 38, the current ceiling.
+Start from `refactor-2-engine-registry` after its implementation and gates pass.
+Use `refactor-3-engine-runners` and target R2.
+Read the [run rules](README.md), issue [15](https://github.com/d-ert/epykit3/issues/15), and the complete current `_process_one_chromosome`.
 
-You own `dmc.py`, `pyproject.toml` (the mccabe setting only), and the tests you add.
+Own `src/epykit/dmc.py`, the complexity limit in `pyproject.toml`, and the relevant tests.
 
-## Commits, in this order
+## Implement
 
-1. `refactor(dmc): EngineInput and EngineResult`
-   - Two frozen dataclasses in `dmc.py`. `EngineInput`: `methylstore_path`, `chrom`, `canonical_pos`, `n_sites`, `samples_case`, `samples_control`, the engine knobs (`dispersion`, `reference`, `smoothing`, `smoothing_span_bp`, `sep_fallback`, `sep_threshold`, `glm_backend`) and the design bundle (`design_full`, `design_reduced`, `coef_idx`, `contrast_matrix`, `contrast_label`, `samples_all_ordered`, `group_labels_per_sample`). `EngineResult`: `pvals`, `log2_ors`, the two Welford triples, `extras`, an optional Newcombe block (`meth_a`, `cov_a`, `meth_b`, `cov_b`, `phi`, `df`) and an optional multigroup block (`level_mean_beta`, `f_stat`, `df1`, `df2`).
-2. `refactor(dmc): one runner per engine`
-   - `_run_fisher`, `_run_lr`, `_run_welch_t`, `_run_glm`, `_run_glm_contrast`, each `(inp: EngineInput) -> EngineResult`, bodies moved from the five branches without edits beyond the record plumbing. A runner returns reduced per-site arrays only, never a sample stack; the per-branch `del` statements become scope exits. `_ENGINE_RUNNERS: dict[str, Callable[[EngineInput], EngineResult]]` at the bottom of `dmc.py`.
-   - `_process_one_chromosome` becomes: the empty guard, build `EngineInput`, look up the runner (a `KeyError` cannot happen: the registry validated the name), call `_finalise_chromosome`.
-3. `refactor(dmc): _finalise_chromosome and _effect_ci`
-   - Everything after the branches moves: the min-samples NaN pass, `_effect_ci(res)` (Newcombe when the pooled block is present, delta method when `coef_treatment` is in extras, Welch otherwise, NaN in multigroup mode), column assembly, the sort.
-4. `test(dmc): runner keys match the registry`
-   - One test: `set(_ENGINE_RUNNERS) == set(ENGINES)`.
-5. `chore(lint): lower the complexity ceiling to 32`
-   - `[tool.ruff.lint.mccabe] max-complexity = 32`. Report in the commit body the new numbers for `_process_one_chromosome`, each runner and `_finalise_chromosome`, and the three highest functions in the tree (expected: `_build_features_index` 32, `call_dmr_chain_merge` 28, `process_chromosomes_dmc` 27). Targets: `_process_one_chromosome` at most 6, `_run_lr` and `_run_glm_contrast` at most 15, `_finalise_chromosome` at most 12. If a target is missed, restructure; do not raise the ceiling.
+1. Introduce a frozen `EngineInput` record. Carry the full `canonical_df`, including pos and strand, both sample lists, the selected test, and both minimum-sample thresholds. Carry every engine and design argument consumed by the original function. Derive `canonical_pos` and site count from that frame. The original brief omitted strand, selected test, and the minimum-sample thresholds.
+2. Introduce `EngineResult` for reduced per-site outputs: p-values, effect coefficients, both Welford triples, extras, pooled counts and dispersion inputs for the Newcombe interval, and the existing multigroup outputs.
+3. Move the five existing branches into `_run_fisher`, `_run_lr`, `_run_welch_t`, `_run_glm`, and `_run_glm_contrast`. Give them the common `EngineInput -> EngineResult` signature. Define a module-level `_ENGINE_RUNNERS` table.
+4. Keep `_process_one_chromosome` as the empty guard, input construction, validated runner lookup, and `_finalise_chromosome(inp, result)`.
+5. Move effect estimates, intervals, minimum-sample masking, column construction, and sorting into the finalizer without changing their order. Keep the GLM adjusted `meth_diff` and dispersion-scaled `coef_se`, not just its interval bounds. Keep empty and multigroup schemas.
+6. Extract a smaller effect helper only if needed to meet the complexity target. If extracted, return every value the effect block changes. Do not lose the adjusted difference or standard error by returning only the interval.
+7. Keep temporary sample arrays inside each runner. Fisher and Welch must retain their current sample-by-sample accumulation. The existing LR and GLM array requirements may remain, but no runner may retain arrays for another chromosome.
+8. Set `max-complexity = 32` only after the whole source tree meets it. Measure the highest remaining functions on the integrated code, rather than assuming the earlier numbers still hold.
 
-## Contract
+## Accept when
 
-No results change; this is the layer where the hash gate matters most. Run the regen script after every commit. Memory stays per chromosome: no runner may hold more than one chromosome's arrays.
+- Runner keys equal registry engine names.
+- Existing numerical tests cover all five paths, minimum-sample masking, empty input, strand preservation, single contrasts, and multigroup output.
+- Compare pre-refactor and post-refactor results on a fixed small fixture for each path, including NaNs, dtypes, effect sizes, intervals, and GLM extras. Reuse existing fixtures.
+- The LR hash gate remains unchanged. That gate does not cover Fisher, Welch, or all GLM behavior.
+- No runner returns a sample stack or materializes another chromosome.
+- Report measured complexity. Target at most 6 for orchestration, 15 for the largest runner, and 12 for the finalizer. The enforced source-tree ceiling is 32.
+- All code-layer gates pass.
 
-## Deliver
-
-PR title: `Per-engine runners for the chromosome loop, complexity ceiling to 32`. Then `worker_done`.
+PR title: `Extract per-engine chromosome runners and lower the complexity ceiling`.

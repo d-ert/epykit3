@@ -1,24 +1,26 @@
-# L: leftovers from the 1.1.0 run
+# L: prepare the shared inputs
 
-Branch `leftovers-1.1.0` from `main`. Standalone PR against `main`, merged before both stacks start. Decisions: map ticket 12 (leftovers) and ticket 27 (the canonical helper, item 3 below). Read `README.md` in this directory first.
+Start now from current `main` on `leftovers-1.1.0`. Target the PR at main.
+This layer must merge before either stack starts.
+Read the [run rules](README.md). Planning sources are issues [12](https://github.com/d-ert/epykit3/issues/12) and [27](https://github.com/d-ert/epykit3/issues/27).
 
-## Commits, in this order
+Own `README.md`, `CLAUDE.md`, the archive index and field guide, `src/epykit/_chroms.py`, and `tests/test_chroms.py`.
 
-1. `docs: the lr+ knobs are Python-API only`
-   - `README.md` (the `dmc` row of the CLI table), `CLAUDE.md` (the neighbour_combine paragraph) and `docs/history/planning/codebase/CONCERNS.md` (the two "deferred to 1.1" statements) say the `lr+` knobs are Python-API only, with no version promise. Grep `rg -n "deferred to 1\.1|in 1\.1\b" README.md CLAUDE.md docs/` and fix every remaining forward-looking statement; historical changelog text stays.
-2. `docs(history): add the 2026-09-05 field guide`
-   - The map driver supplies the HTML file; it is not in the repository. Commit it as `docs/history/2026-09-05-field-guide.html`. Add one line to `docs/history/README.md` describing it as a dated onboarding presentation. Add `2026-09-05-field-guide.html` to `exclude_docs` in `mkdocs.yml` so the site does not ship it; `mkdocs build --strict` must stay green.
-3. `feat(chroms): canonical chromosome helper`
-   - Re-type `src/epykit/_chroms.py` from `origin/feat/canonical-chrom-filter` commit `cd9f89b`: `is_canonical_chrom`, `filter_canonical`, `filter_canonical_logged`, `CANONICAL_CHROM_CORES`, `CANONICAL_CHROMS_UCSC`. Accepts chr1 to chr22, X, Y, M and MT under UCSC and Ensembl naming. Fix it under the current lint set (the branch used `typing.Iterable`). Carry `tests/test_chroms.py` from the branch. Nothing calls the helper yet; both stacks will. Say so in the commit body.
+## Implement
 
-## Not a commit
+1. Correct current claims that the lr+ CLI options are deferred to 1.1. State that the lr+ options are Python API only, with no promised release. Preserve dated historical plans and release notes.
+2. Copy [the supplied field guide](inputs/field-guide.html) to `docs/history/2026-09-05-field-guide.html` on the implementation branch. Add its date and purpose to `docs/history/README.md`. The input is archived on the planning branch so a worker does not need access to the original untracked file. Its SHA-256 is `484fe917697579c0527e41e07c0649d6174e7b85dc727ab99f9e44a6e4be5dfd`. Preserve the original file in the main checkout. `mkdocs.yml` already excludes `history/`; do not add a redundant exclusion.
+3. Port only the chromosome helper and its tests from commit `cd9f89b3fd7a56bd3f9c7fbd2bbdf78aac5f1676`. Add `is_canonical_chrom`, `filter_canonical`, `filter_canonical_logged`, `CANONICAL_CHROM_CORES`, and `CANONICAL_CHROMS_UCSC`. Use current typing and lint conventions.
+4. Keep the existing helper semantics: case-insensitive optional chr prefix, identifiers 1 through 22, X, Y, M, and MT, and order-preserving filtering. Document that this is a fixed human-style chromosome list, not a species-aware assembly validator.
+5. Correct the donor helper's default-on wording and `--all-contigs` advice. Filtering is opt-in. The INFO message reports the dropped contigs and says to omit `canonical_only=True` to retain them.
 
-After the PR is open, delete the two remote branches the triage report drops, first confirming their tips: `fine-tune` at `47d7878` and `optimize/autonomous-v1` at `99b2b4f`. `git push origin --delete fine-tune optimize/autonomous-v1`. Record the two SHAs in the PR body. Leave `bench-tune` and `feat/canonical-chrom-filter` alone.
+No branch deletion is part of this layer. Retain `fine-tune`, `optimize/autonomous-v1`, `bench-tune`, and `feat/canonical-chrom-filter`.
 
-## Contract
+## Accept when
 
-No behaviour change. The helper is unused. Regen hashes unchanged.
+- Helper tests cover both naming styles, prefix case, mitochondrial names, excluded contigs, input order, and the INFO message.
+- The field guide copy has the recorded hash and remains excluded from the site.
+- The helper has no callers yet. Existing defaults and numerical output are unchanged.
+- The code-layer gates in the run rules pass.
 
-## Deliver
-
-PR title: `Leftovers from 1.1.0: lr+ wording, the field guide, and the canonical-chromosome helper`. Body per the run README, plus the deleted branch tips. Then `worker_done`.
+PR title: `Prepare the 1.2 shared chromosome helper and archive the field guide`.

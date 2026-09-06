@@ -1,24 +1,33 @@
-# R1: the tl.dmc stage split
+# R1: split DMC orchestration into stages
 
-Branch `refactor-1-stage-split` from `main` after L merged. Bottom of the refactor stack; PR against `main`. Decisions: map ticket 13 (the split) and ticket 26 (the CI install change and the smoothed-store test). Read `README.md` here, `CLAUDE.md`, `src/epykit/_dmc_config.py`, and the stub at `src/epykit/_dmc_stages.py` on branch `prototype/dmc-stage-split` (commit `3836a6d`): it carries every stage signature and the `tl.py` line ranges each absorbs.
+Start from main after L merges. Use `refactor-1-stage-split` and target main.
+Read the [run rules](README.md) and issues [13](https://github.com/d-ert/epykit3/issues/13) and [26](https://github.com/d-ert/epykit3/issues/26).
+Read `src/epykit/_dmc_stages.py` at prototype commit `3836a6d88709d88bd51c552310e1b37c76cb82b5`.
+Use its stage outline as a guide. Its line ranges and warning stacklevels are not executable specifications.
 
-You own `tl.dmc` and `_run_dmc_contrast` in `tl.py`, `_dmc_config.py`, the new `_dmc_stages.py`, `.github/workflows/test.yml`, and the tests you add. You do not touch `tl.dmr`, `dmr.py`, `dmc.py`, `cli.py`.
+Own `tl.dmc`, `_run_dmc_contrast`, DMC-only helpers, `_dmc_config.py`, the new `_dmc_stages.py`, `.github/workflows/test.yml`, and their tests.
+Preserve `tl.dmr` and shared helpers in `tl.py`.
 
-## Commits, in this order
+## Implement
 
-1. `ci: install the bam extra on the ubuntu legs`
-   - In `test.yml`, give each matrix include entry an `extras` field: `"--extra bam"` for ubuntu, `""` for windows (pysam has no Windows wheel). The install line becomes `uv sync --locked --python ... --group dev --extra all ${{ matrix.extras }}`. The `slow` job (ubuntu) adds `--extra bam` too. Validate the YAML with PyYAML; this PR's own checks must show `test_asm.py`, `test_bam_io.py` and `test_entropy.py` running, not skipping, on ubuntu.
-2. `refactor(tl): split tl.dmc into stages`
-   - Create `src/epykit/_dmc_stages.py` from the stub: keep its records (`TsvPlan`, `DMCPlan`, `ContrastDesign`, `ResumeTicket`, `DMCOutcome`) and its nine stages, and move the bodies from `tl.py` into them line range by line range. `tl.dmc` keeps its signature, docstring, the `DMCConfig` build, and becomes the orchestrator body of `dmc_sketch`. `_run_dmc_contrast` becomes `run_contrast`. `publish` is the only writer of `md.uns["dmc"]`, always through `cfg.to_uns`.
-   - Keep today's error order inside `plan_run`: TSV resolution, then `cfg.validate()`, then the contrast dispatch. No resume support on the contrast path. `persist_resume` after `publish`. Warnings emitted from inside a stage move from `stacklevel=2` to `3`.
-   - The one observable difference, decided on the ticket: the `log2_odds_ratio` FutureWarning is emitted by `finish` on the resume cache hit too. Say so in the PR body. If a test asserts the hit is silent, update that test only.
-3. `test(smoothed_store): the pseudo-count store through open_input_store`
-   - One focused test: build a small smoothed store with `pp.smooth`, enter `open_input_store` with `use_smoothed=True`, and assert on the yielded store that `coverage` equals the raw coverage and `N_meth` equals `round(beta_smooth * coverage)` per site; assert the temporary directory is gone after exit. Fast tier.
+1. Add `--extra bam` to every Ubuntu entry in both dynamic matrix JSON arrays and to the slow job. Keep Windows entries without the BAM extra. Preserve the existing PR and main matrix sizes, event conditions, and Python versions.
+2. Move DMC bodies into the nine stages: `plan_run`, `run_contrast`, `lookup_resume`, `open_input_store`, `run_engine`, `post_process`, `publish`, `persist_resume`, and `finish`.
+3. Keep the prototype's five records, `TsvPlan`, `DMCPlan`, `ContrastDesign`, `ResumeTicket`, and `DMCOutcome`, with concrete annotations. Keep the public `tl.dmc` signature and defaults.
+4. Make the contrast, resume-hit, and ordinary binary paths explicit in `tl.dmc`. `publish` alone writes the DMC result record through `DMCConfig.to_uns`.
+5. Preserve TSV resolution before config validation, then contrast dispatch. Preserve materialization restrictions, return behavior, result keys, best-effort exports, and resume persistence after publication.
+6. Keep contrast resume behavior unchanged. Run `post_process` while the temporary input store is still alive. Clean up that temporary store on both normal exit and exceptions.
+7. Emit the transitional column warning through `finish` on a resume hit too, as recorded in issue 13. Preserve its existing behavior on other paths.
+8. Check warning filenames against a caller outside epykit. Do not change every warning to stacklevel 3: shared helpers and contextmanager entry add different stack depths.
+9. Keep shared TSV, warning, and sample-count helpers callable by DMR. Stages can import these helpers locally after `tl.py` initializes. Do not add a top-level circular import or duplicate their implementations.
 
-## Contract
+## Accept when
 
-No results change. `tests/test_dmc_metadata.py` (the uns contract) and `tests/test_cli_api_parity.py` must pass untouched. Regen hashes unchanged. Report `tl.dmc`'s complexity before and after (`ruff check --select C901 --config 'lint.mccabe.max-complexity=1'`).
+- Existing metadata, resume, multigroup, CLI parity, and streamed DMC tests pass. Update mock targets only where the import location moved.
+- One smoothed-store test checks coverage preservation, rounded and clipped pseudo-counts, raw-count fallback for missing smooth values, and directory cleanup. Include exceptional exit in the same fixture.
+- Binary, contrast, and resume-hit metadata keep the same key set and values except the recorded resume-hit warning.
+- `materialize=False` does not call `DMCStore.to_dataframe()` on the ordinary binary path.
+- Both matrix branches parse as JSON with the intended extras. CI executes `test_asm.py`, `test_bam_io.py`, and `test_entropy.py` on Ubuntu.
+- The code-layer gates pass with the BAM extra installed locally.
+- Report the measured complexity of `tl.dmc` before and after. Do not change the global ceiling in this layer.
 
-## Deliver
-
-PR title: `Split tl.dmc into stages with one writer for the uns record`. Body per the run README, naming the resume-hit warning as the one difference. Then `worker_done`.
+PR title: `Split DMC orchestration into stages and run BAM tests in CI`.

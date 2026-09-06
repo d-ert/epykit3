@@ -1,28 +1,35 @@
-# R5: the 1.2 removals
+# R5: document compatibility and retain deprecated APIs
 
-Branch `refactor-5-removals` from `refactor-4-cli-package`. PR against it. Decision: map ticket 22. Every removal is announced by a `FutureWarning` or `DeprecationWarning` naming 1.2; grep for `1.2` in `src/` to find them all.
+Start from R4 only after S3 merges and the refactor stack is updated onto main.
+Use `refactor-5-compatibility` and target `refactor-4-cli-package`.
+Read the [run rules](README.md) and issue [22](https://github.com/d-ert/epykit3/issues/22).
 
-You own every file a removal touches; name any file outside the refactor stack's list in `worker_done` (there should be none except `pp.py` and `dmr_hmm.py`, which no other stack touches).
+The filename is retained so existing links resolve. This brief replaces the proposed removal layer.
+The previous resolution treated deprecation messages as approval for a breaking change. It was also factually wrong:
+`pp.unite` names 2.0, while the CSV aliases say only "a future release".
+No maintainer-approved removal is established by those messages.
 
-## Commits, one per removal, in this order
+Own current compatibility docs, README and CLAUDE migration guidance, and deprecation wording in `tl.py`, R1's `finish` stage, `dmc.py`, and `dmr_hmm.py`.
+This layer starts after the other owners of those files finish.
 
-1. `feat(dmc)!: remove the transitional log2_odds_ratio column`
-   - The NaN-filled column, its `_EMPTY_SCHEMA` entry, the FutureWarning in the `finish` stage, and any reader that special-cases it. `log2_odds_ratio_pooled` and `coef_treatment_log2` stay.
-2. `feat(pp)!: remove pp.unite`
-   - The function and its DeprecationWarning; the documented replacement stays.
-3. `feat!: remove the dmr_hmm shim`
-   - `src/epykit/dmr_hmm.py`; `dmr_segment` is the name.
-4. `feat(tl)!: remove the csv keyword aliases`
-   - `csv`, `csv_full`, `csv_alpha` on `tl.dmc` and `tl.dmr` (and `DMCConfig`); `_resolve_auto_tsv` loses its csv arguments.
-5. `docs(changelog): the 1.2 removals`
-   - A `### Removed` section under `[Unreleased]` with one line per item and the replacement.
+## Implement
 
-For each removal, delete the tests that asserted on the warning text and update `tests/test_dmc_metadata.py` only where it checks the version string. Update `README.md`, `CLAUDE.md` and the docs pages that mention the removed names.
+1. Keep `pp.unite`, `epykit.dmr_hmm`, the transitional `log2_odds_ratio` column, and all CSV keyword aliases.
+2. Keep the existing pp.unite 2.0 promise and generic CSV deprecation wording.
+3. Replace the unapproved 1.2 removal promise for the transitional column and dmr_hmm shim with "a future major release". Keep warning categories and behavior. Update tests only where they assert that release text.
+4. Document the actual replacements: `pp.set_unite_type`; `epykit.dmr_segment.call_dmr_rule_segment`; `log2_odds_ratio_pooled` for pooled effects and `coef_treatment_log2` for GLM effects; and the matching TSV keyword aliases.
+5. Keep file format distinct from keyword naming. A TSV keyword with a .csv path still requests comma-delimited output.
+6. Check CSV aliases on `tl.qc`, `tl.dmc`, `tl.dmr`, `tl.dvc`, and `tl.annotate`. Do not partially remove the shared resolvers or break these other callers.
+7. Update current docs and CHANGELOG to state that 1.2 retains compatibility. Preserve historical release notes.
 
-## Contract
+## Accept when
 
-Results are unchanged for every call that did not use a removed name. Regen hashes unchanged. The PR is the maintainer's review point; if they object to one item, that commit is dropped and the others stay.
+All existing signatures, aliases, transitional columns, and warning categories remain.
+The metadata test keeps its schema assertions, including `log2_odds_ratio`; it is not a version-string test.
+Existing alias, export, and deprecation tests pass with only planned wording updates.
+The code-layer gates and strict docs build pass.
 
-## Deliver
+A future removal requires a separate maintainer decision on version and migration.
+It is out of scope for this run and does not block these compatibility changes.
 
-PR title: `Remove the four items deprecated for 1.2`. Then `worker_done`.
+PR title: `Retain deprecated APIs and correct the 1.2 migration guidance`.

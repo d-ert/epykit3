@@ -1,25 +1,65 @@
-# C4: bisulfite-safe phasing anchors for ASM
+# C4: reject bisulfite-confounded ASM anchors
 
-Branch `fix-asm-anchor-classes` from `main` after L merged. Standalone PR against `main`. Decision: map ticket 24; evidence: the research note `docs/review/2026-09-06-c4-asm-research.md` on branch `research/c4-asm` (read it first) and the peer review, `docs/review/2026-06-06-epykit-peer-review.md` lines 53 to 57.
+Start from main after R1 merges, so this PR's CI runs the BAM tests.
+Use `fix-asm-anchor-classes` and target main.
+Read the [run rules](README.md), issues [23](https://github.com/d-ert/epykit3/issues/23) and [24](https://github.com/d-ert/epykit3/issues/24), and the research note on `research/c4-asm`.
+The note is [docs/review/2026-09-06-c4-asm-research.md](https://github.com/d-ert/epykit3/blob/6825b1b2583793c0ab59e0e0536b3ef69eb572b7/docs/review/2026-09-06-c4-asm-research.md). Treat its findings as context, not approval to expand this fix.
 
-Environment: Linux or macOS with `uv sync --locked --group dev --extra all --extra bam`. Confirm `tests/test_asm.py` runs (not skips) before you start.
+Own `src/epykit/asm.py`, `tests/test_asm.py`, `docs/analysis/asm.md`, and the C4 changelog entry.
+Use Linux or macOS with `uv sync --locked --group dev --extra all --extra bam`.
+Run the current ASM test first and confirm it executes.
 
-You own `src/epykit/asm.py` and `tests/test_asm.py`.
+## Implement the conservative rule
 
-## Commits, in this order
+Bismark records the genome conversion state in XG, distinct from the ordinary alignment flag.
+See the [Bismark alignment documentation](https://felixkrueger.github.io/Bismark/usage/alignment/).
+Use that tag on each read, not `is_reverse`.
 
-1. `test(asm): a planted C/T anchor fabricates ASM today`
-   - Extend `_write_synth_bam_and_vcf` so it can plant a C/T het SNV whose C-allele reads split into methylated (base C at the SNV, `Z` at the CpG) and unmethylated (base T, `z`), and T-allele reads with the same split, with an `XG` tag per read. Add the test that asserts today's code reports a significant ASM call on that data (the confound), marked `xfail(strict=True)` with the reason. Tag the existing A/G test's reads `XG:Z:CT` (A/G is safe on CT reads) so it keeps passing after the fix.
-2. `fix(asm): filter phasing anchors by SNV class and read strand`
-   - In `_call_asm_one_sample`, between the het check and the fetch: drop C/G anchors always; for the other classes decide per read where the base is read: with `XG:Z:CT` accept A/T, G/A, G/T; with `XG:Z:GA` accept A/T, C/T, C/A; skip the read otherwise. Reads without an `XG` tag: accept A/T anchors only. Do not use `is_reverse` as a strand proxy. No new public parameter. Log one INFO line per sample: anchors kept, anchors dropped by class, reads skipped by the strand rule. Update the `call_asm` docstring with the rule and keep the research-grade warning.
-   - Turn commit 1's `xfail` into a passing test: with CT-only reads the anchor is skipped and no ASM is called; with GA reads added the call is correct.
-3. `docs(changelog): C4`
-   - Under `[Unreleased]` / `### Fixed`, saying what was wrong and which inputs were affected (every Bismark or MethylDackel BAM with C/T or G/A anchors).
+For each heterozygous biallelic SNV, normalize REF and ALT to uppercase and compare their unordered class.
 
-## Contract
+| Unordered SNV class | XG=CT | XG=GA | Missing or unrecognized XG |
+|---|---|---|---|
+| A/T | Accept | Accept | Accept |
+| A/G | Accept | Reject | Reject |
+| G/T | Accept | Reject | Reject |
+| C/T | Reject | Accept | Reject |
+| A/C | Reject | Accept | Reject |
+| C/G | Reject | Reject | Reject |
 
-ASM output changes, by design, only where the old code was wrong. No other module is touched. Regen hashes unchanged (the benchmark slice does not run ASM).
+The accepted classes exclude a potentially converted allele from the selected conversion strand.
+This deliberately conservative policy can drop usable anchors. Do not claim that all changes are limited to false positives.
 
-## Deliver
+1. Apply the class check after the heterozygous SNV check. Skip invalid bases and C/G anchors before fetching reads.
+2. Apply the XG rule before assigning a read to an allele. Preserve the existing mapping, sequence, and phasing checks.
+3. Keep the public API unchanged. Add no fallback switch that restores unsafe phasing.
+4. Log one summary per sample, including no-phaseable-read results. Define counts as anchors that assigned at least one accepted read, anchors rejected before fetch by class, and read-anchor observations rejected by the XG rule.
+5. Document the conservative untagged-read fallback and research limitations. The current `call_asm` docstring has no existing research warning to preserve; add plain scope text without inventing a new runtime warning.
 
-PR title: `ASM: exclude bisulfite-confounded phasing anchors`. Body per the run README, with the strand table from the research note. Then `worker_done`.
+## Prove the confound and the retained signal
+
+Extend the synthetic BAM and VCF builder rather than adding a large binary fixture.
+
+Create a null C/T anchor with 20 reads per true allele.
+For the C allele, 10 reads have C at the anchor and Z at the measured CpG. The other 10 have converted T at the anchor and z at the CpG.
+For the T allele, all 20 reads have T at the anchor. Ten have Z at the CpG and ten have z.
+True methylation is 50% for both alleles. CT-only reads make the old phaser split the data into 10/0 versus 10/20 counts.
+
+Write the desired assertion: the unsafe CT-only anchor contributes no ASM result.
+Run it against the old code and record the failure, then implement the fix in the same passing commit.
+Do not mark an assertion of the old false positive as strict xfail; it would unexpectedly pass.
+
+Also verify:
+
+- GA-tagged C/T reads with balanced methylation produce the expected balanced counts and no significant difference.
+- A genuine GA C/T signal remains detectable.
+- The existing A/G signal remains detectable after its reads receive XG=CT.
+- A parameterized test covers the six classes, both REF/ALT orders, both XG values, and the missing or invalid tag fallback.
+- Untagged A/T signal remains usable. C/G and unsafe reads never contribute to phasing.
+
+## Accept when
+
+The focused tests and all code-layer gates pass with BAM support installed.
+Describe changed ASM results and possible loss of anchors in the changelog.
+Other numerical results remain unchanged. LR hash parity is necessary but does not test ASM.
+
+PR title: `Exclude bisulfite-confounded ASM phasing anchors`.

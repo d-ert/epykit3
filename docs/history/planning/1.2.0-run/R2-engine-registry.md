@@ -1,24 +1,32 @@
-# R2: the DMC engine registry
+# R2: centralize DMC engine facts and validation
 
-Branch `refactor-2-engine-registry` from `refactor-1-stage-split`. PR against it. Decision: map ticket 14. Read `_dmc_config.py`, the top of `dmc.py` (`_GLM_BACKENDS`, `_canonicalise_test_name`, `_TEST_RECOMMENDATIONS`), `_validate_sample_size_and_warn`, `tl.py` `_auto_test_simple`, and the `--test` choices in `cli.py`.
+Start from `refactor-1-stage-split` after its implementation and gates pass.
+Use `refactor-2-engine-registry` and target R1.
+Read the [run rules](README.md) and issue [14](https://github.com/d-ert/epykit3/issues/14).
 
-You own `_dmc_engines.py` (new), `_dmc_config.py`, `dmc.py`, the `--test` choices in `cli.py`, and the tests you add.
+Own the new `_dmc_engines.py`, `_dmc_config.py`, DMC stages, `dmc.py`, CLI engine choices, and their tests.
+R1 has already moved two name-normalization call sites from `tl.py` into stages. Update those too.
 
-## Commits, in this order
+## Implement
 
-1. `feat(engines): declarative engine registry`
-   - `src/epykit/_dmc_engines.py`: a frozen `EngineSpec` with exactly these fields: `name`, `public`, `supports_n1`, `power_stack_applies`, `uses_glm_backend`, `effect_column`, `needs_design`. `ENGINES: dict[str, EngineSpec]` for `lr`, `welch_t`, `fisher`, `glm`, `glm_contrast` (`public=False`). `REMOVED_ENGINES: dict[str, str]` moved from `_dmc_config.py` with the hint text unchanged. `PUBLIC_ENGINES: tuple[str, ...]` in today's CLI order. No callables, no aliases. The module imports nothing from `dmc.py`.
-2. `refactor: consult the registry instead of comparing names`
-   - `DMCConfig.validate`: removed names raise their hint; a name not in `ENGINES` (and not `"auto"`) raises `ValueError` naming the four public engines. `DMCConfig.apply_power_stack`: `ENGINES[selected_test].power_stack_applies` replaces `selected_test != "lr"`. `dmc.py`: `effect_column` replaces the `_GLM_BACKENDS` check for the log2 column; `uses_glm_backend` replaces the set elsewhere; delete `_GLM_BACKENDS` and `_canonicalise_test_name` with its four call sites. `cli.py`: both `--test` `choices` lists come from `PUBLIC_ENGINES`. `_auto_test_simple`, `_warn_fisher_once` and `_validate_sample_size_and_warn` are not changed.
-3. `test(engines): registry contract`
-   - Three tests, fast tier: public names equal the CLI choices and the documented set; the removed names raise their hints through `tl.dmc`; `tl.dmc(test="nope")` raises `ValueError` before any store directory is created (assert on the filesystem under the analysis root).
-4. `docs(dmc): empirical_fdr_for_dmc docstring`
-   - The hand-off from S1: correct the docstring to describe both DMR `fdr_method` values with `max_t` as the default.
+1. Add a dependency-light registry with frozen `EngineSpec` records for lr, glm, welch_t, fisher, and internal glm_contrast.
+2. Give each record only the consumed fields: `name`, `public`, `power_stack_applies`, and `effect_column`. Drop the proposed unused `supports_n1`, `needs_design`, and `uses_glm_backend` fields. Preserve the existing sample-size and design validation.
+3. Keep `REMOVED_ENGINES` as data with existing migration messages. Set `PUBLIC_ENGINES` to `("lr", "glm", "welch_t", "fisher")`, which is the current CLI order.
+4. Make `DMCConfig.validate` reject removed and unknown names. Keep auto selection in its current high-level path. Do not expose glm_contrast as a CLI choice.
+5. Validate resolved names at `process_chromosomes_dmc` too. The CLI, tile DMR path, and public low-level callers bypass `DMCConfig`. Raise a useful ValueError before opening or creating an output store, rather than allowing a runner-map KeyError.
+6. Replace concrete registry-backed checks. Keep `_auto_test_simple`, sample-size warnings, and the numerical algorithms unchanged.
+7. Delete the identity function `_canonicalise_test_name` and every reference, including imports and fields in R1's stages. Remove `canonical_test` from `DMCPlan` when it duplicates `selected_test`.
+8. Use `PUBLIC_ENGINES` for both CLI choice lists without changing their order or defaults.
+9. Correct `empirical_fdr_for_dmc`'s cross-reference after S1's contract. Its own algorithm remains max-T style. Only the DMR function accepts `fdr_method="region"`.
 
-## Contract
+## Accept when
 
-No results change. The only behaviour change is for invalid engine names (error type and timing). Regen hashes unchanged.
+- Both CLI engine lists equal the registry's public names in the original order.
+- Each removed name retains its migration error through `tl.dmc`.
+- An unknown name fails before output creation through both `tl.dmc` and `process_chromosomes_dmc`.
+- Auto selection and valid GLM contrast calls retain their previous behavior.
+- Registry import does not import `dmc.py`; no import cycle exists.
+- No `_canonicalise_test_name` reference remains.
+- Code-layer gates pass. Only invalid-name error type and timing may change.
 
-## Deliver
-
-PR title: `One registry for the DMC engines`. Then `worker_done`.
+PR title: `Centralize DMC engine facts and validate low-level calls`.

@@ -1,22 +1,31 @@
-# S3: the additive parts of bench-tune
+# S3: correct the permissive preset documentation
 
-Branch `salvage-3-bench-tune-additive` from `salvage-2-canonical-filter`. PR against it. Top of the salvage stack. Decision: map ticket 28. Read `origin/bench-tune` commit `66ee2ef` (which includes `fine-tune`'s `47d7878`) for the diff; re-type by hand, cherry-pick nothing.
+Start from `salvage-2-canonical-filter` after its implementation and gates pass.
+Use `salvage-3-bench-tune-additive` and target S2.
+Read the [run rules](README.md) and issue [28](https://github.com/d-ert/epykit3/issues/28).
 
-## Commits
+Own the `tl.dmr` docstring and corresponding DMR documentation only.
 
-1. `feat(dmr): record the smoothing knobs in dmr_params`
-   - `tl.dmr` records `smoothing` and `smoothing_span_bp` in `md.uns["dmr_params"]` exactly as the branch did (the span only when smoothing is on).
-2. `docs(dmr): docstring fix from bench-tune`
-   - Re-type the docstring correction from the branch if it is in a file you own; if it is in `tl.dmc` or `dmc.py`, hand it to the refactor stack in `worker_done` instead.
+## Correct the donor plan
 
-## Not here
+The smoothing metadata additions in `bench-tune` belong to DMC, not DMR.
+Current `DMCConfig.to_uns` already records `smoothing` and `smoothing_span_bp`.
+Current `tl.dmr` and `call_dmr_tile_based` have no smoothing parameters.
+Do not add DMR parameters or record a smoothing setting that no DMR engine consumed.
 
-The `min_cpgs` 5 to 3 and permissive `pct_sig` 0.5 to 0.4 default changes (maintainer question, out of scope), `AGENTS.md`, the calibration plan, the lock change, and the CLI flags (R6 in the refactor stack).
+Read donor commits `47d787823f7c2d4a509493a621d44823f38591de` and `66ee2ef67fb3e6a7c16a38fa68065110236a6ac0` for context.
+Port only the doc correction that matches current `DMR_PRESETS`.
+At the reviewed baseline, permissive uses `dis_merge_bp=1000` and `pct_sig=0.5`.
+The `tl.dmr` docstring incorrectly says `dis_merge_bp=200`.
+Keep the layer-level bare chain_merge minimum at 5.
 
-## Contract
+## Accept when
 
-No behaviour change; one metadata dict gains two keys. Regen hashes unchanged.
+The DMR docstring and docs match `DMR_PRESETS` and `resolve_layer_min_cpgs`.
+No runtime code, defaults, metadata, or lockfile changes.
+Run the documentation-only gates in the run rules.
 
-## Deliver
+DMC CLI smoothing is R6. DMR smoothing and the donor's changed defaults are outside this run.
+If the integrated base already corrected the docstring, report this layer as already satisfied and omit an empty PR.
 
-PR title: `Record the smoothing knobs in dmr_params`. Then `worker_done`.
+PR title: `Correct the documented permissive DMR preset`.

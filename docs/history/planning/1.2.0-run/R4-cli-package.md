@@ -1,22 +1,30 @@
-# R4: the CLI package
+# R4: split the CLI without changing its interface
 
-Branch `refactor-4-cli-package` from `refactor-3-engine-runners`. PR against it. Decision: map ticket 16. Read `src/epykit/cli.py` (1298 lines) and `tests/test_cli_api_parity.py` first; check the `[project.scripts]` entry in `pyproject.toml`.
+Start from `refactor-3-engine-runners` after its implementation and gates pass.
+Use `refactor-4-cli-package` and target R3.
+Read the [run rules](README.md), issue [16](https://github.com/d-ert/epykit3/issues/16), and all imports and parser registrations in `src/epykit/cli.py`.
 
-You own `cli.py` and the new `cli/` package, and the CLI tests.
+Own the CLI module and new package, CLI tests, and `tests/test_no_print_outside_cli.py`.
 
-## Commits, in this order
+## Implement
 
-1. `refactor(cli): move cli.py to the cli package`
-   - `git mv src/epykit/cli.py src/epykit/cli/__init__.py`. Nothing else in this commit, so the move is tracked.
-2. `refactor(cli): shared helpers into _common.py`
-   - `_configure_logging`, `_auto_tsv_path`, `_cli_tsv_opts`, `_write_table_local`, `_add_min_samples_args`, `_read_samplesheet_groups`, `_cli_n1_and_footgun_checks`.
-3. `refactor(cli): one module per command family`
-   - `_ingest.py` (convert, filter, summary, smooth), `_dmc.py`, `_dmr.py`, `_downstream.py` (annotate, qc-report, report, aggregate-regions, export with its sub-parsers). Each exposes `register(sub: argparse._SubParsersAction) -> None` that adds its parsers and sets `func=`. `__init__.py` keeps `build_parser` (calling the four registrars in today's order) and `main`, so `epykit.cli:main` and `python -m epykit` are unchanged.
+1. Capture top-level and all nested command help on the base with a fixed terminal width and program name.
+2. Move `cli.py` to `cli/__init__.py`. In that same commit, change imports of epykit siblings from one dot to two dots, including lazy imports. A bare file move is not a working commit.
+3. In the move commit, update the stdout rule to allow only files under `src/epykit/cli/` by relative path. Update the CLI-presence assertion. Do not allow every `__init__.py` or a broad filename pattern.
+4. Move shared helpers into `cli/_common.py`: logging, TSV helpers, minimum-sample arguments, sample-group reading, and the n=1 checks. Keep imports directed from command modules to common helpers.
+5. Use four registrars called in this order: `_ingest.register`, `_dmc.register`, `_dmr.register`, `_downstream.register`.
+6. Put convert, filter, and summary in `_ingest.py`. Put dmc and dmr in their respective modules. Put annotate, qc-report, smooth, report, aggregate-regions, and export in `_downstream.py`, in that order. Moving smooth into the ingest registrar would change top-level help order.
+7. Keep `build_parser` and `main` in `cli/__init__.py`. Preserve the `epykit.cli:main` entry point and `python -m epykit`. Avoid an import from a command module back into the package initializer.
+8. Update tests that patch private CLI helpers to patch their new defining module. Preserve behavior assertions.
 
-## Contract
+## Accept when
 
-`epykit --help` and every subcommand's `--help` are byte-identical before and after (capture both and diff them in the PR body). Option names, defaults and outputs unchanged; the parity test is the gate. No `lr+` flags. Regen hashes unchanged.
+- The top-level command order remains convert, filter, summary, dmc, dmr, annotate, qc-report, smooth, report, aggregate-regions, export.
+- Before and after help output matches byte for byte under the same environment, including export subcommands.
+- Existing CLI integration, API parity, TSV export, n=1, and error-path tests pass.
+- The stdout test still rejects print calls outside the CLI package.
+- Both entry points work from an installed package.
+- No option, default, output format, or numerical result changes. New options wait for R6.
+- All code-layer gates pass.
 
-## Deliver
-
-PR title: `Split the CLI into a package, one module per command family`. Then `worker_done`.
+PR title: `Split the CLI into command modules without changing its interface`.

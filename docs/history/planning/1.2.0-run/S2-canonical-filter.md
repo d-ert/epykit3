@@ -1,26 +1,36 @@
-# S2: canonical chromosome filter, opt-in
+# S2: add opt-in canonical filtering at ingestion and tile DMR calling
 
-Branch `salvage-2-canonical-filter` from `salvage-1-region-fdr`. PR against `salvage-1-region-fdr`. Decision: map ticket 27. The helper `src/epykit/_chroms.py` is already on `main` from L; use it, do not re-add it.
+Start from `salvage-1-region-fdr` after its implementation and gates pass.
+Use `salvage-2-canonical-filter` and target S1.
+Read the [run rules](README.md) and issue [27](https://github.com/d-ert/epykit3/issues/27).
 
-You own `dmr.py`, `tl.dmr`, `convert.py`, `io.py`, `pl/_compute.py`, their tests and docs. The `tl.dmc`, `_run_dmc_contrast`, `process_chromosomes_dmc` and CLI parts of this feature are R6 in the refactor stack; do not touch them.
+Own `src/epykit/dmr.py`, `tl.dmr`, `convert.py`, `io.py`, `pl/_compute.py`, and their tests and docs.
+Use L's helper. R6 owns DMC filtering and the CLI.
 
-## Commits, in this order
+## Implement
 
-1. `feat(dmr): canonical_only on the tile caller and tl.dmr, default off`
-   - `call_dmr_tile_based(canonical_only: bool = False)` and `tl.dmr(canonical_only: bool = False)`. When on and `chromosomes` is auto-detected, filter with `filter_canonical_logged` and log one INFO line naming the dropped contigs; an explicit `chromosomes=` list is honoured verbatim. Record the value in `md.uns["dmr_params"]`.
-2. `feat(convert,io): canonical_only at ingestion, default off`
-   - `convert_sample`, `ensure_converted_sample`, `_can_reuse_sample` gain `canonical_only=False`; the per-sample manifest records it so a changed value invalidates the conversion cache. `read_bismark`, `read_methyldackel`, `read_combined_strand_bed` forward it.
-3. `refactor(pl): compute_manhattan_data uses the shared canonical list`
-   - Behaviour unchanged; the hardcoded copy goes.
-4. `test: canonical filter, opt-in`
-   - Carry `tests/test_canonical_chrom_filter.py` from the branch with the default-on assertions inverted; keep the override, explicit-list, audit-line and ingestion tests. Drop the DMC-default tests; R6 carries those.
-5. `docs: canonical_only`
-   - The read-bismark, dmr and architecture pages; CHANGELOG under Added.
+1. Add keyword-only `canonical_only: bool = False` to `call_dmr_tile_based` and `tl.dmr`. Preserve positional arguments. Filter only auto-detected chromosomes before analysis and multiple-testing correction. An explicit list, including an empty list, takes precedence.
+2. Define this DMR option as tile-only. DMC-derived methods use the chromosome universe chosen by the upstream DMC call. For those methods, reject `canonical_only=True` with instructions to run DMC with the filter. Do not silently ignore the option or filter a finished q-value table.
+3. Use the same resolved chromosome list for observed tiles and S1 permutations. Record the option in tile `dmr_params`. Keep the default-off path unchanged.
+4. Add and forward `canonical_only=False` through `convert_sample`, `ensure_converted_sample`, `_can_reuse_sample`, `read_bismark`, `read_methyldackel`, and `read_combined_strand_bed`.
+5. Include the option in the per-sample conversion manifest and reuse check. Treat an old manifest without the key as false. When the option changes, regenerate the sample and remove stale partitions so excluded contigs cannot leak through a glob.
+6. Make `pl/_compute.py` import the existing UCSC ordering from the shared helper. Preserve the plot's chromosome order.
 
-## Contract
+## Accept when
 
-Default off everywhere, so no existing number moves. The synth fixtures use chr1 to chr5, so the suite sees no change even when on. Regen hashes unchanged.
+Use the relevant cases from commit `cd9f89b3fd7a56bd3f9c7fbd2bbdf78aac5f1676` as input, then adapt them to current fixtures.
+Own the ingestion and tile cases in `tests/test_canonical_chrom_filter.py`. R6 adds the DMC cases after S3 merges.
 
-## Deliver
+The fixture must contain a canonical chromosome and a noncanonical contig. A chr1-only fixture cannot prove the filter.
 
-PR title: `Opt-in canonical chromosome filter for ingestion and DMR calling`. Then `worker_done`.
+- Default false preserves both contigs. True removes only the noncanonical contig during auto-detection.
+- Explicit chromosome lists take precedence in the tile caller. Unsupported non-tile use fails clearly.
+- False-to-true-to-false conversion in the same cache gives the expected partition set at each step.
+- A manifest without the new key remains reusable for false and is invalid for true.
+- Tile permutation calls use exactly the observed chromosome universe.
+- The helper emits one summary per selection operation, with no per-row log output.
+
+Update the ingestion, DMR, and architecture docs. State the fixed human-style chromosome set and tile-only DMR scope.
+The CLI documentation waits for R6. Run all code-layer gates.
+
+PR title: `Add opt-in canonical filtering for ingestion and tile DMR calling`.
