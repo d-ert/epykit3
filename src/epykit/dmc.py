@@ -193,11 +193,6 @@ def _resolve_dmc_store_dir(
     return fallback
 
 
-def _canonicalise_test_name(test: str) -> str:
-    """Map deprecated test names to their canonical form."""
-    return test
-
-
 _TEST_RECOMMENDATIONS = {
     range(1, 3): "fisher (single-rep only; effect size dominates)",
     range(3, 999): "lr (quasi-binomial likelihood-ratio with MN overdispersion)",
@@ -1376,7 +1371,6 @@ def _process_one_chromosome(
         `logit_t`). Welford accumulators give per-site variance without
         materialising the count matrix.
     """
-    test = _canonicalise_test_name(test)
     n_sites = len(canonical_df)
     if n_sites == 0:
         return pl.DataFrame(schema=_EMPTY_SCHEMA)
@@ -2194,8 +2188,6 @@ def process_chromosomes_dmc(
         min_samples_treatment = 0
     samples_case = samples_treatment
     min_samples_case = min_samples_treatment
-
-    test = _canonicalise_test_name(test)
 
     store = Path(methylstore_path)
     # For glm_contrast the case/control split is not meaningful -- the
