@@ -225,6 +225,29 @@ def test_region_small_n_warns(monkeypatch):
         _run(_observed(10, 1e-6), n_perm=10, fdr_method="region")
 
 
+@pytest.mark.parametrize("missing", [float("nan"), float("inf"), float("-inf"), None])
+def test_missing_observed_statistics_do_not_lower_region_fdr(monkeypatch, missing):
+    monkeypatch.setattr(
+        dmr_mod, "call_dmr_tile_based", lambda **kw: pl.DataFrame({"pvalue": [0.001]})
+    )
+    baseline = _run(_observed(pvalues=[0.001]), fdr_method="region")
+    padded = _run(_observed(pvalues=[missing] * 99 + [0.001]), fdr_method="region")
+    for col in ("empirical_pvalue", "empirical_qvalue", "empirical_fdr_set"):
+        assert baseline[col][0] == 1.0
+        assert padded[col][-1] == baseline[col][0]
+    assert padded["empirical_pvalue"][:-1].is_nan().all()
+    assert padded["empirical_qvalue"][:-1].is_nan().all()
+
+
+def test_region_fdr_is_undefined_without_finite_observed_statistics(monkeypatch):
+    monkeypatch.setattr(
+        dmr_mod, "call_dmr_tile_based", lambda **kw: pl.DataFrame({"pvalue": [0.001]})
+    )
+    out = _run(_observed(pvalues=[float("nan"), None]), fdr_method="region")
+    for col in ("empirical_pvalue", "empirical_qvalue", "empirical_fdr_set"):
+        assert out[col].is_nan().all()
+
+
 def test_max_t_small_n_does_not_warn(monkeypatch):
     monkeypatch.setattr(
         dmr_mod, "call_dmr_tile_based", lambda **kw: pl.DataFrame({"pvalue": [1e-6]})
