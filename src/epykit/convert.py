@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -581,7 +582,8 @@ def convert_sample(
     sample_name : str
         Sample identifier written into the `sample` column
     output_dir : str
-        Directory where Parquet partitions will be written
+        Directory where Parquet partitions will be written. A completed
+        conversion replaces this sample's directory, including old partitions.
     row_group_size : int
         Approximate Parquet row-group size (default 1 000 000)
     context : str
@@ -733,18 +735,22 @@ def convert_sample(
     elif merge_strands and reference_fasta is None:
         df = _merge_cpg_pairs_by_position(df)
 
-    # Write one Parquet file per chromosome. partition_by is a single
-    # hash-partition pass; the prior unique()+filter() loop scanned the
-    # frame once per chromosome.
-    for key, sub in df.partition_by("chrom", as_dict=True, maintain_order=False).items():
-        chrom = key[0] if isinstance(key, tuple) else key
-        part_dir = out / f"sample={sample_name}" / f"chrom={chrom}"
-        part_dir.mkdir(parents=True, exist_ok=True)
-        sub.write_parquet(
-            str(part_dir / "part-0.parquet"),
-            compression="zstd",
-            row_group_size=row_group_size,
-        )
+    # Stage on the destination filesystem so promotion uses a rename.
+    # Replace the whole sample, even when filtering leaves no chromosomes.
+    # A failed write leaves the previous sample intact.
+    with tempfile.TemporaryDirectory(prefix=".epykit_convert_", dir=out) as temp_root:
+        temp_sample_dir = _sample_dir(Path(temp_root), sample_name)
+        temp_sample_dir.mkdir(parents=True)
+        for key, sub in df.partition_by("chrom", as_dict=True, maintain_order=False).items():
+            chrom = key[0] if isinstance(key, tuple) else key
+            part_dir = temp_sample_dir / f"chrom={chrom}"
+            part_dir.mkdir()
+            sub.write_parquet(
+                str(part_dir / "part-0.parquet"),
+                compression="zstd",
+                row_group_size=row_group_size,
+            )
+        _promote_sample_dir(temp_sample_dir, _sample_dir(out, sample_name))
 
     return resolved_base
 

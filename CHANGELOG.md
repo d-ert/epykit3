@@ -6,6 +6,13 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+### Fixed
+
+- Direct sample conversion replaces the previous sample directory after
+  all partitions are written. Enabling `canonical_only` removes old scaffold
+  partitions, including when no chromosomes remain. A failed write preserves
+  the previous sample.
+
 ### Added
 
 - **Opt-in count-ratio region FDR and chain_merge permutations.**
