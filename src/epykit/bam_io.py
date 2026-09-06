@@ -30,6 +30,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable, Iterator
 from pathlib import Path
+from typing import Any, cast
 
 import polars as pl
 
@@ -117,12 +118,13 @@ def read_methylation_calls(
 
     rows: list[dict[str, object]] = []
     with pysam.AlignmentFile(str(bam_p), "rb") as bam:
+        iterator: Iterator[tuple[Any, tuple[int, int] | None]]
         if regions is None:
-            iterator = bam.fetch(until_eof=True)
+            iterator = ((read, None) for read in bam.fetch(until_eof=True))
         else:
             iterator = _multi_region_iter(bam, regions)
 
-        for read in iterator:
+        for read, span in iterator:
             if read.is_unmapped or read.is_secondary or read.is_supplementary:
                 continue
             if read.is_duplicate or read.is_qcfail:
@@ -131,9 +133,16 @@ def read_methylation_calls(
                 continue
 
             if caller == "bismark":
-                rows.extend(_extract_bismark(read, min_baseq=min_baseq, context=context))
+                calls = _extract_bismark(read, min_baseq=min_baseq, context=context)
             else:
-                rows.extend(_extract_methyldackel(read, min_baseq=min_baseq))
+                calls = _extract_methyldackel(read, min_baseq=min_baseq)
+            if span is not None:
+                # fetch() returns whole reads that overlap the window; keep
+                # only the calls inside it so a region request never reports
+                # positions past its end.
+                start, end = span
+                calls = [row for row in calls if start <= cast(int, row["pos"]) < end]
+            rows.extend(calls)
 
     if not rows:
         return pl.DataFrame(schema=_BAM_READ_SCHEMA)
@@ -141,13 +150,22 @@ def read_methylation_calls(
     return pl.DataFrame(rows, schema=_BAM_READ_SCHEMA)
 
 
-def _multi_region_iter(bam, regions: Iterable[tuple[str, int, int]]) -> Iterator:
-    """Yield reads from each (chrom, start, end) in turn."""
+def _multi_region_iter(
+    bam, regions: Iterable[tuple[str, int, int]]
+) -> Iterator[tuple[Any, tuple[int, int]]]:
+    """Yield ``(read, (start, end))`` for every read overlapping each region.
+
+    The half-open ``[start, end)`` span travels with the read so the caller
+    can clip the read's calls to the region it was fetched for.
+    """
     for chrom, start, end in regions:
         try:
-            yield from bam.fetch(chrom, start, end)
+            reads = bam.fetch(chrom, start, end)
         except ValueError:
             logger.warning("Region %s:%d-%d skipped (chrom not in BAM)", chrom, start, end)
+            continue
+        for read in reads:
+            yield read, (start, end)
 
 
 def _read_meta(read) -> tuple[str, str, int, int]:
