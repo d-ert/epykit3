@@ -84,8 +84,36 @@ controlled at your expected level before trusting the results.
 | `"segment"` | Rule-based 3-state segmentation over `meth_diff` (`dmr_segment.py`; `dmr_hmm.py` is a deprecated alias) | Not a fitted HMM; the HMM primitives in `_hmm.py` are separate |
 
 Permutation empirical FDR (`ep.tl.dmr(..., empirical_fdr=True, n_perm=N)`)
-is wired for `method="tile"` only. The other callers raise
-`NotImplementedError` until each gets its own label-shuffle scheme.
+is wired for `method="tile"` and `method="chain_merge"`. Both harnesses
+share `_aggregate_region_perm_results` in `dmr.py`, which dispatches on
+`fdr_method`: `"max_t"` (default) is the Westfall-Young min-P statistic
+with a BH transform; `"region"` is the opt-in count-ratio target-decoy FDR
+in `_region_count_ratio_fdr`. The tile harness re-runs
+`call_dmr_tile_based` on shuffled labels. `empirical_fdr_for_chain_merge`
+replays the observed DMC (engine knobs from `md.uns["dmc"]`, the observed
+chromosome universe and multiple-testing method) into a private temporary
+`DMCStore` per permutation, then chain-merges and filters it like the
+observed run. The per-CpG `empirical_fdr_for_dmc` keeps min-P only; region
+mode exists in the DMR API alone. `sliding_window` and `segment` raise
+`NotImplementedError` until each gets its own label-shuffle scheme. See
+[the design note](../review/2026-06-08-region-empirical-fdr-design.md).
+
+## Canonical chromosome filter
+
+`src/epykit/_chroms.py` is the one definition of a main-assembly
+chromosome: autosomes `1` to `22`, `X`, `Y`, and the mitochondrion as `M`
+or `MT`, with an optional case-insensitive `chr` prefix. It is a fixed
+human-style list, not a species-aware assembly validator. Every
+`canonical_only` option is opt-in (default `False`) and drops the same
+contigs through `filter_canonical_logged`, which emits one INFO line per
+selection naming what it dropped.
+
+| Surface | Scope |
+|---|---|
+| `read_bismark`, `read_methyldackel`, `read_combined_strand_bed`, `convert_sample` | Drops non-canonical contigs before the partition write. The setting is part of the per-sample conversion manifest; a changed setting rebuilds the sample and replaces its partition directory. |
+| `tl.dmr(method="tile")`, `call_dmr_tile_based` | Filters the auto-detected partition list before the tile test and the BH correction. `tl.dmr` resolves the list once and shares it with every `empirical_fdr` permutation. An explicit `chromosomes=` list, including an empty one, is used verbatim. |
+| `chain_merge`, `sliding_window`, `segment` | Not supported. These callers inherit the chromosome universe of the upstream DMC run and raise `ValueError` on `canonical_only=True`; filter at ingestion or restrict `tl.dmc` with `chromosomes=`. |
+| `pl.manhattan` | Takes its axis order from `CANONICAL_CHROMS_UCSC` and hides other contigs unless `canonical_only=False` (unchanged plot behaviour). |
 
 ## Where to look in the source tree
 
@@ -103,3 +131,6 @@ is wired for `method="tile"` only. The other callers raise
   DMR callers.
 - `src/epykit/_smoothed_store.py` — Gaussian-kernel and BSmooth
   smoothing implementations.
+- `src/epykit/_chroms.py` — the canonical chromosome predicate, the
+  order-preserving filters and the UCSC order shared by ingestion, the
+  tile DMR caller and the Manhattan plot.

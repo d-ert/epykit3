@@ -1,9 +1,12 @@
 """M2: empirical_fdr=True was silently a no-op for chain_merge (the
 default), sliding_window, and segment. The calibration-warning note was
 also suppressed in those branches, leaving users with no signal that
-combined_qvalue is anti-conservative. Batch-1 contract: empirical_fdr=True
-must produce columns (tile) OR raise NotImplementedError (others); never
-silently no-op."""
+combined_qvalue is anti-conservative. Contract: empirical_fdr=True must
+produce columns OR raise NotImplementedError; never silently no-op.
+
+The API (``tl.dmr``) supports empirical_fdr for ``tile`` and ``chain_merge``;
+``sliding_window`` / ``segment`` still raise. The CLI (``_cmd_dmr``) stays
+tile-only."""
 from __future__ import annotations
 
 import pytest
@@ -21,7 +24,7 @@ def md_with_dmc(synth_md_filtered):
     return md
 
 
-@pytest.mark.parametrize("method", ["chain_merge", "sliding_window", "segment"])
+@pytest.mark.parametrize("method", ["sliding_window", "segment"])
 def test_non_tile_empirical_fdr_raises_notimplemented(md_with_dmc, method):
     with pytest.raises(NotImplementedError, match=r"empirical_fdr.*tile"):
         ep.tl.dmr(md_with_dmc, method=method, empirical_fdr=True, n_perm=10)
@@ -32,6 +35,43 @@ def test_tile_empirical_fdr_still_works(md_with_dmc):
     dmr = md_with_dmc.uns["dmr"]
     assert "empirical_pvalue" in dmr.columns
     assert "empirical_qvalue" in dmr.columns
+    assert "empirical_fdr_set" in dmr.columns
+    params = md_with_dmc.uns["dmr_params"]
+    assert params["fdr_method"] == "max_t"
+    assert params["empirical_fdr_set"] is None
+
+
+def test_tile_region_mode_records_set_estimate(md_with_dmc):
+    ep.tl.dmr(
+        md_with_dmc,
+        method="tile",
+        empirical_fdr=True,
+        n_perm=5,
+        perm_seed=0,
+        fdr_method="region",
+    )
+    params = md_with_dmc.uns["dmr_params"]
+    assert params["fdr_method"] == "region"
+    assert params["empirical_fdr_set"] is None or 0.0 <= params["empirical_fdr_set"] <= 1.0
+    dmr = md_with_dmc.uns["dmr"]
+    if dmr.height > 0:
+        assert params["empirical_fdr_set"] == pytest.approx(dmr["empirical_fdr_set"][0])
+
+
+def test_chain_merge_empirical_fdr_admitted_in_api(md_with_dmc, monkeypatch):
+    """The API admits chain_merge; the engine is stubbed here and exercised
+    for real in tests/test_chain_merge_empirical_fdr.py."""
+    import numpy as np
+
+    import epykit.dmr as ep_dmr
+
+    monkeypatch.setattr(
+        ep_dmr, "_chain_merge_perm_survivors", lambda **kw: np.array([0.5], dtype=np.float64)
+    )
+    ep.tl.dmr(md_with_dmc, method="chain_merge", empirical_fdr=True, n_perm=3, perm_seed=0)
+    dmr = md_with_dmc.uns["dmr"]
+    assert {"empirical_pvalue", "empirical_qvalue", "empirical_fdr_set"} <= set(dmr.columns)
+    assert md_with_dmc.uns["dmr_params"]["fdr_method"] == "max_t"
 
 
 @pytest.mark.parametrize("method", ["chain_merge", "sliding_window", "segment"])
