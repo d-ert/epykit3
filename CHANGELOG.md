@@ -6,6 +6,12 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+### Changed
+
+- The `lr+` power stack (`power_stack`, `neighbour_combine`, `sep_fallback`)
+  is documented as Python API only. The earlier note that CLI flags were
+  deferred to 1.1 is withdrawn; no CLI flags are planned.
+
 ## [1.1.0] — 2026-09-05
 
 Post-1.0 correctness and reproducibility fixes from a pre-submission code
