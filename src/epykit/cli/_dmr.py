@@ -145,6 +145,7 @@ def _cmd_dmr(args: argparse.Namespace):
                 observed_dmr=dmr_results,
                 n_perm=args.n_perm,
                 seed=args.perm_seed,
+                min_mean_qvalue=getattr(args, "min_mean_qvalue", None),
                 tile_size_bp=args.tile_size_bp,
                 test=args.test,
                 chromosomes=tile_chromosomes,

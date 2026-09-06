@@ -1204,6 +1204,7 @@ def dmr(
                     merge_adjacent=merge_adjacent,
                     backend=backend,
                     fdr_method=fdr_method,
+                    min_mean_qvalue=min_mean_qvalue,
                 )
 
         md.uns["dmr"] = dmr_df
