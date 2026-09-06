@@ -1932,7 +1932,7 @@ def _process_one_chromosome(
     #                        (not log2 of an odds ratio) => coef_treatment_log2.
     #   all other backends: genuine pooled log2 odds ratio => log2_odds_ratio_pooled.
     # A transitional log2_odds_ratio column is NaN-filled so existing code
-    # doesn't silently break; it is slated for removal in 1.1.
+    # doesn't silently break; it is slated for removal in 1.2.
     _log2_col = "coef_treatment_log2" if test in _GLM_BACKENDS else "log2_odds_ratio_pooled"
     out_cols = {
         "chrom": pl.Series([chrom] * n_sites, dtype=pl.Utf8),

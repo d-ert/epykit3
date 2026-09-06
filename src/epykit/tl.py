@@ -288,7 +288,7 @@ def _emit_result_tsv(write_fn, path: str, *, is_auto: bool) -> None:
     """
     try:
         write_fn()
-    except Exception as exc:  # noqa: BLE001 -- auto-emit must not break the run
+    except Exception as exc:  # auto-emit must not break the run
         if not is_auto:
             raise
         logger.warning("Auto TSV emit to %s skipped: %s", path, exc)
@@ -652,22 +652,13 @@ def dmc(
 
     # --- New contrast / multi-group path -------------------------------------
     if cfg.formula is not None or cfg.contrast is not None:
-        if cfg.empirical_fdr:
-            # Same refusal as the DMR path: label shuffling invalidates
-            # the stratified design that formula= encodes.
-            raise ValueError(
-                "empirical_fdr=True is not supported with the contrast / "
-                "multi-group DMC path (label shuffling invalidates the "
-                "stratified design). Use the binary treatment / control "
-                "path or implement a custom stratified permutation."
-            )
         _run_dmc_contrast(md, cfg)
         # P1-11 deprecation notice for GLM / contrast path.
         import warnings as _warnings
 
         _warnings.warn(
             "The 'log2_odds_ratio' column is deprecated and is slated for "
-            "removal in 1.1. Use 'log2_odds_ratio_pooled' for pooled-count "
+            "removal in 1.2. Use 'log2_odds_ratio_pooled' for pooled-count "
             "tests (lr, fisher) or 'coef_treatment_log2' for the glm backend. "
             "The transitional column is NaN-filled.",
             FutureWarning,
@@ -969,14 +960,14 @@ def dmc(
                 exc,
             )
 
-    # P1-11 deprecation notice – emitted once per tl.dmc call (not per-row,
+    # P1-11 deprecation notice - emitted once per tl.dmc call (not per-row,
     # not per-chromosome).  The transitional 'log2_odds_ratio' column is
-    # NaN-filled and slated for removal in 1.1.
+    # NaN-filled and slated for removal in 1.2.
     import warnings as _warnings
 
     _warnings.warn(
         "The 'log2_odds_ratio' column is deprecated and is slated for "
-        "removal in 1.1. Use 'log2_odds_ratio_pooled' for pooled-count "
+        "removal in 1.2. Use 'log2_odds_ratio_pooled' for pooled-count "
         "tests (lr, fisher) or 'coef_treatment_log2' for the glm backend. "
         "The transitional column is NaN-filled.",
         FutureWarning,
@@ -1009,9 +1000,38 @@ def _run_dmc_contrast(md: MethylData, cfg: DMCConfig) -> None:
     ``covariates``, ``treatment_col``, ``reference_level``,
     ``chromosomes``, ``min_samples_*``, ``dispersion``, ``reference`` and
     ``fdr_method`` from ``cfg``; the other knobs are not consumed here.
+    Knobs this path cannot honour (``empirical_fdr``, ``materialize=False``)
+    are refused up front rather than silently ignored, and an unknown
+    ``power_stack`` raises as on the binary path.
     """
     from ._glm import build_design, resolve_contrast
     from .dmc import process_chromosomes_dmc
+
+    if cfg.empirical_fdr:
+        # Same refusal as the DMR path: label shuffling invalidates
+        # the stratified design that formula= encodes.
+        raise ValueError(
+            "empirical_fdr=True is not supported with the contrast / "
+            "multi-group DMC path (label shuffling invalidates the "
+            "stratified design). Use the binary treatment / control "
+            "path or implement a custom stratified permutation."
+        )
+    if not cfg.materialize:
+        # This path always assembles the full result onto md.varm (below);
+        # refuse the argument rather than silently ignore it.
+        raise ValueError(
+            "materialize=False is not supported on the formula / contrast "
+            "path yet: it always assembles the full per-CpG result onto "
+            "md.varm. Re-run with materialize=True (the default)."
+        )
+    # An unknown power_stack raises here as on the binary path. A valid
+    # value is ignored: the GLM has none of the lr+ knobs.
+    cfg.validate_resolved()
+    if cfg.power_stack != "off":
+        logger.info(
+            "power_stack=%r is ignored on the formula / contrast path: the GLM has no lr+ knobs.",
+            cfg.power_stack,
+        )
 
     if not md.obs.height:
         raise ValueError("md.obs is empty; cannot build a design matrix.")
@@ -1025,7 +1045,7 @@ def _run_dmc_contrast(md: MethylData, cfg: DMCConfig) -> None:
     need_treatment = (treatment_col in md.obs.columns) and (
         cfg.formula is None or treatment_col in cfg.formula
     )
-    design_full, _design_reduced, coef_idx, term_names, formula_used, design_info = build_design(
+    design_full, _design_reduced, _coef_idx, term_names, formula_used, design_info = build_design(
         md.obs,
         samples_ordered=samples_all,
         formula=cfg.formula,
@@ -1068,8 +1088,11 @@ def _run_dmc_contrast(md: MethylData, cfg: DMCConfig) -> None:
             mask_treat = (
                 md.obs.get_column(treatment_col).cast(pl.Float64, strict=False) == 1
             ).to_list()
-            samples_case_local = [s for s, m in zip(samples_all, mask_treat) if m]
-            samples_control_local = [s for s, m in zip(samples_all, mask_treat) if not m]
+            # Both lists are columns of md.obs, so they have the same length.
+            samples_case_local = [s for s, m in zip(samples_all, mask_treat, strict=True) if m]
+            samples_control_local = [
+                s for s, m in zip(samples_all, mask_treat, strict=True) if not m
+            ]
         except Exception as exc:
             logger.warning(
                 "Could not derive case/control split from treatment column "
