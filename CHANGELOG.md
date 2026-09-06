@@ -8,6 +8,18 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ### Changed
 
+- **DMC engine facts live in one registry.** `src/epykit/_dmc_engines.py`
+  holds one frozen `EngineSpec` per engine (`lr`, `glm`, `welch_t`,
+  `fisher` and the internal `glm_contrast`) with the facts the rest of the
+  package reads: whether it is a public `test=` choice, whether the `lr+`
+  power stack applies, and which effect-size column it emits. Both CLI
+  `--test` choice lists come from it, in the same order with the same
+  default. An unknown engine name now raises `ValueError` naming the four
+  public engines from `tl.dmc` and from `dmc.process_chromosomes_dmc`
+  before any DMC store directory is created; it used to reach a
+  `NotImplementedError` per chromosome after the directory existed. The
+  engines removed in 0.7.5 keep their migration hints, `"auto"` resolves as
+  before, and engine output is unchanged (the engine hash gate holds).
 - **`tl.dmc` orchestration split into stages.** The body of `ep.tl.dmc` now
   runs nine stages from `src/epykit/_dmc_stages.py` (`plan_run`,
   `run_contrast`, `lookup_resume`, `open_input_store`, `run_engine`,
