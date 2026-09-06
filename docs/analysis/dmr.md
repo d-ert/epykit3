@@ -69,7 +69,7 @@ passed alongside `preset` overrides the bundled value.
 ep.tl.dmr(md, method="chain_merge", preset="strict")
 
 # Permissive preset with custom merge distance
-ep.tl.dmr(md, method="chain_merge", preset="permissive", dis_merge_bp=500)
+ep.tl.dmr(md, method="chain_merge", preset="permissive", dis_merge_bp=2000)
 ```
 
 !!! tip "Tuning chain_merge"
@@ -312,7 +312,7 @@ The five diagnostic buckets:
 | `alpha` | float | 0.05 | Per-CpG significance threshold |
 | `min_abs_meth_diff` | float | 0.1 | Minimum absolute methylation difference |
 | `dis_merge_bp` | int | 500 | Maximum gap (bp) between consecutive sig CpGs |
-| `min_cpgs` | int | 3 | Minimum CpGs in a region |
+| `min_cpgs` | int or None | None | Minimum CpGs in a region. `None` takes the active preset's value, otherwise 5 |
 | `pct_sig` | float | 0.5 | Minimum fraction of significant CpGs |
 | `minlen_bp` | int | 50 | Minimum region span (bp) |
 | `use_q_for_sig` | bool | False | Use q-value instead of p-value for significance |
