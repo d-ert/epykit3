@@ -128,11 +128,104 @@ ep.tl.dmr(md, method="segment")
 
 ## Empirical FDR
 
-Permutation-based FDR is available for the `tile` method:
+The region-level `qvalue` (tile) and `combined_qvalue` (chain_merge,
+sliding_window, segment) are BH corrections of asymptotic region p-values.
+Adjacent WGBS CpGs are positively correlated and real coverage is
+overdispersed, so these q-values rank regions well but are not a calibrated
+region FDR. Permutation FDR re-runs the caller on shuffled treatment and
+control labels and compares the observed regions with the shuffled (decoy)
+regions. It is available for `tile` and `chain_merge`:
 
 ```python
-ep.tl.dmr(md, method="tile", empirical_fdr=True, n_perm=100)
+ep.tl.dmr(md, method="tile", empirical_fdr=True, n_perm=100, perm_seed=42)
+ep.tl.dmr(md, method="chain_merge", empirical_fdr=True, n_perm=100, perm_seed=42)
+# md.uns["dmr"] gains empirical_pvalue, empirical_qvalue and empirical_fdr_set
 ```
+
+Threshold `empirical_qvalue`, not `qvalue` or `combined_qvalue`, for FDR
+control.
+
+### `fdr_method`: how the empirical FDR is computed
+
+Both callers accept `fdr_method`. The default reproduces the numbers earlier
+releases computed; `"region"` is opt-in.
+
+| `fdr_method` | Construction | `empirical_pvalue` | `empirical_qvalue` | `empirical_fdr_set` |
+|---|---|---|---|---|
+| `"max_t"` (default) | Westfall-Young min-P. Each permutation contributes its genome-wide minimum null p-value. Controls the family-wise error rate and is very conservative at genome scale under realistic dispersion. | Fraction of permutations whose minimum null p-value is at or below the observed p-value, with a pseudo-count. | BH transform of `empirical_pvalue`. | NaN. |
+| `"region"` | Count-ratio target-decoy FDR (BSmooth, SAM). At each threshold `t`, the mean number of decoy survivors with `p <= t` divided by the number of observed survivors with `p <= t`, made monotone with a suffix minimum and clipped to `[0, 1]`. The overdispersion that inflates both counts cancels in the ratio. | Fraction of pooled decoy survivors with `p` at or below the observed p-value. A diagnostic, not a calibrated per-region p-value. | The count-ratio estimate at the region's own threshold. | `min(mean decoy survivors / observed survivors, 1)`, the set-level estimate. Also stored in `md.uns["dmr_params"]["empirical_fdr_set"]`. |
+
+The two modes treat permutations differently:
+
+- `max_t` counts every permutation that produced at least one region,
+  including assignments equal to the observed split or its mirror. Failed
+  permutations and permutations with no region leave the denominator.
+- `region` excludes assignments equal to the observed split or its mirror
+  (their statistics are the observed ones, not null draws) and failed
+  permutations. A permutation that ran cleanly and produced no region counts
+  as zero decoys. When no usable assignment remains, all three columns are
+  NaN and a `UserWarning` is emitted.
+- In both modes an observed region with a non-finite p-value gets NaN in
+  `empirical_pvalue` and `empirical_qvalue`.
+- `n_perm` must be positive; the method and count are validated before the
+  first permutation runs.
+
+```python
+ep.tl.dmr(md, method="tile", empirical_fdr=True, n_perm=100, fdr_method="region")
+sig = md.uns["dmr"].filter(pl.col("empirical_qvalue") < 0.05)
+md.uns["dmr_params"]["empirical_fdr_set"]  # e.g. 0.13
+```
+
+`md.uns["dmr_params"]` records `empirical_fdr`, `n_perm`, `perm_seed`,
+`fdr_method` and `empirical_fdr_set` (`None` when the estimate is NaN).
+
+!!! warning "Small cohorts"
+    Permutation FDR needs enough distinct label assignments. At fewer than
+    four samples per group, `fdr_method="region"` emits a `UserWarning`: few
+    shuffles exist, and draws adjacent to the true split leak signal into
+    the null, so the estimate is conservative (biased high). Read it as a
+    floor.
+
+!!! note "Calibration evidence"
+    The engine hash gate under `benchmark/` covers selected per-CpG `lr`
+    output only. It does not establish that either permutation construction
+    is calibrated on your data. The
+    [design note](../review/2026-06-08-region-empirical-fdr-design.md)
+    records the real-data comparison that motivated region mode.
+
+### chain_merge permutations
+
+`method="chain_merge"` replays the observed analysis for every permutation.
+Each permutation recomputes the per-CpG DMC on the shuffled labels with the
+knobs recorded in `md.uns["dmc"]` (test, `unite`, minimum sample counts,
+dispersion, reference, smoothing, separation fallback), over the same
+chromosome universe as the observed DMC, applies the observed
+multiple-testing method, chain-merges with the same preset and knobs, and
+applies the same `min_mean_qvalue` filter. The surviving `combined_pvalue`
+values are the decoys.
+
+Requirements and limits:
+
+- The DMC must be a two-group `lr`, `welch_t` or `fisher` run from
+  `ep.tl.dmc`. GLM, formula and contrast designs, and `use_smoothed=True`
+  are rejected before any permutation.
+- An explicit `chromosomes=` must equal the observed DMC universe. To
+  restrict the scan, rerun `ep.tl.dmc(md, chromosomes=...)` first.
+- `empirical_strata` must name an `md.obs` column that covers every
+  treatment and control sample. A missing or partial column raises instead
+  of falling back to an unrestricted shuffle. The same rule applies to the
+  tile harness.
+- Raw `pvalue` and `qvalue` drive the chain_merge gate, as in the observed
+  run. Neighbour-combined columns from `neighbour_combine=True` are never
+  substituted.
+- Each permutation recomputes a genome-wide DMC, so a whole-genome run with
+  `n_perm=100` takes hours. The cost is logged once at INFO. `perm_n_jobs`
+  parallelises permutations. Each permutation writes its DMC to a private
+  temporary directory and never touches the observed store.
+- The CLI (`epykit dmr --empirical-fdr`) stays tile-only. `sliding_window`
+  and `segment` raise `NotImplementedError`.
+- The per-CpG `empirical_fdr_for_dmc` keeps the min-P construction. Region
+  mode exists only in the DMR API.
 
 !!! note
     Empirical FDR is not supported with covariate designs because label
@@ -153,6 +246,9 @@ The DMR result DataFrame (`md.uns["dmr"]`) contains:
 | `dmr_type` | str | Direction: `"hyper"`, `"hypo"`, or `"mixed"` |
 | `pvalue` | float | Region-level p-value |
 | `qvalue` | float | Region-level q-value |
+| `empirical_pvalue` | float | With `empirical_fdr=True`: permutation p-value (`max_t`) or pooled-null tail fraction (`region`) |
+| `empirical_qvalue` | float | With `empirical_fdr=True`: the permutation FDR to threshold |
+| `empirical_fdr_set` | float | With `empirical_fdr=True`: constant set-level estimate in `region` mode, NaN in `max_t` mode |
 
 ## DMR Calling Diagnostics
 
@@ -218,5 +314,9 @@ The five diagnostic buckets:
 | `csv` | str | None | Write the DMR table to this TSV path; auto-derived next to the DMR output when unset. Pass `csv=False` to disable. |
 | `chromosomes` | list | None | Restrict to specific chromosomes |
 | `backend` | str | `"sequential"` | Execution backend (tile method only) |
-| `empirical_fdr` | bool | False | Permutation FDR (tile method only) |
-| `n_perm` | int | 100 | Number of permutations |
+| `empirical_fdr` | bool | False | Permutation FDR (tile and chain_merge) |
+| `n_perm` | int | 100 | Number of permutations (must be positive) |
+| `perm_seed` | int | 42 | Seed for the label shuffles |
+| `perm_n_jobs` | int | 1 | joblib workers for the permutations |
+| `empirical_strata` | str | None | `md.obs` column that defines shuffle strata; must cover every sample |
+| `fdr_method` | str | `"max_t"` | Permutation FDR construction: `"max_t"` or `"region"` |
