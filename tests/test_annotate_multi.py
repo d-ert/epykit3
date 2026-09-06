@@ -20,8 +20,8 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from epykit.annotate import annotate_features
 from epykit import annotate as A
+from epykit.annotate import annotate_features
 
 
 @pytest.fixture
@@ -311,9 +311,9 @@ def test_gene_type_filter_string_or_list_both_accepted(synth_gtf_mixed_types):
     sites = _sites([2600])
     s = annotate_features(sites, synth_gtf_mixed_types,
                           multi_annotation=True, gene_type_filter="protein_coding")
-    l = annotate_features(sites, synth_gtf_mixed_types,
-                          multi_annotation=True, gene_type_filter=["protein_coding"])
-    assert s["nearest_tss_gene"][0] == l["nearest_tss_gene"][0]
+    lst = annotate_features(sites, synth_gtf_mixed_types,
+                            multi_annotation=True, gene_type_filter=["protein_coding"])
+    assert s["nearest_tss_gene"][0] == lst["nearest_tss_gene"][0]
 
 
 def test_gene_type_filter_makes_distinct_cache_entry(synth_gtf_mixed_types):

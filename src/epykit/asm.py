@@ -333,4 +333,4 @@ def asm(
     }
 
 
-__all__ = ["call_asm", "asm"]
+__all__ = ["asm", "call_asm"]

@@ -288,4 +288,4 @@ def runs_of_state(
     return runs
 
 
-__all__ = ["segment", "runs_of_state"]
+__all__ = ["runs_of_state", "segment"]

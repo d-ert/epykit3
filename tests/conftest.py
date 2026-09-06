@@ -13,16 +13,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+# Force matplotlib's Agg backend before any test imports plotting code, so
+# CI without a display still runs the pl.* smokes.
+import matplotlib
 import numpy as np
 import polars as pl
 import pytest
 
 from tests.fixtures.synth import SimConfig, generate
 
-
-# Force matplotlib's Agg backend before any test imports plotting code, so
-# CI without a display still runs the pl.* smokes.
-import matplotlib
 matplotlib.use("Agg", force=True)
 
 
@@ -170,7 +169,7 @@ def dmr_recovery(
     truth: pl.DataFrame,
     cfg: SimConfig,
     alpha: float = 0.05,
-    q_col: Optional[str] = None,
+    q_col: str | None = None,
 ) -> tuple[int, int]:
     """Number of seeded DMRs recovered by at least one significant call.
 

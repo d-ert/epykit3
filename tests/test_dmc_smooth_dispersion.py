@@ -109,7 +109,7 @@ def test_box_smooth_first_and_last_use_truncated_window():
     meth = np.array([1, 1, 1, 1, 1], dtype=np.int32)
     cov  = np.array([10, 20, 30, 40, 50], dtype=np.int32)
     # window=200 -> half=100; site 0 sees self + site 100 (gap 100 <= 100).
-    meth_sm, cov_sm = _smooth_sample_counts_box(meth, cov, positions, window_bp=200)
+    _meth_sm, cov_sm = _smooth_sample_counts_box(meth, cov, positions, window_bp=200)
     # Site 0 window: {0, 100} -> cov avg = 15. Site 4 window: {300, 400} -> cov avg = 45.
     assert cov_sm[0] == pytest.approx(15.0)
     assert cov_sm[4] == pytest.approx(45.0)

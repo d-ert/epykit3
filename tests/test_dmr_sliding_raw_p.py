@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
-from epykit.dmr import call_dmr_sliding_window, _stouffer_combine_signed
+from epykit.dmr import _stouffer_combine_signed, call_dmr_sliding_window
 
 
 def test_sliding_window_combines_raw_p_not_q():

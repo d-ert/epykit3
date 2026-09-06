@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-
 pytest.importorskip("plotly")
 
 
@@ -37,7 +36,7 @@ def test_global_methylation(synth_md_filtered):
     from epykit.pl._compute import compute_global_methylation
 
     ep.tl.qc(synth_md_filtered)
-    samples, values, groups = compute_global_methylation(synth_md_filtered)
+    samples, values, _groups = compute_global_methylation(synth_md_filtered)
     assert len(samples) == len(values) == synth_md_filtered.n_samples
     assert all(0.0 <= v <= 1.0 for v in values if v == v)
 
@@ -65,7 +64,9 @@ def test_scatter_subsample_keeps_all_significant(synth_md_filtered):
     hyper/hypo counts and Manhattan peaks stay exact on huge tables."""
     import epykit as ep
     from epykit.pl._compute import (
-        compute_volcano_data, compute_ma_data, compute_manhattan_data,
+        compute_ma_data,
+        compute_manhattan_data,
+        compute_volcano_data,
     )
     ep.tl.dmc(synth_md_filtered, test="lr")
 

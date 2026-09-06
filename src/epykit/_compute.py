@@ -156,7 +156,7 @@ def _run_dask(
         # Gather in submission order so downstream tempdir-staging logic
         # writes files in a deterministic order matching the sequential
         # path. (`as_completed` would be faster but would not match.)
-        for i, (chrom, future) in enumerate(zip(chromosomes, futures)):
+        for i, (chrom, future) in enumerate(zip(chromosomes, futures, strict=True)):
             logger.info("[%s %d/%d] %s (awaiting)", label, i + 1, len(chromosomes), chrom)
             result = future.result()
             emitted = _emit(chrom, result)
@@ -205,7 +205,7 @@ def _run_ray(
         remote_handler = ray.remote(handler)
         object_refs = [remote_handler.remote(chrom) for chrom in chromosomes]
 
-        for i, (chrom, ref) in enumerate(zip(chromosomes, object_refs)):
+        for i, (chrom, ref) in enumerate(zip(chromosomes, object_refs, strict=True)):
             logger.info("[%s %d/%d] %s (awaiting)", label, i + 1, len(chromosomes), chrom)
             result = ray.get(ref)
             emitted = _emit(chrom, result)
@@ -216,4 +216,4 @@ def _run_ray(
             ray.shutdown()
 
 
-__all__ = ["run_chrom_pipeline", "ChromHandler"]
+__all__ = ["ChromHandler", "run_chrom_pipeline"]

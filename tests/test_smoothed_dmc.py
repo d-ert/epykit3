@@ -29,7 +29,7 @@ pytestmark = pytest.mark.slow
 
 def test_dmc_use_smoothed_without_pp_smooth_raises(synth_md_filtered):
     """use_smoothed=True must error clearly when no smoothed sidecar exists."""
-    with pytest.raises(ValueError, match="use_smoothed=True requires ep.pp.smooth"):
+    with pytest.raises(ValueError, match=r"use_smoothed=True requires ep\.pp\.smooth"):
         ep.tl.dmc(synth_md_filtered, test="lr", use_smoothed=True)
 
 

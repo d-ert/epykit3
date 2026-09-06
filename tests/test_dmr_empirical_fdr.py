@@ -29,7 +29,7 @@ def test_n_one_each_raises(synth_md_filtered):
     # allow_n1=True lets dmc proceed (Fisher fallback); the refusal we are
     # testing happens later, inside empirical_fdr_for_dmr.
     ep.tl.dmc(md, test="fisher", allow_n1=True)
-    with pytest.raises(ValueError, match="n.*2"):
+    with pytest.raises(ValueError, match=r"n.*2"):
         ep.tl.dmr(md, method="tile", empirical_fdr=True, n_perm=10, allow_n1=True)
 
 

@@ -26,7 +26,6 @@ import polars as pl
 import epykit as ep
 from epykit.convert import _merge_cpg_pairs_by_position, convert_sample
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -81,7 +80,7 @@ class TestMergeCpgPairsByPosition:
                 "coverage": pl.Series([], dtype=pl.Int32),
                 "sample":   pl.Series([], dtype=pl.Utf8),
             })
-        chroms, poses, nm, nu, cov, strand, ctx, samp = zip(*rows)
+        chroms, poses, nm, nu, cov, strand, ctx, samp = zip(*rows, strict=False)
         return pl.DataFrame({
             "chrom":    list(chroms),
             "pos":      pl.Series(list(poses), dtype=pl.Int32),

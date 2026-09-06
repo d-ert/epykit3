@@ -66,4 +66,4 @@ def get_tmp_dir() -> str:
     return tempfile.tempdir or tempfile.gettempdir()
 
 
-__all__ = ["set_tmp_dir", "get_tmp_dir"]
+__all__ = ["get_tmp_dir", "set_tmp_dir"]

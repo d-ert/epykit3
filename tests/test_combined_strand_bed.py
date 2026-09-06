@@ -89,7 +89,7 @@ def test_combined_strand_bed_end_to_end_dmc(tmp_path):
     def write_sample(name: str, M_modifier: int):
         bed = tmp_path / f"{name}.bed"
         rows = []
-        for c, p, mb, rp in zip(chroms, positions, base_M, rev_pad):
+        for c, p, mb, rp in zip(chroms, positions, base_M, rev_pad, strict=True):
             M = max(0, min(10, mb + M_modifier))
             T = 10
             pct = 100.0 * M / T

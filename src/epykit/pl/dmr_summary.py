@@ -154,7 +154,7 @@ def dmr_violin(
             showextrema=False,
             widths=0.8,
         )
-        for body, fill in zip(parts["bodies"], [color_ctrl, color_case]):
+        for body, fill in zip(parts["bodies"], [color_ctrl, color_case], strict=False):
             body.set_facecolor(fill)
             body.set_edgecolor("black")
             body.set_alpha(0.85)
@@ -458,7 +458,7 @@ def dmr_heatmap(
             for i, y in enumerate(display_y):
                 display_y[i] = float(np.clip(y, top_y, bot_y))
 
-            for row_idx, dy in zip(keep_idx_sorted, display_y):
+            for row_idx, dy in zip(keep_idx_sorted, display_y, strict=True):
                 g = rows_meta_ord[row_idx].get(gene_col)
                 if not g:
                     continue
@@ -497,4 +497,4 @@ def dmr_heatmap(
     }
 
 
-__all__ = ["dmr_violin", "dmr_heatmap"]
+__all__ = ["dmr_heatmap", "dmr_violin"]

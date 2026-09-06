@@ -32,7 +32,6 @@ from scipy import stats
 import epykit as ep
 from tests.fixtures.synth import SimConfig, generate
 
-
 pytestmark = pytest.mark.slow
 
 

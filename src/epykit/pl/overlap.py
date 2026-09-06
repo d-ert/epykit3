@@ -222,7 +222,7 @@ def _upset(labels, set_keys, *, min_size, sort_by, ax, figsize, save, md) -> Any
     ax_bar.tick_params(axis="x", which="both", bottom=False, labelbottom=False)
     ax_bar.spines["top"].set_visible(False)
     ax_bar.spines["right"].set_visible(False)
-    for xi, si in zip(xs, sizes):
+    for xi, si in zip(xs, sizes, strict=True):
         ax_bar.text(float(xi), si, f"{si:,}", ha="center", va="bottom", fontsize=8)
 
     # Matrix: y is set, x is combo. Filled dot = set is in combo.

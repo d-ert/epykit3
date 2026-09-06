@@ -238,7 +238,7 @@ def pca_plotly(md: MethylData, *, n_sites: int = 10_000):
                 x=res.coords[mask, 0],
                 y=res.coords[mask, 1],
                 mode="markers+text",
-                text=[s for s, m in zip(res.samples, mask) if m],
+                text=[s for s, m in zip(res.samples, mask, strict=False) if m],
                 textposition="top center",
                 marker=dict(size=12, color=palette_cycle[i % len(palette_cycle)]),
                 name=str(g),
@@ -581,7 +581,7 @@ def feature_direction_stacked_plotly(md: MethylData):
     fig = go.Figure()
     for direction, color in (("hyper", PALETTE["hyper"]), ("hypo", PALETTE["hypo"])):
         sub = prop.filter(_pl.col("dmr_type") == direction)
-        ymap = dict(zip(sub["feature_type"].to_list(), sub["proportion"].to_list()))
+        ymap = dict(zip(sub["feature_type"].to_list(), sub["proportion"].to_list(), strict=True))
         fig.add_trace(
             go.Bar(
                 x=feats,
@@ -605,18 +605,18 @@ def feature_direction_stacked_plotly(md: MethylData):
 
 
 __all__ = [
-    "volcano_plotly",
+    "coverage_histogram_plotly",
+    "cpg_island_pie_plotly",
+    "dmr_size_hist_plotly",
+    "feature_direction_stacked_plotly",
+    "feature_pie_plotly",
+    "global_methylation_bar_plotly",
     "ma_plot_plotly",
     "manhattan_plotly",
-    "coverage_histogram_plotly",
     "pca_plotly",
-    "feature_pie_plotly",
-    "cpg_island_pie_plotly",
-    "tss_metaplot_plotly",
     "pvalue_histogram_plotly",
-    "dmr_size_hist_plotly",
-    "global_methylation_bar_plotly",
     "sample_correlation_plotly",
     "scree_plotly",
-    "feature_direction_stacked_plotly",
+    "tss_metaplot_plotly",
+    "volcano_plotly",
 ]

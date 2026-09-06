@@ -238,4 +238,4 @@ def karyogram(
     return fig, ax
 
 
-__all__ = ["genomic_context_bar", "cpg_island_pie", "karyogram"]
+__all__ = ["cpg_island_pie", "genomic_context_bar", "karyogram"]

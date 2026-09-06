@@ -43,6 +43,7 @@ def test_segment_uses_signed_stouffer_cancelling_mixed_directions():
     toward 0 as it grows even when directions are mixed -- anti-conservative.
     The signed combine cancels opposing directions."""
     from scipy.stats import norm
+
     from epykit.dmr import _stouffer_combine_signed
 
     pvals = np.full(6, 1e-4)                       # all individually strong
@@ -78,6 +79,7 @@ def test_dmr_hmm_shim_warns_on_import_and_re_exports():
     with a DeprecationWarning, and must re-export the new function."""
     import importlib
     import importlib.util
+
     # Unload if cached to force re-import (triggers shim warning)
     import sys
     for mod in list(sys.modules.keys()):

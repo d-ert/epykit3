@@ -181,7 +181,7 @@ def read_bismark(
         converter) falls back to a **position-based heuristic**: each position
         P is paired with P+1 using a greedy left-to-right pass per chromosome.
         This correctly handles the common case (well-separated dyads, both
-        strands present) but can mis-pair sites when a leading − strand row
+        strands present) but can mis-pair sites when a leading - strand row
         has no corresponding + strand row.  A warning is emitted; pass
         ``reference_fasta=`` to guarantee correct strand-aware merging.
         Files that are already strand-collapsed (e.g. from ``bismark2bedGraph``

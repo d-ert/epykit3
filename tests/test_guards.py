@@ -20,8 +20,6 @@ import pytest
 
 from tests.fixtures.synth import SimConfig, generate
 
-
-
 # n=1 per group guard
 
 
@@ -153,6 +151,7 @@ def test_explicit_fisher_emits_user_warning(synth_md_filtered):
     """Picking ``test='fisher'`` outside of the auto fallback should warn
     so the user knows what they signed up for."""
     import epykit as ep
+
     # Reset the one-shot gate so a previous test doesn't suppress this run.
     import epykit.tl as _tl_module
     _tl_module._FISHER_WARNED = False

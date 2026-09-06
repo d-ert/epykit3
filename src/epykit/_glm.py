@@ -168,7 +168,9 @@ def build_design(
         # (b) has a string/categorical dtype -- i.e. a genuine factor for
         # which setting the reference level makes sense.
         obs_str_cols: set[str] = {
-            c for c, d in zip(obs.columns, obs.dtypes) if d in (pl.Utf8, pl.Categorical, pl.String)
+            c
+            for c, d in zip(obs.columns, obs.dtypes, strict=True)
+            if d in (pl.Utf8, pl.Categorical, pl.String)
         }
         wrapped_terms: list[str] = []
         _did_wrap = False

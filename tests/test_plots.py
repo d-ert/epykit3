@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 import polars as pl
 import pytest
 
-
 # Belt-and-suspenders: even though conftest already forces Agg, ensure it
 # here for tests that may be run in isolation.
 matplotlib.use("Agg", force=True)
@@ -142,8 +141,9 @@ def test_pl_cpg_island_pie(synth_md_with_annotation, tmp_path):
 def test_pl_namespace_is_real_module():
     """``epykit.pl`` should be the actual submodule, not a custom proxy
     (we removed the lazy-load shim in this session)."""
-    import epykit
     import types
+
+    import epykit
     assert isinstance(epykit.pl, types.ModuleType)
     for fn in ("volcano", "manhattan", "pca", "coverage_histogram"):
         assert hasattr(epykit.pl, fn), f"epykit.pl missing {fn}"

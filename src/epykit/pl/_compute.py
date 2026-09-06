@@ -254,7 +254,7 @@ def compute_pca(
     coords = pca.fit_transform(matrix)
 
     resolved_col, groups_full = _resolve_group_col(md, group_col)
-    sample_to_group = dict(zip(md.obs.get_column("sample_id").to_list(), groups_full))
+    sample_to_group = dict(zip(md.obs.get_column("sample_id").to_list(), groups_full, strict=False))
     groups = [sample_to_group.get(s, "unknown") for s in samples]
 
     result = PCAResult(
@@ -429,7 +429,7 @@ def compute_tss_metaplot(
             # Per-TSS window: pull the CpGs inside, compute relative bin,
             # accumulate. The Python loop is over TSS (~ thousands), not
             # CpGs, so vectorisation lives inside.
-            for tss_pos, sign in zip(tss_positions, strand_sign):
+            for tss_pos, sign in zip(tss_positions, strand_sign, strict=True):
                 lo = int(tss_pos) - window_bp
                 hi = int(tss_pos) + window_bp
                 left = np.searchsorted(positions, lo, side="left")
@@ -447,7 +447,7 @@ def compute_tss_metaplot(
     x = np.linspace(-window_bp, window_bp, n_bins, endpoint=False) + bin_size / 2.0
 
     resolved_col, groups_full = _resolve_group_col(md, group_by)
-    sample_to_group = dict(zip(md.obs.get_column("sample_id").to_list(), groups_full))
+    sample_to_group = dict(zip(md.obs.get_column("sample_id").to_list(), groups_full, strict=False))
     groups = [sample_to_group.get(s, "unknown") for s in samples]
 
     result = MetaplotResult(
@@ -974,26 +974,26 @@ def compute_scree(
 
 
 __all__ = [
-    "PCAResult",
-    "MetaplotResult",
-    "VolcanoData",
     "MAData",
     "ManhattanData",
+    "MetaplotResult",
+    "PCAResult",
+    "VolcanoData",
     "clear_report_cache",
-    "compute_sample_site_matrix",
-    "compute_pca",
-    "compute_tss_metaplot",
-    "compute_coverage_distribution",
-    "compute_volcano_data",
-    "compute_ma_data",
-    "compute_manhattan_data",
     "compute_annotation_counts",
-    "compute_coannotation_matrix",
-    "compute_numerical_by_annotation",
     "compute_categorical_proportions",
-    "compute_pvalue_histogram",
+    "compute_coannotation_matrix",
+    "compute_coverage_distribution",
     "compute_dmr_size_distribution",
     "compute_global_methylation",
+    "compute_ma_data",
+    "compute_manhattan_data",
+    "compute_numerical_by_annotation",
+    "compute_pca",
+    "compute_pvalue_histogram",
     "compute_sample_correlation_matrix",
+    "compute_sample_site_matrix",
     "compute_scree",
+    "compute_tss_metaplot",
+    "compute_volcano_data",
 ]

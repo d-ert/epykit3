@@ -438,7 +438,7 @@ def deconvolve(
                     exc,
                 )
                 pi = np.full(R.shape[1], np.nan, dtype=np.float64)
-        for ct, p in zip(cell_types, pi):
+        for ct, p in zip(cell_types, pi, strict=True):
             rows.append(
                 {
                     "sample_id": sample,

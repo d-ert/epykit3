@@ -34,7 +34,7 @@ def _import_call_dmr_hmm():
             del sys.modules[mod]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
-        from epykit.dmr_hmm import call_dmr_hmm  # noqa: PLC0415
+        from epykit.dmr_hmm import call_dmr_hmm
         return call_dmr_hmm
 
 

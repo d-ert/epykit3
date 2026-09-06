@@ -7,9 +7,8 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from epykit.nfcore_qc import parse_bismark_mbias
 import epykit as ep
-
+from epykit.nfcore_qc import parse_bismark_mbias
 
 _TINY_PE_REPORT = """CpG context (R1)
 ================
@@ -86,7 +85,7 @@ def test_mbias_plot_renders_from_paths(tmp_path):
     p2 = tmp_path / "s2.M-bias.txt"
     _write_report(p1)
     _write_report(p2)
-    fig, ax = ep.pl.mbias_plot(
+    _fig, ax = ep.pl.mbias_plot(
         {"s1": p1, "s2": str(p2)}, context="CpG",
     )
     # Two samples x R1 + R2 = 4 lines.
@@ -102,7 +101,7 @@ def test_mbias_plot_renders_from_parsed_dataframes(tmp_path):
     p1 = tmp_path / "s1.M-bias.txt"
     _write_report(p1)
     df = parse_bismark_mbias(str(p1))
-    fig, ax = ep.pl.mbias_plot({"s1": df}, context="CHG")
+    _fig, ax = ep.pl.mbias_plot({"s1": df}, context="CHG")
     # CHG has only R1, 2 rows -> 1 line.
     assert len(ax.get_lines()) == 1
 

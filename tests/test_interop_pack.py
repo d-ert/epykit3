@@ -111,7 +111,7 @@ def test_to_anndata_requires_unite(synth_md_filtered):
     pytest.importorskip("anndata")
     md = synth_md_filtered
     md.uns.pop("unite", None)
-    with pytest.raises(ValueError, match="pp.unite"):
+    with pytest.raises(ValueError, match=r"pp\.unite"):
         md.to_anndata()
 
 

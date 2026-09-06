@@ -97,7 +97,7 @@ def impute_knn_beta(
     if k < 1:
         raise ValueError(f"k must be >=1, got {k}")
 
-    n_samples, n_sites = beta_matrix.shape
+    n_samples, _n_sites = beta_matrix.shape
     out = beta_matrix.astype(np.float64, copy=True)
 
     for s in range(n_samples):
@@ -226,4 +226,4 @@ def impute_knn_anndata(
     return beta
 
 
-__all__ = ["impute_knn_beta", "impute_knn_anndata"]
+__all__ = ["impute_knn_anndata", "impute_knn_beta"]

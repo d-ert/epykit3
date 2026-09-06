@@ -49,7 +49,7 @@ def report_multiqc(md, output_dir: str) -> str:
             "plot_type": "bargraph",
             "data": {
                 s: {"conversion_rate": (float(v) if v is not None else None)}
-                for s, v in zip(samples, vals)
+                for s, v in zip(samples, vals, strict=True)
             },
         }
         written.append(
@@ -68,7 +68,7 @@ def report_multiqc(md, output_dir: str) -> str:
             "plot_type": "bargraph",
             "data": {
                 s: {"mean_coverage": float(v) if v is not None else None}
-                for s, v in zip(samples, cov)
+                for s, v in zip(samples, cov, strict=True)
             },
         }
         written.append(
@@ -87,7 +87,7 @@ def report_multiqc(md, output_dir: str) -> str:
             "plot_type": "bargraph",
             "data": {
                 s: {"global_methylation": float(v) if v is not None else None}
-                for s, v in zip(samples, gm)
+                for s, v in zip(samples, gm, strict=True)
             },
         }
         written.append(

@@ -86,7 +86,7 @@ def dmr_boxplot(
         beta_lookup = {r["sample"]: r["mean_beta"] for r in beta_df.iter_rows(named=True)}
         unique_groups = sorted(set(groups_per_sample))
         x_positions = {g: pos for pos, g in enumerate(unique_groups)}
-        for sample, g in zip(samples_obs, groups_per_sample):
+        for sample, g in zip(samples_obs, groups_per_sample, strict=True):
             y = beta_lookup.get(sample, float("nan"))
             if not np.isfinite(y):
                 continue

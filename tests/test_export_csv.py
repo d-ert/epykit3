@@ -6,6 +6,7 @@ from pathlib import Path
 
 import polars as pl
 import pytest
+
 import epykit as ep
 from epykit import export
 
@@ -420,6 +421,7 @@ def test_tl_dmr_auto_emits_to_analysis_root_by_default(synth_md_filtered):
 def test_cli_dmc_auto_emits_sibling_significant_tsv(tmp_path, synth_bundle, monkeypatch):
     """`epykit dmc --output X.parquet` writes X.significant.tsv next to it."""
     import sys
+
     import epykit as ep
     from epykit.cli import main
 
@@ -460,6 +462,7 @@ def test_cli_dmc_auto_emits_sibling_significant_tsv(tmp_path, synth_bundle, monk
 
 def test_cli_dmc_no_tsv_suppresses_sibling(tmp_path, synth_bundle, monkeypatch):
     import sys
+
     import epykit as ep
     from epykit.cli import main
 
@@ -495,6 +498,7 @@ def test_cli_dmc_no_tsv_suppresses_sibling(tmp_path, synth_bundle, monkeypatch):
 def test_cli_dmc_no_csv_still_suppresses_deprecated(tmp_path, synth_bundle, monkeypatch):
     """The deprecated --no-csv flag is still honoured (alias for --no-tsv)."""
     import sys
+
     import epykit as ep
     from epykit.cli import main
 
@@ -526,6 +530,7 @@ def test_cli_dmc_no_csv_still_suppresses_deprecated(tmp_path, synth_bundle, monk
 def test_cli_dmr_auto_emits_sibling_tsv(tmp_path, synth_bundle, monkeypatch):
     """`epykit dmr --output X.parquet` writes X.tsv next to it."""
     import sys
+
     import epykit as ep
     from epykit.cli import main
 
@@ -572,6 +577,7 @@ def test_cli_dmr_auto_emits_sibling_tsv(tmp_path, synth_bundle, monkeypatch):
 def test_cli_annotate_auto_emits_sibling_tsv(tmp_path, synth_bundle, monkeypatch):
     """`epykit annotate --output X.parquet` writes X.tsv next to it."""
     import sys
+
     import epykit as ep
     from epykit.cli import main
 
@@ -617,6 +623,7 @@ def test_cli_annotate_auto_emits_sibling_tsv(tmp_path, synth_bundle, monkeypatch
 def test_cli_qc_report_auto_emits_sibling_tsvs(tmp_path, synth_bundle, monkeypatch):
     """`epykit qc-report --output-dir DIR` writes sibling .tsv files in DIR."""
     import sys
+
     import epykit as ep
     from epykit.cli import main
 
@@ -649,6 +656,7 @@ def test_cli_qc_report_auto_emits_sibling_tsvs(tmp_path, synth_bundle, monkeypat
 def test_env_var_suppresses_cli_auto_emit(tmp_path, synth_bundle, monkeypatch):
     """EPYKIT_NO_AUTO_CSV=1 suppresses the sibling write across the CLI."""
     import sys
+
     import epykit as ep
     from epykit.cli import main
 
@@ -686,6 +694,7 @@ def test_explicit_csv_path_wins_over_auto_emit_name(tmp_path, synth_bundle, monk
     """`--csv` flag overrides the derived `<stem>.significant.tsv` name and
     picks the delimiter from the explicit path suffix."""
     import sys
+
     import epykit as ep
     from epykit.cli import main
 

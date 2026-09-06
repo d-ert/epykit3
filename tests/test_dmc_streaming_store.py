@@ -27,7 +27,6 @@ from epykit import _cache
 from epykit._dmc_store import _MANIFEST_NAME
 from epykit.dmc import _resolve_dmc_store_dir, process_chromosomes_dmc
 
-
 pytestmark = pytest.mark.slow
 
 
@@ -73,7 +72,7 @@ def test_dmc_recomputes_when_input_sig_mismatches(synth_md_filtered):
     # control; otherwise a full swap is two-sidedly symmetric for LR
     # and would yield bit-identical results post-fix.
     mixed_treat = treat[:-1]
-    mixed_ctrl = ctrl + [treat[-1]]
+    mixed_ctrl = [*ctrl, treat[-1]]
     df_b = _run_dmc(md, mixed_treat, mixed_ctrl)
 
     # The signatures differ, so the cache should have been invalidated

@@ -22,7 +22,7 @@ pysam = pytest.importorskip(
     reason="pysam required for BAM ingestion tests (Linux/macOS only).",
 )
 
-from epykit.bam_io import read_methylation_calls
+from epykit.bam_io import read_methylation_calls  # noqa: E402 -- must follow importorskip
 
 
 @pytest.fixture

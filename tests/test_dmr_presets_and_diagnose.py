@@ -21,12 +21,13 @@ Covers the contract:
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 import polars as pl
 import pytest
 
 from epykit.dmr import DMR_PRESETS, call_dmr_chain_merge
-
 
 # ---------------------------------------------------------------------------
 # Presets
@@ -241,8 +242,8 @@ def test_diagnose_raises_when_no_dmc():
     from epykit.tl import diagnose_dmr_calling
 
     class _NoDMC:
-        varm = {}
-        uns = {"dmr": pl.DataFrame({"chrom": ["chr1"], "start": [1], "end": [2], "dmr_type": ["hyper"]})}
+        varm: ClassVar[dict] = {}
+        uns: ClassVar[dict] = {"dmr": pl.DataFrame({"chrom": ["chr1"], "start": [1], "end": [2], "dmr_type": ["hyper"]})}
 
     with pytest.raises(ValueError, match="No DMC table"):
         diagnose_dmr_calling(_NoDMC(), pl.DataFrame([_ref_dmr("chr1", 1, 2)]))
@@ -252,10 +253,10 @@ def test_diagnose_raises_when_no_dmr():
     from epykit.tl import diagnose_dmr_calling
 
     class _NoDMR:
-        varm = {"dmc_lr": pl.DataFrame({
+        varm: ClassVar[dict] = {"dmc_lr": pl.DataFrame({
             "chrom": ["chr1"], "pos": [10], "pvalue": [0.1], "qvalue": [0.1],
         })}
-        uns = {"dmc": {"last_key": "dmc_lr"}}
+        uns: ClassVar[dict] = {"dmc": {"last_key": "dmc_lr"}}
 
     with pytest.raises(ValueError, match="No DMR table"):
         diagnose_dmr_calling(_NoDMR(), pl.DataFrame([_ref_dmr("chr1", 1, 100)]))
