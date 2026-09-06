@@ -149,7 +149,7 @@ def test_cli_chain_merge_forwards_min_cpgs(tmp_path, monkeypatch):
     """``_cmd_dmr`` with method=chain_merge must pass --min-cpgs through to
     call_dmr_chain_merge. Pre-fix the branch dropped it entirely."""
     import epykit.dmr as ep_dmr
-    from epykit.cli import _cmd_dmr
+    from epykit.cli._dmr import _cmd_dmr
 
     dmc = _strict_region(5)
     dmc_path = tmp_path / "dmc.parquet"
@@ -182,7 +182,7 @@ def test_cli_chain_merge_unset_min_cpgs_resolves_preset(tmp_path, monkeypatch):
     CLI resolves min_cpgs to the preset's value at the layer (matching the
     API), rather than forwarding None to the engine."""
     import epykit.dmr as ep_dmr
-    from epykit.cli import _cmd_dmr
+    from epykit.cli._dmr import _cmd_dmr
 
     dmc = _strict_region(5)
     dmc_path = tmp_path / "dmc.parquet"
@@ -219,7 +219,7 @@ def _capture_cli_chain_merge_min_cpgs(tmp_path, monkeypatch, *, preset, min_cpgs
     """Run _cmd_dmr for chain_merge and return the min_cpgs forwarded to
     call_dmr_chain_merge."""
     import epykit.dmr as ep_dmr
-    from epykit.cli import _cmd_dmr
+    from epykit.cli._dmr import _cmd_dmr
 
     dmc = _strict_region(5)
     dmc_path = tmp_path / "dmc.parquet"

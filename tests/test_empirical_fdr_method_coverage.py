@@ -41,7 +41,7 @@ def test_cli_dmr_non_tile_empirical_fdr_raises_notimplemented(method):
     were left thresholding combined_qvalue as if it were FDR-controlled."""
     import argparse
 
-    from epykit.cli import _cmd_dmr
+    from epykit.cli._dmr import _cmd_dmr
     args = argparse.Namespace(method=method, empirical_fdr=True)
     with pytest.raises(NotImplementedError, match=r"empirical[-_]fdr.*tile"):
         _cmd_dmr(args)

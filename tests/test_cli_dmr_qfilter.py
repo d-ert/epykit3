@@ -14,7 +14,8 @@ import argparse
 
 import polars as pl
 
-from epykit.cli import _cmd_dmr, build_parser
+from epykit.cli import build_parser
+from epykit.cli._dmr import _cmd_dmr
 from epykit.dmr import call_dmr_chain_merge, call_dmr_sliding_window
 
 
@@ -142,7 +143,7 @@ def test_cli_tile_applies_qvalue_filter(tmp_path, monkeypatch):
     post-filter behavior (the part that was missing) rather than the tile
     statistics. With a threshold tighter than alpha the filter must drop the
     marginal tile -- proving the parity gap is closed."""
-    import epykit.cli as ep_cli
+    import epykit.cli._dmr as cli_dmr
     import epykit.dmr as ep_dmr
 
     # Two tiles that both already passed the engine's alpha=0.05 filter: one
@@ -159,9 +160,9 @@ def test_cli_tile_applies_qvalue_filter(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(ep_dmr, "call_dmr_tile_based", lambda *a, **k: tile_frame)
     monkeypatch.setattr(
-        ep_cli, "_read_samplesheet_groups", lambda *a, **k: (["t0", "t1"], ["c0", "c1"])
+        cli_dmr, "_read_samplesheet_groups", lambda *a, **k: (["t0", "t1"], ["c0", "c1"])
     )
-    monkeypatch.setattr(ep_cli, "_cli_n1_and_footgun_checks", lambda *a, **k: None)
+    monkeypatch.setattr(cli_dmr, "_cli_n1_and_footgun_checks", lambda *a, **k: None)
 
     threshold = 0.01  # tighter than alpha=0.05 -> must drop the q=0.04 tile
     # The expected survivor set is exactly tl.dmr tile's filter: qvalue-only.
@@ -187,7 +188,7 @@ def test_cli_tile_applies_qvalue_filter(tmp_path, monkeypatch):
 
 def test_cli_tile_none_disables_q_filter(tmp_path, monkeypatch):
     """``min_mean_qvalue=None`` keeps every tile (filter disabled)."""
-    import epykit.cli as ep_cli
+    import epykit.cli._dmr as cli_dmr
     import epykit.dmr as ep_dmr
 
     tile_frame = pl.DataFrame(
@@ -202,9 +203,9 @@ def test_cli_tile_none_disables_q_filter(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(ep_dmr, "call_dmr_tile_based", lambda *a, **k: tile_frame)
     monkeypatch.setattr(
-        ep_cli, "_read_samplesheet_groups", lambda *a, **k: (["t0", "t1"], ["c0", "c1"])
+        cli_dmr, "_read_samplesheet_groups", lambda *a, **k: (["t0", "t1"], ["c0", "c1"])
     )
-    monkeypatch.setattr(ep_cli, "_cli_n1_and_footgun_checks", lambda *a, **k: None)
+    monkeypatch.setattr(cli_dmr, "_cli_n1_and_footgun_checks", lambda *a, **k: None)
 
     args = argparse.Namespace(
         method="tile", empirical_fdr=False,
