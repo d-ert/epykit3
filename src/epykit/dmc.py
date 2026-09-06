@@ -44,6 +44,7 @@ import polars as pl
 from scipy import stats as sp_stats
 
 from . import _cache
+from ._dmc_engines import ENGINES
 from ._dmc_store import DMCStore, _chrom_filename
 
 logger = logging.getLogger(__name__)
@@ -65,9 +66,6 @@ _EMPTY_SCHEMA = {
     "meth_diff_ci_lo": pl.Float32,
     "meth_diff_ci_hi": pl.Float32,
 }
-
-# Backends where log2_ors is a logit coefficient (not a pooled log2-OR).
-_GLM_BACKENDS = frozenset({"glm", "glm_contrast"})
 
 
 def _epykit_version() -> str:
@@ -1927,13 +1925,14 @@ def _process_one_chromosome(
 
     del mean_case, M2_case, n_valid_case, mean_ctrl, M2_ctrl, n_valid_ctrl
 
-    # P1-11: column name is backend-specific.
+    # P1-11: column name is backend-specific, recorded on the engine's
+    # registry entry.
     #   glm / glm_contrast: the value is the logit coefficient in log2 units
     #                        (not log2 of an odds ratio) => coef_treatment_log2.
     #   all other backends: genuine pooled log2 odds ratio => log2_odds_ratio_pooled.
     # A transitional log2_odds_ratio column is NaN-filled so existing code
     # doesn't silently break; it is slated for removal in 1.2.
-    _log2_col = "coef_treatment_log2" if test in _GLM_BACKENDS else "log2_odds_ratio_pooled"
+    _log2_col = ENGINES[test].effect_column
     out_cols = {
         "chrom": pl.Series([chrom] * n_sites, dtype=pl.Utf8),
         "pos": canonical_df["pos"],
