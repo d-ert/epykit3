@@ -285,7 +285,7 @@ def _expected_columns(engine: str) -> list[str]:
     ``strand`` is part of the site key. The effect column is
     ``log2_odds_ratio_pooled`` for pooled-count engines and
     ``coef_treatment_log2`` for the GLM (P1-11); ``log2_odds_ratio`` is the
-    NaN-filled transitional column slated for removal in 1.1. ``qvalue``
+    NaN-filled transitional column slated for removal in 1.2. ``qvalue``
     and ``reject`` are appended by the FDR step. GLM adds the
     ``coef_treatment`` / ``coef_se`` extras.
     """

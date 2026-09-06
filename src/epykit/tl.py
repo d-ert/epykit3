@@ -658,7 +658,7 @@ def dmc(
 
         _warnings.warn(
             "The 'log2_odds_ratio' column is deprecated and is slated for "
-            "removal in 1.1. Use 'log2_odds_ratio_pooled' for pooled-count "
+            "removal in 1.2. Use 'log2_odds_ratio_pooled' for pooled-count "
             "tests (lr, fisher) or 'coef_treatment_log2' for the glm backend. "
             "The transitional column is NaN-filled.",
             FutureWarning,
@@ -962,12 +962,12 @@ def dmc(
 
     # P1-11 deprecation notice – emitted once per tl.dmc call (not per-row,
     # not per-chromosome).  The transitional 'log2_odds_ratio' column is
-    # NaN-filled and slated for removal in 1.1.
+    # NaN-filled and slated for removal in 1.2.
     import warnings as _warnings
 
     _warnings.warn(
         "The 'log2_odds_ratio' column is deprecated and is slated for "
-        "removal in 1.1. Use 'log2_odds_ratio_pooled' for pooled-count "
+        "removal in 1.2. Use 'log2_odds_ratio_pooled' for pooled-count "
         "tests (lr, fisher) or 'coef_treatment_log2' for the glm backend. "
         "The transitional column is NaN-filled.",
         FutureWarning,
