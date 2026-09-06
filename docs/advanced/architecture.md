@@ -127,8 +127,9 @@ selection naming what it dropped.
   IRLS binomial GLM, Wald and F contrasts.
 - `src/epykit/tl.py` — orchestrators (`tl.dmc`, `tl.dmr`, `tl.qc`)
   that wire engines into `MethylData.varm` / `MethylData.uns`. The `power_stack` dispatcher lives in `tl.dmc`.
-- `src/epykit/dmr.py`, `dmr_segment.py`, `dmr_hmm.py`, `_hmm.py` —
-  DMR callers.
+- `src/epykit/dmr.py`, `dmr_segment.py`, `_hmm.py` — DMR callers.
+  `dmr_hmm.py` is the deprecated import shim for `dmr_segment.py`
+  (see [Deprecations](../reference/deprecations.md)).
 - `src/epykit/_smoothed_store.py` — Gaussian-kernel and BSmooth
   smoothing implementations.
 - `src/epykit/_chroms.py` — the canonical chromosome predicate, the
