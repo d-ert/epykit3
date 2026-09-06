@@ -26,7 +26,7 @@ def _fake_md():
 def test_cli_contrast_forwards_dispersion_reference_fdr(tmp_path, monkeypatch):
     import epykit
     import epykit.tl as ep_tl
-    from epykit.cli import _cmd_dmc
+    from epykit.cli._dmc import _cmd_dmc
 
     # A samplesheet with a 'group' column is all the contrast handler reads
     # directly (it derives the group set before delegating to tl.dmc).
