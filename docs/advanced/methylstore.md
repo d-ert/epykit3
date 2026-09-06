@@ -139,7 +139,7 @@ records completed stages for the checkpoint/resume API:
 
 ```json
 {
-  "epykit_version": "1.0.0",
+  "epykit_version": "1.1.0",
   "stages": [
     {
       "name": "dmc_lr",

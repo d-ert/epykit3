@@ -60,7 +60,7 @@ _EMPTY_SCHEMA = {
     "mean_beta_control": pl.Float32,
     "pvalue": pl.Float64,
     "log2_odds_ratio_pooled": pl.Float64,
-    "log2_odds_ratio": pl.Float64,  # transitional NaN-filled; deprecated, slated for removal in 1.1
+    "log2_odds_ratio": pl.Float64,  # transitional NaN-filled; deprecated, slated for removal in 1.2
     "meth_diff": pl.Float32,
     "meth_diff_ci_lo": pl.Float32,
     "meth_diff_ci_hi": pl.Float32,

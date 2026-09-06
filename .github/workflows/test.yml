@@ -19,9 +19,20 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # PRs run three legs (ubuntu 3.10 and 3.13, windows 3.12); pushes to main run all six.
+      # One Windows leg is enough on a PR: Windows failures here have been platform-level, not per-Python-version.
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        python-version: ["3.10", "3.12", "3.13"]
+        include: >-
+          ${{ fromJSON(github.event_name == 'pull_request'
+          && '[{"os": "ubuntu-latest", "python-version": "3.10"},
+          {"os": "ubuntu-latest", "python-version": "3.13"},
+          {"os": "windows-latest", "python-version": "3.12"}]'
+          || '[{"os": "ubuntu-latest", "python-version": "3.10"},
+          {"os": "ubuntu-latest", "python-version": "3.12"},
+          {"os": "ubuntu-latest", "python-version": "3.13"},
+          {"os": "windows-latest", "python-version": "3.10"},
+          {"os": "windows-latest", "python-version": "3.12"},
+          {"os": "windows-latest", "python-version": "3.13"}]') }}
 
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +64,7 @@ jobs:
     # real-engine null calibration) are exercised BEFORE merge, not only after.
     # It's a single ubuntu/py3.12 job, so the per-PR cost stays bounded; the
     # fast engine-oracle tests (tests/test_engine_oracles.py) additionally run
-    # in the full matrix incl. Windows on every PR.
+    # in the matrix `test` job incl. a Windows leg on every PR.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
