@@ -6,6 +6,33 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+### Added
+
+- **Opt-in count-ratio region FDR and chain_merge permutations.**
+  `tl.dmr(..., empirical_fdr=True)` and `empirical_fdr_for_dmr` accept
+  `fdr_method`. `"max_t"` (the default) keeps the Westfall-Young min-P
+  numbers of 1.1; `"region"` selects the count-ratio target-decoy FDR
+  (BSmooth / SAM): the mean decoy survivor count divided by the observed
+  survivor count at each threshold, made monotone. In region mode
+  `empirical_pvalue` is the pooled-null tail fraction (a diagnostic),
+  self/mirror assignments and failed permutations leave the null, a clean
+  zero-survivor permutation counts as zero decoys, and zero usable
+  assignments yield NaN with a `UserWarning`. A constant `empirical_fdr_set`
+  column (NaN under `max_t`) and the `md.uns["dmr_params"]` keys
+  `fdr_method` and `empirical_fdr_set` are added on the empirical paths.
+  `tl.dmr(method="chain_merge", empirical_fdr=True)` is now admitted: the
+  new `empirical_fdr_for_chain_merge` replays the observed DMC from
+  `md.uns["dmc"]` (two-group `lr` / `welch_t` / `fisher` only) over the
+  observed chromosome universe with the observed multiple-testing method,
+  in a private temporary store per permutation, then chain-merges and
+  filters like the observed run. GLM / contrast / `use_smoothed` DMCs, a
+  `chromosomes=` restriction that differs from the observed universe, and
+  a missing or partial `empirical_strata` column raise before any
+  permutation (the strata check now also applies to the tile harness).
+  `n_perm` must be positive. `sliding_window` / `segment` and the CLI are
+  unchanged. See `docs/analysis/dmr.md` and
+  `docs/review/2026-06-08-region-empirical-fdr-design.md`.
+
 ## [1.1.0] — 2026-09-05
 
 Post-1.0 correctness and reproducibility fixes from a pre-submission code
