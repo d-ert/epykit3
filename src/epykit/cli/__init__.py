@@ -23,9 +23,9 @@ import sys
 import warnings
 from pathlib import Path
 
-from . import dmc, filter
-from ._dmc_engines import PUBLIC_ENGINES
-from .convert import convert_sample
+from .. import dmc, filter
+from .._dmc_engines import PUBLIC_ENGINES
+from ..convert import convert_sample
 
 
 def _auto_tsv_path(parquet_path: str, *, suffix: str = "") -> str:
@@ -226,8 +226,8 @@ def _cmd_dmc(args: argparse.Namespace):
     # MethylData on the fly so tl.dmc can resolve the contrast against
     # md.obs.
     if args.formula is not None or args.contrast is not None:
-        from . import read_bismark
-        from . import tl as _tl
+        from .. import read_bismark
+        from .. import tl as _tl
 
         covariates = [c.strip() for c in args.covariates.split(",")] if args.covariates else None
         # All groups from the samplesheet
@@ -306,8 +306,8 @@ def _cmd_dmc(args: argparse.Namespace):
     if not tsv_suppressed and len(results.columns) > 0:
         import polars as pl
 
-        from .export import dmc_to_tsv
-        from .methyldata import MethylData
+        from ..export import dmc_to_tsv
+        from ..methyldata import MethylData
 
         # Build a transient MethylData carrying just the dmc result so the
         # writer can re-use the same delegation path the API uses.
@@ -329,7 +329,7 @@ def _cmd_dmr(args: argparse.Namespace):
     """Handler for 'dmr' subcommand."""
     import polars as pl
 
-    from .dmr import (
+    from ..dmr import (
         _DMR_DEFAULT_MIN_CPGS,
         apply_region_qfilter,
         call_dmr_chain_merge,
@@ -425,7 +425,7 @@ def _cmd_dmr(args: argparse.Namespace):
             candidate_cols=("qvalue",),
         )
         if getattr(args, "empirical_fdr", False) and len(dmr_results) > 0:
-            from .dmr import empirical_fdr_for_dmr
+            from ..dmr import empirical_fdr_for_dmr
 
             dmr_results = empirical_fdr_for_dmr(
                 methylstore_path=args.methylstore,
@@ -447,7 +447,7 @@ def _cmd_dmr(args: argparse.Namespace):
         # --- Rule-based segmentation path: takes a DMC parquet ---
         if not args.dmc_results:
             raise ValueError("method=segment requires --dmc-results.")
-        from .dmr_segment import call_dmr_rule_segment
+        from ..dmr_segment import call_dmr_rule_segment
 
         dmc_results = pl.read_parquet(args.dmc_results)
         dmr_results = call_dmr_rule_segment(
@@ -488,8 +488,8 @@ def _cmd_dmr(args: argparse.Namespace):
 
     tsv_suppressed, tsv_path_opt, _, _ = _cli_tsv_opts(args)
     if not tsv_suppressed and len(dmr_results) > 0:
-        from .export import dmr_to_tsv
-        from .methyldata import MethylData
+        from ..export import dmr_to_tsv
+        from ..methyldata import MethylData
 
         md_tmp = MethylData(obs=pl.DataFrame({"sample_id": []}), store="")
         md_tmp.uns["dmr"] = dmr_results
@@ -505,7 +505,7 @@ def _cmd_annotate(args: argparse.Namespace):
     sites = pl.read_parquet(args.input)
 
     if args.gtf:
-        from .annotate import annotate_features
+        from ..annotate import annotate_features
 
         sites = annotate_features(
             sites,
@@ -517,7 +517,7 @@ def _cmd_annotate(args: argparse.Namespace):
         print("Gene feature annotation complete.")
 
     if args.cpg_islands:
-        from .annotate import annotate_cpg_islands
+        from ..annotate import annotate_cpg_islands
 
         sites = annotate_cpg_islands(sites, cpg_island_bed=args.cpg_islands)
         print("CpG island annotation complete.")
@@ -536,7 +536,7 @@ def _cmd_qc_report(args: argparse.Namespace):
     """Handler for 'qc-report' subcommand."""
     import polars as pl
 
-    from .qc import coverage_uniformity, global_methylation_report
+    from ..qc import coverage_uniformity, global_methylation_report
 
     samples = args.samples.split(",")
     tsv_suppressed = _cli_tsv_opts(args)[0]
@@ -575,7 +575,7 @@ def _cmd_qc_report(args: argparse.Namespace):
 
 def _cmd_smooth(args: argparse.Namespace):
     """Handler for 'smooth' subcommand (Gaussian-kernel smoothing)."""
-    from .dmr import smooth_methylation_gaussian
+    from ..dmr import smooth_methylation_gaussian
 
     samples = args.samples.split(",")
     smooth_path = args.output
@@ -590,7 +590,7 @@ def _cmd_smooth(args: argparse.Namespace):
 
 def _cmd_report(args: argparse.Namespace):
     """Handler for 'report' subcommand."""
-    from .methyldata import MethylData
+    from ..methyldata import MethylData
 
     md = MethylData.load(args.md)
     kwargs: dict = {
@@ -608,8 +608,8 @@ def _cmd_report(args: argparse.Namespace):
 
 def _cmd_aggregate_regions(args: argparse.Namespace):
     """Handler for 'aggregate-regions' subcommand."""
-    from . import pp as pp_mod
-    from .methyldata import MethylData
+    from .. import pp as pp_mod
+    from ..methyldata import MethylData
 
     md = MethylData.load(args.md)
     pp_mod.aggregate_regions(
@@ -625,8 +625,8 @@ def _cmd_aggregate_regions(args: argparse.Namespace):
 
 def _cmd_export(args: argparse.Namespace):
     """Handler for 'export' subcommand."""
-    from .export import dmcs_to_bed, dmrs_to_bed, to_bedgraph, to_bigwig
-    from .methyldata import MethylData
+    from ..export import dmcs_to_bed, dmrs_to_bed, to_bedgraph, to_bigwig
+    from ..methyldata import MethylData
 
     md = MethylData.load(args.md)
     fmt = args.export_cmd
@@ -680,7 +680,7 @@ def build_parser() -> argparse.ArgumentParser:
     Extracted from ``main`` so tests can introspect flags/defaults without
     spawning a subprocess.
     """
-    from . import __version__
+    from .. import __version__
 
     ap = argparse.ArgumentParser(prog="epykit", description="Methylation Parquet store tools")
     ap.add_argument(
@@ -1283,7 +1283,3 @@ def main():
         args.func(args)
     except FileNotFoundError as exc:
         raise SystemExit(f"error: {exc}") from exc
-
-
-if __name__ == "__main__":
-    main()
