@@ -21,6 +21,10 @@ SemVer (`MAJOR.MINOR.PATCH`).
   notice that previously pointed inside `tl.py`, now point at the caller of
   `tl.dmc`. The private `tl._run_dmc_contrast` helper is gone; its body is
   the `run_contrast` stage.
+- **CI runs the BAM-backed tests on Ubuntu.** The Ubuntu legs of the test
+  matrix and the slow job install the `bam` extra, so `test_asm.py`,
+  `test_bam_io.py` and `test_entropy.py` execute instead of skipping.
+  Windows legs are unchanged (`pysam` has no Windows wheel).
 
 ## [1.1.0] — 2026-09-05
 
