@@ -222,7 +222,7 @@ def test_power_stack_auto_engages_all_four_at_any_n(tmp_path, caplog):
     """power_stack='auto' flips neighbour_combine, fdr_method, sep_fallback
     even when n > 2 (1.0 breaking change vs 0.7.6)."""
     import logging
-    caplog.set_level(logging.INFO, logger="epykit.tl")
+    caplog.set_level(logging.INFO, logger="epykit")
     md = _make_md_for_power_stack(n_per_group=5, tmp_path_local=tmp_path)
     ep.tl.dmc(md, test="lr", power_stack="auto")
 
