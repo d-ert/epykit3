@@ -200,11 +200,11 @@ The `epykit` script mirrors the Python pipeline. Every subcommand takes `--methy
 
 | Subcommand          | Purpose |
 |---------------------|---------|
-| `convert`           | Bismark `.cov[.gz]` → partitioned Parquet |
+| `convert`           | Bismark `.cov[.gz]` or MethylDackel `.bedGraph[.gz]` → partitioned Parquet. `--canonical-only` keeps the fixed human-style chromosome set (`1`-`22`, `X`, `Y`, `M`/`MT`). |
 | `filter`            | Coverage / blacklist filtering |
 | `summary`           | Per-sample summary statistics |
-| `dmc`               | Per-CpG differential methylation. `--test {auto,lr,glm,welch_t,fisher}`, plus `--formula` / `--contrast` / `--covariates` for covariate-adjusted and multi-group designs. The `lr+` power-stack knobs (`power_stack`, `fdr_method`, `neighbour_combine`, `sep_fallback`, `dispersion`) are Python-API-only; CLI flags are deferred to 1.1. |
-| `dmr`               | DMR calling — `--method chain_merge` (default), `tile`, `sliding_window` or `segment`. `--empirical-fdr --n-perm N` is supported with `--method tile`. |
+| `dmc`               | Per-CpG differential methylation. `--test {lr,glm,welch_t,fisher}`, plus `--formula` / `--contrast` / `--covariates` for covariate-adjusted and multi-group designs, `--smoothing` / `--smoothing-span-bp` for DSS-style count smoothing on `lr`, and `--canonical-only`. The `lr+` power-stack knobs (`power_stack`, `neighbour_combine`, `sep_fallback`) are Python-API-only. |
+| `dmr`               | DMR calling — `--method chain_merge` (default), `tile`, `sliding_window` or `segment`. `--empirical-fdr --n-perm N` and `--canonical-only` are supported with `--method tile`. |
 | `annotate`          | Add gene-feature (`--gtf`) and CpG-island (`--cpg-islands`) annotation. |
 | `qc-report`         | QC + coverage uniformity report. |
 | `smooth`            | Gaussian-kernel β smoothing along the genome. |
@@ -222,6 +222,7 @@ Run `epykit <subcommand> --help` for the full flag list.
   `chrom`, `start`, `end`, `methylation_percent`, `count_methylated`, `count_unmethylated`. Read with `ep.read_bismark(...)` or `epykit convert --format bismark`.
 - **MethylDackel `.bedGraph` / `.bedGraph.gz`** — same 6 columns as Bismark with a single `track type="bedGraph" ...` header line that is skipped automatically. Read with `ep.read_methyldackel(...)` or `epykit convert --format methyldackel`.
 - **Samplesheet** (CSV) — required columns `sample_id`, `group`, `path`. Any extra column is preserved on `md.obs` and can be referenced as a GLM covariate.
+- **Canonical chromosomes only** — every reader, `ep.tl.dmc()` and `ep.tl.dmr(method="tile")` take an opt-in `canonical_only=True` (`--canonical-only` on the CLI) that keeps `1`-`22`, `X`, `Y` and `M`/`MT`, with or without `chr`, and drops unplaced, unlocalised and alt contigs. See [`docs/io/read-bismark.md`](docs/io/read-bismark.md#canonical-chromosomes-only).
 - **GTF** — Ensembl / GENCODE / UCSC; gene features are extracted via [bioframe](https://github.com/open2c/bioframe). `gene_type` (GENCODE) and `gene_biotype` (Ensembl) are both honoured.
 - **UCSC `refGene.txt[.gz]`** — HOMER's default gene catalog. Pass `ep.tl.annotate(md, refgene=...)` (Python API; not yet wired into `epykit annotate`). Schema-compatible with the GTF path.
 - **CpG-island BED** — UCSC `cpgIslandExt` 4-column BED.
