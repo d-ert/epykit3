@@ -19,6 +19,7 @@ import pytest
 import epykit as ep
 from epykit._dmc_engines import ENGINES, PUBLIC_ENGINES, REMOVED_ENGINES, engine_spec
 from epykit.cli import build_parser
+from epykit.dmc import process_chromosomes_dmc
 
 REGISTRY_PATH = Path(ep.__file__).with_name("_dmc_engines.py")
 
@@ -70,4 +71,14 @@ def test_tl_dmc_refuses_an_unknown_engine_before_any_store(synth_md_filtered):
     with pytest.raises(ValueError, match=r"Unknown DMC test 'bogus'\. Choose one of: lr, glm"):
         ep.tl.dmc(md, test="bogus")
     assert "dmc" not in md.uns
+    assert _tree(md) == before
+
+
+def test_process_chromosomes_dmc_refuses_an_unknown_engine_before_any_store(synth_md_filtered):
+    """The CLI and the tile DMR path bypass DMCConfig, so the low-level
+    entry point checks the name itself, before its store directory exists."""
+    md = synth_md_filtered
+    before = _tree(md)
+    with pytest.raises(ValueError, match=r"Unknown DMC test 'bogus'"):
+        process_chromosomes_dmc(md.store, md.treatment_ids, md.control_ids, test="bogus")
     assert _tree(md) == before

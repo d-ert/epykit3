@@ -44,7 +44,7 @@ import polars as pl
 from scipy import stats as sp_stats
 
 from . import _cache
-from ._dmc_engines import ENGINES
+from ._dmc_engines import ENGINES, engine_spec
 from ._dmc_store import DMCStore, _chrom_filename
 
 logger = logging.getLogger(__name__)
@@ -2186,6 +2186,10 @@ def process_chromosomes_dmc(
         raise TypeError("Missing required argument: samples_control")
     if min_samples_treatment is None:
         min_samples_treatment = 0
+    # The CLI, the tile DMR path and direct callers reach this function
+    # without DMCConfig, so the name is checked here too, before the store
+    # directory is resolved or created.
+    engine_spec(test)
     samples_case = samples_treatment
     min_samples_case = min_samples_treatment
 
