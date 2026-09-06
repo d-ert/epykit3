@@ -29,6 +29,7 @@ from .dmr import (
     call_dmr_chain_merge,
     call_dmr_sliding_window,
     call_dmr_tile_based,
+    empirical_fdr_for_chain_merge,
     empirical_fdr_for_dmr,
     resolve_layer_min_cpgs,
 )
@@ -1191,6 +1192,107 @@ def _empirical_fdr_set_value(dmr_df: pl.DataFrame) -> float | None:
     return float(value)
 
 
+# ``md.uns["dmc"]`` keys the chain_merge permutation replays verbatim. The
+# smoothing span is only meaningful when smoothing is on and is handled
+# separately.
+_CHAIN_MERGE_REPLAY_KEYS = (
+    "unite",
+    "min_samples_treatment",
+    "min_samples_control",
+    "dispersion",
+    "reference",
+    "smoothing",
+    "sep_fallback",
+    "sep_threshold",
+)
+
+
+def _chain_merge_permutation_inputs(
+    md: MethylData,
+    dmc_input: object,
+    chromosomes: list[str] | None,
+) -> tuple[dict[str, Any], str, list[str]]:
+    """Validate that the observed DMC can be replayed under shuffled labels.
+
+    Returns ``(dmc_kwargs, dmc_fdr_method, observed_chromosomes)`` for
+    :func:`epykit.dmr.empirical_fdr_for_chain_merge`. Every rejection
+    happens here, before any permutation starts:
+
+    * the canonical ``md.uns["dmc"]`` record must exist and carry the engine
+      knobs (a DMC computed outside ``ep.tl.dmc`` has no record to replay);
+    * GLM, formula / contrast designs and ``use_smoothed=True`` cannot be
+      permuted by label shuffling (the pseudo-count store is temporary);
+    * an explicit ``chromosomes=`` restriction must equal the observed DMC
+      universe, otherwise the caller has to rerun ``ep.tl.dmc`` with it.
+
+    The chromosome universe comes from the observed ``DMCStore`` manifest
+    or from the distinct chromosomes of the materialized DMC table, never
+    from the surviving DMRs.
+    """
+    from ._dmc_store import DMCStore
+    from .dmr import CHAIN_MERGE_PERM_DMC_TESTS
+
+    meta = md.uns.get("dmc")
+    if not meta:
+        raise ValueError(
+            "chain_merge empirical_fdr replays the observed DMC from md.uns['dmc'], "
+            "which is missing. Run ep.tl.dmc(md) first."
+        )
+    test_used = meta.get("test_used")
+    if (
+        meta.get("formula") is not None
+        or meta.get("contrast") is not None
+        or meta.get("design_terms") is not None
+        or test_used not in CHAIN_MERGE_PERM_DMC_TESTS
+    ):
+        raise NotImplementedError(
+            f"chain_merge empirical_fdr supports the two-group DMC tests "
+            f"{sorted(CHAIN_MERGE_PERM_DMC_TESTS)}; the DMC on md used "
+            f"test={test_used!r}"
+            f"{' with a formula / contrast design' if meta.get('formula') else ''}. "
+            f"Label shuffling cannot permute a covariate design. Omit "
+            f"empirical_fdr or recompute the DMC with a two-group test."
+        )
+    if meta.get("use_smoothed"):
+        raise NotImplementedError(
+            "chain_merge empirical_fdr cannot replay a use_smoothed=True DMC: the "
+            "smoothed pseudo-count store is temporary. Recompute the DMC with "
+            "use_smoothed=False (smoothing=True is supported)."
+        )
+    missing = [k for k in (*_CHAIN_MERGE_REPLAY_KEYS, "fdr_method") if meta.get(k) is None]
+    if meta.get("smoothing") and meta.get("smoothing_span_bp") is None:
+        missing.append("smoothing_span_bp")
+    if missing:
+        raise ValueError(
+            f"md.uns['dmc'] lacks the engine knobs {missing} needed to replay "
+            f"the observed DMC under shuffled labels. Recompute with ep.tl.dmc(md)."
+        )
+
+    if isinstance(dmc_input, DMCStore):
+        observed_chroms = dmc_input.chroms()
+    elif isinstance(dmc_input, pl.DataFrame):
+        observed_chroms = (
+            dmc_input.get_column("chrom").cast(pl.Utf8).unique(maintain_order=True).to_list()
+        )
+    else:  # pragma: no cover - tl.dmr only hands over these two types
+        raise TypeError(f"Unsupported DMC input {type(dmc_input).__name__}")
+    if not observed_chroms:
+        raise ValueError("The observed DMC covers no chromosomes; nothing to permute.")
+    if chromosomes is not None and set(chromosomes) != set(observed_chroms):
+        raise ValueError(
+            f"chromosomes={sorted(chromosomes)} differs from the observed DMC "
+            f"universe {sorted(observed_chroms)}. Permutations must replay the "
+            f"same scan; rerun ep.tl.dmc(md, chromosomes=...) with that restriction "
+            f"and then call ep.tl.dmr."
+        )
+
+    dmc_kwargs: dict[str, Any] = {"test": test_used}
+    dmc_kwargs.update({k: meta[k] for k in _CHAIN_MERGE_REPLAY_KEYS})
+    if meta.get("smoothing"):
+        dmc_kwargs["smoothing_span_bp"] = meta["smoothing_span_bp"]
+    return dmc_kwargs, meta["fdr_method"], list(observed_chroms)
+
+
 def dmr(
     md: MethylData,
     method: str = "chain_merge",
@@ -1225,7 +1327,7 @@ def dmr(
     min_mean_qvalue: float | None = 0.05,
     # Replicate-count guard --------------------------------------------------
     allow_n1: bool = False,
-    # permutation-based empirical FDR (tile method only) --------
+    # permutation-based empirical FDR (tile and chain_merge) ----
     empirical_fdr: bool = False,
     n_perm: int = 100,
     perm_seed: int = 42,
@@ -1235,7 +1337,7 @@ def dmr(
     backend: str = "sequential",
     n_workers: int | None = None,
     merge_adjacent: bool = True,
-    # Permutation FDR construction (tile method) -----------------------
+    # Permutation FDR construction (tile and chain_merge) --------------
     fdr_method: Literal["max_t", "region"] = "max_t",
     # Auto-emits the DMR table to <analysis_root>/results/dmr.tsv by default;
     # tsv=False disables, tsv="path" overrides. csv= is a deprecated alias.
@@ -1279,10 +1381,10 @@ def dmr(
     variance exceeds 1 and these region q-values are **anti-conservative**
     (too small) in CpG-dense regions. Treat them as a well-calibrated
     *ranking* signal, **not** a calibrated region-level FDR. For trustworthy
-    region-level inference pass ``empirical_fdr=True`` with ``method="tile"``,
-    which re-runs the engine on shuffled labels and adds permutation
-    ``empirical_pvalue`` / ``empirical_qvalue`` / ``empirical_fdr_set``
-    columns; threshold ``empirical_qvalue`` instead of
+    region-level inference pass ``empirical_fdr=True`` with ``method="tile"``
+    or ``method="chain_merge"``, which re-runs the caller on shuffled labels
+    and adds permutation ``empirical_pvalue`` / ``empirical_qvalue`` /
+    ``empirical_fdr_set`` columns; threshold ``empirical_qvalue`` instead of
     ``combined_qvalue`` for FDR control. ``fdr_method="max_t"`` (default)
     keeps the Westfall-Young min-P construction; ``fdr_method="region"``
     selects the count-ratio target-decoy FDR and records the set-level
@@ -1343,7 +1445,12 @@ def dmr(
         DMR set.
     empirical_fdr : bool
         Run the permutation FDR after the observed call. Implemented for
-        ``method="tile"``; the other methods raise ``NotImplementedError``.
+        ``method="tile"`` and ``method="chain_merge"``; the other methods
+        raise ``NotImplementedError``. The chain_merge harness recomputes
+        the per-CpG DMC for every permutation with the knobs recorded in
+        ``md.uns["dmc"]`` (two-group ``lr`` / ``welch_t`` / ``fisher`` only;
+        GLM, contrast and ``use_smoothed`` DMCs are rejected), over the
+        observed chromosome universe, so a whole-genome run is expensive.
     n_perm, perm_seed, perm_n_jobs : int
         Permutation count (positive), seed and joblib worker count.
     empirical_strata : str or None
@@ -1363,22 +1470,20 @@ def dmr(
     if min_samples_treatment is None:
         min_samples_treatment = 0
     tsv, _, _, _tsv_is_auto = _resolve_auto_tsv(md, tsv, csv, default_name="dmr.tsv")
-    # M2 (Batch-1): empirical_fdr is currently wired only for method='tile'.
-    # The chain_merge / sliding_window / segment branches previously accepted
-    # the kwarg and silently no-op'd (no empirical_pvalue / empirical_qvalue
-    # columns added), AND suppressed the calibration-warning note. Raise
-    # explicitly so users don't unknowingly threshold combined_qvalue as if
-    # it were FDR-controlled. Per-method permutation harnesses for the other
-    # callers are deferred to a Batch-4 follow-up (each caller's region
-    # definition needs its own shuffle scheme).
-    if empirical_fdr and method != "tile":
+    # M2 (Batch-1): empirical_fdr is wired for method='tile' and, since the
+    # chain_merge harness landed, method='chain_merge'. The sliding_window /
+    # segment branches previously accepted the kwarg and silently no-op'd
+    # (no empirical_pvalue / empirical_qvalue columns added), AND suppressed
+    # the calibration-warning note. Raise explicitly so users don't
+    # unknowingly threshold combined_qvalue as if it were FDR-controlled.
+    # Permutation harnesses for the remaining callers are a follow-up (each
+    # caller's region definition needs its own shuffle scheme).
+    if empirical_fdr and method not in ("tile", "chain_merge"):
         raise NotImplementedError(
-            f"empirical_fdr=True is currently implemented only for "
-            f"method='tile'. Got method={method!r}. Use method='tile' or "
-            f"omit empirical_fdr=True. (Follow-up: implement permutation "
-            f"FDR for chain_merge/sliding_window/segment -- tracked in "
-            f"docs/superpowers/plans/2026-06-07-epykit-audit-fixes.md "
-            f"Batch-4 follow-up.)"
+            f"empirical_fdr=True is implemented for method='tile' and "
+            f"method='chain_merge'. Got method={method!r}. Use one of those "
+            f"or omit empirical_fdr=True. (Follow-up: permutation FDR for "
+            f"sliding_window / segment.)"
         )
     # Asymptotic DMR q-values are a ranking signal, not a calibrated
     # region-level FDR under CpG spatial correlation (M5). Point users at
@@ -1647,22 +1752,54 @@ def dmr(
         # The resolver also validates ``preset`` (friendly ValueError, not a
         # bare KeyError, on a typo'd preset name).
         cm_min_cpgs = resolve_layer_min_cpgs(min_cpgs, preset)
-        dmr_df = call_dmr_chain_merge(
-            dmc_input,
-            preset=preset,
-            alpha=alpha,
-            min_abs_meth_diff=min_abs_meth_diff,
-            dis_merge_bp=dis_merge_bp,
-            min_cpgs=cm_min_cpgs,
-            pct_sig=pct_sig,
-            minlen_bp=minlen_bp,
-            use_q_for_sig=use_q_for_sig,
-        )
+        # One kwargs dict for the observed call and every permutation, so the
+        # decoy regions are defined by exactly the observed chain_merge knobs.
+        cm_kwargs: dict[str, Any] = {
+            "preset": preset,
+            "alpha": alpha,
+            "min_abs_meth_diff": min_abs_meth_diff,
+            "dis_merge_bp": dis_merge_bp,
+            "min_cpgs": cm_min_cpgs,
+            "pct_sig": pct_sig,
+            "minlen_bp": minlen_bp,
+            "use_q_for_sig": use_q_for_sig,
+        }
+        dmr_df = call_dmr_chain_merge(dmc_input, **cm_kwargs)
 
         # Same post-hoc q-value filter as the sliding-window path: drop
         # candidate DMRs whose BH-corrected combined q-value isn't sig.
         # Shared with the CLI via apply_region_qfilter (default candidate cols).
         dmr_df = apply_region_qfilter(dmr_df, min_mean_qvalue)
+
+        if empirical_fdr:
+            # Permutation FDR: replay the observed DMC (shuffled labels) ->
+            # observed multiple-testing correction -> chain_merge -> same
+            # q-filter per shuffle, then compare survivors with the decoys.
+            # Every rejection (GLM / contrast / use_smoothed DMC, missing
+            # metadata, a chromosome restriction that differs from the
+            # observed universe, a bad strata column) happens before the
+            # first permutation runs.
+            cm_dmc_kwargs, cm_dmc_fdr_method, cm_chroms = _chain_merge_permutation_inputs(
+                md, dmc_input, chromosomes
+            )
+            cm_strata_map = _empirical_strata_map(md, empirical_strata)
+            if len(dmr_df) > 0:
+                dmr_df = empirical_fdr_for_chain_merge(
+                    methylstore_path=md.store,
+                    samples_treatment=md.treatment_ids,
+                    samples_control=md.control_ids,
+                    observed_dmr=dmr_df,
+                    chromosomes=cm_chroms,
+                    dmc_kwargs=cm_dmc_kwargs,
+                    chain_merge_kwargs=cm_kwargs,
+                    dmc_fdr_method=cm_dmc_fdr_method,
+                    min_mean_qvalue=min_mean_qvalue,
+                    n_perm=n_perm,
+                    seed=perm_seed,
+                    n_jobs=perm_n_jobs,
+                    empirical_strata=cm_strata_map,
+                    fdr_method=fdr_method,
+                )
 
         md.uns["dmr"] = dmr_df
         md.uns["dmr_params"] = {
@@ -1675,6 +1812,11 @@ def dmr(
             "minlen_bp": minlen_bp,
             "use_q_for_sig": use_q_for_sig,
             "min_mean_qvalue": min_mean_qvalue,
+            "empirical_fdr": empirical_fdr,
+            "n_perm": n_perm if empirical_fdr else None,
+            "perm_seed": perm_seed if empirical_fdr else None,
+            "fdr_method": fdr_method if empirical_fdr else None,
+            "empirical_fdr_set": _empirical_fdr_set_value(dmr_df) if empirical_fdr else None,
         }
         if tsv is not None:
             from .export import dmr_to_tsv

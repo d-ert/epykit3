@@ -30,7 +30,7 @@ import tempfile
 import warnings
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import polars as pl
@@ -2045,6 +2045,256 @@ def empirical_fdr_for_dmr(
         n_perm=n_perm,
         fdr_method=fdr_method,
         label="empirical_fdr_for_dmr",
+    )
+    return observed_dmr.with_columns(
+        [
+            pl.Series("empirical_pvalue", emp_p),
+            pl.Series("empirical_qvalue", emp_q),
+            pl.lit(fdr_set, dtype=pl.Float64).alias("empirical_fdr_set"),
+        ]
+    )
+
+
+# chain_merge permutation harness
+
+# DMC engines whose per-CpG test depends only on the two-group split, so a
+# label shuffle is a valid permutation of the observed analysis.
+CHAIN_MERGE_PERM_DMC_TESTS = frozenset({"lr", "welch_t", "fisher"})
+
+# ``process_chromosomes_dmc`` knobs a caller may replay through ``dmc_kwargs``.
+# The chromosome universe, output directory and the design / contrast inputs
+# are owned by the harness or rejected outright.
+_CHAIN_MERGE_PERM_DMC_KWARGS = frozenset(
+    {
+        "test",
+        "unite",
+        "min_samples_treatment",
+        "min_samples_control",
+        "dispersion",
+        "reference",
+        "smoothing",
+        "smoothing_span_bp",
+        "sep_fallback",
+        "sep_threshold",
+        "backend",
+        "n_workers",
+    }
+)
+
+
+def _validate_chain_merge_perm_dmc_kwargs(dmc_kwargs: dict[str, Any]) -> None:
+    unknown = sorted(set(dmc_kwargs) - _CHAIN_MERGE_PERM_DMC_KWARGS)
+    if unknown:
+        raise ValueError(
+            f"dmc_kwargs may only carry the two-group DMC knobs "
+            f"{sorted(_CHAIN_MERGE_PERM_DMC_KWARGS)}; got unsupported "
+            f"key(s) {unknown}. GLM / contrast designs cannot be permuted by "
+            f"label shuffling, and the chromosome universe is passed as "
+            f"chromosomes=."
+        )
+    test = dmc_kwargs.get("test")
+    if test not in CHAIN_MERGE_PERM_DMC_TESTS:
+        raise NotImplementedError(
+            f"chain_merge empirical_fdr supports the two-group DMC tests "
+            f"{sorted(CHAIN_MERGE_PERM_DMC_TESTS)}; got test={test!r}."
+        )
+
+
+def _chain_merge_perm_survivors(
+    *,
+    methylstore_path: str,
+    samples_treatment: list[str],
+    samples_control: list[str],
+    chromosomes: list[str],
+    dmc_kwargs: dict[str, Any],
+    dmc_fdr_method: str,
+    chain_merge_kwargs: dict[str, Any],
+    min_mean_qvalue: float | None,
+) -> np.ndarray | None:
+    """Per-permutation engine for :func:`empirical_fdr_for_chain_merge`.
+
+    Replays the observed analysis under one label assignment: streams the
+    per-CpG DMC for ``chromosomes`` into a private temporary store, applies
+    the observed multiple-testing correction, chain-merges from that store
+    and applies the same region q-filter. Returns the surviving regions'
+    ``combined_pvalue``; ``None`` on engine failure and an empty array on a
+    clean zero-survivor run.
+
+    The temporary store is removed before returning, so the observed
+    ``DMCStore`` (and its chain_merge cache files) is never touched, whatever
+    ``n_jobs`` is. Only the raw ``pvalue`` / ``qvalue`` columns are written,
+    which is what ``call_dmr_chain_merge`` reads; neighbour-combined columns
+    are never substituted. A module-level function so tests can monkeypatch
+    it without recomputing a genome-wide DMC.
+    """
+    from .dmc import apply_multiple_testing_correction, process_chromosomes_dmc
+
+    with tempfile.TemporaryDirectory(prefix="epykit_dmr_perm_") as perm_dir:
+        try:
+            store = process_chromosomes_dmc(
+                methylstore_path=methylstore_path,
+                samples_treatment=samples_treatment,
+                samples_control=samples_control,
+                chromosomes=list(chromosomes),
+                out_dir=perm_dir,
+                return_store=True,
+                **dmc_kwargs,
+            )
+            store = apply_multiple_testing_correction(store, method=dmc_fdr_method)
+            region_df = call_dmr_chain_merge(store, **chain_merge_kwargs)
+        except Exception as exc:
+            logger.warning("chain_merge permutation failed: %s", exc)
+            return None
+    region_df = apply_region_qfilter(region_df, min_mean_qvalue)
+    if "combined_pvalue" not in region_df.columns or len(region_df) == 0:
+        return np.array([], dtype=np.float64)
+    return region_df.get_column("combined_pvalue").drop_nulls().to_numpy()
+
+
+def empirical_fdr_for_chain_merge(
+    methylstore_path: str,
+    samples_treatment: list[str],
+    samples_control: list[str],
+    observed_dmr: pl.DataFrame,
+    *,
+    chromosomes: list[str],
+    dmc_kwargs: dict[str, Any],
+    chain_merge_kwargs: dict[str, Any],
+    dmc_fdr_method: str = "fdr_bh",
+    min_mean_qvalue: float | None = 0.05,
+    n_perm: int = 100,
+    seed: int = 42,
+    n_jobs: int = 1,
+    empirical_strata: dict[str, list[str]] | None = None,
+    fdr_method: Literal["max_t", "region"] = "max_t",
+) -> pl.DataFrame:
+    """Empirical (permutation) FDR for chain_merge DMRs.
+
+    Replays the observed chain_merge analysis on ``n_perm`` label shuffles.
+    Each permutation recomputes the per-CpG DMC for the observed chromosome
+    universe (``chromosomes``) with the observed engine knobs
+    (``dmc_kwargs``), applies the observed multiple-testing correction
+    (``dmc_fdr_method``), chain-merges with ``chain_merge_kwargs`` and
+    applies the same ``min_mean_qvalue`` region filter. The surviving
+    regions' ``combined_pvalue`` values form the decoy pool that
+    :func:`_aggregate_region_perm_results` compares with the observed
+    survivors, with the same ``fdr_method`` semantics as
+    :func:`empirical_fdr_for_dmr` (``"max_t"`` default, ``"region"``
+    opt-in).
+
+    Each permutation recomputes the genome-wide per-CpG DMC, so a
+    whole-genome run with the default ``n_perm`` can take hours. The cost
+    is logged once per run at INFO. Raise ``n_jobs`` to parallelise, or
+    rerun ``ep.tl.dmc`` with ``chromosomes=`` to shrink the universe.
+
+    Parameters
+    ----------
+    methylstore_path, samples_treatment, samples_control
+        The methylstore and the observed two-group split, as passed to
+        :func:`process_chromosomes_dmc` for the observed run.
+    observed_dmr
+        The chain_merge DMR table of the observed run after the region
+        q-filter. Empirical columns are appended to a copy of this frame.
+    chromosomes
+        The observed DMC chromosome universe (``DMCStore.chroms()`` or the
+        distinct chromosomes of the materialized DMC table). Every
+        permutation tests exactly these chromosomes so observed and decoy
+        survivors come from the same scan.
+    dmc_kwargs
+        Observed ``process_chromosomes_dmc`` knobs to replay: ``test``
+        (``"lr"``, ``"welch_t"`` or ``"fisher"``), ``unite``,
+        ``min_samples_treatment``, ``min_samples_control``, ``dispersion``,
+        ``reference``, ``smoothing``, ``smoothing_span_bp``,
+        ``sep_fallback``, ``sep_threshold`` and optionally ``backend`` /
+        ``n_workers``. ``tl.dmr`` builds this from ``md.uns["dmc"]``. GLM,
+        contrast and design inputs are rejected before any work.
+    chain_merge_kwargs
+        Forwarded to :func:`call_dmr_chain_merge` for each permutation.
+        Must match the observed call (preset, alpha, dis_merge_bp,
+        min_cpgs, pct_sig, minlen_bp, use_q_for_sig).
+    dmc_fdr_method
+        The observed DMC multiple-testing method (``md.uns["dmc"]
+        ["fdr_method"]``). Applied to every permutation store before
+        chain-merging so a ``use_q_for_sig=True`` gate sees comparable
+        q-values. This is a DMC correction method, not the DMR
+        ``fdr_method``.
+    min_mean_qvalue
+        The region q-filter applied to both observed and permutation regions.
+    n_perm, seed, n_jobs, empirical_strata
+        As in :func:`empirical_fdr_for_dmr`.
+    fdr_method : {"max_t", "region"}
+        As in :func:`empirical_fdr_for_dmr`.
+
+    Returns
+    -------
+    pl.DataFrame
+        ``observed_dmr`` plus ``empirical_pvalue``, ``empirical_qvalue`` and
+        the constant ``empirical_fdr_set`` column.
+    """
+    _validate_permutation_request(fdr_method, n_perm)
+    _validate_chain_merge_perm_dmc_kwargs(dmc_kwargs)
+    if not chromosomes:
+        raise ValueError(
+            "chromosomes must list the observed DMC chromosome universe; got an empty list."
+        )
+    from .dmc import _VALID_FDR_METHODS
+
+    if dmc_fdr_method not in _VALID_FDR_METHODS:
+        raise ValueError(
+            f"dmc_fdr_method must be one of {sorted(_VALID_FDR_METHODS)}; got {dmc_fdr_method!r}."
+        )
+
+    if len(observed_dmr) == 0:
+        return _empty_empirical_columns(observed_dmr)
+
+    n_treat = len(samples_treatment)
+    n_ctrl = len(samples_control)
+    if n_treat == 1 and n_ctrl == 1:
+        raise ValueError(
+            "empirical chain_merge FDR requires n>=2 per group; got n_treat=1, n_ctrl=1."
+        )
+    _warn_if_region_underpowered(fdr_method, n_treat, n_ctrl, label="empirical_fdr_for_chain_merge")
+    logger.info(
+        "empirical_fdr_for_chain_merge: each of %d permutations recomputes the "
+        "per-CpG DMC (test=%s) over %d chromosome(s) before chain-merging; "
+        "whole-genome runs can take hours. Raise n_jobs to parallelise.",
+        n_perm,
+        dmc_kwargs.get("test"),
+        len(chromosomes),
+    )
+
+    def _run_one_perm(perm_idx: int) -> _PermResult:
+        perm_treat, perm_ctrl = _permutation_assignment(
+            perm_idx,
+            seed=seed,
+            samples_treatment=samples_treatment,
+            samples_control=samples_control,
+            empirical_strata=empirical_strata,
+        )
+        is_self = _is_self_or_mirror_perm(
+            perm_treatment=perm_treat,
+            observed_treatment=samples_treatment,
+            observed_control=samples_control,
+        )
+        arr = _chain_merge_perm_survivors(
+            methylstore_path=methylstore_path,
+            samples_treatment=perm_treat,
+            samples_control=perm_ctrl,
+            chromosomes=chromosomes,
+            dmc_kwargs=dmc_kwargs,
+            dmc_fdr_method=dmc_fdr_method,
+            chain_merge_kwargs=chain_merge_kwargs,
+            min_mean_qvalue=min_mean_qvalue,
+        )
+        return (is_self, arr)
+
+    results = _run_permutations(_run_one_perm, n_perm, n_jobs)
+    emp_p, emp_q, fdr_set = _aggregate_region_perm_results(
+        observed_pvalues=observed_dmr.get_column("combined_pvalue").to_numpy(),
+        results=results,
+        n_perm=n_perm,
+        fdr_method=fdr_method,
+        label="empirical_fdr_for_chain_merge",
     )
     return observed_dmr.with_columns(
         [
