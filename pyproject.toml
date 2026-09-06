@@ -183,9 +183,6 @@ allowed-confusables = ["×"]
 "src/epykit/__init__.py" = ["F401"]  # re-exports
 # re-exports; E402 because _apply_theme() must run before the plot modules import
 "src/epykit/pl/__init__.py" = ["F401", "E402"]
-# pending the tl.dmc refactor (PR 1): two zip() calls, one en dash comment, one unused
-# unpack, one stale noqa
-"src/epykit/tl.py" = ["B905", "RUF003", "RUF059", "RUF100"]
 
 [tool.ruff.lint.mccabe]
 # Ceiling, not a target: the smallest value with zero C901 findings in src/ at

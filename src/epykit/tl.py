@@ -288,7 +288,7 @@ def _emit_result_tsv(write_fn, path: str, *, is_auto: bool) -> None:
     """
     try:
         write_fn()
-    except Exception as exc:  # noqa: BLE001 -- auto-emit must not break the run
+    except Exception as exc:  # auto-emit must not break the run
         if not is_auto:
             raise
         logger.warning("Auto TSV emit to %s skipped: %s", path, exc)
@@ -960,7 +960,7 @@ def dmc(
                 exc,
             )
 
-    # P1-11 deprecation notice – emitted once per tl.dmc call (not per-row,
+    # P1-11 deprecation notice - emitted once per tl.dmc call (not per-row,
     # not per-chromosome).  The transitional 'log2_odds_ratio' column is
     # NaN-filled and slated for removal in 1.2.
     import warnings as _warnings
@@ -1045,7 +1045,7 @@ def _run_dmc_contrast(md: MethylData, cfg: DMCConfig) -> None:
     need_treatment = (treatment_col in md.obs.columns) and (
         cfg.formula is None or treatment_col in cfg.formula
     )
-    design_full, _design_reduced, coef_idx, term_names, formula_used, design_info = build_design(
+    design_full, _design_reduced, _coef_idx, term_names, formula_used, design_info = build_design(
         md.obs,
         samples_ordered=samples_all,
         formula=cfg.formula,
@@ -1088,8 +1088,11 @@ def _run_dmc_contrast(md: MethylData, cfg: DMCConfig) -> None:
             mask_treat = (
                 md.obs.get_column(treatment_col).cast(pl.Float64, strict=False) == 1
             ).to_list()
-            samples_case_local = [s for s, m in zip(samples_all, mask_treat) if m]
-            samples_control_local = [s for s, m in zip(samples_all, mask_treat) if not m]
+            # Both lists are columns of md.obs, so they have the same length.
+            samples_case_local = [s for s, m in zip(samples_all, mask_treat, strict=True) if m]
+            samples_control_local = [
+                s for s, m in zip(samples_all, mask_treat, strict=True) if not m
+            ]
         except Exception as exc:
             logger.warning(
                 "Could not derive case/control split from treatment column "
