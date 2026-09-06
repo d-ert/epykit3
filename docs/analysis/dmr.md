@@ -92,6 +92,19 @@ ep.tl.dmr(md, method="tile", tile_size_bp=500, min_cpgs_per_tile=5)
 | `tile_size_bp` | 1000 | Tile width in base pairs |
 | `min_cpgs_per_tile` | 5 | Minimum CpGs per tile |
 | `merge_adjacent` | True | Merge adjacent significant tiles |
+| `canonical_only` | False | Keep only the fixed human-style chromosome set (`1`-`22`, `X`, `Y`, `M`/`MT`, with or without `chr`) of the auto-detected partitions; an explicit `chromosomes=` list wins |
+
+`canonical_only` is a tile-only option because the tile caller enumerates
+the store partitions itself. It filters the auto-detected chromosome list
+before the tile test and the BH correction, uses the same resolved list for
+the observed tiles and every `empirical_fdr` permutation, logs one INFO line
+naming the dropped contigs, and is recorded in `md.uns["dmr_params"]`. An
+explicit `chromosomes=` list, including an empty one, is used verbatim.
+`chain_merge`, `sliding_window` and `segment` work on the DMC table and
+inherit the chromosome universe of the upstream `ep.tl.dmc()` run, so they
+raise `ValueError` on `canonical_only=True`. Filter upstream instead: ingest
+with `canonical_only=True` (see [read_bismark](../io/read-bismark.md#canonical-chromosomes-only))
+or restrict `ep.tl.dmc(md, chromosomes=...)`.
 
 ### sliding_window
 
@@ -312,7 +325,8 @@ The five diagnostic buckets:
 | `md` | MethylData | required | Analysis object |
 | `method` | str | `"chain_merge"` | DMR method: `"chain_merge"`, `"tile"`, `"sliding_window"`, `"segment"` |
 | `csv` | str | None | Write the DMR table to this TSV path; auto-derived next to the DMR output when unset. Pass `csv=False` to disable. |
-| `chromosomes` | list | None | Restrict to specific chromosomes |
+| `chromosomes` | list | None | Restrict to specific chromosomes (tile method); an explicit list wins over `canonical_only` |
+| `canonical_only` | bool | False | Tile method only: keep the fixed human-style chromosome set of the auto-detected partitions; the other methods raise |
 | `backend` | str | `"sequential"` | Execution backend (tile method only) |
 | `empirical_fdr` | bool | False | Permutation FDR (tile and chain_merge) |
 | `n_perm` | int | 100 | Number of permutations (must be positive) |

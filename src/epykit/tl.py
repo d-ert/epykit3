@@ -25,6 +25,7 @@ from .dmc import (
 from .dmr import (
     _DMR_DEFAULT_MIN_CPGS,
     DMR_PRESETS,  # noqa: F401 -- public re-export: `from epykit.tl import DMR_PRESETS`
+    _resolve_tile_chromosomes,
     apply_region_qfilter,
     call_dmr_chain_merge,
     call_dmr_sliding_window,
@@ -1337,6 +1338,8 @@ def dmr(
     backend: str = "sequential",
     n_workers: int | None = None,
     merge_adjacent: bool = True,
+    # Chromosome universe (tile only) ---------------------------------------
+    canonical_only: bool = False,
     # Permutation FDR construction (tile and chain_merge) --------------
     fdr_method: Literal["max_t", "region"] = "max_t",
     # Auto-emits the DMR table to <analysis_root>/results/dmr.tsv by default;
@@ -1418,7 +1421,21 @@ def dmr(
         Statistical test for tile-method (ignored when ``method="sliding_window"``).
         ``"auto"`` resolves the same way as in :func:`dmc`.
     chromosomes : list[str], optional
-        Restrict tile-method processing to these chromosomes.
+        Restrict tile-method processing to these chromosomes. An explicit
+        list, including an empty one, is used verbatim and takes
+        precedence over ``canonical_only``.
+    canonical_only : bool, keyword-only
+        ``method="tile"`` only. When ``chromosomes`` is None, keep only the
+        fixed human-style chromosome set (``1``-``22``, ``X``, ``Y``,
+        ``M``/``MT``, with or without a ``chr`` prefix) of the auto-detected
+        partitions; the same resolved list is used for the observed tiles
+        and every ``empirical_fdr`` permutation, and the option is recorded
+        in ``md.uns["dmr_params"]``. The DMC-derived methods
+        (``chain_merge``, ``sliding_window``, ``segment``) inherit the
+        chromosome universe of the upstream DMC run and raise
+        ``ValueError`` on ``canonical_only=True``: filter upstream instead
+        (ingest with ``canonical_only=True`` or restrict ``tl.dmc`` with
+        ``chromosomes=``). Default False.
     min_samples_treatment, min_samples_control : int
         Per-tile sample-count guard for tile-method.
     window_bp, step_bp, min_sites_significant : int
@@ -1485,6 +1502,19 @@ def dmr(
             f"or omit empirical_fdr=True. (Follow-up: permutation FDR for "
             f"sliding_window / segment.)"
         )
+    # canonical_only is tile-only: the other callers take their chromosome
+    # universe from the DMC table, and filtering a finished q-value table
+    # would silently change its multiple-testing burden. Refuse up front,
+    # before any DMC lookup, and say where the filter belongs.
+    if canonical_only and method != "tile":
+        raise ValueError(
+            f"canonical_only=True applies to method='tile' only; got method={method!r}. "
+            "The DMC-derived callers use the chromosome universe of the upstream "
+            "DMC run, so filter there: ingest with canonical_only=True, or run "
+            "ep.tl.dmc(md, chromosomes=...) restricted to the canonical set "
+            "(epykit._chroms.filter_canonical), then call tl.dmr without "
+            "canonical_only."
+        )
     # Asymptotic DMR q-values are a ranking signal, not a calibrated
     # region-level FDR under CpG spatial correlation (M5). Point users at
     # empirical_fdr=True for calibrated inference. Fired regardless of the
@@ -1531,13 +1561,18 @@ def dmr(
             # work with the GLM path.
             selected_test = "glm"
 
+        # Resolve the chromosome universe once (one audit line) and hand the
+        # same explicit list to the observed run and every permutation.
+        tile_chromosomes = _resolve_tile_chromosomes(
+            md.store, chromosomes, canonical_only=canonical_only
+        )
         dmr_df = call_dmr_tile_based(
             methylstore_path=md.store,
             samples_treatment=md.treatment_ids,
             samples_control=md.control_ids,
             tile_size_bp=tile_size_bp,
             test=selected_test,
-            chromosomes=chromosomes,
+            chromosomes=tile_chromosomes,
             min_cpgs_per_tile=min_cpgs_per_tile,
             alpha=alpha,
             min_abs_meth_diff=min_abs_meth_diff,
@@ -1585,7 +1620,7 @@ def dmr(
                     empirical_strata=strata_map,
                     tile_size_bp=tile_size_bp,
                     test=selected_test,
-                    chromosomes=chromosomes,
+                    chromosomes=tile_chromosomes,
                     min_cpgs_per_tile=min_cpgs_per_tile,
                     alpha=alpha,
                     min_abs_meth_diff=min_abs_meth_diff,
@@ -1618,6 +1653,7 @@ def dmr(
             "treatment_col": treatment_col,
             "formula_used": formula_used,
             "design_terms": term_names if term_names else None,
+            "canonical_only": canonical_only,
             "empirical_fdr": empirical_fdr,
             "n_perm": n_perm if empirical_fdr else None,
             "perm_seed": perm_seed if empirical_fdr else None,
