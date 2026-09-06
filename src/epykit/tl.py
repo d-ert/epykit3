@@ -652,15 +652,6 @@ def dmc(
 
     # --- New contrast / multi-group path -------------------------------------
     if cfg.formula is not None or cfg.contrast is not None:
-        if cfg.empirical_fdr:
-            # Same refusal as the DMR path: label shuffling invalidates
-            # the stratified design that formula= encodes.
-            raise ValueError(
-                "empirical_fdr=True is not supported with the contrast / "
-                "multi-group DMC path (label shuffling invalidates the "
-                "stratified design). Use the binary treatment / control "
-                "path or implement a custom stratified permutation."
-            )
         _run_dmc_contrast(md, cfg)
         # P1-11 deprecation notice for GLM / contrast path.
         import warnings as _warnings
@@ -1009,9 +1000,38 @@ def _run_dmc_contrast(md: MethylData, cfg: DMCConfig) -> None:
     ``covariates``, ``treatment_col``, ``reference_level``,
     ``chromosomes``, ``min_samples_*``, ``dispersion``, ``reference`` and
     ``fdr_method`` from ``cfg``; the other knobs are not consumed here.
+    Knobs this path cannot honour (``empirical_fdr``, ``materialize=False``)
+    are refused up front rather than silently ignored, and an unknown
+    ``power_stack`` raises as on the binary path.
     """
     from ._glm import build_design, resolve_contrast
     from .dmc import process_chromosomes_dmc
+
+    if cfg.empirical_fdr:
+        # Same refusal as the DMR path: label shuffling invalidates
+        # the stratified design that formula= encodes.
+        raise ValueError(
+            "empirical_fdr=True is not supported with the contrast / "
+            "multi-group DMC path (label shuffling invalidates the "
+            "stratified design). Use the binary treatment / control "
+            "path or implement a custom stratified permutation."
+        )
+    if not cfg.materialize:
+        # This path always assembles the full result onto md.varm (below);
+        # refuse the argument rather than silently ignore it.
+        raise ValueError(
+            "materialize=False is not supported on the formula / contrast "
+            "path yet: it always assembles the full per-CpG result onto "
+            "md.varm. Re-run with materialize=True (the default)."
+        )
+    # An unknown power_stack raises here as on the binary path. A valid
+    # value is ignored: the GLM has none of the lr+ knobs.
+    cfg.validate_resolved()
+    if cfg.power_stack != "off":
+        logger.info(
+            "power_stack=%r is ignored on the formula / contrast path: the GLM has no lr+ knobs.",
+            cfg.power_stack,
+        )
 
     if not md.obs.height:
         raise ValueError("md.obs is empty; cannot build a design matrix.")

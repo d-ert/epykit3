@@ -111,12 +111,15 @@ class DMCConfig:
             raise ValueError(message)
 
     def validate_resolved(self) -> None:
-        """Checks that need the power stack resolved first (binary path only).
+        """Checks that need the power stack resolved first.
 
         ``power_stack`` must be a known mode, and ``materialize=False`` cannot
         run the eager-only post-processors that need the full in-memory
         result table. ``neighbour_combine`` may have been switched on by the
-        stack itself, which is why this runs after :meth:`apply_power_stack`.
+        stack itself, which is why the binary path runs this after
+        :meth:`apply_power_stack`. The formula / contrast path never applies
+        the stack and runs this on the config as built, after refusing
+        ``materialize=False`` outright.
         """
         if self.power_stack not in _POWER_STACK_MODES:
             raise ValueError(

@@ -192,6 +192,13 @@ scheduled for removal in 1.2 (see Changed).
   `pp.normalize_coverage` and then `pp.aggregate_regions` are affected; the
   tile DMR caller and the AnnData `N_unmeth` layer derive the count as
   `coverage - N_meth` and were correct before.
+- **`tl.dmc` contrast path skipped two checks.** With `formula=` /
+  `contrast=`, an unknown `power_stack` value and `materialize=False` were
+  silently ignored. The contrast path now raises the same `ValueError` as
+  the binary path for an unknown `power_stack`, refuses `materialize=False`
+  (that path always assembles the full result onto `md.varm`), and logs one
+  INFO line when a valid `power_stack` is ignored because the GLM has no
+  lr+ knobs. Valid calls are unchanged.
 
 ### Changed
 

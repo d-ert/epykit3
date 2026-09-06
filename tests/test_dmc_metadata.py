@@ -31,6 +31,7 @@ commit 2 unified the writer.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -236,6 +237,43 @@ def test_contrast_path_writes_canonical_record(md):
         "smoothing_span_bp",
     ):
         assert rec[key] is None, key
+
+
+def test_contrast_path_rejects_invalid_power_stack(md):
+    """An unknown ``power_stack`` raises the same ValueError as on the binary
+    path instead of being ignored, and nothing is written."""
+    with pytest.raises(ValueError, match="power_stack must be one of"):
+        ep.tl.dmc(md, formula="~ group", contrast="group", power_stack="bogus", tsv=False)
+    assert "dmc" not in md.uns
+    assert "dmc_glm_contrast" not in md.varm
+
+
+def test_contrast_path_rejects_materialize_false(md):
+    """The contrast path always assembles the full result onto ``md.varm``,
+    so ``materialize=False`` is refused instead of being silently ignored."""
+    with pytest.raises(ValueError, match="materialize=False is not supported on the formula"):
+        ep.tl.dmc(md, formula="~ group", contrast="group", materialize=False, tsv=False)
+    assert "dmc" not in md.uns
+    assert "dmc_glm_contrast" not in md.varm
+
+
+def test_contrast_path_ignores_power_stack_with_a_notice(md, caplog):
+    """``power_stack="lr+"`` has no GLM knob to switch on: the result table
+    and the record equal the default run's, and one INFO line says so."""
+    ep.tl.dmc(md, formula="~ group", contrast="group", tsv=False)
+    baseline = md.varm["dmc_glm_contrast"]
+    baseline_rec = dict(md.uns["dmc"])
+
+    with caplog.at_level(logging.INFO, logger="epykit.tl"):
+        ep.tl.dmc(md, formula="~ group", contrast="group", power_stack="lr+", tsv=False)
+
+    notices = [r.getMessage() for r in caplog.records if "power_stack" in r.getMessage()]
+    assert notices == [
+        "power_stack='lr+' is ignored on the formula / contrast path: the GLM has no lr+ knobs."
+    ]
+    assert md.varm["dmc_glm_contrast"].equals(baseline)
+    assert md.uns["dmc"] == baseline_rec
+    assert md.uns["dmc"]["power_stack"] is None
 
 
 # Per-engine column set
