@@ -323,7 +323,7 @@ epykit report \
 The following features are currently available only through the Python API
 and do not have CLI equivalents:
 
-- `tl.dmc(power_stack=...)` and the individual lr+ knobs (`neighbour_combine`, `fdr_method`, `sep_fallback`, `dispersion`). The CLI runs bare `lr` only -- 1.1 is expected to surface the lr+ knobs as flags.
+- `tl.dmc(power_stack=...)` and the `neighbour_combine` / `sep_fallback` knobs of the lr+ stack. The CLI runs bare `lr` (`--fdr-method` and `--dispersion` are exposed); the lr+ stack is Python API only and no CLI flags are planned.
 - AnnData / MuData export with custom modalities
 - `ep.query` random-access queries
 
