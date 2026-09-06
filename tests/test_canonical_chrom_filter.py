@@ -22,7 +22,12 @@ import pytest
 import epykit as ep
 from epykit import dmr as dmr_mod
 from epykit import tl as tl_mod
-from epykit.convert import _can_reuse_sample, _manifest_path, ensure_converted_sample
+from epykit.convert import (
+    _can_reuse_sample,
+    _manifest_path,
+    convert_sample,
+    ensure_converted_sample,
+)
 from epykit.dmr import _DMR_TILE_SCHEMA, call_dmr_tile_based
 from epykit.pl._compute import compute_manhattan_data
 
@@ -193,6 +198,47 @@ def test_ingestion_false_true_false_rebuilds_the_partition_set(cohort_sheet, tmp
     assert all(c == {"chr1", SCAFFOLD} for c in _partitions(md_back.store).values())
     assert _manifest_flag(md_back.store, "t0") is False
     assert md_back.uns["n_sites_raw"] == n_sites_all
+
+
+@pytest.mark.parametrize("chroms", [("chr1", SCAFFOLD), (SCAFFOLD,)])
+def test_direct_conversion_replaces_filtered_partitions(tmp_path, chroms):
+    cov = tmp_path / "s.cov"
+    cov.write_text("".join(f"{chrom}\t101\t101\t90\t18\t2\n" for chrom in chroms))
+    store = tmp_path / "raw"
+    convert_sample(str(cov), "other", str(store), merge_strands=False)
+    for canonical_only in (False, True, False):
+        convert_sample(
+            str(cov), "s", str(store), merge_strands=False, canonical_only=canonical_only
+        )
+        expected = set(chroms) - {SCAFFOLD} if canonical_only else set(chroms)
+        assert _partitions(str(store)) == {"s": expected, "other": set(chroms)}
+        assert not list(store.glob(".epykit_convert_*"))
+
+
+def test_failed_direct_conversion_preserves_previous_sample(tmp_path, monkeypatch):
+    cov = tmp_path / "s.cov"
+    chroms = ("chr1", "chr2", SCAFFOLD)
+    cov.write_text("".join(f"{chrom}\t101\t101\t90\t18\t2\n" for chrom in chroms))
+    store = tmp_path / "raw"
+    convert_sample(str(cov), "s", str(store), merge_strands=False)
+    before = {p.relative_to(store): p.read_bytes() for p in store.rglob("*.parquet")}
+    cov.write_text("".join(f"{chrom}\t101\t101\t15\t3\t17\n" for chrom in chroms))
+    write_parquet = pl.DataFrame.write_parquet
+    writes = 0
+
+    def fail_second_write(frame, *args, **kwargs):
+        nonlocal writes
+        writes += 1
+        if writes == 2:
+            raise OSError("partition write failed")
+        return write_parquet(frame, *args, **kwargs)
+
+    monkeypatch.setattr(pl.DataFrame, "write_parquet", fail_second_write)
+    with pytest.raises(OSError, match="partition write failed"):
+        convert_sample(str(cov), "s", str(store), merge_strands=False, canonical_only=True)
+    assert writes == 2
+    assert {p.relative_to(store): p.read_bytes() for p in store.rglob("*.parquet")} == before
+    assert not list(store.glob(".epykit_convert_*"))
 
 
 def test_legacy_manifest_without_key_is_reusable_for_false_only(tmp_path):
