@@ -165,6 +165,7 @@ ep.tl.annotate(md, gtf="gencode.v44.gtf.gz", alpha=0.01)
 | `multi_annotation` | bool | True | Add annotatr-style one-to-many columns |
 | `gene_type_filter` | str/list | None | Restrict to specific gene biotypes |
 | `clear_gtf_cache` | bool | True | Clear GTF cache after annotation |
+| `tsv` | str or bool | None | Write the annotated table to this path; auto-derived next to the DMC output when unset. Tab-delimited unless the path ends in `.csv`. Pass `tsv=False` to disable. `csv` is a deprecated alias that emits a `DeprecationWarning`. |
 
 ## Full Example
 

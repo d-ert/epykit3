@@ -2,7 +2,8 @@
 
 The full version history is maintained in the project's
 [`CHANGELOG.md`](https://github.com/d-ert/epykit3/blob/main/CHANGELOG.md)
-at the repository root.
+at the repository root. Deprecated names that still work, and what replaces
+them, are listed on the [Deprecations](deprecations.md) page.
 
 ## 1.1.0 highlights (2026-09-05)
 

@@ -169,4 +169,4 @@ required sample size), but not both.
 | `run_sample_correlation` | bool | False | Enable all-vs-all correlation |
 | `correlation_method` | str | `"spearman"` | Correlation method (`"spearman"` or `"pearson"`) |
 | `expected_sex_col` | str | None | Column in `md.obs` with reported sex for mismatch detection |
-| `csv` | str | None | Write the QC metrics table to this TSV path. Pass `csv=False` to disable. |
+| `tsv` | str | None | Write the QC metrics table to this path; nothing is written when unset. Tab-delimited unless the path ends in `.csv`. `csv` is a deprecated alias that emits a `DeprecationWarning`. |

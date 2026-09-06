@@ -142,7 +142,7 @@ The result DataFrame (`md.varm["dmc_<test>"]`) contains:
 | `qvalue` | float | BH-adjusted q-value |
 | `log2_odds_ratio_pooled` | float | Log2 odds ratio (pooled-count tests: `lr`, `fisher`). Renamed from `log2_odds_ratio` in 0.7.5. |
 | `coef_treatment_log2` | float | Logit coefficient in log2 units (`glm` backend). Renamed from `log2_odds_ratio` in 0.7.5. |
-| `log2_odds_ratio` | float | **Deprecated.** Transitional NaN-filled column kept since 0.7.5 for backward compatibility; scheduled for removal in 1.2. Use `log2_odds_ratio_pooled` or `coef_treatment_log2` instead. |
+| `log2_odds_ratio` | float | **Deprecated.** Transitional NaN-filled column kept since 0.7.5 for backward compatibility. It is retained in 1.2 and scheduled for removal in a future major release; every `tl.dmc` call emits a `FutureWarning` naming the replacements. Use `log2_odds_ratio_pooled` (pooled-count tests) or `coef_treatment_log2` (`glm`) instead. See [Deprecations](../reference/deprecations.md). |
 
 Results are stored at `md.varm["dmc_<test>"]`, where `<test>` is the canonical
 test name (e.g., `dmc_lr`, `dmc_glm`, `dmc_welch_t`, `dmc_fisher`).
@@ -199,9 +199,10 @@ the cache.
 | `use_smoothed` | bool | False | Use smoothed pseudo-counts |
 | `fdr_method` | str | `"fdr_bh"` | FDR correction method |
 | `power_stack` | str | `"off"` | lr+ engagement mode -- one of `"off"`, `"lr+"` (alias `"auto"`/`True`), `"conservative"`, or `False`. See [lr+ Power Stack](lr-plus.md). |
-| `csv` | str | None | Write the significant DMCs (q < `csv_alpha`) to this TSV path; auto-derived next to the DMC parquet when unset. Pass `csv=False` to disable. |
-| `csv_full` | bool | False | Also emit the full DMC table alongside the significant TSV. |
-| `csv_alpha` | float | 0.05 | q-value threshold used to filter the significant TSV. |
+| `tsv` | str or bool | None | Write the significant DMCs (q < `tsv_alpha`) to this path; auto-derived next to the DMC parquet when unset. Tab-delimited unless the path ends in `.csv`. Pass `tsv=False` to disable. |
+| `tsv_full` | bool | False | Also emit the full DMC table alongside the significant table. |
+| `tsv_alpha` | float | 0.05 | q-value threshold used to filter the significant table. |
+| `csv`, `csv_full`, `csv_alpha` | | | Deprecated aliases for the three `tsv*` parameters. They still work, emit a `DeprecationWarning`, and lose to the `tsv*` value when both are given. The keyword does not select the delimiter; the path suffix does. |
 
 ## Distributed Execution
 
