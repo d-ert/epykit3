@@ -59,6 +59,22 @@ SemVer (`MAJOR.MINOR.PATCH`).
   matrix and the slow job install the `bam` extra, so `test_asm.py`,
   `test_bam_io.py` and `test_entropy.py` execute instead of skipping.
   Windows legs are unchanged (`pysam` has no Windows wheel).
+- **Deprecation schedule: 1.2 retains every deprecated surface.** The
+  transitional `log2_odds_ratio` DMC column, the `epykit.dmr_hmm` import
+  shim and the `__getattr__` shim for the five top-level DMC names demoted
+  in 1.0 were announced as "removed in 1.2". All three stay, and their
+  warnings now say "a future major release": no maintainer decision on a
+  removal version exists, so the code no longer names one. Warning
+  categories and behaviour are unchanged. `pp.unite()` (scheduled for 2.0)
+  and the `csv` / `csv_full` / `csv_alpha` keyword aliases on `tl.qc`,
+  `tl.dmc`, `tl.dmr`, `tl.dvc` and `tl.annotate` (scheduled for a future
+  release) keep their existing wording. Every warning names its replacement:
+  `pp.set_unite_type`, `epykit.dmr_segment.call_dmr_rule_segment`,
+  `log2_odds_ratio_pooled` (pooled-count engines) or `coef_treatment_log2`
+  (GLM), and the `tsv` / `tsv_full` / `tsv_alpha` keywords. The keyword
+  never selects the delimiter; a `.csv` path suffix does. The new
+  `docs/reference/deprecations.md` page lists the retained names, their
+  replacements and their schedules.
 
 ### Fixed
 

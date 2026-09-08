@@ -63,7 +63,7 @@ _EMPTY_SCHEMA = {
     "mean_beta_control": pl.Float32,
     "pvalue": pl.Float64,
     "log2_odds_ratio_pooled": pl.Float64,
-    "log2_odds_ratio": pl.Float64,  # transitional NaN-filled; deprecated, slated for removal in 1.2
+    "log2_odds_ratio": pl.Float64,  # transitional NaN-filled; deprecated (removal not scheduled)
     "meth_diff": pl.Float32,
     "meth_diff_ci_lo": pl.Float32,
     "meth_diff_ci_hi": pl.Float32,
@@ -2059,7 +2059,7 @@ def _finalise_chromosome(inp: EngineInput, res: EngineResult) -> pl.DataFrame:
     #                        (not log2 of an odds ratio) => coef_treatment_log2.
     #   all other backends: genuine pooled log2 odds ratio => log2_odds_ratio_pooled.
     # A transitional log2_odds_ratio column is NaN-filled so existing code
-    # doesn't silently break; it is slated for removal in 1.2.
+    # doesn't silently break; it is slated for removal in a future major release.
     _log2_col = ENGINES[inp.test].effect_column
     out_cols = {
         "chrom": pl.Series([chrom] * n_sites, dtype=pl.Utf8),

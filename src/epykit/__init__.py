@@ -156,7 +156,7 @@ __all__ = [
     "to_mudata",
 ]
 
-# --- Deprecation shim for demoted top-level names (1.0; removed in 1.2) ---
+# --- Deprecation shim for demoted top-level names (1.0; kept until a future major release) ---
 _DEMOTED_TO_DMC = frozenset(
     {
         "process_chromosomes_dmc",
@@ -173,8 +173,8 @@ def __getattr__(name: str):
     from `__all__` at 1.0.
 
     Returns the function from the appropriate submodule and emits
-    DeprecationWarning pointing users at the new import path. Shim is
-    scheduled for removal in 1.2.
+    DeprecationWarning pointing users at the new import path. The shim is
+    retained in 1.2 and scheduled for removal in a future major release.
     """
     if name in _DEMOTED_TO_DMC:
         import warnings
@@ -185,7 +185,7 @@ def __getattr__(name: str):
             f"epykit.{name} is no longer a top-level export; use "
             f"`from epykit.dmc import {name}` instead, or use the "
             f"recommended `epykit.tl.dmc` wrapper. This shim will be "
-            f"removed in epykit 1.2.",
+            f"removed in a future major release of epykit.",
             DeprecationWarning,
             stacklevel=2,
         )

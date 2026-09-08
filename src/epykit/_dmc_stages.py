@@ -55,10 +55,10 @@ logger = logging.getLogger(__name__)
 Mode = Literal["binary", "contrast"]
 
 _LOG2_ODDS_RATIO_NOTICE = (
-    "The 'log2_odds_ratio' column is deprecated and is slated for "
-    "removal in 1.2. Use 'log2_odds_ratio_pooled' for pooled-count "
-    "tests (lr, fisher) or 'coef_treatment_log2' for the glm backend. "
-    "The transitional column is NaN-filled."
+    "The 'log2_odds_ratio' column is deprecated and is slated for removal "
+    "in a future major release. Use 'log2_odds_ratio_pooled' for "
+    "pooled-count tests (lr, fisher) or 'coef_treatment_log2' for the glm "
+    "backend. The transitional column is NaN-filled."
 )
 
 

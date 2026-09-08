@@ -324,7 +324,7 @@ The five diagnostic buckets:
 |-----------|------|---------|-------------|
 | `md` | MethylData | required | Analysis object |
 | `method` | str | `"chain_merge"` | DMR method: `"chain_merge"`, `"tile"`, `"sliding_window"`, `"segment"` |
-| `csv` | str | None | Write the DMR table to this TSV path; auto-derived next to the DMR output when unset. Pass `csv=False` to disable. |
+| `tsv` | str or bool | None | Write the DMR table to this path; auto-derived next to the DMR output when unset. Tab-delimited unless the path ends in `.csv`. Pass `tsv=False` to disable. `csv` is a deprecated alias that emits a `DeprecationWarning`. |
 | `chromosomes` | list | None | Restrict to specific chromosomes (tile method); an explicit list wins over `canonical_only` |
 | `canonical_only` | bool | False | Tile method only: keep the fixed human-style chromosome set of the auto-detected partitions; the other methods raise |
 | `backend` | str | `"sequential"` | Execution backend (tile method only) |

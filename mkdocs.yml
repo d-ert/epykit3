@@ -164,4 +164,5 @@ nav:
       - Distributed Execution: advanced/distributed.md
   - Reference:
       - MethylData API: reference/methyldata.md
+      - Deprecations: reference/deprecations.md
       - Changelog: reference/changelog.md

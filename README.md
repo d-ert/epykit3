@@ -269,7 +269,7 @@ The canonical architecture reference is [`docs/advanced/architecture.md`](docs/a
 | `io.py`            | `read_bismark`, `read_nfcore_methylseq`, `load` |
 | `convert.py`       | `.cov` → partitioned Parquet |
 | `filter.py`        | Coverage filter, coverage normalisation, blacklist intersect |
-| `pp.py`            | Preprocessing wrappers (`filter_coverage`, `normalize_coverage`, `unite`, `smooth`, `aggregate_regions`) |
+| `pp.py`            | Preprocessing wrappers (`filter_coverage`, `normalize_coverage`, `set_unite_type`, `smooth`, `aggregate_regions`) |
 | `dmc.py`           | Streaming per-CpG accumulators + statistical engines (`lr`, `glm`, `welch_t`, `fisher`), BH correction |
 | `_dmc_store.py`    | `DMCStore` handle — persistent per-chromosome DMC parquet directory + manifest; lets BH and sliding-window DMR stream from disk so peak memory is O(largest chrom), not O(genome) |
 | `dmr.py`           | `call_dmr_chain_merge` (default, DSS-style), `call_dmr_tile_based`, `call_dmr_sliding_window`, `empirical_fdr_for_dmr`, `smooth_methylation_gaussian`, `smooth_methylation_bsmooth` |
@@ -288,6 +288,10 @@ The canonical architecture reference is [`docs/advanced/architecture.md`](docs/a
 | `cli.py`           | `epykit` CLI entry point |
 | `_glm.py`          | Wilkinson formula → design matrix, batched IRLS binomial GLM, Wald test on contrasts |
 | `_style.py`        | Shared matplotlib palette / theme |
+
+### Deprecated names
+
+1.2 removes no public API. `pp.unite()` (use `pp.set_unite_type()`), the `epykit.dmr_hmm` import path (use `epykit.dmr_segment.call_dmr_rule_segment`), the NaN-filled `log2_odds_ratio` DMC column (read `log2_odds_ratio_pooled` or, for the GLM, `coef_treatment_log2`), and the `csv` / `csv_full` / `csv_alpha` keywords (use `tsv` / `tsv_full` / `tsv_alpha`) all still work and warn. The keyword never selects the delimiter: a `.csv` path suffix does. Removal dates and the full table are in [`docs/reference/deprecations.md`](docs/reference/deprecations.md).
 
 ---
 
