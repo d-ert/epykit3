@@ -203,7 +203,7 @@ The `epykit` script mirrors the Python pipeline. Every subcommand takes `--methy
 | `convert`           | Bismark `.cov[.gz]` → partitioned Parquet |
 | `filter`            | Coverage / blacklist filtering |
 | `summary`           | Per-sample summary statistics |
-| `dmc`               | Per-CpG differential methylation. `--test {auto,lr,glm,welch_t,fisher}`, plus `--formula` / `--contrast` / `--covariates` for covariate-adjusted and multi-group designs. The `lr+` power-stack knobs (`power_stack`, `fdr_method`, `neighbour_combine`, `sep_fallback`, `dispersion`) are Python-API-only; CLI flags are deferred to 1.1. |
+| `dmc`               | Per-CpG differential methylation. `--test {auto,lr,glm,welch_t,fisher}`, plus `--formula` / `--contrast` / `--covariates` for covariate-adjusted and multi-group designs. `--fdr-method` and `--dispersion` are exposed. The `lr+` power stack (`power_stack`, `neighbour_combine`, `sep_fallback`) is Python API only; no CLI flags are planned. |
 | `dmr`               | DMR calling — `--method chain_merge` (default), `tile`, `sliding_window` or `segment`. `--empirical-fdr --n-perm N` is supported with `--method tile`. |
 | `annotate`          | Add gene-feature (`--gtf`) and CpG-island (`--cpg-islands`) annotation. |
 | `qc-report`         | QC + coverage uniformity report. |

@@ -74,7 +74,7 @@ and is what `ep.tl.dmc(...)` does out of the box.
 `power_stack="lr+"` / `True` / `"auto"` engages all four at any n.
 `power_stack="conservative"` engages only at n ≤ 2 (legacy behavior).
 
-When `neighbour_combine=True`, **`pvalue`/`qvalue` remain the raw per-CpG values; the combined values are added as `pvalue_combined`/`qvalue_combined`** (plus `pvalue_combined_n_neighbours` and `qvalue_combined_reject` as audit columns). Downstream code that wants the combined p-values must read the `_combined` columns explicitly. CLI flags for the `lr+` knobs are deferred to 1.1.
+When `neighbour_combine=True`, **`pvalue`/`qvalue` remain the raw per-CpG values; the combined values are added as `pvalue_combined`/`qvalue_combined`** (plus `pvalue_combined_n_neighbours` and `qvalue_combined_reject` as audit columns). Downstream code that wants the combined p-values must read the `_combined` columns explicitly. The `lr+` stack (`power_stack`, `neighbour_combine`, `sep_fallback`) is Python API only; no CLI flags are planned, because a flag would promote a research knob.
 
 ### DMR engines (`dmr.py`)
 
