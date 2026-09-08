@@ -99,7 +99,7 @@ def _dmc_engine(test_name: str, *, lr_plus: bool = False, glm: bool = False) -> 
             elif glm:
                 # Full design ~ group (intercept + group[T.treatment]); reduced
                 # design ~ 1 (intercept only). build_design is called inside
-                # _run_dmc_contrast; we only need to pass the formula + contrast.
+                # the run_contrast stage of _dmc_stages; we only need to pass the formula + contrast.
                 ep.tl.dmc(
                     md_perm, test="glm",
                     formula="~ group",
@@ -130,7 +130,7 @@ ENGINE_REGISTRY: dict[str, Callable] = {
     "welch_t": _dmc_engine("welch_t"),
     "fisher":  _dmc_engine("fisher"),
     # glm: builds design matrices on every shuffle via ep.tl.dmc(formula=...)
-    # which routes through _run_dmc_contrast -> _glm.build_design. The full
+    # which routes through _dmc_stages.run_contrast -> _glm.build_design. The full
     # model is ~ group, the reduced model is the intercept-only ~ 1.
     "glm":     _dmc_engine("glm", glm=True),
 }
