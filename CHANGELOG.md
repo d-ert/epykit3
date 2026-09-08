@@ -8,9 +8,53 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ### Changed
 
-- The `lr+` power stack (`power_stack`, `neighbour_combine`, `sep_fallback`)
-  is documented as Python API only. The earlier note that CLI flags were
-  deferred to 1.1 is withdrawn; no CLI flags are planned.
+- **`tl.dmc` orchestration split into stages.** The body of `ep.tl.dmc` now
+  runs nine stages from `src/epykit/_dmc_stages.py` (`plan_run`,
+  `run_contrast`, `lookup_resume`, `open_input_store`, `run_engine`,
+  `post_process`, `publish`, `persist_resume`, `finish`), each handing a
+  frozen plan or outcome record to the next; `publish` is the only writer of
+  `md.uns["dmc"]`. The public signature, defaults, result keys, metadata
+  record and engine output are unchanged (the engine hash gate holds). One
+  observable difference: the `log2_odds_ratio` FutureWarning is now emitted
+  on the `resumable=True` cache hit too, where it was silent before.
+  Warnings raised by the DMC stages, including the n<2 Fisher fallback
+  notice that previously pointed inside `tl.py`, now point at the caller of
+  `tl.dmc`. The private `tl._run_dmc_contrast` helper is gone; its body is
+  the `run_contrast` stage.
+- **CI runs the BAM-backed tests on Ubuntu.** The Ubuntu legs of the test
+  matrix and the slow job install the `bam` extra, so `test_asm.py`,
+  `test_bam_io.py` and `test_entropy.py` execute instead of skipping.
+  Windows legs are unchanged (`pysam` has no Windows wheel).
+
+### Fixed
+
+- **`read_methylation_calls(regions=...)` reported calls past the region
+  end.** `bam_io.read_methylation_calls` fetched every read overlapping a
+  requested `(chrom, start, end)` window but kept all of the read's calls, so
+  positions beyond `end` (and duplicate calls for a read spanning two
+  adjacent windows) leaked into the result. Calls are now clipped to the
+  half-open `[start, end)` span. The existing region test in
+  `tests/test_bam_io.py` catches this; CI never executed it before because
+  `pysam` was not installed.
+- **ASM phasing anchors confounded allele with methylation state.**
+  `call_asm` / `tl.asm` assigned a read to an allele by its raw base at a
+  heterozygous SNV. In a Bismark BAM that base is bisulfite-converted: an
+  unmethylated C reads as T on `XG:Z:CT` reads and an unmethylated G reads
+  as A on `XG:Z:GA` reads, so at any anchor other than A/T the allele a
+  read landed in tracked its methylation state and ASM was fabricated. A
+  null C/T anchor with 50% methylation on both alleles came out as 10/0
+  versus 10/20 reads (Fisher p = 4.4e-4). Each read is now phased only
+  when its `XG` conversion strand cannot convert either allele: A/T on
+  both strands; A/G and G/T on CT reads; C/T and A/C on GA reads; C/G
+  never. Reads without a recognised `XG` tag (MethylDackel / bwa-meth
+  BAMs, or a Bismark BAM with the tag stripped) phase A/T anchors only.
+  ASM results change wherever such anchors contributed: fabricated sites
+  disappear, and because the rule is deliberately conservative some
+  genuine anchors and reads are dropped too, so anchor counts fall and
+  sites reported by earlier releases can vanish. One INFO line per sample
+  now reports the anchors that phased at least one read, the anchors
+  rejected by class before any read was fetched, and the read-anchor
+  observations the strand rule rejected. The public API is unchanged.
 
 ## [1.1.0] — 2026-09-05
 
