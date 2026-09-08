@@ -8,6 +8,17 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ### Changed
 
+- **The CLI is a package.** `src/epykit/cli.py` is now the package
+  `src/epykit/cli/`. `_common.py` holds the helpers every command shares
+  (logging setup, the `--tsv` sibling-table options, `--min-samples-*`,
+  samplesheet group reading and the n=1 checks); `_ingest.py` (convert,
+  filter, summary), `_dmc.py`, `_dmr.py` and `_downstream.py` (annotate,
+  qc-report, smooth, report, aggregate-regions, export) each register their
+  subcommands, and `build_parser` calls the four registrars in that order.
+  Command names, options, defaults, help text and output are unchanged;
+  `epykit` and `python -m epykit.cli` work as before. Private handlers moved
+  with their commands (for example `epykit.cli._dmr._cmd_dmr`), and the
+  stdout guard test now exempts the `cli/` directory rather than one file.
 - **Per-engine chromosome runners.** `dmc._process_one_chromosome` now
   builds one frozen `EngineInput` record for the chromosome, dispatches to
   the engine's runner (`_run_fisher`, `_run_lr`, `_run_welch_t`, `_run_glm`,
