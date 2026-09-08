@@ -21,18 +21,21 @@ jobs:
       fail-fast: false
       # PRs run three legs (ubuntu 3.10 and 3.13, windows 3.12); pushes to main run all six.
       # One Windows leg is enough on a PR: Windows failures here have been platform-level, not per-Python-version.
+      # `extras` carries the platform-only extras on top of `--extra all`: the
+      # bam extra (pysam) has no Windows wheel, so only the Ubuntu legs install
+      # it and run test_asm.py, test_bam_io.py and test_entropy.py.
       matrix:
         include: >-
           ${{ fromJSON(github.event_name == 'pull_request'
-          && '[{"os": "ubuntu-latest", "python-version": "3.10"},
-          {"os": "ubuntu-latest", "python-version": "3.13"},
-          {"os": "windows-latest", "python-version": "3.12"}]'
-          || '[{"os": "ubuntu-latest", "python-version": "3.10"},
-          {"os": "ubuntu-latest", "python-version": "3.12"},
-          {"os": "ubuntu-latest", "python-version": "3.13"},
-          {"os": "windows-latest", "python-version": "3.10"},
-          {"os": "windows-latest", "python-version": "3.12"},
-          {"os": "windows-latest", "python-version": "3.13"}]') }}
+          && '[{"os": "ubuntu-latest", "python-version": "3.10", "extras": "--extra bam"},
+          {"os": "ubuntu-latest", "python-version": "3.13", "extras": "--extra bam"},
+          {"os": "windows-latest", "python-version": "3.12", "extras": ""}]'
+          || '[{"os": "ubuntu-latest", "python-version": "3.10", "extras": "--extra bam"},
+          {"os": "ubuntu-latest", "python-version": "3.12", "extras": "--extra bam"},
+          {"os": "ubuntu-latest", "python-version": "3.13", "extras": "--extra bam"},
+          {"os": "windows-latest", "python-version": "3.10", "extras": ""},
+          {"os": "windows-latest", "python-version": "3.12", "extras": ""},
+          {"os": "windows-latest", "python-version": "3.13", "extras": ""}]') }}
 
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +52,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install epykit + test deps
-        run: uv sync --locked --python ${{ matrix.python-version }} --group dev --extra all
+        run: uv sync --locked --python ${{ matrix.python-version }} --group dev --extra all ${{ matrix.extras }}
 
       - name: Run pytest (skip slow, with coverage)
         env:
@@ -80,7 +83,8 @@ jobs:
         run: uv python install 3.12
 
       - name: Install epykit + test deps
-        run: uv sync --locked --python 3.12 --group dev --extra all
+        # The bam extra so the slow tier also exercises the pysam-backed tests.
+        run: uv sync --locked --python 3.12 --group dev --extra all --extra bam
 
       - name: Run pytest (slow tier)
         env:

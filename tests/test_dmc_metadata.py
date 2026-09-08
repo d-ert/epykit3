@@ -264,7 +264,7 @@ def test_contrast_path_ignores_power_stack_with_a_notice(md, caplog):
     baseline = md.varm["dmc_glm_contrast"]
     baseline_rec = dict(md.uns["dmc"])
 
-    with caplog.at_level(logging.INFO, logger="epykit.tl"):
+    with caplog.at_level(logging.INFO, logger="epykit._dmc_stages"):
         ep.tl.dmc(md, formula="~ group", contrast="group", power_stack="lr+", tsv=False)
 
     notices = [r.getMessage() for r in caplog.records if "power_stack" in r.getMessage()]
