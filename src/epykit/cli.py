@@ -24,6 +24,7 @@ import warnings
 from pathlib import Path
 
 from . import dmc, filter
+from ._dmc_engines import PUBLIC_ENGINES
 from .convert import convert_sample
 
 
@@ -769,12 +770,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_dmc.add_argument("--output", required=True)
     p_dmc.add_argument(
         "--test",
-        choices=[
-            "lr",
-            "glm",
-            "welch_t",
-            "fisher",
-        ],
+        choices=list(PUBLIC_ENGINES),
         default="lr",
         help=(
             "Statistical test (default: lr). "
@@ -959,12 +955,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_dmr.add_argument(
         "--test",
-        choices=[
-            "lr",
-            "glm",
-            "welch_t",
-            "fisher",
-        ],
+        choices=list(PUBLIC_ENGINES),
         default="lr",
         help="(tile only) Statistical test applied to tile-level counts. "
         "Default 'lr': quasi-binomial LR with McCullagh-Nelder dispersion.",

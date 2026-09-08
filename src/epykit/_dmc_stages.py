@@ -43,7 +43,6 @@ import polars as pl
 from ._dmc_config import DMCConfig
 from .dmc import (
     DMCStore,
-    _canonicalise_test_name,
     apply_multiple_testing_correction,
     combine_neighbour_pvalues,
     empirical_fdr_for_dmc,
@@ -90,9 +89,8 @@ class DMCPlan:
     cfg: DMCConfig
     mode: Mode
     selected_test: str
-    """The engine after ``"auto"`` resolution; ``"glm_contrast"`` in contrast mode."""
-    canonical_test: str
-    """``_canonicalise_test_name(selected_test)``; the ``test_used`` recorded in uns."""
+    """The engine after ``"auto"`` resolution, ``"glm_contrast"`` in contrast
+    mode; the ``test_used`` recorded in uns and the resume stage name."""
     unite: bool
     smooth_method: str | None
     key: str
@@ -201,7 +199,6 @@ def plan_run(md: MethylData, cfg: DMCConfig) -> DMCPlan:
             cfg=cfg,
             mode="contrast",
             selected_test="glm_contrast",
-            canonical_test="glm_contrast",
             unite=unite,
             smooth_method=None,
             key="dmc_glm_contrast",
@@ -236,13 +233,11 @@ def plan_run(md: MethylData, cfg: DMCConfig) -> DMCPlan:
         _warn_fisher_once(stacklevel=4)
     smooth_method = md.uns.get("smooth_params", {}).get("method") if cfg.use_smoothed else None
 
-    canonical_test = _canonicalise_test_name(selected_test)
-    key = f"dmc_{canonical_test}_smoothed" if cfg.use_smoothed else f"dmc_{canonical_test}"
+    key = f"dmc_{selected_test}_smoothed" if cfg.use_smoothed else f"dmc_{selected_test}"
     return DMCPlan(
         cfg=cfg,
         mode="binary",
         selected_test=selected_test,
-        canonical_test=canonical_test,
         unite=unite,
         smooth_method=smooth_method,
         key=key,
@@ -296,7 +291,7 @@ def lookup_resume(md: MethylData, plan: DMCPlan) -> ResumeTicket | None:
         return None
     from ._cache import input_signature, manifest_find
 
-    stage_name = f"dmc_{plan.canonical_test}"
+    stage_name = f"dmc_{plan.selected_test}"
     root = md.analysis_root or md.store
     if not root:
         return None
@@ -580,7 +575,7 @@ def publish(md: MethylData, plan: DMCPlan, outcome: DMCOutcome) -> None:
         md.varm[plan.key] = outcome.result
     design = outcome.design
     md.uns["dmc"] = plan.cfg.to_uns(
-        test_used=plan.canonical_test,
+        test_used=plan.selected_test,
         n_sites=outcome.n_sites,
         materialized=outcome.result is not None,
         unite=plan.unite,
@@ -618,7 +613,7 @@ def persist_resume(
             ticket.root,
             ticket.stage_name,
             params={
-                "test": plan.canonical_test,
+                "test": plan.selected_test,
                 "unite": plan.unite,
                 "min_samples_treatment": cfg.min_samples_treatment,
                 "min_samples_control": cfg.min_samples_control,

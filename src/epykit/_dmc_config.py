@@ -14,38 +14,12 @@ import logging
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
+from ._dmc_engines import engine_spec
+
 logger = logging.getLogger(__name__)
 
 PowerStack = Literal["auto", "lr+", "conservative", "off"]
 _POWER_STACK_MODES = frozenset({"auto", "lr+", "conservative", "off"})
-
-# Engines removed in 0.7.5. Each raises ValueError with the migration hint.
-_REMOVED_ENGINES = {
-    "logit_t": (
-        "test='logit_t' was removed in 0.7.5 (miscalibrated near β=0/1). "
-        "Use test='welch_t' for the replicate-aware β-mean test or "
-        "test='lr' for the recommended default."
-    ),
-    "bb_lr": (
-        "test='bb_lr' was removed in 0.7.5 (TPR < 8% at n ≤ 4 + a "
-        "dispersion-df bug). Use test='lr' (recommended) which uses "
-        "the same quasi-binomial dispersion but pools counts per group "
-        "for higher power at small n."
-    ),
-    "score": (
-        "test='score' was removed in 0.7.5 (strictly dominated by "
-        "test='lr' in finite samples; asymptotically equivalent under "
-        "H0). Switch test='score' -> test='lr'; output schema is "
-        "identical."
-    ),
-    "cmh": (
-        "test='cmh' was removed in 0.7.5 (stratification semantics "
-        "confusing; dominated by GLM with batch covariate). For "
-        "stratified analysis use tl.dmc(formula='~ group + batch'), "
-        "which gives proper dispersion correction and handles "
-        "continuous covariates."
-    ),
-}
 
 
 @dataclass(frozen=True)
@@ -101,14 +75,16 @@ class DMCConfig:
             object.__setattr__(self, "power_stack", "lr+" if self.power_stack else "off")
 
     def validate(self) -> None:
-        """Reject the engines removed in 0.7.5 with their migration hints.
+        """Reject removed and unknown engine names.
 
-        Runs before the formula / contrast dispatch, so a removed engine
-        name is refused on every path.
+        Runs before the formula / contrast dispatch, so a bad ``test`` is
+        refused on every path before any store is opened. An engine removed
+        in 0.7.5 raises with its migration hint, any other unknown name with
+        the public choice list. ``"auto"`` passes: the binary path resolves
+        it after the n=1 guard.
         """
-        message = _REMOVED_ENGINES.get(self.test)
-        if message is not None:
-            raise ValueError(message)
+        if self.test != "auto":
+            engine_spec(self.test)
 
     def validate_resolved(self) -> None:
         """Checks that need the power stack resolved first.
@@ -150,13 +126,15 @@ class DMCConfig:
         """Resolve the ``lr+`` power stack into its component knobs.
 
         Returns a copy with ``neighbour_combine``, ``fdr_method`` and
-        ``sep_fallback`` switched on for the ``lr`` engine: ``"lr+"`` and
-        ``"auto"`` engage at any n, ``"conservative"`` only at n <= 2,
-        ``"off"`` leaves the user's values alone. The fourth component,
-        ``dispersion="eb"``, is already the default. Knobs the user set
-        themselves are kept.
+        ``sep_fallback`` switched on when the registry says the stack
+        applies to ``selected_test`` (only ``lr``): ``"lr+"`` and ``"auto"``
+        engage at any n, ``"conservative"`` only at n <= 2, ``"off"`` leaves
+        the user's values alone. The fourth component, ``dispersion="eb"``,
+        is already the default. Knobs the user set themselves are kept.
         """
-        if selected_test != "lr" or self.power_stack not in {"auto", "lr+", "conservative"}:
+        if not engine_spec(selected_test).power_stack_applies:
+            return self
+        if self.power_stack not in {"auto", "lr+", "conservative"}:
             return self
         if self.power_stack == "conservative" and min_n > 2:
             return self

@@ -44,6 +44,7 @@ import polars as pl
 from scipy import stats as sp_stats
 
 from . import _cache
+from ._dmc_engines import ENGINES, engine_spec
 from ._dmc_store import DMCStore, _chrom_filename
 
 logger = logging.getLogger(__name__)
@@ -65,9 +66,6 @@ _EMPTY_SCHEMA = {
     "meth_diff_ci_lo": pl.Float32,
     "meth_diff_ci_hi": pl.Float32,
 }
-
-# Backends where log2_ors is a logit coefficient (not a pooled log2-OR).
-_GLM_BACKENDS = frozenset({"glm", "glm_contrast"})
 
 
 def _epykit_version() -> str:
@@ -193,11 +191,6 @@ def _resolve_dmc_store_dir(
         fallback,
     )
     return fallback
-
-
-def _canonicalise_test_name(test: str) -> str:
-    """Map deprecated test names to their canonical form."""
-    return test
 
 
 _TEST_RECOMMENDATIONS = {
@@ -1378,7 +1371,6 @@ def _process_one_chromosome(
         `logit_t`). Welford accumulators give per-site variance without
         materialising the count matrix.
     """
-    test = _canonicalise_test_name(test)
     n_sites = len(canonical_df)
     if n_sites == 0:
         return pl.DataFrame(schema=_EMPTY_SCHEMA)
@@ -1927,13 +1919,14 @@ def _process_one_chromosome(
 
     del mean_case, M2_case, n_valid_case, mean_ctrl, M2_ctrl, n_valid_ctrl
 
-    # P1-11: column name is backend-specific.
+    # P1-11: column name is backend-specific, recorded on the engine's
+    # registry entry.
     #   glm / glm_contrast: the value is the logit coefficient in log2 units
     #                        (not log2 of an odds ratio) => coef_treatment_log2.
     #   all other backends: genuine pooled log2 odds ratio => log2_odds_ratio_pooled.
     # A transitional log2_odds_ratio column is NaN-filled so existing code
     # doesn't silently break; it is slated for removal in 1.2.
-    _log2_col = "coef_treatment_log2" if test in _GLM_BACKENDS else "log2_odds_ratio_pooled"
+    _log2_col = ENGINES[test].effect_column
     out_cols = {
         "chrom": pl.Series([chrom] * n_sites, dtype=pl.Utf8),
         "pos": canonical_df["pos"],
@@ -2193,10 +2186,12 @@ def process_chromosomes_dmc(
         raise TypeError("Missing required argument: samples_control")
     if min_samples_treatment is None:
         min_samples_treatment = 0
+    # The CLI, the tile DMR path and direct callers reach this function
+    # without DMCConfig, so the name is checked here too, before the store
+    # directory is resolved or created.
+    engine_spec(test)
     samples_case = samples_treatment
     min_samples_case = min_samples_treatment
-
-    test = _canonicalise_test_name(test)
 
     store = Path(methylstore_path)
     # For glm_contrast the case/control split is not meaningful -- the
@@ -3089,8 +3084,11 @@ def empirical_fdr_for_dmc(
     **conservative at genome scale** (low power across millions of CpGs); it
     is NOT a pooled-null per-site FDR despite the function name.
     ``empirical_qvalue`` is a subsequent BH transform of those FWER p-values,
-    provided for convenience. For a less conservative region-level empirical
-    FDR, prefer :func:`epykit.dmr.empirical_fdr_for_dmr` on DMRs.
+    provided for convenience. This function has no ``fdr_method`` knob: it
+    is always this max-T style statistic. The less conservative count-ratio
+    mode, ``fdr_method="region"``, exists only on the DMR side
+    (:func:`epykit.dmr.empirical_fdr_for_dmr` and ``tl.dmr``), which
+    estimates FDR at the region level.
 
     Parallels :func:`epykit.dmr.empirical_fdr_for_dmr`; same caveats apply:
 
