@@ -84,8 +84,19 @@ controlled at your expected level before trusting the results.
 | `"segment"` | Rule-based 3-state segmentation over `meth_diff` (`dmr_segment.py`; `dmr_hmm.py` is a deprecated alias) | Not a fitted HMM; the HMM primitives in `_hmm.py` are separate |
 
 Permutation empirical FDR (`ep.tl.dmr(..., empirical_fdr=True, n_perm=N)`)
-is wired for `method="tile"` only. The other callers raise
-`NotImplementedError` until each gets its own label-shuffle scheme.
+is wired for `method="tile"` and `method="chain_merge"`. Both harnesses
+share `_aggregate_region_perm_results` in `dmr.py`, which dispatches on
+`fdr_method`: `"max_t"` (default) is the Westfall-Young min-P statistic
+with a BH transform; `"region"` is the opt-in count-ratio target-decoy FDR
+in `_region_count_ratio_fdr`. The tile harness re-runs
+`call_dmr_tile_based` on shuffled labels. `empirical_fdr_for_chain_merge`
+replays the observed DMC (engine knobs from `md.uns["dmc"]`, the observed
+chromosome universe and multiple-testing method) into a private temporary
+`DMCStore` per permutation, then chain-merges and filters it like the
+observed run. The per-CpG `empirical_fdr_for_dmc` keeps min-P only; region
+mode exists in the DMR API alone. `sliding_window` and `segment` raise
+`NotImplementedError` until each gets its own label-shuffle scheme. See
+[the design note](../review/2026-06-08-region-empirical-fdr-design.md).
 
 ## Where to look in the source tree
 
