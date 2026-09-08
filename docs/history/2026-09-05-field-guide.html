@@ -1,0 +1,1404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>epykit Field Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#F3F6F4; --surface:#FFFFFF; --surface-2:#E9EEEB; --ink:#17222A; --muted:#5B6B72; --line:#D3DBD7;
+  --accent:#0E6E5C; --accent-soft:#D9EFE9; --accent-ink:#FFFFFF;
+  --hyper:#D55E00; --hypo:#0072B2; --warn:#B7791F; --bad:#B42318; --good:#1F7A3E;
+  --code-bg:#EAF0ED; --code-ink:#1B2B33; --shadow:0 1px 2px rgba(23,34,42,.06),0 8px 24px rgba(23,34,42,.06);
+  --rail:272px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1617; --surface:#161F1F; --surface-2:#1C2726; --ink:#E4EBE8; --muted:#93A39E; --line:#2A3836;
+    --accent:#3FB59B; --accent-soft:#183530; --accent-ink:#0B1513;
+    --hyper:#F29A4E; --hypo:#5AAEE8; --warn:#D9A441; --bad:#E5665A; --good:#4FBF7A;
+    --code-bg:#111A1A; --code-ink:#DCE6E2; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1617; --surface:#161F1F; --surface-2:#1C2726; --ink:#E4EBE8; --muted:#93A39E; --line:#2A3836;
+  --accent:#3FB59B; --accent-soft:#183530; --accent-ink:#0B1513;
+  --hyper:#F29A4E; --hypo:#5AAEE8; --warn:#D9A441; --bad:#E5665A; --good:#4FBF7A;
+  --code-bg:#111A1A; --code-ink:#DCE6E2; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{transition:none!important;animation:none!important} }
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Source Sans 3",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+code,pre,kbd,.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+code{font-size:.86em;background:var(--code-bg);color:var(--code-ink);padding:.1em .38em;border-radius:4px}
+pre{background:var(--code-bg);color:var(--code-ink);padding:14px 18px;border-radius:8px;overflow-x:auto;font-size:13.5px;line-height:1.5;margin:0}
+pre code{background:none;padding:0;font-size:inherit}
+h1,h2,h3,h4{font-family:"Familjen Grotesk","Source Sans 3",system-ui,sans-serif;text-wrap:balance;line-height:1.12;margin:0}
+h1{font-size:clamp(40px,6vw,72px);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(28px,3.4vw,40px);font-weight:700;letter-spacing:-.015em}
+h3{font-size:20px;font-weight:600;margin-top:8px}
+h4{font-size:16px;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:"JetBrains Mono",monospace;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{font-size:20px;line-height:1.5;max-width:62ch;color:var(--ink)}
+.muted{color:var(--muted)}
+.prose{max-width:66ch;display:flex;flex-direction:column;gap:12px}
+.prose p{max-width:66ch}
+ul,ol{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px}
+li{max-width:70ch}
+strong{font-weight:600}
+hr{border:0;border-top:1px solid var(--line);margin:0}
+
+/* progress + rail */
+#progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:50;transition:width .15s linear}
+#rail{position:fixed;top:0;left:0;bottom:0;width:var(--rail);background:var(--surface);border-right:1px solid var(--line);overflow-y:auto;padding:22px 18px 28px;z-index:40;display:flex;flex-direction:column;gap:18px}
+#rail .brand{display:flex;flex-direction:column;gap:2px}
+#rail .brand b{font-family:"Familjen Grotesk",sans-serif;font-size:20px;font-weight:700;letter-spacing:-.01em}
+#rail .brand span{font-size:12px;color:var(--muted)}
+#rail nav{display:flex;flex-direction:column;gap:14px}
+#rail .part{display:flex;flex-direction:column;gap:2px}
+#rail .part-name{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 8px 4px}
+#rail a.item{display:grid;grid-template-columns:26px 1fr;gap:6px;align-items:baseline;text-decoration:none;color:var(--ink);font-size:14px;padding:5px 8px;border-radius:6px;line-height:1.3}
+#rail a.item .n{font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+#rail a.item:hover{background:var(--surface-2)}
+#rail a.item.active{background:var(--accent-soft);color:var(--ink)}
+#rail a.item.active .n{color:var(--accent)}
+#rail a.item:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#rail .keys{font-size:12px;color:var(--muted);line-height:1.6;margin-top:auto}
+kbd{font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--surface-2);color:var(--ink)}
+#theme{align-self:flex-start;font:inherit;font-size:12px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px 10px;cursor:pointer}
+
+/* slides */
+main{margin-left:var(--rail)}
+.slide{padding:64px 56px 72px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:26px;max-width:1180px}
+.slide .head{display:flex;flex-direction:column;gap:12px}
+.slide .head .eyebrow{display:flex;gap:14px;align-items:center}
+.slide .head .eyebrow .idx{color:var(--accent)}
+.cover{min-height:auto;padding-top:96px;gap:34px}
+.cover .lede{font-size:22px;max-width:60ch}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;max-width:900px}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.fact b{font-family:"Familjen Grotesk",sans-serif;font-size:26px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.fact span{font-size:12.5px;color:var(--muted)}
+
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start}
+.cols-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:start}
+.cols-wide{display:grid;grid-template-columns:1.25fr 1fr;gap:28px;align-items:start}
+@media (max-width:1000px){.cols,.cols-3,.cols-wide{grid-template-columns:1fr}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:10px}
+.panel h4{display:flex;align-items:center;gap:8px}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;max-width:72ch;display:flex;flex-direction:column;gap:4px}
+.callout.warn{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,var(--surface))}
+.callout.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,var(--surface))}
+.callout b{font-weight:600}
+
+figure{margin:0;display:flex;flex-direction:column;gap:10px}
+figure svg{max-width:100%;height:auto;display:block}
+figcaption{font-size:13.5px;color:var(--muted);max-width:72ch}
+.fig-wrap{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;overflow-x:auto}
+
+table{border-collapse:collapse;width:100%;font-size:14.5px;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tbl{overflow-x:auto;border-radius:8px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:"JetBrains Mono",monospace;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td code{white-space:nowrap}
+
+.pill{display:inline-block;font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.04em;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--surface-2);white-space:nowrap}
+.pill.hyper{color:var(--hyper);border-color:var(--hyper)}
+.pill.hypo{color:var(--hypo);border-color:var(--hypo)}
+.pill.good{color:var(--good);border-color:var(--good)}
+.pill.warn{color:var(--warn);border-color:var(--warn)}
+.pill.bad{color:var(--bad);border-color:var(--bad)}
+.pill.acc{color:var(--accent);border-color:var(--accent)}
+
+.steps{display:flex;flex-direction:column;gap:0;counter-reset:step}
+.step{display:grid;grid-template-columns:40px 1fr;gap:14px;padding:12px 0;border-top:1px solid var(--line)}
+.step:first-child{border-top:0}
+.step .k{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--accent);padding-top:3px}
+.step .body{display:flex;flex-direction:column;gap:4px}
+.step .body b{font-weight:600}
+.step .body p{max-width:70ch}
+
+.sev{display:grid;grid-template-columns:110px 1fr;gap:14px;padding:12px 0;border-top:1px solid var(--line);align-items:start}
+.sev:first-child{border-top:0}
+.sev .lbl{display:flex;flex-direction:column;gap:4px}
+.sev .body{display:flex;flex-direction:column;gap:4px}
+.sev .body p{max-width:78ch}
+
+.bar-row{display:grid;grid-template-columns:190px 1fr 60px;gap:10px;align-items:center;font-size:13.5px}
+.bar-row .track{height:10px;background:var(--surface-2);border-radius:5px;overflow:hidden}
+.bar-row .fill{height:100%;background:var(--accent);border-radius:5px}
+.bar-row .fill.hot{background:var(--hyper)}
+.bar-row .v{font-family:"JetBrains Mono",monospace;font-size:12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.bars{display:flex;flex-direction:column;gap:7px}
+
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+
+@media (max-width:860px){
+  :root{--rail:0px}
+  #rail{position:sticky;top:0;bottom:auto;width:100%;height:auto;flex-direction:row;align-items:center;gap:10px;padding:10px 14px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}
+  #rail nav{flex-direction:row;gap:6px}
+  #rail .part{flex-direction:row;gap:4px}
+  #rail .part-name,#rail .keys,#rail .brand span{display:none}
+  #rail a.item{grid-template-columns:auto;padding:4px 8px;white-space:nowrap}
+  #rail a.item .n{display:none}
+  main{margin-left:0}
+  .slide{padding:40px 20px 48px}
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<aside id="rail">
+  <div class="brand"><b>epykit Field Guide</b><span>v1.0.0 · read on 2026-09-05</span></div>
+  <nav>
+    <div class="part"><div class="part-name">Part 1 · The domain</div>
+      <a class="item" href="#s1"><span class="n">01</span>What methylation is</a>
+      <a class="item" href="#s2"><span class="n">02</span>How WGBS measures it</a>
+      <a class="item" href="#s3"><span class="n">03</span>The question: DMC and DMR</a>
+      <a class="item" href="#s4"><span class="n">04</span>Glossary</a>
+    </div>
+    <div class="part"><div class="part-name">Part 2 · The system</div>
+      <a class="item" href="#s5"><span class="n">05</span>Pipeline at a glance</a>
+      <a class="item" href="#s6"><span class="n">06</span>The methylstore</a>
+      <a class="item" href="#s7"><span class="n">07</span>MethylData</a>
+      <a class="item" href="#s8"><span class="n">08</span>API and CLI</a>
+      <a class="item" href="#s9"><span class="n">09</span>Inside the DMC engine</a>
+      <a class="item" href="#s10"><span class="n">10</span>DMR callers</a>
+      <a class="item" href="#s11"><span class="n">11</span>Statistics, honestly</a>
+      <a class="item" href="#s12"><span class="n">12</span>The periphery</a>
+      <a class="item" href="#s13"><span class="n">13</span>Load-bearing conventions</a>
+    </div>
+    <div class="part"><div class="part-name">Part 3 · The codebase</div>
+      <a class="item" href="#s14"><span class="n">14</span>Modules and dependencies</a>
+      <a class="item" href="#s15"><span class="n">15</span>Quality gates and tests</a>
+      <a class="item" href="#s16"><span class="n">16</span>History and process</a>
+    </div>
+    <div class="part"><div class="part-name">Part 4 · Cleanup</div>
+      <a class="item" href="#s17"><span class="n">17</span>Hotspots</a>
+      <a class="item" href="#s18"><span class="n">18</span>Lint and type debt</a>
+      <a class="item" href="#s19"><span class="n">19</span>Stale surface</a>
+      <a class="item" href="#s20"><span class="n">20</span>Repo hygiene</a>
+      <a class="item" href="#s21"><span class="n">21</span>Correctness debt</a>
+      <a class="item" href="#s22"><span class="n">22</span>A sequenced plan</a>
+      <a class="item" href="#s23"><span class="n">23</span>Run it, read next</a>
+    </div>
+  </nav>
+  <button id="theme" type="button">Theme: system</button>
+  <div class="keys"><kbd>J</kbd>/<kbd>K</kbd> or <kbd>←</kbd>/<kbd>→</kbd> move between slides</div>
+</aside>
+
+<main>
+<section class="slide cover" id="s0">
+  <div class="head">
+    <div class="eyebrow">A software engineer's guide to a genomics codebase</div>
+    <h1>epykit, explained from zero</h1>
+  </div>
+  <p class="lede">epykit is a Python library and command-line tool that takes raw DNA-methylation measurements from a sequencer, finds the places in the genome where two groups of samples differ, and writes the result out as tables, plots, and a report. This guide explains the biology only as far as the code needs it, then walks the architecture, the data model, the quality gates, and the places that deserve cleanup.</p>
+  <div class="facts">
+    <div class="fact"><b>27,272</b><span>lines of Python in <code>src/epykit</code> (55 files)</span></div>
+    <div class="fact"><b>14,222</b><span>lines of tests, 575 collected (442 fast, 133 slow)</span></div>
+    <div class="fact"><b>238</b><span>commits, 2026-05-20 to 2026-06-09, one main author</span></div>
+    <div class="fact"><b>3.9–3.12</b><span>Python, on Linux, macOS and Windows in CI</span></div>
+    <div class="fact"><b>4 + 4</b><span>per-site statistical engines and region callers</span></div>
+  </div>
+  <div class="callout"><b>How to read this</b><p>Parts 1 and 2 build the mental model. Part 3 is the map. Part 4 is the work. Every number here was measured on the checkout at commit <code>1f501e0</code>, and the example outputs come from running the pipeline on the repo's own synthetic test fixture.</p></div>
+</section>
+
+<!-- ───────────── PART 1 ───────────── -->
+<section class="slide" id="s1">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">01 / 23</span><span>Part 1 · The domain</span></div>
+    <h2>DNA methylation is a per-position on/off mark, measured as a fraction</h2>
+  </div>
+  <div class="cols-wide">
+    <div class="prose">
+      <p>DNA is a string over the alphabet A, C, G, T. At certain positions, a cytosine (C) that is immediately followed by a guanine (G) can carry a small chemical tag, a methyl group. That C-then-G pair is called a <strong>CpG</strong> (the "p" is the phosphate link between them). Methylation at CpGs helps decide which genes a cell uses. Cancer, ageing and development all shift it, which is why people measure it.</p>
+      <p>A tissue sample contains millions of cells. At one CpG position, some cells are methylated and some are not. So the unit of measurement is not a boolean but a <strong>fraction</strong>: of the DNA fragments observed at that position, what share carried the mark. epykit calls that fraction <strong>β (beta)</strong>. It lives in [0, 1].</p>
+      <p>Every row of methylation data is therefore a tiny binomial experiment. Two integers are the raw truth. Everything else is derived.</p>
+      <pre><code>N_meth     = fragments that were methylated at this CpG
+N_unmeth   = fragments that were not
+coverage   = N_meth + N_unmeth          # how many fragments we saw
+beta       = N_meth / coverage          # the methylation level</code></pre>
+      <p>The human genome has roughly 28 million CpGs. A whole-genome dataset has one row per CpG per sample. With 8 samples that is well over 100 million rows. That number drives most of epykit's architecture.</p>
+    </div>
+    <figure>
+      <div class="fig-wrap">
+      <svg viewBox="0 0 440 300" role="img" aria-label="One CpG position seen across several sequenced fragments; four of six carry the methyl mark, so beta is 0.67">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+        </defs>
+        <g fill="currentColor" font-family="JetBrains Mono, monospace" font-size="12">
+          <text x="16" y="24" font-size="11" opacity=".7">reference genome, one strand</text>
+          <text x="16" y="52" letter-spacing="6">A T G C G T A C C G T A G G A T</text>
+          <rect x="49" y="38" width="30" height="20" fill="none" stroke="currentColor" stroke-dasharray="3 2" rx="3"/>
+          <text x="52" y="76" font-size="10.5" opacity=".7">CpG</text>
+        </g>
+        <g font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor">
+          <text x="16" y="108" font-size="11" opacity=".7">six fragments covering it</text>
+          <g>
+            <rect x="16" y="120" width="220" height="12" rx="2" fill="none" stroke="currentColor" opacity=".55"/><circle cx="64" cy="126" r="5" fill="var(--hyper)"/>
+            <rect x="30" y="140" width="220" height="12" rx="2" fill="none" stroke="currentColor" opacity=".55"/><circle cx="64" cy="146" r="5" fill="var(--hyper)"/>
+            <rect x="8"  y="160" width="220" height="12" rx="2" fill="none" stroke="currentColor" opacity=".55"/><circle cx="64" cy="166" r="5" fill="none" stroke="var(--hypo)" stroke-width="2"/>
+            <rect x="40" y="180" width="220" height="12" rx="2" fill="none" stroke="currentColor" opacity=".55"/><circle cx="64" cy="186" r="5" fill="var(--hyper)"/>
+            <rect x="22" y="200" width="220" height="12" rx="2" fill="none" stroke="currentColor" opacity=".55"/><circle cx="64" cy="206" r="5" fill="var(--hyper)"/>
+            <rect x="12" y="220" width="220" height="12" rx="2" fill="none" stroke="currentColor" opacity=".55"/><circle cx="64" cy="226" r="5" fill="none" stroke="var(--hypo)" stroke-width="2"/>
+          </g>
+          <line x1="64" y1="62" x2="64" y2="116" stroke="currentColor" stroke-dasharray="2 3" opacity=".6"/>
+          <line x1="270" y1="176" x2="300" y2="176" stroke="currentColor" marker-end="url(#arr)"/>
+          <text x="310" y="150">N_meth   = 4</text>
+          <text x="310" y="170">N_unmeth = 2</text>
+          <text x="310" y="190">coverage = 6</text>
+          <text x="310" y="218" font-weight="600">β = 4/6 = 0.67</text>
+          <circle cx="24" cy="262" r="5" fill="var(--hyper)"/><text x="34" y="266">methylated C</text>
+          <circle cx="150" cy="262" r="5" fill="none" stroke="var(--hypo)" stroke-width="2"/><text x="160" y="266">unmethylated C</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption>One CpG, six fragments. The data at one position is two counts and a ratio. epykit stores the counts and computes β on the fly.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="slide" id="s2">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">02 / 23</span><span>Part 1 · The domain</span></div>
+    <h2>WGBS turns a chemical mark into a letter change, and upstream tools count the letters</h2>
+  </div>
+  <div class="cols-wide">
+    <div class="prose">
+      <p><strong>WGBS</strong> means whole-genome bisulfite sequencing. Bisulfite is a chemical that converts an <em>unmethylated</em> C into a U, which the sequencer reads as T. A <em>methylated</em> C is protected and still reads as C. After sequencing, an aligner compares each fragment to the reference genome: where the reference says C, a C in the read means "methylated", a T means "unmethylated".</p>
+      <p>epykit does not do alignment. Two established tools do that and write per-CpG count files: <strong>Bismark</strong> (writes <code>.cov</code>) and <strong>MethylDackel</strong> (writes <code>.bedGraph</code>). Those files are epykit's input. Below is a real row from the synthetic Bismark file the test suite generates.</p>
+      <pre><code># chrom  start  end   percent   N_meth  N_unmeth
+chr1     1332   1332  35.7143   5       9</code></pre>
+      <p>Two things about that row matter to an engineer. First, the percent column is redundant with the counts, and epykit drops it. Second, Bismark positions are <strong>1-based</strong> while MethylDackel and epykit's internal store are <strong>0-based</strong>. Until June 2026 the converter ignored this and stored every real Bismark CpG one base off. That was the top finding of the pre-release review, and the fix (auto-detecting <code>start == end</code>) is why the raw-store manifest is at version 2.</p>
+      <p>Besides the count files, an analysis needs a <strong>samplesheet</strong> (a CSV saying which file is which sample and which group it belongs to), and, for annotation, a gene catalogue (<strong>GTF</strong> file) and a list of CpG islands (a <strong>BED</strong> file of intervals).</p>
+    </div>
+    <figure>
+      <div class="fig-wrap">
+      <svg viewBox="0 0 440 250" role="img" aria-label="Bisulfite conversion: methylated C stays C, unmethylated C becomes T; the aligner counts C versus T at reference C positions and Bismark or MethylDackel write per-CpG count files that epykit reads">
+        <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+        <g font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">
+          <rect x="14" y="20" width="118" height="44" rx="6" fill="none" stroke="currentColor"/>
+          <text x="73" y="38" text-anchor="middle">methylated C</text><text x="73" y="55" text-anchor="middle" opacity=".7">protected</text>
+          <rect x="14" y="90" width="118" height="44" rx="6" fill="none" stroke="currentColor"/>
+          <text x="73" y="108" text-anchor="middle">unmethylated C</text><text x="73" y="125" text-anchor="middle" opacity=".7">converted → U</text>
+          <line x1="134" y1="42" x2="186" y2="42" stroke="currentColor" marker-end="url(#arr2)"/>
+          <line x1="134" y1="112" x2="186" y2="112" stroke="currentColor" marker-end="url(#arr2)"/>
+          <text x="160" y="34" text-anchor="middle" font-size="10.5" opacity=".7">bisulfite</text>
+          <text x="160" y="104" text-anchor="middle" font-size="10.5" opacity=".7">bisulfite</text>
+          <rect x="190" y="20" width="60" height="44" rx="6" fill="var(--hyper)" opacity=".9"/><text x="220" y="47" text-anchor="middle" font-weight="600" fill="#fff">reads C</text>
+          <rect x="190" y="90" width="60" height="44" rx="6" fill="var(--hypo)" opacity=".9"/><text x="220" y="117" text-anchor="middle" font-weight="600" fill="#fff">reads T</text>
+          <line x1="252" y1="42" x2="300" y2="70" stroke="currentColor" marker-end="url(#arr2)"/>
+          <line x1="252" y1="112" x2="300" y2="84" stroke="currentColor" marker-end="url(#arr2)"/>
+          <rect x="304" y="52" width="122" height="52" rx="6" fill="none" stroke="currentColor"/>
+          <text x="365" y="73" text-anchor="middle">aligner counts</text><text x="365" y="90" text-anchor="middle" opacity=".7">C vs T per CpG</text>
+          <line x1="365" y1="106" x2="365" y2="150" stroke="currentColor" marker-end="url(#arr2)"/>
+          <text x="376" y="132" font-size="10.5" opacity=".7">writes</text>
+          <rect x="230" y="154" width="196" height="40" rx="6" fill="none" stroke="currentColor"/>
+          <text x="328" y="172" text-anchor="middle">.cov / .bedGraph</text><text x="328" y="187" text-anchor="middle" opacity=".7" font-size="10.5">Bismark · MethylDackel</text>
+          <line x1="228" y1="174" x2="150" y2="174" stroke="currentColor" marker-end="url(#arr2)"/>
+          <text x="190" y="166" text-anchor="middle" font-size="10.5" opacity=".7">read_bismark</text>
+          <rect x="14" y="154" width="132" height="40" rx="6" fill="var(--accent)"/>
+          <text x="80" y="179" text-anchor="middle" font-weight="600" fill="var(--accent-ink)">epykit starts here</text>
+          <text x="14" y="232" font-size="11" opacity=".7">Everything left of the arrow is sequencing and alignment; epykit never touches reads.</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption>The chemistry converts a mark into a base change. Upstream tools count bases; epykit consumes the counts.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="slide" id="s3">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">03 / 23</span><span>Part 1 · The domain</span></div>
+    <h2>The question is always the same: where do two groups differ, and can we trust it?</h2>
+  </div>
+  <div class="cols">
+    <div class="prose">
+      <p>A study has a <strong>treatment</strong> group and a <strong>control</strong> group (tumour vs normal, knockout vs wild type), each with a few biological <strong>replicates</strong>. Two replicates per group is common. Four is comfortable. That small n is the central statistical difficulty.</p>
+      <p>A <strong>DMC</strong> (differentially methylated cytosine) is one CpG whose β differs between the groups. For each CpG the engine reports the effect size <code>meth_diff</code> (mean β treatment minus mean β control), a confidence interval, and a <strong>p-value</strong>. A positive difference is <span class="pill hyper">hyper</span>, negative is <span class="pill hypo">hypo</span>.</p>
+      <p>Testing 22 million positions means 22 million p-values. At p&lt;0.05 you would get a million false hits by chance alone. So the p-values are corrected for multiple testing (Benjamini-Hochberg, "BH") into <strong>q-values</strong>, which bound the <strong>false discovery rate</strong>: at q&lt;0.05, about 5% of the sites you call are expected to be wrong.</p>
+      <p>A <strong>DMR</strong> (differentially methylated region) is a stretch of neighbouring CpGs that move together. Regions are what biologists actually report, because a single CpG is noisy and a promoter that shifts as a block is meaningful. epykit derives DMRs from the per-CpG results.</p>
+    </div>
+    <div class="prose">
+      <div class="panel">
+        <h4>Why the statistics are hard</h4>
+        <ul>
+          <li><strong>Counts, not measurements.</strong> A β of 0.67 from 6 fragments is far less certain than 0.67 from 60. Tests must weight by coverage.</li>
+          <li><strong>Overdispersion (φ).</strong> Biological replicates vary more than the binomial model predicts. A "quasi-binomial" test estimates that extra variance, φ, and inflates its uncertainty accordingly. Real WGBS has φ around 1.5–5; the simulator used to tune some heuristics has φ around 0.4. That gap is the source of a documented caveat about the <code>lr+</code> option.</li>
+          <li><strong>Tiny n.</strong> With 2 vs 2 replicates the per-site variance estimate is almost meaningless, so engines pool ("shrink") information across a chromosome.</li>
+          <li><strong>Spatial correlation.</strong> Neighbouring CpGs are not independent, which breaks the assumptions behind region-level q-values. The code logs an explicit note about this on every DMR call.</li>
+          <li><strong>Covariates.</strong> Age, sex, batch can confound a comparison. A generalised linear model (GLM) with a formula like <code>~ group + batch</code> adjusts for them.</li>
+        </ul>
+      </div>
+      <div class="callout"><b>The one sentence to remember</b><p>Input is two integers per CpG per sample. Output is a p-value and an effect size per CpG, then merged into regions. Everything in between is about doing that at 22 million positions without loading them all into memory and without lying about uncertainty at n=2.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s4">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">04 / 23</span><span>Part 1 · The domain</span></div>
+    <h2>Glossary, in the order you will meet the words in the code</h2>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>Term</th><th>Meaning</th><th>Where it shows up</th></tr></thead>
+    <tbody>
+      <tr><td><strong>CpG</strong></td><td>A C followed by a G. The position that can be methylated. "Site" in the code means one CpG.</td><td><code>pos</code>, <code>n_sites</code>, <code>context="CpG"</code></td></tr>
+      <tr><td><strong>β / beta</strong></td><td>Methylation fraction at a site, N_meth / coverage.</td><td><code>mean_beta_case</code>, <code>mean_beta_control</code></td></tr>
+      <tr><td><strong>coverage</strong></td><td>Fragments observed at a site. Low coverage means noisy β; very high coverage usually means a repeat artefact. Both get filtered.</td><td><code>pp.filter_coverage(lo_count, hi_perc)</code></td></tr>
+      <tr><td><strong>chrom / assembly</strong></td><td>Chromosome name (chr1…chr22, chrX, chrY) and the reference genome build (hg38, mm10). Names differ between catalogues: UCSC says <code>chr1</code>, Ensembl says <code>1</code>.</td><td><code>chrom=</code> partitions, <code>assembly=</code></td></tr>
+      <tr><td><strong>strand</strong></td><td>Which of the two DNA strands. Bismark merged files lose it, so most stores hold <code>*</code>.</td><td><code>strand</code> column</td></tr>
+      <tr><td><strong>samplesheet</strong></td><td>CSV with <code>sample_id, group, path</code>. Extra columns become covariates.</td><td><code>read_bismark(samplesheet)</code>, <code>md.obs</code></td></tr>
+      <tr><td><strong>treatment / control</strong></td><td>The two groups being compared. Encoded as a 0/1 <code>treatment</code> column on <code>obs</code>.</td><td><code>md.treatment_ids</code>, <code>n_case</code>, <code>n_control</code></td></tr>
+      <tr><td><strong>DMC</strong></td><td>Differentially methylated cytosine: one site, one test.</td><td><code>tl.dmc</code>, <code>md.varm["dmc_lr"]</code></td></tr>
+      <tr><td><strong>DMR</strong></td><td>Differentially methylated region: merged neighbouring DMCs.</td><td><code>tl.dmr</code>, <code>md.uns["dmr"]</code></td></tr>
+      <tr><td><strong>meth_diff</strong></td><td>Effect size: mean β treatment minus mean β control, in [-1, 1].</td><td><code>meth_diff</code>, <code>min_abs_meth_diff</code></td></tr>
+      <tr><td><strong>p-value / q-value</strong></td><td>Raw test result and its BH-corrected version. "Significant" means q below alpha (0.05 by default).</td><td><code>pvalue</code>, <code>qvalue</code>, <code>reject</code></td></tr>
+      <tr><td><strong>FDR</strong></td><td>False discovery rate. BH is the analytic estimate; "empirical FDR" re-runs the test on shuffled labels to measure it.</td><td><code>fdr_method</code>, <code>empirical_fdr=True</code></td></tr>
+      <tr><td><strong>dispersion φ</strong></td><td>Extra variance beyond binomial. Estimated per site, per chromosome, or shrunk between the two ("eb").</td><td><code>dispersion="eb"</code></td></tr>
+      <tr><td><strong>GLM / IRLS</strong></td><td>Generalised linear model fitted by iteratively reweighted least squares. The engine for covariate-adjusted and multi-group designs.</td><td><code>_glm.py</code>, <code>formula="~ group + age"</code></td></tr>
+      <tr><td><strong>unite (intersect / union)</strong></td><td>Which sites enter the test: those covered in every sample, or in any sample.</td><td><code>pp.set_unite_type</code></td></tr>
+      <tr><td><strong>GTF / refGene</strong></td><td>Gene catalogue formats. Used to label a site as promoter, exon, intron, and so on.</td><td><code>tl.annotate(gtf=...)</code></td></tr>
+      <tr><td><strong>CpG island / shore / shelf</strong></td><td>Dense CpG clusters near gene starts, and the 2 kb and 4 kb bands around them. Everything else is "open sea".</td><td><code>cpg_context</code></td></tr>
+      <tr><td><strong>BED</strong></td><td>Tab-separated interval file: chrom, start, end, 0-based half-open.</td><td><code>cpg_islands=</code>, <code>pp.aggregate_regions</code></td></tr>
+      <tr><td><strong>smoothing</strong></td><td>Borrowing signal from neighbouring CpGs to stabilise β. BSmooth is the reference method.</td><td><code>pp.smooth</code>, <code>smoothing=True</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+<!-- ───────────── PART 2 ───────────── -->
+<section class="slide" id="s5">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">05 / 23</span><span>Part 2 · The system</span></div>
+    <h2>The pipeline is a chain of on-disk stores; each step reads one and writes the next</h2>
+  </div>
+  <figure>
+    <div class="fig-wrap">
+    <svg viewBox="0 0 1060 330" role="img" aria-label="Pipeline: cov files are converted to a raw Parquet store, filtered into a new store, optionally normalized, then the DMC engine writes per-chromosome result parquets, BH correction rewrites them with q-values, the table is materialised onto MethylData, DMR calling merges neighbours into regions, annotation adds gene columns, and report or export writes the final artefacts">
+      <defs><marker id="arr5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+      <g font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">
+        <!-- row 1 -->
+        <rect x="10" y="30" width="150" height="54" rx="8" fill="none" stroke="currentColor"/>
+        <text x="85" y="52" text-anchor="middle">.cov / .bedGraph</text><text x="85" y="70" text-anchor="middle" font-size="10.5" opacity=".7">one file per sample</text>
+        <line x1="162" y1="57" x2="228" y2="57" stroke="currentColor" marker-end="url(#arr5)"/>
+        <text x="195" y="47" text-anchor="middle" font-size="10.5" opacity=".8">read_bismark</text>
+        <rect x="232" y="30" width="150" height="54" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <text x="307" y="52" text-anchor="middle">.cache/raw/</text><text x="307" y="70" text-anchor="middle" font-size="10.5" opacity=".7">sample=… / chrom=…</text>
+        <line x1="384" y1="57" x2="450" y2="57" stroke="currentColor" marker-end="url(#arr5)"/>
+        <text x="417" y="47" text-anchor="middle" font-size="10.5" opacity=".8">pp.filter_coverage</text>
+        <rect x="454" y="30" width="150" height="54" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <text x="529" y="52" text-anchor="middle">.cache/filtered/</text><text x="529" y="70" text-anchor="middle" font-size="10.5" opacity=".7">same layout, fewer rows</text>
+        <line x1="606" y1="57" x2="672" y2="57" stroke="currentColor" stroke-dasharray="4 3" marker-end="url(#arr5)"/>
+        <text x="639" y="47" text-anchor="middle" font-size="10.5" opacity=".8">pp.normalize (opt.)</text>
+        <rect x="676" y="30" width="150" height="54" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="4 3"/>
+        <text x="751" y="52" text-anchor="middle">.cache/normalized/</text><text x="751" y="70" text-anchor="middle" font-size="10.5" opacity=".7">rescaled counts</text>
+        <line x1="828" y1="57" x2="894" y2="57" stroke="currentColor" marker-end="url(#arr5)"/>
+        <text x="861" y="47" text-anchor="middle" font-size="10.5" opacity=".8">tl.dmc</text>
+        <rect x="898" y="30" width="150" height="54" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <text x="973" y="52" text-anchor="middle">.cache/dmc/lr/</text><text x="973" y="70" text-anchor="middle" font-size="10.5" opacity=".7">chrom=*.parquet + manifest</text>
+        <!-- turn -->
+        <path d="M973,86 L973,120 L85,120 L85,152" fill="none" stroke="currentColor" marker-end="url(#arr5)"/>
+        <text x="530" y="113" text-anchor="middle" font-size="10.5" opacity=".8">apply_multiple_testing_correction rewrites each chrom file with qvalue, then to_dataframe()</text>
+        <!-- row 2 -->
+        <rect x="10" y="156" width="150" height="54" rx="8" fill="none" stroke="currentColor"/>
+        <text x="85" y="178" text-anchor="middle">md.varm["dmc_lr"]</text><text x="85" y="196" text-anchor="middle" font-size="10.5" opacity=".7">in memory, ~700 MB / genome</text>
+        <line x1="162" y1="183" x2="228" y2="183" stroke="currentColor" marker-end="url(#arr5)"/>
+        <text x="195" y="173" text-anchor="middle" font-size="10.5" opacity=".8">tl.dmr</text>
+        <rect x="232" y="156" width="150" height="54" rx="8" fill="none" stroke="currentColor"/>
+        <text x="307" y="178" text-anchor="middle">md.uns["dmr"]</text><text x="307" y="196" text-anchor="middle" font-size="10.5" opacity=".7">regions, small table</text>
+        <line x1="384" y1="183" x2="450" y2="183" stroke="currentColor" marker-end="url(#arr5)"/>
+        <text x="417" y="173" text-anchor="middle" font-size="10.5" opacity=".8">tl.annotate</text>
+        <rect x="454" y="156" width="150" height="54" rx="8" fill="none" stroke="currentColor"/>
+        <text x="529" y="178" text-anchor="middle">+ feature_type</text><text x="529" y="196" text-anchor="middle" font-size="10.5" opacity=".7">+ gene_id, cpg_context</text>
+        <line x1="606" y1="183" x2="672" y2="183" stroke="currentColor" marker-end="url(#arr5)"/>
+        <text x="639" y="173" text-anchor="middle" font-size="10.5" opacity=".8">md.report / export</text>
+        <rect x="676" y="156" width="150" height="54" rx="8" fill="none" stroke="currentColor"/>
+        <text x="751" y="178" text-anchor="middle">report.html · TSV</text><text x="751" y="196" text-anchor="middle" font-size="10.5" opacity=".7">BED · bigWig · AnnData</text>
+        <line x1="828" y1="183" x2="894" y2="183" stroke="currentColor" marker-end="url(#arr5)"/>
+        <text x="861" y="173" text-anchor="middle" font-size="10.5" opacity=".8">md.save</text>
+        <rect x="898" y="156" width="150" height="54" rx="8" fill="none" stroke="currentColor"/>
+        <text x="973" y="178" text-anchor="middle">results/&lt;name&gt;/</text><text x="973" y="196" text-anchor="middle" font-size="10.5" opacity=".7">obs, varm, uns, json</text>
+        <!-- legend -->
+        <rect x="10" y="256" width="14" height="14" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="32" y="268" font-size="11.5">partitioned Parquet store on disk; every pp step writes a new one and repoints md.store</text>
+        <rect x="10" y="284" width="14" height="14" rx="3" fill="none" stroke="currentColor"/><text x="32" y="296" font-size="11.5">result held on the MethylData object (md.varm / md.uns) or a final artefact</text>
+        <line x1="620" y1="263" x2="660" y2="263" stroke="currentColor" stroke-dasharray="4 3"/><text x="668" y="267" font-size="11.5">optional step</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Nothing upstream is ever modified. A step reads the store <code>md.store</code> points at, writes a sibling directory, and moves the pointer. Rerunning with the same parameters hits a manifest and is skipped.</figcaption>
+  </figure>
+  <div class="cols-3">
+    <div class="panel"><h4>Ingest</h4><p>Parse count files with Polars, split by chromosome, write one Parquet file per (sample, chromosome). Fingerprint each input so a rerun is a no-op.</p></div>
+    <div class="panel"><h4>Preprocess (<code>pp</code>)</h4><p>Drop low and extreme coverage, optionally rescale counts per sample, record the site-alignment policy. Each writes a new store.</p></div>
+    <div class="panel"><h4>Analyse (<code>tl</code>)</h4><p>Per-CpG test streamed chromosome by chromosome, then correction, region merging, annotation. Results attach to the object, not the store.</p></div>
+  </div>
+</section>
+
+<section class="slide" id="s6">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">06 / 23</span><span>Part 2 · The system</span></div>
+    <h2>The methylstore: Hive-partitioned Parquet, one file per sample per chromosome</h2>
+  </div>
+  <div class="cols-wide">
+    <div class="prose">
+      <p>The store is a directory tree. The two partition keys are in the path, so reading one sample's chromosome 3 is a single file open, and reading "all of chromosome 3" is a glob. The tree below is the real output of the demo run, showing one sample.</p>
+      <pre><code>methyl_store/
+└── .cache/
+    ├── raw/
+    │   ├── sample=treatment_1/
+    │   │   ├── .epykit_raw_manifest.json
+    │   │   ├── chrom=chr1/part-0.parquet
+    │   │   ├── chrom=chr2/part-0.parquet
+    │   │   └── … chr3, chr4, chr5
+    │   └── sample=…  (8 samples in the fixture)
+    ├── filtered/            ← same shape, after pp.filter_coverage
+    └── dmc/
+        └── lr/              ← DMC results, one file per chromosome
+            ├── .epykit_dmc_manifest.json
+            └── chrom=chr1.parquet …</code></pre>
+      <p>Every partition has the same eight columns. Counts are 32-bit integers on purpose: a 22-million-row chromosome set at Int32 is half the size of Int64, and no count ever overflows it.</p>
+    </div>
+    <div class="prose">
+      <div class="tbl"><table>
+        <thead><tr><th>Column</th><th>Type</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>chrom</code></td><td>str</td><td>chromosome name, also the partition key</td></tr>
+          <tr><td><code>pos</code></td><td>i32</td><td>0-based position of the C</td></tr>
+          <tr><td><code>strand</code></td><td>str</td><td><code>+</code>, <code>-</code>, or <code>*</code> when unknown</td></tr>
+          <tr><td><code>context</code></td><td>str</td><td>CpG (CHG/CHH exist but are rarely used)</td></tr>
+          <tr><td><code>N_meth</code></td><td>i32</td><td>methylated fragment count</td></tr>
+          <tr><td><code>N_unmeth</code></td><td>i32</td><td>unmethylated fragment count</td></tr>
+          <tr><td><code>coverage</code></td><td>i32</td><td><code>N_meth + N_unmeth</code>, stored, not derived</td></tr>
+          <tr><td><code>sample</code></td><td>str</td><td>sample id, also the partition key</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout"><b>The one architectural rule</b><p>Never load the whole genome into one frame. Access is <code>pl.scan_parquet</code> on a partition glob, or an explicit loop over chromosomes. Peak memory is O(largest chromosome). The word "streaming" in the code always means this loop.</p></div>
+      <div class="panel">
+        <h4>Two manifest layers</h4>
+        <ul>
+          <li><strong>Per-sample, per-step</strong> (<code>.epykit_raw_manifest.json</code>, <code>_filter_</code>, <code>_normalize_</code>): a fingerprint of the input file plus parameters. Lets convert and filter skip samples already done.</li>
+          <li><strong>Pipeline-level</strong> (<code>.epykit_manifest.json</code> at the analysis root): a list of completed stages with input signatures, used only when a caller passes <code>resumable=True</code>. Both live in <code>_cache.py</code>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s7">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">07 / 23</span><span>Part 2 · The system</span></div>
+    <h2>MethylData is the single object every function takes; it is mostly pointers and dictionaries</h2>
+  </div>
+  <div class="cols-wide">
+    <div class="prose">
+      <p>The design mirrors scanpy's <code>AnnData</code>, which Python biologists already know. It is a plain dataclass in <code>methyldata.py</code> with four slots. Here is the real object after the demo pipeline ran (filter, unite, QC, DMC, DMR):</p>
+      <pre><code>MethylData [raw, filtered, united]
+  assembly : synth
+  n_samples: 8 (control (n=4)  treatment (n=4))
+  n_sites  : 78,412
+  context  : CpG
+  store    : …/methyl_store/.cache/filtered
+  varm     : dmc_lr
+  uns      : _store_history, dmc, dmr, dmr_params, epykit_version,
+             filter, n_sites_filtered, n_sites_raw, pipeline,
+             qc_coverage_uniformity, qc_global_methylation,
+             samplesheet, source_format, unite</code></pre>
+      <div class="tbl"><table>
+        <thead><tr><th>Slot</th><th>Holds</th><th>Who writes it</th></tr></thead>
+        <tbody>
+          <tr><td><code>obs</code></td><td>One row per sample: <code>sample_id, group, path, treatment</code> plus any samplesheet extras and QC metrics.</td><td><code>read_*</code>, <code>tl.qc</code></td></tr>
+          <tr><td><code>store</code></td><td>Path string to the current partitioned store.</td><td>every <code>pp.*</code> step</td></tr>
+          <tr><td><code>varm</code></td><td>Dict of per-site result tables keyed by analysis: <code>dmc_lr</code>, <code>dmc_glm</code>, <code>dmc_lr_annotated</code>, <code>dvc</code>.</td><td><code>tl.dmc</code>, <code>tl.annotate</code>, <code>tl.dvc</code></td></tr>
+          <tr><td><code>uns</code></td><td>Everything else: the DMR table, QC summaries, parameters of each step, the <code>_store_history</code> log, the <code>dmc</code> metadata with <code>last_key</code> and <code>store_path</code>.</td><td>every step</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="prose">
+      <div class="panel">
+        <h4>State is derived, never stored</h4>
+        <p>There are no <code>is_filtered</code> booleans. <code>md._filtered</code> is a property that scans <code>uns["_store_history"]</code> for a step named <code>filtered</code>. <code>md.state</code> is the ordered list of steps. This is the real log from the demo:</p>
+        <pre><code>[{'step': 'raw',      'path': '…/.cache/raw',      'n_sites': 80000},
+ {'step': 'filtered', 'path': '…/.cache/filtered', 'n_sites': 78412},
+ {'step': 'united',   'path': '…/.cache/filtered', 'n_sites': None}]</code></pre>
+        <p>When you add a preprocessing step, append to this list. Do not add a flag.</p>
+      </div>
+      <div class="panel">
+        <h4>Properties worth knowing</h4>
+        <ul>
+          <li><code>md.dmc</code> resolves the most recent DMC table via <code>uns["dmc"]["last_key"]</code>, preferring the <code>_annotated</code> variant. If the table was never materialised it reads it back from the on-disk DMCStore.</li>
+          <li><code>md.dmc_store</code> reopens the streaming handle from <code>uns["dmc"]["store_path"]</code>.</li>
+          <li><code>md.treatment_ids</code> / <code>md.control_ids</code> filter <code>obs.treatment</code>.</li>
+          <li><code>md.save(path)</code> writes <code>obs.parquet</code>, one Parquet per <code>varm</code> table, Parquet sidecars for DataFrames in <code>uns</code>, and a <code>methyldata.json</code>. A DMCStore-backed table is <strong>hard-linked</strong> per chromosome instead of re-encoded, because a single 22M-row write needs a second copy in RAM.</li>
+        </ul>
+      </div>
+      <div class="callout warn"><b>Watch for</b><p><code>varm</code> and <code>uns</code> are mutated in place by every function. There is no schema for <code>uns</code>; it is a bag of ~25 keys with different shapes, and <code>save()</code> serialises the non-DataFrame ones with <code>json.dumps(default=str)</code>. Anything that is not JSON-native silently becomes a string on reload.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s8">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">08 / 23</span><span>Part 2 · The system</span></div>
+    <h2>Two front doors, one engine: the scanpy-style API and a mirrored CLI</h2>
+  </div>
+  <div class="cols">
+    <div class="prose">
+      <pre><code>import epykit as ep
+
+md = ep.read_bismark("samplesheet.csv",
+        treatment_group="cd55", control_group="control",
+        assembly="hg38", store_dir="methyl_store")
+
+ep.pp.filter_coverage(md, lo_count=10, hi_perc=99.9)
+ep.pp.set_unite_type(md, type="intersect")
+
+ep.tl.qc(md)                 # -> md.obs columns, md.uns["qc_*"]
+ep.tl.dmc(md, test="auto")   # -> md.varm["dmc_lr"], md.uns["dmc"]
+ep.tl.dmr(md)                # -> md.uns["dmr"]
+ep.tl.annotate(md, gtf="gencode.v49.gtf",
+               cpg_islands="hg38_cpg_islands.bed")
+
+md.save("cd55_analysis")
+md.report("cd55_report.html")
+ep.pl.volcano(md, save="volcano")</code></pre>
+      <p>Every function mutates <code>md</code> and returns <code>None</code>. That is the scanpy convention: the object is the session. <code>tl.dmc</code>, <code>tl.dmr</code> and <code>tl.annotate</code> also auto-write a TSV under <code>&lt;store&gt;/results/</code> unless told not to.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Namespace</th><th>Role</th><th>Module</th></tr></thead>
+        <tbody>
+          <tr><td><code>ep.read_*</code>, <code>ep.load</code></td><td>ingest, reload</td><td><code>io.py</code>, <code>convert.py</code></td></tr>
+          <tr><td><code>ep.pp</code></td><td>preprocess: repoint <code>md.store</code></td><td><code>pp.py</code> → <code>filter.py</code>, <code>dmr.py</code> (smoothers)</td></tr>
+          <tr><td><code>ep.tl</code></td><td>tools: fill <code>varm</code> / <code>uns</code></td><td><code>tl.py</code> → <code>dmc.py</code>, <code>dmr.py</code>, <code>annotate.py</code>, <code>qc.py</code>, <code>dvc.py</code></td></tr>
+          <tr><td><code>ep.pl</code></td><td>matplotlib plots</td><td><code>pl/*.py</code>, shared math in <code>pl/_compute.py</code></td></tr>
+          <tr><td><code>ep.query</code></td><td>random access by locus</td><td><code>query.py</code></td></tr>
+          <tr><td><code>ep.export</code>, <code>md.to_*</code></td><td>interop sinks</td><td><code>export.py</code>, <code>anndata_io.py</code>, <code>methylkit_io.py</code>, <code>multiqc_export.py</code></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="prose">
+      <div class="panel">
+        <h4>The CLI (<code>cli.py</code>, argparse, 1,161 lines)</h4>
+        <pre><code>epykit convert   --samplesheet s.csv --methylstore ms/
+epykit filter    --methylstore ms/ --lo-count 10
+epykit dmc       --methylstore ms/ --test lr --output dmc.parquet
+epykit dmr       --methylstore ms/ --method chain_merge
+epykit annotate  --dmc dmc.parquet --gtf genes.gtf
+epykit qc-report | smooth | report | aggregate-regions
+epykit export    bedgraph | bigwig | dmcs-bed | dmrs-bed
+                 | mudata | methylkit-tabix | multiqc</code></pre>
+        <p>Each subcommand calls the same engine functions the API does (<code>process_chromosomes_dmc</code>, <code>call_dmr_*</code>). Parity is enforced by subprocess tests (<code>test_cli_api_parity.py</code>) because it once drifted: the CLI computed different q-values than the API until a review caught it. The <code>lr+</code> research knobs are deliberately API-only.</p>
+      </div>
+      <div class="panel">
+        <h4>Beyond the core (research-grade, exported at top level)</h4>
+        <ul>
+          <li><code>tl.dvc</code> / <code>tl.dvr</code>: differential <em>variability</em>, not mean.</li>
+          <li><code>tl.pmd</code>, <code>tl.hmr</code>: partially-methylated and hypomethylated domain finders.</li>
+          <li><code>tl.asm</code>, <code>tl.entropy</code>: read BAM files directly (need pysam, Linux/macOS).</li>
+          <li><code>ep.age_clock</code>, <code>ep.deconvolve</code>, <code>ep.impute_knn_beta</code>: epigenetic clocks, cell-type deconvolution, imputation.</li>
+        </ul>
+        <p>The peer review flagged several of these as unvalidated and proposed an <code>epykit.experimental</code> namespace. That move has not happened yet.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="slide" id="s9">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">09 / 23</span><span>Part 2 · The system</span></div>
+    <h2>Inside the DMC engine: a chromosome loop, per-site accumulators, and a store that is rewritten in place</h2>
+  </div>
+  <figure>
+    <div class="fig-wrap">
+    <svg viewBox="0 0 1060 340" role="img" aria-label="For each chromosome, the engine builds the canonical site list, loads each sample's counts aligned to it, updates per-site accumulator arrays, finalises the test into one per-chromosome DataFrame and writes chrom=X.parquet into the DMCStore; then BH correction makes a counting pass, computes q-values, and atomically rewrites each chromosome file; finally to_dataframe concatenates into md.varm">
+      <defs><marker id="arr9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+      <g font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">
+        <!-- loop frame -->
+        <rect x="10" y="14" width="600" height="260" rx="10" fill="none" stroke="currentColor" stroke-dasharray="6 4"/>
+        <text x="26" y="36" font-size="11.5" opacity=".8">for chrom in chromosomes:   (process_chromosomes_dmc → _process_one_chromosome)</text>
+        <!-- step 1 -->
+        <rect x="26" y="60" width="160" height="58" rx="8" fill="none" stroke="currentColor"/>
+        <text x="106" y="82" text-anchor="middle">canonical sites</text><text x="106" y="99" text-anchor="middle" font-size="10.5" opacity=".7">intersect or union of pos</text>
+        <line x1="188" y1="89" x2="234" y2="89" stroke="currentColor" marker-end="url(#arr9)"/>
+        <!-- step 2 -->
+        <rect x="238" y="60" width="160" height="58" rx="8" fill="none" stroke="currentColor"/>
+        <text x="318" y="82" text-anchor="middle">for sample in n:</text><text x="318" y="99" text-anchor="middle" font-size="10.5" opacity=".7">_load_sample_chrom → (meth, cov)</text>
+        <line x1="400" y1="89" x2="446" y2="89" stroke="currentColor" marker-end="url(#arr9)"/>
+        <text x="423" y="79" text-anchor="middle" font-size="10.5" opacity=".8">update</text>
+        <!-- step 3 -->
+        <rect x="450" y="52" width="146" height="74" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <text x="523" y="74" text-anchor="middle">accumulators</text>
+        <text x="523" y="91" text-anchor="middle" font-size="10.5" opacity=".7">mean, M2, n_valid (Welford)</text>
+        <text x="523" y="106" text-anchor="middle" font-size="10.5" opacity=".7">S0, S1, Σm²/n (lr score)</text>
+        <text x="523" y="120" text-anchor="middle" font-size="10.5" opacity=".7">arrays of length n_sites</text>
+        <!-- step 4 -->
+        <path d="M523,128 L523,160" fill="none" stroke="currentColor" marker-end="url(#arr9)"/>
+        <text x="540" y="150" font-size="10.5" opacity=".8">finalize</text>
+        <rect x="380" y="164" width="216" height="58" rx="8" fill="none" stroke="currentColor"/>
+        <text x="488" y="186" text-anchor="middle">engine: fisher | lr | welch_t | glm</text><text x="488" y="203" text-anchor="middle" font-size="10.5" opacity=".7">pvalue, meth_diff, CI per site</text>
+        <line x1="378" y1="193" x2="300" y2="193" stroke="currentColor" marker-end="url(#arr9)"/>
+        <text x="340" y="183" text-anchor="middle" font-size="10.5" opacity=".8">one DataFrame</text>
+        <rect x="26" y="164" width="270" height="58" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <text x="161" y="186" text-anchor="middle">.cache/dmc/lr/chrom=chr1.parquet</text><text x="161" y="203" text-anchor="middle" font-size="10.5" opacity=".7">written, then the arrays are freed (gc)</text>
+        <text x="26" y="254" font-size="11" opacity=".75">memory: O(n_sites on this chromosome) × a few float64 arrays, independent of sample count</text>
+        <!-- outside loop -->
+        <line x1="612" y1="144" x2="660" y2="144" stroke="currentColor" marker-end="url(#arr9)"/>
+        <text x="636" y="134" text-anchor="middle" font-size="10.5" opacity=".8">manifest</text>
+        <rect x="664" y="110" width="180" height="68" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <text x="754" y="134" text-anchor="middle">DMCStore</text><text x="754" y="151" text-anchor="middle" font-size="10.5" opacity=".7">.epykit_dmc_manifest.json</text><text x="754" y="166" text-anchor="middle" font-size="10.5" opacity=".7">input_sig, chroms, total_sites</text>
+        <path d="M754,180 L754,214" fill="none" stroke="currentColor" marker-end="url(#arr9)"/>
+        <rect x="664" y="218" width="180" height="68" rx="8" fill="none" stroke="currentColor"/>
+        <text x="754" y="240" text-anchor="middle">BH correction</text><text x="754" y="256" text-anchor="middle" font-size="10.5" opacity=".7">pass 1: count + gather p</text><text x="754" y="271" text-anchor="middle" font-size="10.5" opacity=".7">pass 2: update_chrom(q, reject)</text>
+        <line x1="846" y1="252" x2="892" y2="252" stroke="currentColor" marker-end="url(#arr9)"/>
+        <text x="869" y="242" text-anchor="middle" font-size="10.5" opacity=".8">materialize</text>
+        <rect x="896" y="218" width="150" height="68" rx="8" fill="none" stroke="currentColor"/>
+        <text x="971" y="240" text-anchor="middle">md.varm["dmc_lr"]</text><text x="971" y="256" text-anchor="middle" font-size="10.5" opacity=".7">to_dataframe(), or skip</text><text x="971" y="271" text-anchor="middle" font-size="10.5" opacity=".7">with materialize=False</text>
+        <text x="664" y="316" font-size="11" opacity=".75">tl.dmr streams from the DMCStore too; only plots, report and export need the full table.</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Per-chromosome results land on disk the moment they exist. Multiple-testing correction is two streaming passes over those files, and the atomic rename in <code>DMCStore.update_chrom</code> keeps the store consistent if the process dies mid-write.</figcaption>
+  </figure>
+  <div class="cols">
+    <div class="prose">
+      <h3>What <code>tl.dmc</code> does before and after the engine</h3>
+      <div class="steps">
+        <div class="step"><span class="k">resolve</span><div class="body"><b>Choose the engine.</b><p><code>test="auto"</code> becomes <code>fisher</code> at n&lt;2 (only with <code>allow_n1=True</code>) or <code>lr</code> otherwise. Any <code>formula</code> or <code>contrast</code> forces the GLM path via <code>_run_dmc_contrast</code>. Removed engine names raise <code>ValueError</code> with a migration hint.</p></div></div>
+        <div class="step"><span class="k">guard</span><div class="body"><b>Refuse degenerate designs.</b><p>n&lt;2 per group without <code>allow_n1</code>, union-mode with no <code>min_samples_*</code> floor, <code>materialize=False</code> combined with any post-processor that needs the full table.</p></div></div>
+        <div class="step"><span class="k">stack</span><div class="body"><b>Apply <code>power_stack</code>.</b><p>If <code>"lr+"</code>, flip <code>neighbour_combine</code>, <code>fdr_method="fdr_tsbh"</code>, <code>sep_fallback</code> on. Off by default.</p></div></div>
+        <div class="step"><span class="k">resume</span><div class="body"><b>Optional checkpoint.</b><p>With <code>resumable=True</code>, hash store path + samples + every parameter, look it up in the pipeline manifest, and load the sidecar Parquet instead of computing.</p></div></div>
+        <div class="step"><span class="k">run</span><div class="body"><b>Engine, correction, post-processors.</b><p><code>process_chromosomes_dmc</code> → <code>apply_multiple_testing_correction</code> → optional neighbour combining (adds <code>pvalue_combined</code>, never overwrites <code>pvalue</code>) → optional permutation FDR.</p></div></div>
+        <div class="step"><span class="k">record</span><div class="body"><b>Write <code>uns["dmc"]</code>.</b><p>A 24-key dict of what ran, including <code>last_key</code> and <code>store_path</code>, then the TSV auto-export and a <code>FutureWarning</code> about a deprecated column.</p></div></div>
+      </div>
+    </div>
+    <div class="prose">
+      <h3>The canonical result schema (real columns from the demo)</h3>
+      <pre><code>chrom  pos  strand  n_case  n_control
+mean_beta_case  mean_beta_control
+meth_diff  meth_diff_ci_lo  meth_diff_ci_hi
+pvalue  qvalue  reject
+log2_odds_ratio_pooled
+log2_odds_ratio        # NaN-filled, deprecated</code></pre>
+      <p>Every engine emits exactly these, so downstream code (DMR, plots, report, export) never branches on which test ran. The GLM adds <code>coef_treatment</code>, <code>coef_se</code>, <code>coef_treatment_log2</code>; multi-group contrasts add <code>f_stat</code>, <code>df1</code>, <code>df2</code> and per-level means.</p>
+      <div class="panel">
+        <h4>Execution backends</h4>
+        <ul>
+          <li><code>backend="sequential"</code> (default) walks chromosomes in-process. <code>"dask"</code> and <code>"ray"</code> submit one task per chromosome; both live in <code>_compute.py</code> behind optional extras.</li>
+          <li><code>glm_backend="gpu"</code> routes the IRLS inner loop through CuPy (<code>_glm_gpu.py</code>). Only the GLM path; <code>lr</code> is closed-form numpy.</li>
+          <li>Hot loops that need it are numba <code>@njit</code>, compiled lazily on first call and cached in a module global (<code>_SMOOTH_BOX_NJIT_FN</code>, <code>_BSMOOTH_NJIT_FN</code>).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s10">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">10 / 23</span><span>Part 2 · The system</span></div>
+    <h2>DMR callers: four ways to turn per-site results into regions</h2>
+  </div>
+  <div class="cols-wide">
+    <div class="prose">
+      <div class="tbl"><table>
+        <thead><tr><th>method=</th><th>Idea</th><th>Reads from</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>chain_merge</code> <span class="pill acc">default</span></td><td>Walk each chromosome; chain significant CpGs of the same direction that are within <code>dis_merge_bp</code>; keep chains with enough CpGs, length and share of significant sites. Mirrors the R package DSS's <code>callDMR</code>.</td><td>DMCStore, streamed</td><td>Presets below. Region p-value is a Stouffer combination, flagged in the docs as DSS-<em>style</em>, not identical.</td></tr>
+          <tr><td><code>tile</code></td><td>Cut the genome into fixed tiles (1 kb), sum counts per tile per sample, run a full DMC test on tile counts.</td><td>methylstore directly</td><td>Read-pooling gives more power at low coverage. The only caller with permutation FDR wired in. Slowest.</td></tr>
+          <tr><td><code>sliding_window</code></td><td>Signed Stouffer's Z over CpG p-values inside a moving window; sign from each site's <code>meth_diff</code> so mixed windows cancel.</td><td>DMCStore, streamed</td><td>Combines raw p (not q) since a June fix. Adds <code>combined_pvalue</code>, <code>combined_qvalue</code>.</td></tr>
+          <tr><td><code>segment</code></td><td>Rule-based 3-state segmentation of <code>meth_diff</code> (hyper / neutral / hypo).</td><td>DMC table</td><td>Lives in <code>dmr_segment.py</code>; the old name <code>dmr_hmm</code> is a deprecated shim because it is not a fitted HMM. A real HMM exists in <code>_hmm.py</code>.</td></tr>
+        </tbody>
+      </table></div>
+      <p>The real DMR table from the demo has ten columns: <code>chrom, start, end, n_cpgs, n_significant, mean_meth_diff, combined_pvalue, dmr_type, combined_qvalue, combined_qvalue_reject</code>. <code>dmr_type</code> is one of <span class="pill hyper">hyper</span> <span class="pill hypo">hypo</span> <span class="pill">mixed</span>.</p>
+    </div>
+    <div class="prose">
+      <div class="panel">
+        <h4>Chain-merge presets (<code>DMR_PRESETS</code> in <code>dmr.py</code>)</h4>
+        <div class="tbl"><table>
+          <thead><tr><th>knob</th><th class="num">strict</th><th class="num">default</th><th class="num">permissive</th></tr></thead>
+          <tbody>
+            <tr><td>alpha (per-CpG p)</td><td class="num">1e-6</td><td class="num">1e-4</td><td class="num">1e-4</td></tr>
+            <tr><td>min |meth_diff|</td><td class="num">0.20</td><td class="num">0.10</td><td class="num">0.05</td></tr>
+            <tr><td>dis_merge_bp</td><td class="num">250</td><td class="num">500</td><td class="num">1000</td></tr>
+            <tr><td>min_cpgs</td><td class="num">5</td><td class="num">3</td><td class="num">3</td></tr>
+            <tr><td>pct_sig</td><td class="num">0.5</td><td class="num">0.5</td><td class="num">0.5</td></tr>
+            <tr><td>minlen_bp</td><td class="num">100</td><td class="num">50</td><td class="num">50</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="callout warn"><b>Empirical FDR is partial</b><p><code>tl.dmr(empirical_fdr=True)</code> raises <code>NotImplementedError</code> for every method except <code>tile</code>. The README's claim that "all four support" it is ahead of the code. The DMC-level permutation FDR does exist for the binary path and refuses formula designs.</p></div>
+      <div class="panel">
+        <h4>Also in <code>tl.py</code></h4>
+        <p><code>tl.diagnose_dmr_calling(md, reference_dmrs)</code> buckets reference regions the caller missed into "coverage loss", "weak test" or "structural filter" so a user can tune presets. Useful, and also 120 lines with a nested function.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s11">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">11 / 23</span><span>Part 2 · The system</span></div>
+    <h2>Statistics, honestly: four engines, one recommended, one research knob with a known problem</h2>
+  </div>
+  <div class="cols-wide">
+    <div class="prose">
+      <div class="tbl"><table>
+        <thead><tr><th>test=</th><th>Model</th><th>Use when</th><th>Caveat the code itself states</th></tr></thead>
+        <tbody>
+          <tr><td><code>lr</code> <span class="pill acc">default n≥2</span></td><td>Quasi-binomial likelihood-ratio χ² on counts pooled per group, with McCullagh-Nelder dispersion φ estimated from replicates. Closed-form on streaming accumulators.</td><td>Almost always. The benchmark paper's claims are about this engine.</td><td>Needs ≥2 replicates. Dispersion at n=2 is shrunk toward the chromosome pool (<code>"eb"</code>).</td></tr>
+          <tr><td><code>welch_t</code></td><td>Welch t-test on per-replicate β values.</td><td>Quick look; sanity check.</td><td>Ignores coverage; anti-conservative near β = 0 or 1.</td></tr>
+          <tr><td><code>fisher</code> <span class="pill">n=1 fallback</span></td><td>Fisher exact test on counts pooled across replicates.</td><td>One sample per group, nothing else works.</td><td>Ignores between-replicate variance. Warns once per process when chosen explicitly.</td></tr>
+          <tr><td><code>glm</code></td><td>Binomial GLM by batched IRLS (<code>_glm.py</code>), Wilkinson formula → design matrix via patsy; Wald or joint-F contrasts.</td><td>Covariates, batch, ≥3 groups, continuous effects.</td><td>Slowest. Separation handled by fallback; rank-deficient designs reduce with a warning.</td></tr>
+        </tbody>
+      </table></div>
+      <p>Four names were removed in 0.7.5 and now raise with a hint: <code>logit_t</code> → <code>welch_t</code>, <code>bb_lr</code> and <code>score</code> → <code>lr</code>, <code>cmh</code> → a formula with a batch term. The header docstring of <code>dmc.py</code> still lists <code>score</code> and <code>logit_t</code> as live engines; it was not updated.</p>
+      <h3>The GLM path in one line</h3>
+      <pre><code>formula "~ group + age"  ──patsy──▶  design X (n_samples × p)
+  ──irls_binomial_batch──▶  β̂, SE, deviance for every site at once
+  ──resolve_contrast + wald_test──▶  pvalue, f_stat/df, CI on meth scale</code></pre>
+    </div>
+    <div class="prose">
+      <div class="callout bad"><b><code>power_stack="lr+"</code> is not a free upgrade</b>
+        <p>It bundles four extensions: Stouffer-combining p-values across CpGs within 500 bp, two-stage BH, a Fisher fallback under quasi-complete separation, and empirical-Bayes dispersion shrinkage. They were tuned on a simulator with φ≈0.4. On the real cohort GSE263850 at q=0.05, <code>lr+</code> calls about 13× more DMCs than bare <code>lr</code>, which the authors read as false-positive drift, not sensitivity. It is off by default, documented as exploratory, and the CLI deliberately does not expose it.</p>
+        <p>Do not change its defaults without re-running the ablations in <code>benchmark/</code>. The CI job <code>benchmark-regen</code> hashes engine output on a small slice and fails on drift.</p>
+      </div>
+      <div class="panel">
+        <h4>Dispersion strategies (<code>dispersion=</code>)</h4>
+        <ul>
+          <li><code>site</code>: per-site Pearson estimate. Noisy at small n.</li>
+          <li><code>chrom</code>: one pooled φ per chromosome for every site.</li>
+          <li><code>shrink</code>: fixed-weight average of the two.</li>
+          <li><code>eb</code> (default in <code>tl.dmc</code>): method-of-moments inverse-gamma prior; weight depends on the site's degrees of freedom.</li>
+        </ul>
+        <p>Note the default is <code>"eb"</code> in <code>tl.dmc</code> but <code>"site"</code> in the lower-level <code>process_chromosomes_dmc</code> and in <code>tl.dmr</code>. That asymmetry is real and bit the CLI once.</p>
+      </div>
+      <div class="panel">
+        <h4>Calibration is tested</h4>
+        <p>The slow tier runs each engine on null data (shuffled labels) and checks the false-positive rate at α=0.05 with a Kolmogorov-Smirnov test on the p-value distribution. Recorded results: <code>lr</code> 0.047, <code>welch_t</code> 0.038, <code>glm</code> 0.038. That test is the guardrail for any refactor of <code>dmc.py</code>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s12">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">12 / 23</span><span>Part 2 · The system</span></div>
+    <h2>The periphery: annotation, QC, plots, report and export sit around the same object</h2>
+  </div>
+  <div class="cols-3">
+    <div class="panel">
+      <h4>Annotation · <code>annotate.py</code> (1,500 lines)</h4>
+      <p>Streams a GTF or UCSC <code>refGene.txt</code> into pandas frames of genes and exons, builds promoter / UTR / exon / intron / TTS / non-coding intervals, then overlaps sites per chromosome with bioframe. Ties resolve by a HOMER-style priority table. CpG islands come from a BED; shore = ±2 kb, shelf = ±4 kb, else open sea.</p>
+      <ul>
+        <li>Three module-level LRU caches (parsed GTF, built feature index, parsed UTRs) sized by env vars.</li>
+        <li>Raises when site and catalogue chromosome names share zero overlap (<code>chr1</code> vs <code>1</code>), warns under 50%. Before June it silently produced a 100%-intergenic pie chart.</li>
+        <li>Applies to the DMC table and, since the last commit, the DMR table with the same columns.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h4>QC · <code>qc.py</code> (877 lines)</h4>
+      <p><code>tl.qc</code> writes per-sample metrics onto <code>obs</code>: bisulfite conversion rate (from non-CpG contexts; reported, never applied), global methylation, coverage uniformity. Opt-in: sex check from chrX β, a bimodality score labelled "contamination", all-vs-all sample correlation for swap detection, and a power calculator rebuilt in June on a non-central t with overdispersion.</p>
+    </div>
+    <div class="panel">
+      <h4>Plots · <code>pl/</code> (14 modules)</h4>
+      <p>Volcano, MA, Manhattan, PCA, UMAP, heatmaps, karyogram, TSS and gene-body metaplots, DMR box/violin/heatmap, annotatr-style bars, a <code>figure_grid</code> composer. All matplotlib, themed by <code>_style.py</code> with named palettes (<code>default</code>, <code>publication</code>, <code>colorblind</code>).</p>
+      <p>The good decision: <code>pl/_compute.py</code> holds every data-preparation function (one lazy scan per plot, results cached in <code>uns["_report_cache"]</code>), and both the matplotlib plotters and the Plotly twins in <code>pl/_plotly.py</code> consume it. One source of truth for "what does this plot show".</p>
+    </div>
+    <div class="panel">
+      <h4>Report · <code>report.py</code> + <code>templates/</code></h4>
+      <p>A single-file HTML dashboard: Jinja2 template, Plotly figures (inlined bundle by default, ~4 MB), a sidebar with per-section status, sortable tables, an auto-generated Methods section with citations, and the provenance dict. Every section degrades to "not run yet" if its input is absent. Jinja2 and Plotly are lazy imports behind the <code>report</code> extra.</p>
+    </div>
+    <div class="panel">
+      <h4>Export and interop</h4>
+      <ul>
+        <li><code>export.py</code>: TSV/CSV tables, per-sample bedGraph and bigWig (streamed per chromosome), DMC and DMR BED.</li>
+        <li><code>anndata_io.py</code>: AnnData / MuData for the single-cell ecosystem.</li>
+        <li><code>methylkit_io.py</code>, <code>multiqc_export.py</code>, <code>nfcore_qc.py</code>: bridges to the R package methylKit, to MultiQC, and to nf-core/methylseq output.</li>
+        <li><code>bam_io.py</code>: reads aligned BAM for ASM and entropy; pysam, no Windows.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h4>Random access · <code>query.py</code></h4>
+      <p><code>query_region(store, chrom, start, end)</code>, <code>query_regions</code>, <code>query_sites</code>. Builds the partition path directly and pushes the position filter into the Parquet reader so row groups outside the window are never read. This is what makes the store usable without a tabix index.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s13">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">13 / 23</span><span>Part 2 · The system</span></div>
+    <h2>Conventions that are load-bearing: break these and something downstream breaks quietly</h2>
+  </div>
+  <div class="cols">
+    <div class="prose">
+      <div class="panel">
+        <h4>Library code never prints</h4>
+        <p>Every module uses <code>logger = logging.getLogger(__name__)</code>. Only <code>cli.py</code> calls <code>print</code>, and only for the final result line. A test (<code>test_no_print_outside_cli.py</code>) greps for violations. Reason: notebooks and host applications import epykit and must own stdout.</p>
+      </div>
+      <div class="panel">
+        <h4>Temporary files go where <code>set_tmp_dir</code> says</h4>
+        <p><code>ep.set_tmp_dir(path)</code> sets <code>tempfile.tempdir</code> and mirrors it into <code>TMPDIR</code>, <code>TEMP</code>, <code>TMP</code> so Dask and Ray workers inherit it. Windows <code>%TEMP%</code> on <code>C:</code> is routinely too small for a genome. Never hardcode a temp path.</p>
+      </div>
+      <div class="panel">
+        <h4>Windows is a first-class CI target</h4>
+        <p>Matrix is <code>{ubuntu, windows} × {3.9, 3.12}</code>. pysam and pyBigWig have no Windows wheels, so <code>bam</code>, <code>methylkit</code> and <code>export</code> extras are gated in <code>pyproject.toml</code> and the modules raise a helpful <code>ImportError</code>. Tests skip via <code>importorskip</code>. Path handling is <code>pathlib</code> throughout; hard-links fall back to copies.</p>
+      </div>
+      <div class="panel">
+        <h4>Optional dependencies are imported inside functions</h4>
+        <p>Plotly, Jinja2, anndata, umap, joblib, cupy, dask: all lazy. That is the legitimate reason for many of the 179 in-function imports. The illegitimate ones import <code>warnings</code>, <code>pathlib</code> and <code>logging</code> inside functions that already have them at module scope.</p>
+      </div>
+    </div>
+    <div class="prose">
+      <div class="panel">
+        <h4>Deprecation policy is real and scheduled</h4>
+        <ul>
+          <li>Removal in <strong>1.1</strong>: the NaN-filled <code>log2_odds_ratio</code> column, <code>pp.unite</code>, the <code>dmr_hmm</code> shim, <code>csv*</code> keyword aliases.</li>
+          <li>Removal in <strong>1.2</strong>: the module-level <code>__getattr__</code> in <code>__init__.py</code> that forwards five demoted engine functions to <code>epykit.dmc</code>.</li>
+          <li>Removal in <strong>2.0</strong>: <code>MethylData._analysis_root</code>.</li>
+        </ul>
+        <p>Tests assert on these warnings, so <code>pyproject.toml</code> lets epykit's own <code>DeprecationWarning</code> and <code>UserWarning</code> through the filter. Do not silence them globally.</p>
+      </div>
+      <div class="panel">
+        <h4>One-shot warnings use process-global flags</h4>
+        <p><code>_FISHER_WARNED</code> and <code>_DMR_FDR_NOTED</code> in <code>tl.py</code>. They fire once per interpreter, which means the second test in a session never sees them. Known, documented, not yet fixed.</p>
+      </div>
+      <div class="panel">
+        <h4>Version pins carry reasons</h4>
+        <p><code>polars&gt;=1.0,&lt;2</code> because <code>DataFrame.pivot(on=)</code> changed at 1.0; <code>numba&gt;=0.60</code> for numpy 2; <code>numpy&lt;3</code>. The comments in <code>pyproject.toml</code> say why. <code>uv.lock</code> is committed for reproducible CI; the benchmark protocol pins thread counts to 1 for determinism.</p>
+      </div>
+      <div class="callout"><b>Coordinates</b><p>The store is 0-based. GTF is 1-based closed and gets converted on parse. BED is 0-based half-open and passes through. Bismark input is 1-based and is shifted on ingest since manifest version 2. If a number is off by one, it is this.</p></div>
+    </div>
+  </div>
+</section>
+<!-- ───────────── PART 3 ───────────── -->
+<section class="slide" id="s14">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">14 / 23</span><span>Part 3 · The codebase</span></div>
+    <h2>Modules by size: five files hold half the code, and they are the ones that change most</h2>
+  </div>
+  <div class="cols-wide">
+    <div class="prose">
+      <div class="bars">
+        <div class="bar-row"><span><code>dmc.py</code> · engines</span><div class="track"><div class="fill hot" style="width:100%"></div></div><span class="v">3,233</span></div>
+        <div class="bar-row"><span><code>tl.py</code> · orchestrators</span><div class="track"><div class="fill hot" style="width:72%"></div></div><span class="v">2,335</span></div>
+        <div class="bar-row"><span><code>dmr.py</code> · region callers</span><div class="track"><div class="fill hot" style="width:66%"></div></div><span class="v">2,132</span></div>
+        <div class="bar-row"><span><code>annotate.py</code></span><div class="track"><div class="fill" style="width:46%"></div></div><span class="v">1,500</span></div>
+        <div class="bar-row"><span><code>cli.py</code></span><div class="track"><div class="fill hot" style="width:36%"></div></div><span class="v">1,161</span></div>
+        <div class="bar-row"><span><code>_glm.py</code></span><div class="track"><div class="fill" style="width:35%"></div></div><span class="v">1,130</span></div>
+        <div class="bar-row"><span><code>report.py</code></span><div class="track"><div class="fill" style="width:33%"></div></div><span class="v">1,070</span></div>
+        <div class="bar-row"><span><code>pl/_compute.py</code></span><div class="track"><div class="fill" style="width:31%"></div></div><span class="v">997</span></div>
+        <div class="bar-row"><span><code>qc.py</code></span><div class="track"><div class="fill" style="width:27%"></div></div><span class="v">877</span></div>
+        <div class="bar-row"><span><code>convert.py</code></span><div class="track"><div class="fill" style="width:24%"></div></div><span class="v">792</span></div>
+        <div class="bar-row"><span><code>methyldata.py</code></span><div class="track"><div class="fill" style="width:20%"></div></div><span class="v">655</span></div>
+        <div class="bar-row"><span><code>filter.py</code></span><div class="track"><div class="fill" style="width:19%"></div></div><span class="v">617</span></div>
+        <div class="bar-row"><span><code>export.py</code></span><div class="track"><div class="fill" style="width:18%"></div></div><span class="v">595</span></div>
+        <div class="bar-row"><span><code>pp.py</code></span><div class="track"><div class="fill" style="width:17%"></div></div><span class="v">554</span></div>
+        <div class="bar-row"><span><code>dvc.py</code></span><div class="track"><div class="fill" style="width:17%"></div></div><span class="v">541</span></div>
+        <div class="bar-row"><span>39 other modules</span><div class="track"><div class="fill" style="width:100%;opacity:.35"></div></div><span class="v">9,083</span></div>
+      </div>
+      <div class="legend"><span><i style="background:var(--hyper)"></i>most-changed files in git history (tl.py 35 commits, dmc.py 30, cli.py 26, dmr.py 16)</span><span><i style="background:var(--accent)"></i>other</span></div>
+    </div>
+    <figure>
+      <div class="fig-wrap">
+      <svg viewBox="0 0 470 330" role="img" aria-label="Import dependency layers: cli and the pp, tl, pl namespaces sit on MethylData; they call the engine modules dmc, dmr, annotate, qc, which sit on the storage helpers _dmc_store, _cache, _glm, filter, convert, io; there are no cycles">
+        <defs><marker id="arr14" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+        <g font-family="JetBrains Mono, monospace" font-size="11.5" fill="currentColor">
+          <text x="12" y="22" font-size="10.5" opacity=".7">entry</text>
+          <rect x="12" y="30" width="100" height="34" rx="6" fill="none" stroke="currentColor"/><text x="62" y="52" text-anchor="middle">cli.py</text>
+          <rect x="130" y="30" width="100" height="34" rx="6" fill="none" stroke="currentColor"/><text x="180" y="52" text-anchor="middle">__init__.py</text>
+          <text x="12" y="96" font-size="10.5" opacity=".7">user namespaces</text>
+          <rect x="12" y="104" width="70" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="47" y="126" text-anchor="middle">pp.py</text>
+          <rect x="92" y="104" width="70" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="127" y="126" text-anchor="middle">tl.py</text>
+          <rect x="172" y="104" width="70" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="207" y="126" text-anchor="middle">pl/</text>
+          <rect x="252" y="104" width="90" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="297" y="126" text-anchor="middle">export*.py</text>
+          <rect x="352" y="104" width="106" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="405" y="126" text-anchor="middle">report.py</text>
+          <line x1="62" y1="66" x2="62" y2="100" stroke="currentColor" marker-end="url(#arr14)"/>
+          <line x1="180" y1="66" x2="180" y2="100" stroke="currentColor" marker-end="url(#arr14)"/>
+          <text x="12" y="170" font-size="10.5" opacity=".7">the object everyone passes</text>
+          <rect x="12" y="178" width="446" height="30" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="235" y="198" text-anchor="middle">methyldata.py  (MethylData)</text>
+          <line x1="127" y1="140" x2="127" y2="174" stroke="currentColor" marker-end="url(#arr14)"/>
+          <line x1="297" y1="140" x2="297" y2="174" stroke="currentColor" marker-end="url(#arr14)"/>
+          <text x="12" y="240" font-size="10.5" opacity=".7">engines</text>
+          <rect x="12" y="248" width="80" height="30" rx="6" fill="none" stroke="currentColor"/><text x="52" y="268" text-anchor="middle">dmc.py</text>
+          <rect x="102" y="248" width="80" height="30" rx="6" fill="none" stroke="currentColor"/><text x="142" y="268" text-anchor="middle">dmr.py</text>
+          <rect x="192" y="248" width="96" height="30" rx="6" fill="none" stroke="currentColor"/><text x="240" y="268" text-anchor="middle">annotate.py</text>
+          <rect x="298" y="248" width="70" height="30" rx="6" fill="none" stroke="currentColor"/><text x="333" y="268" text-anchor="middle">qc.py</text>
+          <rect x="378" y="248" width="80" height="30" rx="6" fill="none" stroke="currentColor"/><text x="418" y="268" text-anchor="middle">_glm.py</text>
+          <path d="M127,140 L127,160 L60,160 L60,244" fill="none" stroke="currentColor" opacity=".6" marker-end="url(#arr14)"/>
+          <text x="12" y="306" font-size="10.5" opacity=".7">storage &amp; helpers</text>
+          <rect x="12" y="312" width="446" height="1" fill="currentColor" opacity=".4"/>
+          <text x="235" y="327" text-anchor="middle" font-size="10.5">_dmc_store · _cache · filter · convert · io · _config · _compute · _style</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption>The import graph is a clean DAG with no cycles. <code>tl.py</code> is the one module that touches every layer, which is why it is the most-churned file.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="slide" id="s15">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">15 / 23</span><span>Part 3 · The codebase</span></div>
+    <h2>Quality gates: a serious test suite, a lenient linter, and a benchmark hash in CI</h2>
+  </div>
+  <div class="cols">
+    <div class="prose">
+      <div class="panel">
+        <h4>CI (<code>.github/workflows/test.yml</code>), five jobs</h4>
+        <div class="tbl"><table>
+          <thead><tr><th>Job</th><th>What</th><th>Status now</th></tr></thead>
+          <tbody>
+            <tr><td><code>test</code> ×4</td><td><code>pytest -m "not slow"</code> with coverage on ubuntu and windows, py3.9 and 3.12</td><td>442 tests</td></tr>
+            <tr><td><code>slow</code></td><td>the accuracy and calibration tier on ubuntu 3.12, on every PR</td><td>133 tests</td></tr>
+            <tr><td><code>lint</code></td><td><code>ruff check src/</code> (F rules only) and <code>mypy src/epykit</code></td><td><span class="pill good">both pass</span></td></tr>
+            <tr><td><code>benchmark-regen</code></td><td>runs <code>regen_small.py</code> and diffs output hashes against a committed JSON</td><td>guards engine drift</td></tr>
+            <tr><td><code>build</code></td><td>sdist + wheel, <code>twine check</code>, install in a clean venv, run <code>epykit --help</code></td><td>packaging smoke</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="panel">
+        <h4>Commands</h4>
+        <pre><code>uv sync --extra dev --extra all
+uv run pytest -m "not slow" --strict-markers -ra     # ~ CI
+uv run pytest -m slow                                # opt-in tier
+uv run pytest tests/test_dmc_lr.py::test_name
+uv run ruff check src/
+uv run mypy src/epykit</code></pre>
+        <p>The lock file is committed. Running <code>uv sync</code> on this machine rewrote it (resolver refresh); I restored the committed one. Expect that on first sync.</p>
+      </div>
+    </div>
+    <div class="prose">
+      <div class="panel">
+        <h4>How the tests are built</h4>
+        <p><code>tests/fixtures/synth.py</code> generates a synthetic dataset with <strong>known truth</strong>: 8 samples, 5 chromosomes, 2,000 CpGs each, 500 planted DMCs, 10 planted DMRs, β around 0.30, coverage around 20. It writes real 1-based Bismark files and a truth Parquet. <code>conftest.py</code> builds it once per session and hands each test a fresh <code>MethylData</code> on its own store directory.</p>
+        <p>Helpers compute power, empirical FDR, effect-size bias and DMR recovery against the truth table. Tests assert on statistics, not on snapshots. The fast tier stays under a minute or two; anything slower carries <code>@pytest.mark.slow</code> and <code>--strict-markers</code> rejects unregistered marks.</p>
+      </div>
+      <div class="panel">
+        <h4>Coverage of concerns</h4>
+        <ul>
+          <li>Engine oracles against statsmodels / scipy (<code>test_engine_oracles.py</code>).</li>
+          <li>Null calibration under overdispersion for <code>lr</code>, <code>welch_t</code>, <code>glm</code>.</li>
+          <li>CLI/API parity via subprocess.</li>
+          <li>Coordinate conventions end to end (Bismark row → <code>pos</code> → annotated feature).</li>
+          <li>Streaming contract: <code>materialize=False</code> paths, DMCStore round trip.</li>
+          <li>A grep test that no library module calls <code>print</code>.</li>
+          <li>GPU parity tests skip cleanly without CuPy.</li>
+        </ul>
+      </div>
+      <div class="callout warn"><b>What the gates do not check</b><p>ruff runs pyflakes only. mypy runs with <code>no_strict_optional</code>, <code>follow_imports = silent</code>, <code>ignore_missing_imports</code>, and does not check the bodies of untyped functions. "Passes lint and types" currently means "no undefined names and no unused imports". The pre-commit config includes <code>ruff-format</code>, but the code is not formatted to it, so the first run would touch every file.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s16">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">16 / 23</span><span>Part 3 · The codebase</span></div>
+    <h2>History and process: three intense weeks, a simulated peer review, and an agent-driven fix campaign</h2>
+  </div>
+  <div class="cols">
+    <div class="prose">
+      <div class="steps">
+        <div class="step"><span class="k">05-20</span><div class="body"><b>Restart.</b><p>The first commit says the code was carried over from an earlier <code>epykit2</code> branch that "got messed up". The git history before that is gone; design decisions from that era survive only as comments.</p></div></div>
+        <div class="step"><span class="k">05-27</span><div class="body"><b>Engine freeze and benchmark.</b><p>Engines <code>score</code>, <code>logit_t</code>, <code>bb_lr</code>, <code>cmh</code> removed (0.7.5). Benchmark scripts and the paper written. Tag <code>v0.7.6</code>.</p></div></div>
+        <div class="step"><span class="k">06-01</span><div class="body"><b>1.0 prep.</b><p>Public surface audit, TSV auto-output, demotion of low-level engine functions to <code>epykit.dmc</code> with a <code>__getattr__</code> shim. Tag <code>v1.0.0</code>.</p></div></div>
+        <div class="step"><span class="k">06-06</span><div class="body"><b>Simulated peer review.</b><p><code>docs/review/2026-06-06-epykit-peer-review.md</code> (36 KB): five criticals, including the Bismark off-by-one, the annotation silent failure, a wrong epigenetic-clock formula, an ASM confound, and an anti-conservative power calculator. Then an overnight autonomous remediation run with a written summary of what was fixed, what was overturned by actually running tests, and what was deferred.</p></div></div>
+        <div class="step"><span class="k">06-07</span><div class="body"><b>Audit-fix batch (M1–M13, D-series).</b><p>Streaming exports, overdispersed calibration tests, changelog entries. Version stays 1.0.0 with an <code>[Unreleased]</code> section on top.</p></div></div>
+        <div class="step"><span class="k">06-09</span><div class="body"><b>Report redesign, DMR annotation charts.</b><p>Last commit. Nine remote branches remain (<code>1.0-prep</code>, <code>bench-tune</code>, <code>fine-tune</code>, <code>p0-fixes</code>, <code>report-redesign</code>, …).</p></div></div>
+      </div>
+    </div>
+    <div class="prose">
+      <div class="panel">
+        <h4>Process artefacts in the repo</h4>
+        <ul>
+          <li><code>CLAUDE.md</code> at the root: accurate architecture notes for AI assistants, worth reading first.</li>
+          <li><code>.planning/</code> (tracked): a "publication-hardening campaign" charter and a codebase map dated 2026-06-06 (architecture, concerns, conventions, testing). The concerns file is the best existing list of known debt.</li>
+          <li><code>docs/superpowers/plans/</code> and <code>specs/</code> (18 tracked files): dated implementation plans and design specs. Excluded from the published docs site.</li>
+          <li><code>CHANGELOG.md</code> (58 KB): thorough, keep-a-changelog style, with reasoning per entry.</li>
+          <li><code>benchmark/</code>: scripts, frozen data, a manuscript, and a report with the headline TPR / FPR numbers. Raw data is not bundled.</li>
+        </ul>
+      </div>
+      <div class="callout"><b>What this means for you</b><p>The codebase has been reviewed harder than most, and the findings are written down. Much of the cleanup work is already itemised; the job is to sequence it, guard it with the accuracy suite, and finish the items that were deferred because they needed a human decision or a Linux box.</p></div>
+      <div class="panel">
+        <h4>Ownership</h4>
+        <p>Author Deniz Ertuğrul, 237 of 238 commits. One external contributor with 4 commits. No CODEOWNERS, no issue templates, no contributing guide. The docs site (MkDocs Material) is configured but the repository URLs in <code>pyproject.toml</code> point at <code>d-ert/epykit</code> while everything else points at <code>d-ert/epykit3</code>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ───────────── PART 4 ───────────── -->
+<section class="slide" id="s17">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">17 / 23</span><span>Part 4 · Cleanup</span></div>
+    <h2>Hotspots: the orchestrators have grown into 600-line functions with 35 parameters</h2>
+  </div>
+  <div class="cols-wide">
+    <div class="prose">
+      <div class="tbl"><table>
+        <thead><tr><th>Function</th><th class="num">Lines</th><th class="num">Params</th><th>What it mixes</th></tr></thead>
+        <tbody>
+          <tr><td><code>tl.dmc</code></td><td class="num">672</td><td class="num">36</td><td>validation, engine choice, power-stack flips, resume cache, smoothed temp store, engine call, three post-processors, metadata dict, sidecar write, TSV export, a warning</td></tr>
+          <tr><td><code>dmc._process_one_chromosome</code></td><td class="num">618</td><td class="num">~20</td><td>five engine branches inlined in one if/elif, each loading samples and updating accumulators, then a shared column-assembly tail</td></tr>
+          <tr><td><code>cli.build_parser</code></td><td class="num">477</td><td class="num">0</td><td>every subcommand's argparse definition in one body</td></tr>
+          <tr><td><code>tl.dmr</code></td><td class="num">470</td><td class="num">35</td><td>four method branches with different parameter subsets, per-branch TSV, empirical-FDR wiring for one branch</td></tr>
+          <tr><td><code>dmc._score_finalize</code></td><td class="num">433</td><td class="num">~12</td><td>the <code>lr</code> statistic plus four dispersion strategies plus separation fallback plus CI</td></tr>
+          <tr><td><code>dmr.call_dmr_chain_merge</code></td><td class="num">335</td><td class="num">~14</td><td>streaming, chaining, stats recompute, BH, cache key</td></tr>
+          <tr><td><code>annotate.annotate_features</code></td><td class="num">308</td><td class="num">~10</td><td>source detection, cache lookup, chrom guard, per-chrom overlap, multi-annotation columns</td></tr>
+          <tr><td><code>dmr.call_dmr_sliding_window</code></td><td class="num">301</td><td class="num">~10</td><td>two-pointer sweep, Stouffer, direction, recompute, BH</td></tr>
+        </tbody>
+      </table></div>
+      <p>ruff's complexity rule (C901) flags 58 functions in <code>src/</code>. The pattern is consistent: a public function accumulates every option as a keyword argument, and each option adds a branch in the same body. <code>uns["dmc"]</code>, the 24-key metadata record, is written out as a literal in three different places in <code>tl.py</code> (the resume path, the contrast path, the main path) and they have already drifted slightly.</p>
+    </div>
+    <div class="prose">
+      <div class="panel">
+        <h4>Shape of the fix (structural, no behaviour change)</h4>
+        <ul>
+          <li><strong>A config object per orchestrator.</strong> A frozen dataclass <code>DMCConfig</code> with the 36 knobs, one <code>validate()</code>, one <code>signature()</code> for the resume hash, one <code>to_uns()</code> for the metadata record. Same for <code>DMRConfig</code>. The public <code>tl.dmc(md, **kwargs)</code> signature can stay for users; internally it builds the config once.</li>
+          <li><strong>Split <code>tl.dmc</code> into stages</strong> that each fit on a screen: resolve → maybe_resume → run_engine → post_process → record. The current body already has those comment headers.</li>
+          <li><strong>One engine, one function.</strong> Turn the if/elif in <code>_process_one_chromosome</code> into a small registry <code>{name: EngineFn}</code> where each engine owns its accumulator init / update / finalize. The shared tail (column assembly, <code>min_samples</code> masking) becomes one helper. This also makes the "every engine emits the canonical schema" rule enforceable by a test over the registry.</li>
+          <li><strong>Move the CLI parser per subcommand</strong> into <code>_add_dmc_args(sub)</code>-style functions next to their <code>_cmd_*</code> handlers.</li>
+        </ul>
+      </div>
+      <div class="callout"><b>Guardrail</b><p>Every step above must leave the <code>benchmark-regen</code> hash unchanged and the slow calibration tier green. Those two checks are precisely "did I change the numbers". Run them locally before pushing: <code>uv run python benchmark/scripts/regen_small.py</code> takes about 30 seconds.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s18">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">18 / 23</span><span>Part 4 · Cleanup</span></div>
+    <h2>Lint and type debt: the baseline is deliberately minimal, and the plan to ratchet it is written in <code>pyproject.toml</code></h2>
+  </div>
+  <div class="cols-wide">
+    <div class="prose">
+      <p>Running ruff with the rule set the config comment proposes (<code>E, W, I, B, UP, RUF</code> plus <code>C90</code>) gives 515 findings. 124 are auto-fixable. Breakdown of the large buckets:</p>
+      <div class="bars">
+        <div class="bar-row"><span>UP045 Optional[X] → X | None</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="v">190</span></div>
+        <div class="bar-row"><span>C901 too complex</span><div class="track"><div class="fill hot" style="width:31%"></div></div><span class="v">58</span></div>
+        <div class="bar-row"><span>I001 unsorted imports</span><div class="track"><div class="fill" style="width:23%"></div></div><span class="v">43</span></div>
+        <div class="bar-row"><span>E501 line too long</span><div class="track"><div class="fill" style="width:17%"></div></div><span class="v">33</span></div>
+        <div class="bar-row"><span>E702 statements joined by ;</span><div class="track"><div class="fill" style="width:17%"></div></div><span class="v">33</span></div>
+        <div class="bar-row"><span>UP037 quoted annotations</span><div class="track"><div class="fill" style="width:13%"></div></div><span class="v">24</span></div>
+        <div class="bar-row"><span>E402 import not at top</span><div class="track"><div class="fill" style="width:9%"></div></div><span class="v">18</span></div>
+        <div class="bar-row"><span>RUF022 / W293 / UP035 / UP007</span><div class="track"><div class="fill" style="width:31%"></div></div><span class="v">59</span></div>
+        <div class="bar-row"><span>B007, B904, RUF001-003, RUF059, RUF100, misc</span><div class="track"><div class="fill" style="width:19%"></div></div><span class="v">36</span></div>
+      </div>
+      <p>The 33 semicolon findings are one idiom: the SHA-256 fingerprint builders in <code>dmc.py</code> and <code>dmr.py</code> write <code>h.update(b"|key="); h.update(value)</code> on one line, repeated for every field, in three near-identical functions. A single <code>_fingerprint(**fields)</code> helper removes all of them and the duplication.</p>
+    </div>
+    <div class="prose">
+      <div class="panel">
+        <h4>Other measurable debt</h4>
+        <div class="tbl"><table>
+          <tbody>
+            <tr><td>Imports inside function bodies</td><td class="num">179</td><td>46 in <code>tl.py</code>. Keep the ones for optional extras; hoist stdlib and intra-package ones.</td></tr>
+            <tr><td><code>except Exception</code> (broad)</td><td class="num">39</td><td>15 in <code>annotate.py</code> alone. Several swallow parse errors and fall through to an empty frame, which is how the silent-annotation bug happened.</td></tr>
+            <tr><td><code>warnings.warn</code> call sites</td><td class="num">22</td><td>Including a <code>FutureWarning</code> on every successful <code>tl.dmc</code> call about a column nobody asked for.</td></tr>
+            <tr><td><code>Any</code> annotations</td><td class="num">47</td><td>Mostly in the annotation caches and report context.</td></tr>
+            <tr><td><code>type: ignore</code> / <code>noqa</code></td><td class="num">3 / 5</td><td>Low. Five of the <code>noqa</code> are unused (RUF100).</td></tr>
+            <tr><td><code>TODO</code> / <code>FIXME</code></td><td class="num">0</td><td>The one hit is a false positive in a docstring. Debt is tracked in docs, not in code.</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="panel">
+        <h4>Suggested ratchet order</h4>
+        <ol>
+          <li>Enable <code>I</code>, <code>W</code>, <code>UP</code> and run <code>--fix</code> in one commit. Mechanical, safe, 124 fixes.</li>
+          <li>Enable <code>E</code> and <code>B</code>; fix the 33 semicolon lines by extracting the fingerprint helper; fix <code>B904</code> (<code>raise … from</code>) and the unused loop variables by hand.</li>
+          <li>Turn on <code>ruff-format</code> in one whole-tree commit, so blame stays readable.</li>
+          <li>Enable <code>C901</code> at a high threshold (say 25) and lower it as Slide 17's refactors land.</li>
+          <li>mypy: switch on <code>check_untyped_defs</code> first, then <code>strict_optional</code> module by module, starting with <code>methyldata.py</code> and <code>_dmc_store.py</code>, which are already typed.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s19">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">19 / 23</span><span>Part 4 · Cleanup</span></div>
+    <h2>Stale surface: shims scheduled for removal, docs that describe an older engine set, and a stable API that exports research code</h2>
+  </div>
+  <div class="cols">
+    <div class="prose">
+      <div class="panel">
+        <h4>Scheduled removals you can execute (with a 1.1 version bump)</h4>
+        <ul>
+          <li><code>log2_odds_ratio</code>: a NaN-filled column in <code>_EMPTY_SCHEMA</code>, emitted by every engine, normalised again in <code>dmr.py</code>, and announced by a <code>FutureWarning</code> on each <code>tl.dmc</code> call. Removing it touches four files and deletes the noisiest warning in the package.</li>
+          <li><code>pp.unite()</code> → <code>pp.set_unite_type()</code>.</li>
+          <li><code>epykit/dmr_hmm.py</code>, a whole-module shim for <code>dmr_segment.py</code>.</li>
+          <li><code>csv</code>, <code>csv_full</code>, <code>csv_alpha</code> keyword aliases on <code>tl.dmc</code>, <code>tl.dmr</code>, <code>tl.annotate</code>.</li>
+          <li><code>use_smoothed=True</code> on <code>tl.dmc</code>: warns as deprecated, builds a temporary pseudo-count store, and forces a separate <code>varm</code> key. <code>smoothing=True</code> is the replacement.</li>
+        </ul>
+        <p>The 1.2 item (<code>__getattr__</code> in <code>__init__.py</code>) and the 2.0 item (<code>_analysis_root</code>) should wait for their versions; the schedule is documented and tests assert on the warnings.</p>
+      </div>
+      <div class="panel">
+        <h4>Defaults that disagree with each other</h4>
+        <ul>
+          <li><code>dispersion</code>: <code>"eb"</code> in <code>tl.dmc</code>, <code>"site"</code> in <code>process_chromosomes_dmc</code> and <code>tl.dmr</code>.</li>
+          <li><code>min_samples_treatment</code> is <code>int | None</code> defaulting to <code>None</code> and immediately coerced to 0, while <code>min_samples_control</code> is <code>int = 0</code>.</li>
+          <li><code>tl.dmr</code> accepts <code>design=</code> while <code>tl.dmc</code> calls the same thing <code>formula=</code>.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="prose">
+      <div class="panel">
+        <h4>Text that no longer matches the code</h4>
+        <div class="tbl"><table>
+          <tbody>
+            <tr><td><code>dmc.py</code> module docstring</td><td>lists <code>score</code> and <code>logit_t</code> as engines; both were removed in 0.7.5</td></tr>
+            <tr><td><code>tl.py:464</code>, <code>docs/getting-started/concepts.md:131</code></td><td>"All 8 test backends"; there are four</td></tr>
+            <tr><td><code>README.md:295</code></td><td>links to "Quickstart §5" on <code>lr+</code>; the section numbering jumps from 4 to 6 and the anchor does not exist</td></tr>
+            <tr><td><code>README.md</code>, <code>docs/advanced/architecture.md</code></td><td>say all four DMR callers support empirical FDR; only <code>tile</code> does</td></tr>
+            <tr><td><code>docs/advanced/methylstore.md</code></td><td>documents a <code>DMCStore.iter_chromosomes()</code> that is called <code>iter_chroms()</code>, and a manifest layout that does not match <code>_cache.py</code></td></tr>
+            <tr><td><code>pyproject.toml</code> URLs</td><td><code>d-ert/epykit</code> vs <code>d-ert/epykit3</code> everywhere else</td></tr>
+            <tr><td><code>CLAUDE.md</code> and <code>docs/advanced/architecture.md</code></td><td>cite line ranges like <code>tl.py:498–532</code> that have drifted; prefer function names</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="callout warn"><b>A decision for the owner, not for you</b><p>The peer review recommended moving <code>clocks</code>, <code>asm</code>, <code>entropy</code>, <code>pmd</code>, <code>hmr</code> and <code>impute</code> under <code>epykit.experimental</code> and no longer exporting <code>_glm.build_design</code> at top level. Under SemVer that is a breaking change for a "Production/Stable" 1.0. It is the right move, and it needs the author's yes.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s20">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">20 / 23</span><span>Part 4 · Cleanup</span></div>
+    <h2>Repo hygiene: campaign residue that a new reader has to step around</h2>
+  </div>
+  <div class="cols">
+    <div class="prose">
+      <div class="sev">
+        <div class="lbl"><span class="pill warn">tracked</span></div>
+        <div class="body"><b><code>.planning/</code> and <code>docs/superpowers/</code></b><p>Charter, codebase map, 18 dated plans and specs from the agent-driven campaigns. Valuable history, wrong place. Either move under <code>docs/history/</code> with an index, or archive them in the wiki and keep only <code>CONCERNS.md</code> merged into a <code>docs/contributing/known-issues.md</code>.</p></div>
+      </div>
+      <div class="sev">
+        <div class="lbl"><span class="pill warn">naming</span></div>
+        <div class="body"><b>Test files named after tickets, not behaviour</b><p><code>test_p0_*.py</code> (6 files), <code>test_phase3_drops.py</code>, <code>test_empirical_fdr_denominator.py</code> next to <code>test_p0_dmc_empirical_fdr_denominator.py</code>. A reader cannot tell what they cover without opening them. Fold each into the module-named file it belongs to (<code>test_dmc_multitest.py</code>, <code>test_dmr_empirical_fdr.py</code>).</p></div>
+      </div>
+      <div class="sev">
+        <div class="lbl"><span class="pill">root</span></div>
+        <div class="body"><b>Files at the repository root</b><p><code>samplesheet.csv</code> (an example with absolute-looking paths), <code>Dockerfile.python</code> and <code>Dockerfile.r</code> (benchmark reproduction), <code>downloads/</code> with two paper PDFs (ignored, 3.3 MB, but sitting there). Move the example into <code>docs/getting-started/</code>, the Dockerfiles into <code>benchmark/</code>.</p></div>
+      </div>
+      <div class="sev">
+        <div class="lbl"><span class="pill">branches</span></div>
+        <div class="body"><b>Nine remote branches, all behind main</b><p><code>1.0-prep</code>, <code>bench-tune</code>, <code>fine-tune</code>, <code>p0-fixes</code>, <code>report-redesign</code>, <code>feat/dmr-annotation-charts</code>, <code>feat/canonical-chrom-filter</code>, <code>optimize/autonomous-v1</code>, <code>gb-resubmission-scaffolding</code>. Confirm each is merged (<code>git branch -r --merged main</code>) and delete.</p></div>
+      </div>
+    </div>
+    <div class="prose">
+      <div class="sev">
+        <div class="lbl"><span class="pill">release</span></div>
+        <div class="body"><b>Version says 1.0.0, changelog says Unreleased</b><p>Two months of post-1.0 fixes, including a store-format bump (raw manifest v2) that forces rebuilds, sit under <code>[Unreleased]</code>. Cut 1.0.1 (or 1.1 if the shims go) so installs and the changelog agree.</p></div>
+      </div>
+      <div class="sev">
+        <div class="lbl"><span class="pill">docs</span></div>
+        <div class="body"><b>Two module maps, two architecture pages, one CLAUDE.md</b><p>README, <code>docs/advanced/architecture.md</code>, <code>.planning/codebase/ARCHITECTURE.md</code> and <code>CLAUDE.md</code> each restate the architecture with slightly different facts. Pick <code>docs/advanced/architecture.md</code> as canonical and have the others link to it.</p></div>
+      </div>
+      <div class="sev">
+        <div class="lbl"><span class="pill">tooling</span></div>
+        <div class="body"><b>Pre-commit is configured but not applied</b><p><code>.pre-commit-config.yaml</code> pins ruff 0.5.7 with <code>--fix</code> and <code>ruff-format</code>; the lock file has ruff 0.15. Nine files lack a trailing newline and 16 have whitespace-only lines, so the hooks have not run. Align the pin, run once, commit.</p></div>
+      </div>
+      <div class="sev">
+        <div class="lbl"><span class="pill">meta</span></div>
+        <div class="body"><b>No contributor scaffolding</b><p>No <code>CONTRIBUTING.md</code>, no issue or PR templates, no <code>CODEOWNERS</code>. For a package inviting external validation of its statistics, a short contributing guide that names the two guardrail jobs would pay for itself.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s21">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">21 / 23</span><span>Part 4 · Cleanup</span></div>
+    <h2>Correctness debt: known, documented, and not to be touched without the accuracy suite in hand</h2>
+  </div>
+  <div class="cols">
+    <div class="prose">
+      <p>These come from the June review and its remediation summary. They were deferred on purpose: each changes numbers, so each needs a benchmark re-run or a statistician's decision, not a refactor.</p>
+      <div class="sev">
+        <div class="lbl"><span class="pill bad">C4</span></div>
+        <div class="body"><b>ASM reads bisulfite-converted bases at SNVs</b><p>In <code>asm.py</code>, haplotype assignment uses the converted read base, so C/T and G/A variants confound allele with methylation. Output can be fabricated. Fix is well specified (restrict to bisulfite-safe SNV classes) but pysam-gated, so it needs a Linux box. Highest-severity open item.</p></div>
+      </div>
+      <div class="sev">
+        <div class="lbl"><span class="pill warn">M-STAT4</span></div>
+        <div class="body"><b>BH includes NaN-masked sites as p=1</b><p>Conservative direction, but it touches the genome-wide correction; validate against the accuracy suite.</p></div>
+      </div>
+      <div class="sev">
+        <div class="lbl"><span class="pill warn">M-STAT2</span></div>
+        <div class="body"><b>Multi-group df reporting</b><p><code>wald_test</code> uses an adaptive F / χ² reference, so the stored <code>df2</code> does not let a reader reproduce the p-value. A first attempt was test-falsified and reverted.</p></div>
+      </div>
+    </div>
+    <div class="prose">
+      <div class="sev">
+        <div class="lbl"><span class="pill warn">M-DMR3/5/6</span></div>
+        <div class="body"><b>Region-level FDR details</b><p>Stratified permutation shuffles across strata instead of within; region FDR is computed on post-filter survivors (selective inference) and the tile path applies BH twice; <code>dmr_segment</code> uses unsigned Stouffer with per-chromosome BH.</p></div>
+      </div>
+      <div class="sev">
+        <div class="lbl"><span class="pill warn">M-STAT1/3</span></div>
+        <div class="body"><b>GLM effect-size CI and the φ floor</b><p>The GLM path has an unused <code>delta_method_meth_diff_ci</code>; the <code>DF_PHI_FLOOR</code> is applied inconsistently between <code>lr</code> and <code>glm</code>.</p></div>
+      </div>
+      <div class="sev">
+        <div class="lbl"><span class="pill">minor</span></div>
+        <div class="body"><b>Smaller items with a clear fix</b><p>Standardise DMR <code>start</code>/<code>end</code> width across callers (M-DMR7); make <code>_MAX_DMR_BP</code> a parameter (M-DMR8); vectorise nearest-TSS lookup (M-ANN3); pairwise-complete <code>sample_correlation</code> (M-QC3); <code>region_beta</code> uses a closed interval and reads only <code>part-0</code>.</p></div>
+      </div>
+      <div class="callout"><b>Rule of thumb</b><p>If a change can alter a p-value, it is not cleanup. Land it separately, with a benchmark note, and let the <code>benchmark-regen</code> hash fail on purpose so the diff is visible.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" id="s22">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">22 / 23</span><span>Part 4 · Cleanup</span></div>
+    <h2>A sequenced plan: hygiene first, then structure, then the items that need a decision</h2>
+  </div>
+  <div class="cols-3">
+    <div class="panel">
+      <h4><span class="pill acc">first</span> Mechanical, zero-risk</h4>
+      <ul>
+        <li>Restore trust: run both test tiers and <code>regen_small.py</code> locally, record the hashes.</li>
+        <li>Delete merged remote branches.</li>
+        <li>ruff ratchet step 1 (<code>I</code>, <code>W</code>, <code>UP</code> with <code>--fix</code>), then <code>ruff-format</code> in one commit, then align the pre-commit pin.</li>
+        <li>Fix the stale text on Slide 19 and the URL mismatch.</li>
+        <li>Move planning residue under <code>docs/history/</code>; rename the ticket-named test files.</li>
+        <li>Cut a release so version and changelog agree.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h4><span class="pill acc">second</span> Structural, behaviour-preserving</h4>
+      <ul>
+        <li>Extract the fingerprint helper (kills 33 lint hits and 3 duplicated hash builders).</li>
+        <li><code>DMCConfig</code> / <code>DMRConfig</code> dataclasses; one <code>to_uns()</code> writer for the metadata record.</li>
+        <li>Split <code>tl.dmc</code> and <code>tl.dmr</code> into stage functions.</li>
+        <li>Engine registry in <code>dmc.py</code>; consider a <code>dmc/</code> package: <code>engines.py</code>, <code>dispersion.py</code>, <code>multitest.py</code>, <code>neighbour.py</code>, <code>permutation.py</code>.</li>
+        <li>Per-subcommand argparse builders in <code>cli.py</code>.</li>
+        <li>Narrow the 39 broad excepts; log at WARNING where a fallback is taken.</li>
+        <li>Hoist the non-optional in-function imports.</li>
+      </ul>
+      <p class="muted">Gate: benchmark hash identical, slow tier green, CLI parity test green.</p>
+    </div>
+    <div class="panel">
+      <h4><span class="pill acc">third</span> Needs the owner or a Linux box</h4>
+      <ul>
+        <li>Remove the 1.1 shims and the <code>log2_odds_ratio</code> column; bump to 1.1.</li>
+        <li><code>epykit.experimental</code> namespace for the research-grade callers.</li>
+        <li>Unify the <code>dispersion</code> default and the <code>design</code>/<code>formula</code> naming.</li>
+        <li>C4 (ASM) on Linux with the <code>bam</code> extra.</li>
+        <li>Permutation FDR for the three DMR callers that raise <code>NotImplementedError</code>, or change the docs to say so.</li>
+        <li>The statistical items on Slide 21, one at a time, each with its own benchmark note.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout"><b>What not to do</b><p>Do not "simplify" the streaming loops into a single <code>pl.scan_parquet(...).collect()</code>; the whole design exists to avoid that. Do not touch <code>lr+</code> defaults. Do not change the canonical output schema without updating <code>_EMPTY_SCHEMA</code>, the DMR normalisation in <code>dmr.py</code>, the report, and the export writers together.</p></div>
+</section>
+
+<section class="slide" id="s23">
+  <div class="head">
+    <div class="eyebrow"><span class="idx">23 / 23</span><span>Part 4 · Cleanup</span></div>
+    <h2>Run it in ten minutes, then read these five things</h2>
+  </div>
+  <div class="cols">
+    <div class="prose">
+      <h3>A working session on the synthetic fixture</h3>
+      <pre><code>uv sync --extra dev --extra all
+uv run python - &lt;&lt;'PY'
+from pathlib import Path
+from tests.fixtures.synth import SimConfig, generate
+import epykit as ep, polars as pl
+
+out = Path("scratch_demo"); out.mkdir(exist_ok=True)
+res = generate(SimConfig(), out)          # 8 samples, 5 chroms, truth table
+md = ep.read_bismark(res["samplesheet"],
+        treatment_group="treatment", control_group="control",
+        assembly="synth", store_dir=str(out / "store"))
+ep.pp.filter_coverage(md, lo_count=5)
+ep.pp.set_unite_type(md, type="intersect")
+ep.tl.dmc(md); ep.tl.dmr(md)
+print(md)
+print(md.dmc.filter(pl.col("qvalue") &lt; 0.05).height, "DMCs")
+print(md.uns["dmr"].height, "DMRs")
+md.report(str(out / "report.html"))
+PY</code></pre>
+      <p>On this machine that produced 78,412 sites after filtering, a DMC table with 15 columns, and a DMR table of hyper and hypo regions that line up with the planted ones. Open the report to see what the end user sees.</p>
+    </div>
+    <div class="prose">
+      <h3>Reading order</h3>
+      <div class="steps">
+        <div class="step"><span class="k">1</span><div class="body"><b><code>CLAUDE.md</code></b><p>The most accurate short description of the architecture, including the streaming contract and the <code>lr+</code> caveat.</p></div></div>
+        <div class="step"><span class="k">2</span><div class="body"><b><code>src/epykit/methyldata.py</code> and <code>_dmc_store.py</code></b><p>Together 880 lines, well commented, and every other module is written against them.</p></div></div>
+        <div class="step"><span class="k">3</span><div class="body"><b><code>.planning/codebase/CONCERNS.md</code></b><p>The maintainers' own list of debt, with file pointers.</p></div></div>
+        <div class="step"><span class="k">4</span><div class="body"><b><code>docs/review/2026-06-06-remediation-summary.md</code></b><p>What was fixed, what turned out to be wrong in the review, what was deferred and why. Then the full review it summarises.</p></div></div>
+        <div class="step"><span class="k">5</span><div class="body"><b><code>tl.py</code>, function <code>dmc</code>, top to bottom</b><p>Once, slowly. It is the function you will refactor, and it contains every decision the pipeline makes in one place.</p></div></div>
+      </div>
+      <div class="callout"><b>The mental model, one last time</b><p>Two integers per CpG per sample, partitioned on disk by sample and chromosome. A loop over chromosomes turns them into one p-value and one effect size per site, written straight back to disk. Regions, annotation, plots and the report read from there. The object in your hand is a path plus two dictionaries. Keep it that simple.</p></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('main .slide'));
+  var links = Array.prototype.slice.call(document.querySelectorAll('#rail a.item'));
+  var byId = {};
+  links.forEach(function(a){ byId[a.getAttribute('href').slice(1)] = a; });
+  var progress = document.getElementById('progress');
+
+  function current(){
+    var mid = window.innerHeight * 0.35;
+    var best = slides[0], bestD = Infinity;
+    slides.forEach(function(s){
+      var r = s.getBoundingClientRect();
+      var d = Math.abs(r.top - mid);
+      if (r.top <= mid + 1 && d < bestD){ best = s; bestD = d; }
+    });
+    return best;
+  }
+  function update(){
+    var cur = current();
+    links.forEach(function(a){ a.classList.remove('active'); });
+    var a = byId[cur.id]; if (a){ a.classList.add('active'); }
+    var doc = document.documentElement;
+    var max = doc.scrollHeight - window.innerHeight;
+    progress.style.width = (max > 0 ? (window.scrollY / max) * 100 : 0) + '%';
+  }
+  var ticking = false;
+  window.addEventListener('scroll', function(){ if(!ticking){ requestAnimationFrame(function(){ update(); ticking=false; }); ticking=true; } }, {passive:true});
+  window.addEventListener('resize', update);
+  update();
+
+  function go(delta){
+    var cur = current();
+    var i = slides.indexOf(cur) + delta;
+    if (i < 0 || i >= slides.length) return;
+    slides[i].scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
+  document.addEventListener('keydown', function(e){
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowRight' || e.key === 'PageDown'){ e.preventDefault(); go(1); }
+    else if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowLeft' || e.key === 'PageUp'){ e.preventDefault(); go(-1); }
+    else if (e.key === 'Home'){ e.preventDefault(); slides[0].scrollIntoView({block:'start'}); }
+    else if (e.key === 'End'){ e.preventDefault(); slides[slides.length-1].scrollIntoView({block:'start'}); }
+  });
+
+  // theme toggle: system -> light -> dark -> system
+  var btn = document.getElementById('theme');
+  var order = ['system','light','dark'];
+  var mode = 'system';
+  try { mode = localStorage.getItem('epykit-guide-theme') || 'system'; } catch (e) {}
+  function apply(){
+    var root = document.documentElement;
+    if (mode === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', mode);
+    btn.textContent = 'Theme: ' + mode;
+    try { localStorage.setItem('epykit-guide-theme', mode); } catch (e) {}
+  }
+  if (order.indexOf(mode) < 0) mode = 'system';
+  apply();
+  btn.addEventListener('click', function(){ mode = order[(order.indexOf(mode) + 1) % order.length]; apply(); });
+})();
+</script>
+
+</body>
+</html>
