@@ -46,6 +46,7 @@ import polars as pl
 from scipy import stats as sp_stats
 
 from . import _cache
+from ._chroms import filter_canonical_logged
 from ._dmc_engines import ENGINES, engine_spec
 from ._dmc_store import DMCStore, _chrom_filename
 
@@ -1187,6 +1188,32 @@ def _detect_chromosomes(methylstore_path: Path) -> list[str]:
     return sorted(chroms)
 
 
+def resolve_dmc_chromosomes(
+    methylstore_path: str | Path,
+    chromosomes: list[str] | None,
+    *,
+    canonical_only: bool = False,
+) -> list[str]:
+    """Return the chromosome universe a DMC run works on.
+
+    An explicit ``chromosomes`` list, including an empty one, is used
+    verbatim. Only the auto-detected partition set (``chromosomes=None``) is
+    subject to ``canonical_only``, which keeps the fixed human-style
+    chromosomes of :mod:`epykit._chroms` and logs one INFO line naming the
+    dropped contigs. :func:`process_chromosomes_dmc` calls this for direct
+    callers; ``tl.dmc`` resolves the list once up front so the observed run
+    and every ``empirical_fdr`` permutation test the same universe, mirroring
+    the tile DMR caller.
+    """
+    if chromosomes is not None:
+        return list(chromosomes)
+    detected = _detect_chromosomes(Path(methylstore_path))
+    logger.info("Auto-detected %d chromosomes", len(detected))
+    if canonical_only:
+        return filter_canonical_logged(detected, context="dmc")
+    return detected
+
+
 def _intersect_chrom(
     methylstore_path: Path,
     chrom: str,
@@ -2188,6 +2215,7 @@ def process_chromosomes_dmc(
     smoothing_span_bp: int = ...,
     sep_fallback: bool = ...,
     sep_threshold: float = ...,
+    canonical_only: bool = ...,
 ) -> DMCStore: ...
 
 
@@ -2220,6 +2248,7 @@ def process_chromosomes_dmc(
     smoothing_span_bp: int = ...,
     sep_fallback: bool = ...,
     sep_threshold: float = ...,
+    canonical_only: bool = ...,
 ) -> pl.DataFrame: ...
 
 
@@ -2251,6 +2280,7 @@ def process_chromosomes_dmc(
     smoothing_span_bp: int = 500,
     sep_fallback: bool = False,
     sep_threshold: float = 0.9,
+    canonical_only: bool = False,
 ) -> pl.DataFrame | DMCStore:
     """Process differential methylation for all chromosomes.
 
@@ -2273,7 +2303,23 @@ def process_chromosomes_dmc(
             "fisher"             -- Fisher exact on reads pooled across
                                    replicates (anti-conservative; warns).
     chromosomes : list[str], optional
-        Chromosomes to process. Auto-detected when None.
+        Chromosomes to process. Auto-detected when None; an explicit list,
+        including an empty one, is used verbatim.
+    canonical_only : bool, keyword-only
+        When ``chromosomes`` is None, keep only the fixed human-style
+        chromosome set of :mod:`epykit._chroms` (``1``-``22``, ``X``,
+        ``Y``, ``M``/``MT``, with or without ``chr``) from the auto-detected
+        partitions, before the engine runs and before any correction. One
+        INFO line names the dropped contigs. An explicit ``chromosomes``
+        list takes precedence. The resolved list is part of the DMC cache
+        signature. Default False keeps every partition.
+    smoothing, smoothing_span_bp : bool, int
+        DSS-style per-sample count smoothing for the ``"lr"`` engine: each
+        sample's raw counts are replaced by a uniform-box average over the
+        CpGs within ``+/-smoothing_span_bp // 2`` bp before they reach the
+        accumulators. The other engines do not read these knobs; the
+        high-level ``tl.dmc`` records them and the CLI refuses them for
+        engines that do not consume them.
     unite : bool
         If True (default), test only CpG sites covered in every sample
         (intersection / inner join).
@@ -2348,9 +2394,7 @@ def process_chromosomes_dmc(
             logger.info("N replicates / group = %d; recommended test: %s", min_group, rec)
             break
 
-    if chromosomes is None:
-        chromosomes = _detect_chromosomes(store)
-        logger.info("Auto-detected %d chromosomes", len(chromosomes))
+    chromosomes = resolve_dmc_chromosomes(store, chromosomes, canonical_only=canonical_only)
 
     logger.info(
         "DMC: %d case / %d control, test=%s, unite=%s, min_samples_case=%d, min_samples_control=%d",

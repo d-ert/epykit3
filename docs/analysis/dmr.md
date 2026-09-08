@@ -102,9 +102,14 @@ naming the dropped contigs, and is recorded in `md.uns["dmr_params"]`. An
 explicit `chromosomes=` list, including an empty one, is used verbatim.
 `chain_merge`, `sliding_window` and `segment` work on the DMC table and
 inherit the chromosome universe of the upstream `ep.tl.dmc()` run, so they
-raise `ValueError` on `canonical_only=True`. Filter upstream instead: ingest
-with `canonical_only=True` (see [read_bismark](../io/read-bismark.md#canonical-chromosomes-only))
-or restrict `ep.tl.dmc(md, chromosomes=...)`.
+raise `ValueError` on `canonical_only=True`. Filter upstream instead: run
+`ep.tl.dmc(md, canonical_only=True)` (see
+[DMC calling](dmc.md#canonical-chromosomes-only)), ingest with
+`canonical_only=True` (see
+[read_bismark](../io/read-bismark.md#canonical-chromosomes-only)), or
+restrict `ep.tl.dmc(md, chromosomes=...)`. The CLI mirrors this:
+`epykit dmr --method tile --canonical-only` filters, the other methods
+point at `epykit dmc --canonical-only`.
 
 ### sliding_window
 

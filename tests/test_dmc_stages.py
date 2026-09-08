@@ -92,6 +92,7 @@ def _binary_plan(cfg: DMCConfig) -> DMCPlan:
         cfg=cfg,
         mode="binary",
         selected_test="lr",
+        chromosomes=["chr1", "chr2"],
         unite=False,
         smooth_method="bsmooth" if cfg.use_smoothed else None,
         key="dmc_lr_smoothed" if cfg.use_smoothed else "dmc_lr",

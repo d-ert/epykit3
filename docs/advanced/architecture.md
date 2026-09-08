@@ -111,8 +111,10 @@ selection naming what it dropped.
 | Surface | Scope |
 |---|---|
 | `read_bismark`, `read_methyldackel`, `read_combined_strand_bed`, `convert_sample` | Drops non-canonical contigs before the partition write. The setting is part of the per-sample conversion manifest; a changed setting rebuilds the sample and replaces its partition directory. |
+| `tl.dmc`, `process_chromosomes_dmc` | Filters the auto-detected partition list before the engine and the multiple-testing correction, on the binary and the formula / contrast path. `plan_run` resolves the list once through `resolve_dmc_chromosomes` and carries it on the `DMCPlan`, so the engine run and every `empirical_fdr` permutation test the same universe. The resolved list is part of the low-level cache signature; `canonical_only` is part of the `resumable=True` fingerprint and recorded in `md.uns["dmc"]`. An explicit `chromosomes=` list, including an empty one, is used verbatim. |
 | `tl.dmr(method="tile")`, `call_dmr_tile_based` | Filters the auto-detected partition list before the tile test and the BH correction. `tl.dmr` resolves the list once and shares it with every `empirical_fdr` permutation. An explicit `chromosomes=` list, including an empty one, is used verbatim. |
-| `chain_merge`, `sliding_window`, `segment` | Not supported. These callers inherit the chromosome universe of the upstream DMC run and raise `ValueError` on `canonical_only=True`; filter at ingestion or restrict `tl.dmc` with `chromosomes=`. |
+| `chain_merge`, `sliding_window`, `segment` | Not supported. These callers inherit the chromosome universe of the upstream DMC run and raise `ValueError` on `canonical_only=True`; run `tl.dmc(canonical_only=True)`, filter at ingestion, or restrict `tl.dmc` with `chromosomes=`. |
+| `epykit convert`, `epykit dmc`, `epykit dmr --method tile` | `--canonical-only` forwards to `convert_sample`, to `process_chromosomes_dmc` (binary) or `tl.dmc` (formula / contrast), and to the tile caller with the list resolved once for the observed run and the permutations. The other `dmr` methods exit with an error that points at `epykit dmc --canonical-only`. |
 | `pl.manhattan` | Takes its axis order from `CANONICAL_CHROMS_UCSC` and hides other contigs unless `canonical_only=False` (unchanged plot behaviour). |
 
 ## Where to look in the source tree
