@@ -1414,7 +1414,7 @@ def dmr(
           signal; keeps the 10% per-CpG effect-size floor. Recommended
           starting point for general WGBS analyses.
         * ``"permissive"`` -- recall-oriented (alpha=1e-4,
-          dis_merge_bp=200, min_abs_meth_diff=0.05). Expect lower PPV.
+          dis_merge_bp=1000, min_abs_meth_diff=0.05). Expect lower PPV.
     tile_size_bp, min_cpgs_per_tile : int
         Tile-method options. Default ``tile_size_bp=1000``.
     test : str
