@@ -8,6 +8,17 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ### Changed
 
+- **Per-engine chromosome runners.** `dmc._process_one_chromosome` now
+  builds one frozen `EngineInput` record for the chromosome, dispatches to
+  the engine's runner (`_run_fisher`, `_run_lr`, `_run_welch_t`, `_run_glm`,
+  `_run_glm_contrast`, keyed by registry name in `_ENGINE_RUNNERS`) and
+  hands the runner's reduced per-site `EngineResult` to
+  `_finalise_chromosome`, which owns the effect estimates, intervals,
+  minimum-sample mask and column assembly. Per-sample stacks and streaming
+  accumulators end with the runner's scope. Engine output is unchanged: the
+  engine hash gate holds, and every engine path compares bit-identical on a
+  fixed fixture. The C901 complexity ceiling in `pyproject.toml` drops from
+  38 to 32, the highest remaining function in the source tree.
 - **DMC engine facts live in one registry.** `src/epykit/_dmc_engines.py`
   holds one frozen `EngineSpec` per engine (`lr`, `glm`, `welch_t`,
   `fisher` and the internal `glm_contrast`) with the facts the rest of the

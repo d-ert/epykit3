@@ -186,9 +186,9 @@ allowed-confusables = ["×"]
 
 [tool.ruff.lint.mccabe]
 # Ceiling, not a target: the smallest value with zero C901 findings in src/ at
-# the time it was set. The tl.dmc refactor PRs lower it; new code must not
-# raise it.
-max-complexity = 38
+# the time it was set. The DMC runner split lowered it from 38; the 32 is
+# annotate._build_features_index. New code must not raise it.
+max-complexity = 32
 
 [tool.ruff.lint.isort]
 known-first-party = ["epykit"]
