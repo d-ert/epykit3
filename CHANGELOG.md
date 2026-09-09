@@ -6,6 +6,113 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-09-09
+
+Upgrading from 1.1.0: no public API is removed, and every deprecated
+surface is retained. The warnings that named 1.2 as the removal release now
+say "a future major release" (see Changed and
+`docs/reference/deprecations.md`). Allele-specific methylation output
+changes on purpose: `call_asm` / `tl.asm` phase a read only when its Bismark
+`XG` conversion strand cannot convert either allele, so fabricated sites at
+bisulfite-confounded anchors disappear and anchor counts fall relative to
+1.1 (see Fixed). Everything else is opt-in and off by default: the
+count-ratio region FDR (`fdr_method="region"`) and chain_merge permutations,
+canonical chromosome filtering (`canonical_only=True` in Python,
+`--canonical-only` on `convert`, `dmc` and `dmr`), and DSS-style count
+smoothing on the CLI (`epykit dmc --smoothing --smoothing-span-bp`; DMC
+only, there is no DMR smoothing API). Numerical output on unchanged paths is
+the same and the engine hash gate holds. Existing stores are not rebuilt: a
+conversion manifest without the `canonical_only` key counts as `False`.
+`resumable=True` sidecars recompute once, because the resume fingerprint
+now keys on smoothing and `canonical_only`. CI runs the BAM-backed tests
+(`asm`, `bam_io`, `entropy`) on the Ubuntu legs. Consumers of private
+imports: `epykit.cli` is a package (handlers such as
+`epykit.cli._dmc._cmd_dmc`), `tl.dmc` runs its stages from
+`epykit._dmc_stages`, engine facts live in `epykit._dmc_engines`, and the
+private `tl._run_dmc_contrast` helper is gone.
+
+### Added
+
+- **Opt-in canonical chromosome filtering in DMC calling, and the
+  supported options on the CLI.** `tl.dmc` and both overloads of
+  `process_chromosomes_dmc` accept keyword-only `canonical_only=False`.
+  `True` keeps only the fixed human-style set of the `epykit._chroms`
+  helper from the auto-detected partitions, before the engine and before
+  the multiple-testing correction, on the binary and the `formula=` /
+  `contrast=` path; one INFO line names the dropped contigs. The new
+  `dmc.resolve_dmc_chromosomes` resolves the universe once, `plan_run`
+  carries it on the `DMCPlan`, and the engine run and every
+  `empirical_fdr` permutation receive the same explicit list. The resolved
+  list stays part of the low-level cache signature, `canonical_only` joins
+  the `resumable=True` fingerprint and is recorded as a bool in
+  `md.uns["dmc"]` on the binary, resume-hit and contrast paths. An explicit
+  `chromosomes=` list, including an empty one, is used verbatim, and a
+  store without canonical contigs yields the usual empty result. The
+  `tl.dmr` rejection for non-tile methods now points at
+  `tl.dmc(canonical_only=True)`. On the CLI, `convert`, `dmc` and `dmr`
+  take `--canonical-only` (default off): `convert` forwards it to
+  `convert_sample`, the binary `dmc` path to `process_chromosomes_dmc` and
+  the `--formula` / `--contrast` path to `tl.dmc`, and `dmr --method tile`
+  resolves the list once for the tile caller and every `--empirical-fdr`
+  permutation; the DMC-derived `dmr` methods exit with an error that points
+  at `epykit dmc --canonical-only`. `dmc` also takes `--smoothing` (default
+  off) and `--smoothing-span-bp` (default 500), forwarded to the binary
+  engine; the span must be positive while smoothing is on, and because only
+  the `lr` engine reads the knobs, `--smoothing` with another engine, with
+  the `--allow-n1` Fisher fallback, or on the `--formula` / `--contrast`
+  path exits with an error instead of being ignored. No DMR smoothing,
+  `--all-contigs` or lr+ flags are added. Defaults and numerical output are
+  unchanged; the engine hash gate holds. The CLI reference now documents
+  the `--tsv` flags as the primary names with the `--csv` flags as
+  deprecated aliases, and its examples use the flags the commands accept.
+  See `docs/analysis/dmc.md`, `docs/cli/index.md` and
+  `docs/advanced/architecture.md`.
+- **Opt-in count-ratio region FDR and chain_merge permutations.**
+  `tl.dmr(..., empirical_fdr=True)` and `empirical_fdr_for_dmr` accept
+  `fdr_method`. `"max_t"` (the default) keeps the Westfall-Young min-P
+  numbers of 1.1; `"region"` selects the count-ratio target-decoy FDR
+  (BSmooth / SAM): the mean decoy survivor count divided by the observed
+  survivor count at each threshold, made monotone. In region mode
+  `empirical_pvalue` is the pooled-null tail fraction (a diagnostic),
+  self/mirror assignments and failed permutations leave the null, a clean
+  zero-survivor permutation counts as zero decoys, and zero usable
+  assignments yield NaN with a `UserWarning`. A constant `empirical_fdr_set`
+  column (NaN under `max_t`) and the `md.uns["dmr_params"]` keys
+  `fdr_method` and `empirical_fdr_set` are added on the empirical paths.
+  `tl.dmr(method="chain_merge", empirical_fdr=True)` is now admitted: the
+  new `empirical_fdr_for_chain_merge` replays the observed DMC from
+  `md.uns["dmc"]` (two-group `lr` / `welch_t` / `fisher` only) over the
+  observed chromosome universe with the observed multiple-testing method,
+  in a private temporary store per permutation, then chain-merges and
+  filters like the observed run. GLM / contrast / `use_smoothed` DMCs, a
+  `chromosomes=` restriction that differs from the observed universe, and
+  a missing or partial `empirical_strata` column raise before any
+  permutation (the strata check now also applies to the tile harness).
+  `n_perm` must be positive. `sliding_window` / `segment` and the CLI are
+  unchanged. See `docs/analysis/dmr.md` and
+  `docs/review/2026-06-08-region-empirical-fdr-design.md`.
+- **Opt-in canonical chromosome filtering at ingestion and in tile DMR
+  calling.** `read_bismark`, `read_methyldackel`,
+  `read_combined_strand_bed`, `convert_sample` and `ensure_converted_sample`
+  accept `canonical_only=False`. `True` drops every contig outside the fixed
+  human-style set of the `epykit._chroms` helper (`1`-`22`, `X`, `Y`,
+  `M`/`MT`, with or without a `chr` prefix) before the partition write and
+  logs one INFO line per sample naming the dropped contigs. The setting is
+  recorded in the per-sample conversion manifest: a cached sample converted
+  under a different setting is rebuilt and its partition directory replaced,
+  and a manifest without the key counts as `False`. `tl.dmr(method="tile")`
+  and `call_dmr_tile_based` accept keyword-only `canonical_only=False`,
+  which filters the auto-detected chromosomes before the tile test and the
+  BH correction; the same resolved list is used for the observed tiles and
+  every `empirical_fdr` permutation, and the option is recorded in
+  `md.uns["dmr_params"]`. An explicit `chromosomes=` list, including an
+  empty one, is used verbatim. `chain_merge`, `sliding_window` and
+  `segment` inherit the DMC run's universe and raise `ValueError` on
+  `canonical_only=True`. `pl.manhattan` takes its chromosome order from the
+  shared helper (same order as before). Defaults and numerical output are
+  unchanged; the DMC engine and the CLI are not part of this change. See
+  `docs/io/read-bismark.md` and `docs/advanced/architecture.md`.
+
 ### Changed
 
 - **The CLI is a package.** `src/epykit/cli.py` is now the package
@@ -115,91 +222,6 @@ SemVer (`MAJOR.MINOR.PATCH`).
 - Tile permutation FDR applies the same `min_mean_qvalue` post-filter to
   observed and null regions. The Python API and CLI forward the cutoff,
   so excluded null regions cannot inflate the estimated FDR.
-
-### Added
-
-- **Opt-in canonical chromosome filtering in DMC calling, and the
-  supported options on the CLI.** `tl.dmc` and both overloads of
-  `process_chromosomes_dmc` accept keyword-only `canonical_only=False`.
-  `True` keeps only the fixed human-style set of the `epykit._chroms`
-  helper from the auto-detected partitions, before the engine and before
-  the multiple-testing correction, on the binary and the `formula=` /
-  `contrast=` path; one INFO line names the dropped contigs. The new
-  `dmc.resolve_dmc_chromosomes` resolves the universe once, `plan_run`
-  carries it on the `DMCPlan`, and the engine run and every
-  `empirical_fdr` permutation receive the same explicit list. The resolved
-  list stays part of the low-level cache signature, `canonical_only` joins
-  the `resumable=True` fingerprint and is recorded as a bool in
-  `md.uns["dmc"]` on the binary, resume-hit and contrast paths. An explicit
-  `chromosomes=` list, including an empty one, is used verbatim, and a
-  store without canonical contigs yields the usual empty result. The
-  `tl.dmr` rejection for non-tile methods now points at
-  `tl.dmc(canonical_only=True)`. On the CLI, `convert`, `dmc` and `dmr`
-  take `--canonical-only` (default off): `convert` forwards it to
-  `convert_sample`, the binary `dmc` path to `process_chromosomes_dmc` and
-  the `--formula` / `--contrast` path to `tl.dmc`, and `dmr --method tile`
-  resolves the list once for the tile caller and every `--empirical-fdr`
-  permutation; the DMC-derived `dmr` methods exit with an error that points
-  at `epykit dmc --canonical-only`. `dmc` also takes `--smoothing` (default
-  off) and `--smoothing-span-bp` (default 500), forwarded to the binary
-  engine; the span must be positive while smoothing is on, and because only
-  the `lr` engine reads the knobs, `--smoothing` with another engine, with
-  the `--allow-n1` Fisher fallback, or on the `--formula` / `--contrast`
-  path exits with an error instead of being ignored. No DMR smoothing,
-  `--all-contigs` or lr+ flags are added. Defaults and numerical output are
-  unchanged; the engine hash gate holds. The CLI reference now documents
-  the `--tsv` flags as the primary names with the `--csv` flags as
-  deprecated aliases, and its examples use the flags the commands accept.
-  See `docs/analysis/dmc.md`, `docs/cli/index.md` and
-  `docs/advanced/architecture.md`.
-- **Opt-in count-ratio region FDR and chain_merge permutations.**
-  `tl.dmr(..., empirical_fdr=True)` and `empirical_fdr_for_dmr` accept
-  `fdr_method`. `"max_t"` (the default) keeps the Westfall-Young min-P
-  numbers of 1.1; `"region"` selects the count-ratio target-decoy FDR
-  (BSmooth / SAM): the mean decoy survivor count divided by the observed
-  survivor count at each threshold, made monotone. In region mode
-  `empirical_pvalue` is the pooled-null tail fraction (a diagnostic),
-  self/mirror assignments and failed permutations leave the null, a clean
-  zero-survivor permutation counts as zero decoys, and zero usable
-  assignments yield NaN with a `UserWarning`. A constant `empirical_fdr_set`
-  column (NaN under `max_t`) and the `md.uns["dmr_params"]` keys
-  `fdr_method` and `empirical_fdr_set` are added on the empirical paths.
-  `tl.dmr(method="chain_merge", empirical_fdr=True)` is now admitted: the
-  new `empirical_fdr_for_chain_merge` replays the observed DMC from
-  `md.uns["dmc"]` (two-group `lr` / `welch_t` / `fisher` only) over the
-  observed chromosome universe with the observed multiple-testing method,
-  in a private temporary store per permutation, then chain-merges and
-  filters like the observed run. GLM / contrast / `use_smoothed` DMCs, a
-  `chromosomes=` restriction that differs from the observed universe, and
-  a missing or partial `empirical_strata` column raise before any
-  permutation (the strata check now also applies to the tile harness).
-  `n_perm` must be positive. `sliding_window` / `segment` and the CLI are
-  unchanged. See `docs/analysis/dmr.md` and
-  `docs/review/2026-06-08-region-empirical-fdr-design.md`.
-- **Opt-in canonical chromosome filtering at ingestion and in tile DMR
-  calling.** `read_bismark`, `read_methyldackel`,
-  `read_combined_strand_bed`, `convert_sample` and `ensure_converted_sample`
-  accept `canonical_only=False`. `True` drops every contig outside the fixed
-  human-style set of the `epykit._chroms` helper (`1`-`22`, `X`, `Y`,
-  `M`/`MT`, with or without a `chr` prefix) before the partition write and
-  logs one INFO line per sample naming the dropped contigs. The setting is
-  recorded in the per-sample conversion manifest: a cached sample converted
-  under a different setting is rebuilt and its partition directory replaced,
-  and a manifest without the key counts as `False`. `tl.dmr(method="tile")`
-  and `call_dmr_tile_based` accept keyword-only `canonical_only=False`,
-  which filters the auto-detected chromosomes before the tile test and the
-  BH correction; the same resolved list is used for the observed tiles and
-  every `empirical_fdr` permutation, and the option is recorded in
-  `md.uns["dmr_params"]`. An explicit `chromosomes=` list, including an
-  empty one, is used verbatim. `chain_merge`, `sliding_window` and
-  `segment` inherit the DMC run's universe and raise `ValueError` on
-  `canonical_only=True`. `pl.manhattan` takes its chromosome order from the
-  shared helper (same order as before). Defaults and numerical output are
-  unchanged; the DMC engine and the CLI are not part of this change. See
-  `docs/io/read-bismark.md` and `docs/advanced/architecture.md`.
-
-### Fixed
-
 - **`resumable=True` now keys on count smoothing.** The resume fingerprint
   did not include `smoothing` or `smoothing_span_bp`, so
   `tl.dmc(smoothing=True, resumable=True)` after an unsmoothed resumable

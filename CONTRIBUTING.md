@@ -40,7 +40,7 @@ Tests slower than about five seconds carry `@pytest.mark.slow`.
   use `pl.scan_parquet` on a partition glob. Anything under `tl.dmc` must
   keep peak memory at O(largest chromosome).
 - **Library code never calls `print()`.** Use
-  `logger = logging.getLogger(__name__)`. Only `cli.py` prints, and only the
+  `logger = logging.getLogger(__name__)`. Only the `cli/` package prints, and only the
   final result line. A test enforces this.
 - **Preprocessing state is derived.** A new `pp.*` step appends to
   `md.uns["_store_history"]` and repoints `md.store`. Do not add boolean
