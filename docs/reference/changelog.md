@@ -5,6 +5,33 @@ The full version history is maintained in the project's
 at the repository root. Deprecated names that still work, and what replaces
 them, are listed on the [Deprecations](deprecations.md) page.
 
+## 1.2.0 highlights (2026-09-09)
+
+1.2 lands the post-1.1 salvage and refactor work. No public API was removed,
+and defaults are unchanged.
+
+- **Deprecations retained.** Every deprecated surface stays. Its warning no
+  longer names a removal release; `docs/reference/deprecations.md` lists the
+  names, replacements and schedules.
+- **ASM phasing is bisulfite-safe.** `call_asm` / `tl.asm` phase a read only
+  when its Bismark `XG` strand cannot convert either allele. Fabricated sites
+  disappear and anchor counts fall; this changes ASM output on purpose.
+- **Opt-in region FDR.** `tl.dmr(..., empirical_fdr=True, fdr_method="region")`
+  selects the count-ratio target-decoy estimator, and `method="chain_merge"`
+  now supports permutations.
+- **Opt-in canonical chromosome filtering.** `canonical_only=True` at
+  ingestion, in `tl.dmc` and in tile DMR calling; `--canonical-only` on
+  `convert`, `dmc` and `dmr`.
+- **DMC smoothing on the CLI.** `epykit dmc --smoothing --smoothing-span-bp`
+  forwards DSS-style count smoothing to the `lr` engine.
+- **Internals.** `epykit.cli` is a package, `tl.dmc` runs as stages, engine
+  facts live in one registry and each engine has its own runner. Engine
+  output is unchanged.
+- **Fixes.** BAM region calls are clipped to the requested window, the resume
+  fingerprint keys on smoothing, conversion replaces a sample's partitions
+  only after a successful write, and the permutation FDR counts exclude
+  missing statistics and apply the observed tile cutoff.
+
 ## 1.1.0 highlights (2026-09-05)
 
 1.1 is a maintenance release: the pre-submission review fixes, a redesigned
