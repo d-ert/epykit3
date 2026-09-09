@@ -2072,9 +2072,7 @@ def empirical_fdr_for_dmr(
                 backend=backend,
                 **kwargs,
             )
-            null_df = apply_region_qfilter(
-                null_df, min_mean_qvalue, candidate_cols=("qvalue",)
-            )
+            null_df = apply_region_qfilter(null_df, min_mean_qvalue, candidate_cols=("qvalue",))
         except Exception as exc:
             logger.warning("permutation %d failed: %s", perm_idx, exc)
             return (is_self, None)
