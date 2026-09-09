@@ -43,11 +43,11 @@ import polars as pl
 from ._dmc_config import DMCConfig
 from .dmc import (
     DMCStore,
-    _canonicalise_test_name,
     apply_multiple_testing_correction,
     combine_neighbour_pvalues,
     empirical_fdr_for_dmc,
     process_chromosomes_dmc,
+    resolve_dmc_chromosomes,
 )
 from .methyldata import MethylData
 
@@ -56,10 +56,10 @@ logger = logging.getLogger(__name__)
 Mode = Literal["binary", "contrast"]
 
 _LOG2_ODDS_RATIO_NOTICE = (
-    "The 'log2_odds_ratio' column is deprecated and is slated for "
-    "removal in 1.2. Use 'log2_odds_ratio_pooled' for pooled-count "
-    "tests (lr, fisher) or 'coef_treatment_log2' for the glm backend. "
-    "The transitional column is NaN-filled."
+    "The 'log2_odds_ratio' column is deprecated and is slated for removal "
+    "in a future major release. Use 'log2_odds_ratio_pooled' for "
+    "pooled-count tests (lr, fisher) or 'coef_treatment_log2' for the glm "
+    "backend. The transitional column is NaN-filled."
 )
 
 
@@ -90,9 +90,12 @@ class DMCPlan:
     cfg: DMCConfig
     mode: Mode
     selected_test: str
-    """The engine after ``"auto"`` resolution; ``"glm_contrast"`` in contrast mode."""
-    canonical_test: str
-    """``_canonicalise_test_name(selected_test)``; the ``test_used`` recorded in uns."""
+    """The engine after ``"auto"`` resolution, ``"glm_contrast"`` in contrast
+    mode; the ``test_used`` recorded in uns and the resume stage name."""
+    chromosomes: list[str]
+    """The chromosome universe, resolved once from ``cfg.chromosomes`` and
+    ``cfg.canonical_only`` against ``md.store``. The engine run and every
+    ``empirical_fdr`` permutation receive this same explicit list."""
     unite: bool
     smooth_method: str | None
     key: str
@@ -153,12 +156,13 @@ class DMCOutcome:
 def plan_run(md: MethylData, cfg: DMCConfig) -> DMCPlan:
     """Validate the request and fix every run-time choice.
 
-    In order: TSV resolution, ``cfg.validate``, the formula / contrast
-    dispatch (with the refusals that path cannot honour), the n=1 and
-    union guards, ``"auto"`` test selection, ``apply_power_stack``,
-    ``validate_resolved``, the one-time Fisher warning, ``unite`` from
-    ``md.uns["unite"]`` and ``smooth_method`` from
-    ``md.uns["smooth_params"]``.
+    In order: TSV resolution, ``cfg.validate``, the chromosome universe
+    (``cfg.chromosomes`` verbatim, else the store's partitions filtered by
+    ``cfg.canonical_only``), the formula / contrast dispatch (with the
+    refusals that path cannot honour), the n=1 and union guards, ``"auto"``
+    test selection, ``apply_power_stack``, ``validate_resolved``, the
+    one-time Fisher warning, ``unite`` from ``md.uns["unite"]`` and
+    ``smooth_method`` from ``md.uns["smooth_params"]``.
 
     Raises ``ValueError`` in the same order as the pre-split ``tl.dmc``.
     Emits no result; everything after this stage is mechanical.
@@ -192,6 +196,13 @@ def plan_run(md: MethylData, cfg: DMCConfig) -> DMCPlan:
 
     cfg.validate()
 
+    # One resolution, one audit line, whatever path follows. The smoothed
+    # temp store of use_smoothed=True mirrors md.store's partitions, so the
+    # list resolved here is valid for the store the engine actually reads.
+    chromosomes = resolve_dmc_chromosomes(
+        md.store, cfg.chromosomes, canonical_only=cfg.canonical_only
+    )
+
     unite_info = md.uns.get("unite")
     unite = (unite_info is not None) and (unite_info.get("type") == "intersect")
 
@@ -201,7 +212,7 @@ def plan_run(md: MethylData, cfg: DMCConfig) -> DMCPlan:
             cfg=cfg,
             mode="contrast",
             selected_test="glm_contrast",
-            canonical_test="glm_contrast",
+            chromosomes=chromosomes,
             unite=unite,
             smooth_method=None,
             key="dmc_glm_contrast",
@@ -236,13 +247,12 @@ def plan_run(md: MethylData, cfg: DMCConfig) -> DMCPlan:
         _warn_fisher_once(stacklevel=4)
     smooth_method = md.uns.get("smooth_params", {}).get("method") if cfg.use_smoothed else None
 
-    canonical_test = _canonicalise_test_name(selected_test)
-    key = f"dmc_{canonical_test}_smoothed" if cfg.use_smoothed else f"dmc_{canonical_test}"
+    key = f"dmc_{selected_test}_smoothed" if cfg.use_smoothed else f"dmc_{selected_test}"
     return DMCPlan(
         cfg=cfg,
         mode="binary",
         selected_test=selected_test,
-        canonical_test=canonical_test,
+        chromosomes=chromosomes,
         unite=unite,
         smooth_method=smooth_method,
         key=key,
@@ -296,7 +306,7 @@ def lookup_resume(md: MethylData, plan: DMCPlan) -> ResumeTicket | None:
         return None
     from ._cache import input_signature, manifest_find
 
-    stage_name = f"dmc_{plan.canonical_test}"
+    stage_name = f"dmc_{plan.selected_test}"
     root = md.analysis_root or md.store
     if not root:
         return None
@@ -368,9 +378,10 @@ def run_engine(md: MethylData, plan: DMCPlan, store_path: str) -> DMCStore:
     """Stream the per-CpG test and apply the FDR correction in place.
 
     One call to ``process_chromosomes_dmc(..., return_store=True)`` with the
-    knobs read from ``plan.cfg``, then ``apply_multiple_testing_correction``
-    on the store. Returns the streaming store; nothing is materialised here.
-    The per-chrom parquet directory is the source of truth, so both the
+    knobs read from ``plan.cfg`` and the chromosome list resolved in
+    :func:`plan_run`, then ``apply_multiple_testing_correction`` on the
+    store. Returns the streaming store; nothing is materialised here. The
+    per-chrom parquet directory is the source of truth, so both the
     correction and downstream DMR stream chromosomes from disk.
     """
     cfg = plan.cfg
@@ -379,7 +390,7 @@ def run_engine(md: MethylData, plan: DMCPlan, store_path: str) -> DMCStore:
         samples_treatment=md.treatment_ids,
         samples_control=md.control_ids,
         test=plan.selected_test,
-        chromosomes=cfg.chromosomes,
+        chromosomes=plan.chromosomes,
         unite=plan.unite,
         min_samples_treatment=cfg.min_samples_treatment,
         min_samples_control=cfg.min_samples_control,
@@ -445,7 +456,9 @@ def post_process(
             seed=cfg.perm_seed,
             n_jobs=cfg.perm_n_jobs,
             test=plan.selected_test,
-            chromosomes=cfg.chromosomes,
+            # The observed universe, so the null replays the same scan
+            # whether the list came from the caller or from canonical_only.
+            chromosomes=plan.chromosomes,
             unite=plan.unite,
             min_samples_treatment=cfg.min_samples_treatment,
             min_samples_control=cfg.min_samples_control,
@@ -544,7 +557,7 @@ def run_contrast(md: MethylData, plan: DMCPlan) -> DMCOutcome:
         samples_treatment=samples_case,
         samples_control=samples_control,
         test="glm_contrast",
-        chromosomes=cfg.chromosomes,
+        chromosomes=plan.chromosomes,
         unite=plan.unite,
         min_samples_treatment=cfg.min_samples_treatment,
         min_samples_control=cfg.min_samples_control,
@@ -580,7 +593,7 @@ def publish(md: MethylData, plan: DMCPlan, outcome: DMCOutcome) -> None:
         md.varm[plan.key] = outcome.result
     design = outcome.design
     md.uns["dmc"] = plan.cfg.to_uns(
-        test_used=plan.canonical_test,
+        test_used=plan.selected_test,
         n_sites=outcome.n_sites,
         materialized=outcome.result is not None,
         unite=plan.unite,
@@ -618,7 +631,7 @@ def persist_resume(
             ticket.root,
             ticket.stage_name,
             params={
-                "test": plan.canonical_test,
+                "test": plan.selected_test,
                 "unite": plan.unite,
                 "min_samples_treatment": cfg.min_samples_treatment,
                 "min_samples_control": cfg.min_samples_control,

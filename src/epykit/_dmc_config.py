@@ -14,38 +14,12 @@ import logging
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
+from ._dmc_engines import engine_spec
+
 logger = logging.getLogger(__name__)
 
 PowerStack = Literal["auto", "lr+", "conservative", "off"]
 _POWER_STACK_MODES = frozenset({"auto", "lr+", "conservative", "off"})
-
-# Engines removed in 0.7.5. Each raises ValueError with the migration hint.
-_REMOVED_ENGINES = {
-    "logit_t": (
-        "test='logit_t' was removed in 0.7.5 (miscalibrated near β=0/1). "
-        "Use test='welch_t' for the replicate-aware β-mean test or "
-        "test='lr' for the recommended default."
-    ),
-    "bb_lr": (
-        "test='bb_lr' was removed in 0.7.5 (TPR < 8% at n ≤ 4 + a "
-        "dispersion-df bug). Use test='lr' (recommended) which uses "
-        "the same quasi-binomial dispersion but pools counts per group "
-        "for higher power at small n."
-    ),
-    "score": (
-        "test='score' was removed in 0.7.5 (strictly dominated by "
-        "test='lr' in finite samples; asymptotically equivalent under "
-        "H0). Switch test='score' -> test='lr'; output schema is "
-        "identical."
-    ),
-    "cmh": (
-        "test='cmh' was removed in 0.7.5 (stratification semantics "
-        "confusing; dominated by GLM with batch covariate). For "
-        "stratified analysis use tl.dmc(formula='~ group + batch'), "
-        "which gives proper dispersion correction and handles "
-        "continuous covariates."
-    ),
-}
 
 
 @dataclass(frozen=True)
@@ -80,6 +54,7 @@ class DMCConfig:
     use_smoothed: bool = False
     smoothing: bool = False
     smoothing_span_bp: int = 500
+    canonical_only: bool = False
     fdr_method: str = "fdr_bh"
     neighbour_combine: bool = False
     neighbour_bp: int = 500
@@ -101,14 +76,16 @@ class DMCConfig:
             object.__setattr__(self, "power_stack", "lr+" if self.power_stack else "off")
 
     def validate(self) -> None:
-        """Reject the engines removed in 0.7.5 with their migration hints.
+        """Reject removed and unknown engine names.
 
-        Runs before the formula / contrast dispatch, so a removed engine
-        name is refused on every path.
+        Runs before the formula / contrast dispatch, so a bad ``test`` is
+        refused on every path before any store is opened. An engine removed
+        in 0.7.5 raises with its migration hint, any other unknown name with
+        the public choice list. ``"auto"`` passes: the binary path resolves
+        it after the n=1 guard.
         """
-        message = _REMOVED_ENGINES.get(self.test)
-        if message is not None:
-            raise ValueError(message)
+        if self.test != "auto":
+            engine_spec(self.test)
 
     def validate_resolved(self) -> None:
         """Checks that need the power stack resolved first.
@@ -150,13 +127,15 @@ class DMCConfig:
         """Resolve the ``lr+`` power stack into its component knobs.
 
         Returns a copy with ``neighbour_combine``, ``fdr_method`` and
-        ``sep_fallback`` switched on for the ``lr`` engine: ``"lr+"`` and
-        ``"auto"`` engage at any n, ``"conservative"`` only at n <= 2,
-        ``"off"`` leaves the user's values alone. The fourth component,
-        ``dispersion="eb"``, is already the default. Knobs the user set
-        themselves are kept.
+        ``sep_fallback`` switched on when the registry says the stack
+        applies to ``selected_test`` (only ``lr``): ``"lr+"`` and ``"auto"``
+        engage at any n, ``"conservative"`` only at n <= 2, ``"off"`` leaves
+        the user's values alone. The fourth component, ``dispersion="eb"``,
+        is already the default. Knobs the user set themselves are kept.
         """
-        if selected_test != "lr" or self.power_stack not in {"auto", "lr+", "conservative"}:
+        if not engine_spec(selected_test).power_stack_applies:
+            return self
+        if self.power_stack not in {"auto", "lr+", "conservative"}:
             return self
         if self.power_stack == "conservative" and min_n > 2:
             return self
@@ -188,12 +167,16 @@ class DMCConfig:
         """The params half of the ``resumable=True`` fingerprint.
 
         Every knob that changes engine output is listed, including the
-        ``lr+`` stack knobs: leaving one out would let a parameter sweep
-        silently reuse a cached result computed at different values.
+        ``lr+`` stack knobs, ``canonical_only`` and the DSS-style count
+        smoothing: leaving one out would let a parameter sweep silently
+        reuse a cached result computed at different values. The smoothing
+        span is keyed only while smoothing is on, so changing an unused
+        span does not invalidate a cache.
         """
         return {
             "test": selected_test,
             "chromosomes": self.chromosomes,
+            "canonical_only": self.canonical_only,
             "unite": unite,
             "min_samples_treatment": self.min_samples_treatment,
             "min_samples_control": self.min_samples_control,
@@ -208,6 +191,8 @@ class DMCConfig:
             "neighbour_combine": self.neighbour_combine,
             "neighbour_bp": self.neighbour_bp,
             "fdr_method": self.fdr_method,
+            "smoothing": self.smoothing,
+            "smoothing_span_bp": self.smoothing_span_bp if self.smoothing else None,
         }
 
     def to_uns(
@@ -237,8 +222,10 @@ class DMCConfig:
         the resolved ``formula`` and ``contrast`` label. That path does not
         consume the power stack, permutation FDR or smoothing knobs, so
         they are recorded as ``None`` there; the binary path records the
-        contrast fields as ``None``. ``store_path`` is ``None`` when no
-        DMCStore was opened (the resume cache hit).
+        contrast fields as ``None``. ``canonical_only`` shapes the
+        chromosome universe on every path and is recorded as a bool on all
+        three. ``store_path`` is ``None`` when no DMCStore was opened (the
+        resume cache hit).
         """
         binary = design_terms is None
 
@@ -275,6 +262,9 @@ class DMCConfig:
             "smoothing_span_bp": binary_only(
                 int(self.smoothing_span_bp) if self.smoothing else None
             ),
+            # Opt-in canonical chromosome filter of the auto-detected
+            # partitions; applies to the binary and the contrast run alike.
+            "canonical_only": bool(self.canonical_only),
             # Persistent per-chromosome DMCStore, so tl.dmr can stream
             # chromosomes from disk instead of holding the full table.
             "store_path": store_path,

@@ -73,9 +73,10 @@ Results are stored at `md.varm["dvc"]`:
 | `mean_filter_alpha` | float | 0.05 | p-value threshold for mean filter (sites must **exceed** this) |
 | `backend` | str | `"sequential"` | Execution backend |
 | `n_workers` | int | None | Worker pool size |
-| `csv` | str | None | Write the significant DVCs (q < `csv_alpha`) to this TSV path. Pass `csv=False` to disable. |
-| `csv_full` | bool | False | Also emit the full DVC table alongside the significant TSV. |
-| `csv_alpha` | float | 0.05 | q-value threshold used to filter the significant TSV. |
+| `tsv` | str | None | Write the significant DVCs (q < `tsv_alpha`) to this path; nothing is written when unset. Tab-delimited unless the path ends in `.csv`. |
+| `tsv_full` | bool | False | Also emit the full DVC table alongside the significant table. |
+| `tsv_alpha` | float | 0.05 | q-value threshold used to filter the significant table. |
+| `csv`, `csv_full`, `csv_alpha` | | | Deprecated aliases for the three `tsv*` parameters. They still work, emit a `DeprecationWarning`, and lose to the `tsv*` value when both are given. |
 
 Summary metadata is stored at `md.uns["dvc"]`:
 

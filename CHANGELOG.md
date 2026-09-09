@@ -8,6 +8,40 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ### Changed
 
+- **The CLI is a package.** `src/epykit/cli.py` is now the package
+  `src/epykit/cli/`. `_common.py` holds the helpers every command shares
+  (logging setup, the `--tsv` sibling-table options, `--min-samples-*`,
+  samplesheet group reading and the n=1 checks); `_ingest.py` (convert,
+  filter, summary), `_dmc.py`, `_dmr.py` and `_downstream.py` (annotate,
+  qc-report, smooth, report, aggregate-regions, export) each register their
+  subcommands, and `build_parser` calls the four registrars in that order.
+  Command names, options, defaults, help text and output are unchanged;
+  `epykit` and `python -m epykit.cli` work as before. Private handlers moved
+  with their commands (for example `epykit.cli._dmr._cmd_dmr`), and the
+  stdout guard test now exempts the `cli/` directory rather than one file.
+- **Per-engine chromosome runners.** `dmc._process_one_chromosome` now
+  builds one frozen `EngineInput` record for the chromosome, dispatches to
+  the engine's runner (`_run_fisher`, `_run_lr`, `_run_welch_t`, `_run_glm`,
+  `_run_glm_contrast`, keyed by registry name in `_ENGINE_RUNNERS`) and
+  hands the runner's reduced per-site `EngineResult` to
+  `_finalise_chromosome`, which owns the effect estimates, intervals,
+  minimum-sample mask and column assembly. Per-sample stacks and streaming
+  accumulators end with the runner's scope. Engine output is unchanged: the
+  engine hash gate holds, and every engine path compares bit-identical on a
+  fixed fixture. The C901 complexity ceiling in `pyproject.toml` drops from
+  38 to 32, the highest remaining function in the source tree.
+- **DMC engine facts live in one registry.** `src/epykit/_dmc_engines.py`
+  holds one frozen `EngineSpec` per engine (`lr`, `glm`, `welch_t`,
+  `fisher` and the internal `glm_contrast`) with the facts the rest of the
+  package reads: whether it is a public `test=` choice, whether the `lr+`
+  power stack applies, and which effect-size column it emits. Both CLI
+  `--test` choice lists come from it, in the same order with the same
+  default. An unknown engine name now raises `ValueError` naming the four
+  public engines from `tl.dmc` and from `dmc.process_chromosomes_dmc`
+  before any DMC store directory is created; it used to reach a
+  `NotImplementedError` per chromosome after the directory existed. The
+  engines removed in 0.7.5 keep their migration hints, `"auto"` resolves as
+  before, and engine output is unchanged (the engine hash gate holds).
 - **`tl.dmc` orchestration split into stages.** The body of `ep.tl.dmc` now
   runs nine stages from `src/epykit/_dmc_stages.py` (`plan_run`,
   `run_contrast`, `lookup_resume`, `open_input_store`, `run_engine`,
@@ -25,6 +59,22 @@ SemVer (`MAJOR.MINOR.PATCH`).
   matrix and the slow job install the `bam` extra, so `test_asm.py`,
   `test_bam_io.py` and `test_entropy.py` execute instead of skipping.
   Windows legs are unchanged (`pysam` has no Windows wheel).
+- **Deprecation schedule: 1.2 retains every deprecated surface.** The
+  transitional `log2_odds_ratio` DMC column, the `epykit.dmr_hmm` import
+  shim and the `__getattr__` shim for the five top-level DMC names demoted
+  in 1.0 were announced as "removed in 1.2". All three stay, and their
+  warnings now say "a future major release": no maintainer decision on a
+  removal version exists, so the code no longer names one. Warning
+  categories and behaviour are unchanged. `pp.unite()` (scheduled for 2.0)
+  and the `csv` / `csv_full` / `csv_alpha` keyword aliases on `tl.qc`,
+  `tl.dmc`, `tl.dmr`, `tl.dvc` and `tl.annotate` (scheduled for a future
+  release) keep their existing wording. Every warning names its replacement:
+  `pp.set_unite_type`, `epykit.dmr_segment.call_dmr_rule_segment`,
+  `log2_odds_ratio_pooled` (pooled-count engines) or `coef_treatment_log2`
+  (GLM), and the `tsv` / `tsv_full` / `tsv_alpha` keywords. The keyword
+  never selects the delimiter; a `.csv` path suffix does. The new
+  `docs/reference/deprecations.md` page lists the retained names, their
+  replacements and their schedules.
 
 ### Fixed
 
@@ -55,6 +105,115 @@ SemVer (`MAJOR.MINOR.PATCH`).
   now reports the anchors that phased at least one read, the anchors
   rejected by class before any read was fetched, and the read-anchor
   observations the strand rule rejected. The public API is unchanged.
+- Direct sample conversion replaces the previous sample directory after
+  all partitions are written. Enabling `canonical_only` removes old scaffold
+  partitions, including when no chromosomes remain. A failed write preserves
+  the previous sample.
+- Region permutation FDR excludes missing and non-finite observed p-values
+  from survivor counts. Such rows retain NaN estimates and cannot lower
+  valid regions' q-values or the set-level FDR.
+- Tile permutation FDR applies the same `min_mean_qvalue` post-filter to
+  observed and null regions. The Python API and CLI forward the cutoff,
+  so excluded null regions cannot inflate the estimated FDR.
+
+### Added
+
+- **Opt-in canonical chromosome filtering in DMC calling, and the
+  supported options on the CLI.** `tl.dmc` and both overloads of
+  `process_chromosomes_dmc` accept keyword-only `canonical_only=False`.
+  `True` keeps only the fixed human-style set of the `epykit._chroms`
+  helper from the auto-detected partitions, before the engine and before
+  the multiple-testing correction, on the binary and the `formula=` /
+  `contrast=` path; one INFO line names the dropped contigs. The new
+  `dmc.resolve_dmc_chromosomes` resolves the universe once, `plan_run`
+  carries it on the `DMCPlan`, and the engine run and every
+  `empirical_fdr` permutation receive the same explicit list. The resolved
+  list stays part of the low-level cache signature, `canonical_only` joins
+  the `resumable=True` fingerprint and is recorded as a bool in
+  `md.uns["dmc"]` on the binary, resume-hit and contrast paths. An explicit
+  `chromosomes=` list, including an empty one, is used verbatim, and a
+  store without canonical contigs yields the usual empty result. The
+  `tl.dmr` rejection for non-tile methods now points at
+  `tl.dmc(canonical_only=True)`. On the CLI, `convert`, `dmc` and `dmr`
+  take `--canonical-only` (default off): `convert` forwards it to
+  `convert_sample`, the binary `dmc` path to `process_chromosomes_dmc` and
+  the `--formula` / `--contrast` path to `tl.dmc`, and `dmr --method tile`
+  resolves the list once for the tile caller and every `--empirical-fdr`
+  permutation; the DMC-derived `dmr` methods exit with an error that points
+  at `epykit dmc --canonical-only`. `dmc` also takes `--smoothing` (default
+  off) and `--smoothing-span-bp` (default 500), forwarded to the binary
+  engine; the span must be positive while smoothing is on, and because only
+  the `lr` engine reads the knobs, `--smoothing` with another engine, with
+  the `--allow-n1` Fisher fallback, or on the `--formula` / `--contrast`
+  path exits with an error instead of being ignored. No DMR smoothing,
+  `--all-contigs` or lr+ flags are added. Defaults and numerical output are
+  unchanged; the engine hash gate holds. The CLI reference now documents
+  the `--tsv` flags as the primary names with the `--csv` flags as
+  deprecated aliases, and its examples use the flags the commands accept.
+  See `docs/analysis/dmc.md`, `docs/cli/index.md` and
+  `docs/advanced/architecture.md`.
+- **Opt-in count-ratio region FDR and chain_merge permutations.**
+  `tl.dmr(..., empirical_fdr=True)` and `empirical_fdr_for_dmr` accept
+  `fdr_method`. `"max_t"` (the default) keeps the Westfall-Young min-P
+  numbers of 1.1; `"region"` selects the count-ratio target-decoy FDR
+  (BSmooth / SAM): the mean decoy survivor count divided by the observed
+  survivor count at each threshold, made monotone. In region mode
+  `empirical_pvalue` is the pooled-null tail fraction (a diagnostic),
+  self/mirror assignments and failed permutations leave the null, a clean
+  zero-survivor permutation counts as zero decoys, and zero usable
+  assignments yield NaN with a `UserWarning`. A constant `empirical_fdr_set`
+  column (NaN under `max_t`) and the `md.uns["dmr_params"]` keys
+  `fdr_method` and `empirical_fdr_set` are added on the empirical paths.
+  `tl.dmr(method="chain_merge", empirical_fdr=True)` is now admitted: the
+  new `empirical_fdr_for_chain_merge` replays the observed DMC from
+  `md.uns["dmc"]` (two-group `lr` / `welch_t` / `fisher` only) over the
+  observed chromosome universe with the observed multiple-testing method,
+  in a private temporary store per permutation, then chain-merges and
+  filters like the observed run. GLM / contrast / `use_smoothed` DMCs, a
+  `chromosomes=` restriction that differs from the observed universe, and
+  a missing or partial `empirical_strata` column raise before any
+  permutation (the strata check now also applies to the tile harness).
+  `n_perm` must be positive. `sliding_window` / `segment` and the CLI are
+  unchanged. See `docs/analysis/dmr.md` and
+  `docs/review/2026-06-08-region-empirical-fdr-design.md`.
+- **Opt-in canonical chromosome filtering at ingestion and in tile DMR
+  calling.** `read_bismark`, `read_methyldackel`,
+  `read_combined_strand_bed`, `convert_sample` and `ensure_converted_sample`
+  accept `canonical_only=False`. `True` drops every contig outside the fixed
+  human-style set of the `epykit._chroms` helper (`1`-`22`, `X`, `Y`,
+  `M`/`MT`, with or without a `chr` prefix) before the partition write and
+  logs one INFO line per sample naming the dropped contigs. The setting is
+  recorded in the per-sample conversion manifest: a cached sample converted
+  under a different setting is rebuilt and its partition directory replaced,
+  and a manifest without the key counts as `False`. `tl.dmr(method="tile")`
+  and `call_dmr_tile_based` accept keyword-only `canonical_only=False`,
+  which filters the auto-detected chromosomes before the tile test and the
+  BH correction; the same resolved list is used for the observed tiles and
+  every `empirical_fdr` permutation, and the option is recorded in
+  `md.uns["dmr_params"]`. An explicit `chromosomes=` list, including an
+  empty one, is used verbatim. `chain_merge`, `sliding_window` and
+  `segment` inherit the DMC run's universe and raise `ValueError` on
+  `canonical_only=True`. `pl.manhattan` takes its chromosome order from the
+  shared helper (same order as before). Defaults and numerical output are
+  unchanged; the DMC engine and the CLI are not part of this change. See
+  `docs/io/read-bismark.md` and `docs/advanced/architecture.md`.
+
+### Fixed
+
+- **`resumable=True` now keys on count smoothing.** The resume fingerprint
+  did not include `smoothing` or `smoothing_span_bp`, so
+  `tl.dmc(smoothing=True, resumable=True)` after an unsmoothed resumable
+  run, or a span change between two smoothed runs, returned the earlier
+  sidecar. Both join the fingerprint; the span is keyed only while
+  smoothing is on. Existing resume sidecars recompute once.
+- **Documented permissive DMR preset.** The `tl.dmr` docstring listed
+  `dis_merge_bp=200` for `preset="permissive"`; the `DMR_PRESETS` bundle has
+  used 1000 since the chain_merge gap defaults were widened. The chain_merge
+  parameter table in `docs/analysis/dmr.md` now states the `tl.dmr` default
+  for `min_cpgs` (`None`, resolving to the preset's value or 5) instead of
+  the engine's bare 3, and its preset-override example passes a merge
+  distance that differs from the signature default, which the preset would
+  otherwise replace. Documentation only; no runtime change.
 
 ## [1.1.0] — 2026-09-05
 
