@@ -31,6 +31,7 @@ chrom    start    end    methylation_percent    count_methylated    count_unmeth
 | `assembly` | `str` | required | Genome assembly name (e.g. `"hg38"`, `"mm10"`) |
 | `store_dir` | `str` | `"methylstore"` | Directory where the partitioned Parquet store will be written |
 | `context` | `str` | `"CpG"` | Cytosine context to retain (`"CpG"`, `"CHG"`, or `"CHH"`) |
+| `canonical_only` | `bool` | `False` | Keep only the fixed human-style chromosome set at conversion time; see [Canonical Chromosomes Only](#canonical-chromosomes-only) |
 
 ## Usage
 
@@ -87,6 +88,39 @@ The returned `MethylData` object (`md`) holds:
 - `md.obs` -- A DataFrame of sample-level metadata (name, group, file path).
 - `md.store` -- A reference to the on-disk Parquet store for lazy, memory-efficient queries.
 - `md.uns` -- A dictionary for unstructured metadata (assembly, context, parameters).
+
+## Canonical Chromosomes Only
+
+`canonical_only=True` drops every contig outside a fixed human-style set
+before the sample is written to the store: autosomes `1` to `22`, `X`, `Y`,
+and the mitochondrion as `M` or `MT`, with or without a `chr` prefix
+(`chr1` and `1` both match). Unplaced, unlocalised and alt contigs
+(`chrUn_*`, `*_random`, `GL000216v2`, `KI270722.1`) never reach the store, so
+QC, smoothing, DMC and DMR calling all work on the canonical set. The list is
+not a species-aware assembly check: assemblies with roman-numeral or named
+chromosomes must keep the default.
+
+The default `False` keeps every contig in the input. The setting is part of
+the per-sample conversion cache: a sample cached under a different setting is
+rebuilt and its partition directory replaced, so an excluded contig cannot
+survive in the store. A store written before this option existed counts as
+`canonical_only=False`. Each conversion that drops contigs logs one INFO line
+naming them.
+
+```python
+md = ep.read_bismark(
+    samplesheet="samplesheet.csv",
+    treatment_group="tumor",
+    control_group="normal",
+    assembly="hg38",
+    store_dir="results/methylstore",
+    canonical_only=True,
+)
+```
+
+The same option exists on `ep.read_methyldackel()`,
+`ep.read_combined_strand_bed()`, and `ep.convert_sample()`. The tile DMR
+caller has its own `canonical_only`; see [DMR calling](../analysis/dmr.md#tile).
 
 ## Next Steps
 

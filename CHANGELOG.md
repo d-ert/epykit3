@@ -32,6 +32,38 @@ SemVer (`MAJOR.MINOR.PATCH`).
   `n_perm` must be positive. `sliding_window` / `segment` and the CLI are
   unchanged. See `docs/analysis/dmr.md` and
   `docs/review/2026-06-08-region-empirical-fdr-design.md`.
+- **Opt-in canonical chromosome filtering at ingestion and in tile DMR
+  calling.** `read_bismark`, `read_methyldackel`,
+  `read_combined_strand_bed`, `convert_sample` and `ensure_converted_sample`
+  accept `canonical_only=False`. `True` drops every contig outside the fixed
+  human-style set of the `epykit._chroms` helper (`1`-`22`, `X`, `Y`,
+  `M`/`MT`, with or without a `chr` prefix) before the partition write and
+  logs one INFO line per sample naming the dropped contigs. The setting is
+  recorded in the per-sample conversion manifest: a cached sample converted
+  under a different setting is rebuilt and its partition directory replaced,
+  and a manifest without the key counts as `False`. `tl.dmr(method="tile")`
+  and `call_dmr_tile_based` accept keyword-only `canonical_only=False`,
+  which filters the auto-detected chromosomes before the tile test and the
+  BH correction; the same resolved list is used for the observed tiles and
+  every `empirical_fdr` permutation, and the option is recorded in
+  `md.uns["dmr_params"]`. An explicit `chromosomes=` list, including an
+  empty one, is used verbatim. `chain_merge`, `sliding_window` and
+  `segment` inherit the DMC run's universe and raise `ValueError` on
+  `canonical_only=True`. `pl.manhattan` takes its chromosome order from the
+  shared helper (same order as before). Defaults and numerical output are
+  unchanged; the DMC engine and the CLI are not part of this change. See
+  `docs/io/read-bismark.md` and `docs/advanced/architecture.md`.
+
+### Fixed
+
+- **Documented permissive DMR preset.** The `tl.dmr` docstring listed
+  `dis_merge_bp=200` for `preset="permissive"`; the `DMR_PRESETS` bundle has
+  used 1000 since the chain_merge gap defaults were widened. The chain_merge
+  parameter table in `docs/analysis/dmr.md` now states the `tl.dmr` default
+  for `min_cpgs` (`None`, resolving to the preset's value or 5) instead of
+  the engine's bare 3, and its preset-override example passes a merge
+  distance that differs from the signature default, which the preset would
+  otherwise replace. Documentation only; no runtime change.
 
 ## [1.1.0] — 2026-09-05
 

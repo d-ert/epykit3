@@ -98,6 +98,23 @@ mode exists in the DMR API alone. `sliding_window` and `segment` raise
 `NotImplementedError` until each gets its own label-shuffle scheme. See
 [the design note](../review/2026-06-08-region-empirical-fdr-design.md).
 
+## Canonical chromosome filter
+
+`src/epykit/_chroms.py` is the one definition of a main-assembly
+chromosome: autosomes `1` to `22`, `X`, `Y`, and the mitochondrion as `M`
+or `MT`, with an optional case-insensitive `chr` prefix. It is a fixed
+human-style list, not a species-aware assembly validator. Every
+`canonical_only` option is opt-in (default `False`) and drops the same
+contigs through `filter_canonical_logged`, which emits one INFO line per
+selection naming what it dropped.
+
+| Surface | Scope |
+|---|---|
+| `read_bismark`, `read_methyldackel`, `read_combined_strand_bed`, `convert_sample` | Drops non-canonical contigs before the partition write. The setting is part of the per-sample conversion manifest; a changed setting rebuilds the sample and replaces its partition directory. |
+| `tl.dmr(method="tile")`, `call_dmr_tile_based` | Filters the auto-detected partition list before the tile test and the BH correction. `tl.dmr` resolves the list once and shares it with every `empirical_fdr` permutation. An explicit `chromosomes=` list, including an empty one, is used verbatim. |
+| `chain_merge`, `sliding_window`, `segment` | Not supported. These callers inherit the chromosome universe of the upstream DMC run and raise `ValueError` on `canonical_only=True`; filter at ingestion or restrict `tl.dmc` with `chromosomes=`. |
+| `pl.manhattan` | Takes its axis order from `CANONICAL_CHROMS_UCSC` and hides other contigs unless `canonical_only=False` (unchanged plot behaviour). |
+
 ## Where to look in the source tree
 
 - `src/epykit/dmc.py` — all four per-CpG engines, the dispersion
@@ -114,3 +131,6 @@ mode exists in the DMR API alone. `sliding_window` and `segment` raise
   DMR callers.
 - `src/epykit/_smoothed_store.py` — Gaussian-kernel and BSmooth
   smoothing implementations.
+- `src/epykit/_chroms.py` — the canonical chromosome predicate, the
+  order-preserving filters and the UCSC order shared by ingestion, the
+  tile DMR caller and the Manhattan plot.

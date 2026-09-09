@@ -30,6 +30,7 @@ from pathlib import Path
 import polars as pl
 
 from . import _cache
+from ._chroms import filter_canonical_logged
 
 RAW_MANIFEST_NAME = ".epykit_raw_manifest.json"
 
@@ -110,6 +111,7 @@ class _SampleManifest:
     format: str = "bismark"
     coordinate_base: str = "auto"  # requested convention
     resolved_coordinate_base: str = "zero_based"  # convention actually applied
+    canonical_only: bool = False  # ingestion filter that shaped the partition set
 
 
 _file_signature = _cache.file_signature
@@ -134,6 +136,7 @@ def _manifest_payload(manifest: _SampleManifest) -> dict[str, object]:
         "format": manifest.format,
         "coordinate_base": manifest.coordinate_base,
         "resolved_coordinate_base": manifest.resolved_coordinate_base,
+        "canonical_only": manifest.canonical_only,
     }
 
 
@@ -143,6 +146,7 @@ def _can_reuse_sample(
     row_group_size: int,
     format: str = "bismark",
     coordinate_base: str = "auto",
+    canonical_only: bool = False,
 ) -> bool:
     manifest = _load_json(_manifest_path(sample_dir))
     if not manifest:
@@ -152,6 +156,11 @@ def _can_reuse_sample(
     if manifest.get("manifest_version") != _MANIFEST_VERSION:
         return False
     if manifest.get("coordinate_base", "auto") != coordinate_base:
+        return False
+    # The filter decides which chromosome partitions exist on disk, so a
+    # different setting means a different store. A manifest written before
+    # the key existed was converted unfiltered: reusable for False only.
+    if bool(manifest.get("canonical_only", False)) != canonical_only:
         return False
     if manifest.get("source") != _file_signature(input_path):
         return False
@@ -560,6 +569,7 @@ def convert_sample(
     merge_strands: bool = True,
     format: str = "bismark",
     coordinate_base: str = "auto",
+    canonical_only: bool = False,
 ) -> str:
     """Convert a Bismark .cov or MethylDackel .bedGraph file into a
     partitioned Parquet store.
@@ -595,6 +605,12 @@ def convert_sample(
         Input coordinate convention. ``"auto"`` (default) detects 1-based
         Bismark .cov (``start == end``) vs 0-based bedGraph and shifts so
         ``pos`` is always 0-based. Override to force the convention. (C1)
+    canonical_only : bool
+        If True, keep only the fixed human-style chromosome set (``1``-``22``,
+        ``X``, ``Y``, ``M``/``MT``, with or without a ``chr`` prefix; see
+        :mod:`epykit._chroms`) and drop every other contig before strand
+        handling and the partition write. One INFO line names the dropped
+        contigs. Default False keeps every contig in the input.
 
     Returns
     -------
@@ -683,6 +699,16 @@ def convert_sample(
 
     df = lf.collect()
 
+    # Opt-in canonical filter: drop unplaced / alt contigs before strand work
+    # and the partition write so they never reach the store. Filtering on
+    # the distinct chromosome names keeps the audit log to one line.
+    if canonical_only:
+        kept = filter_canonical_logged(
+            df.get_column("chrom").unique().sort().to_list(),
+            context=f"convert/{sample_name}",
+        )
+        df = df.filter(pl.col("chrom").is_in(kept))
+
     # Strand inference : requires reference FASTA via pyfaidx
     if reference_fasta is not None:
         strand_series = _infer_strand(df, reference_fasta)
@@ -732,11 +758,15 @@ def ensure_converted_sample(
     reference_fasta: str | None = None,
     format: str = "bismark",
     coordinate_base: str = "auto",
+    canonical_only: bool = False,
 ) -> bool:
     """Convert a sample unless a valid on-disk conversion already exists.
 
     Returns True when a fresh conversion was performed, False when the
-    existing partitioned store was reused without changes.
+    existing partitioned store was reused without changes. The conversion
+    settings, including ``canonical_only``, are part of the per-sample
+    manifest; a sample cached under different settings is rebuilt and its
+    whole partition directory replaced, so no stale contig survives.
     """
     source_path = Path(input_path)
     output_root = Path(output_dir)
@@ -749,6 +779,7 @@ def ensure_converted_sample(
         row_group_size,
         format=format,
         coordinate_base=coordinate_base,
+        canonical_only=canonical_only,
     ):
         return False
 
@@ -766,6 +797,7 @@ def ensure_converted_sample(
             reference_fasta=reference_fasta,
             format=format,
             coordinate_base=coordinate_base,
+            canonical_only=canonical_only,
         )
         temp_sample_dir = _sample_dir(temp_root, sample_name)
         chroms = _expected_chrom_dirs(temp_sample_dir)
@@ -777,6 +809,7 @@ def ensure_converted_sample(
             format=format,
             coordinate_base=coordinate_base,
             resolved_coordinate_base=resolved_base,
+            canonical_only=canonical_only,
         )
         _write_json(_manifest_path(temp_sample_dir), _manifest_payload(manifest))
         _promote_sample_dir(temp_sample_dir, final_sample_dir)

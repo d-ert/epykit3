@@ -37,6 +37,7 @@ import polars as pl
 from scipy import stats as sp_stats
 
 from . import _cache
+from ._chroms import filter_canonical_logged
 from ._dmc_store import DMCStore
 
 logger = logging.getLogger(__name__)
@@ -1256,6 +1257,32 @@ def _merge_adjacent_tiles(dmr_df: pl.DataFrame) -> pl.DataFrame:
     return result.sort(["chrom", "start"])
 
 
+def _resolve_tile_chromosomes(
+    methylstore_path: str,
+    chromosomes: list[str] | None,
+    *,
+    canonical_only: bool = False,
+) -> list[str]:
+    """Return the chromosome universe a tile DMR run works on.
+
+    An explicit ``chromosomes`` list, including an empty one, is used
+    verbatim. Only the auto-detected set (``chromosomes=None``) is subject to
+    ``canonical_only``, which keeps the fixed human-style chromosomes of
+    :mod:`epykit._chroms` and logs one INFO line naming the dropped contigs.
+    ``tl.dmr`` resolves the list once so the observed run and every
+    permutation of :func:`empirical_fdr_for_dmr` test the same universe.
+    """
+    if chromosomes is not None:
+        return list(chromosomes)
+    store = Path(methylstore_path)
+    detected = sorted(
+        {d.name.removeprefix("chrom=") for s in store.glob("sample=*") for d in s.glob("chrom=*")}
+    )
+    if canonical_only:
+        return filter_canonical_logged(detected, context="dmr/tile")
+    return detected
+
+
 def call_dmr_tile_based(
     methylstore_path: str,
     samples_treatment: list[str] | None = None,
@@ -1278,6 +1305,7 @@ def call_dmr_tile_based(
     backend: str = "sequential",
     n_workers: int | None = None,
     merge_adjacent: bool = True,
+    canonical_only: bool = False,
 ) -> pl.DataFrame:
     """Call DMRs by aggregating read counts within fixed-size tiles.
 
@@ -1314,7 +1342,14 @@ def call_dmr_tile_based(
         (quasi-binomial likelihood-ratio), the recommended default
         when tile-level pooled counts are available.
     chromosomes : list[str], optional
-        Chromosomes to process. Auto-detected when None.
+        Chromosomes to process. Auto-detected when None. An explicit list,
+        including an empty one, is used verbatim.
+    canonical_only : bool, keyword-only
+        When ``chromosomes`` is None, keep only the fixed human-style
+        chromosome set (``1``-``22``, ``X``, ``Y``, ``M``/``MT``, with or
+        without a ``chr`` prefix) of the auto-detected partitions, so
+        unplaced / alt contigs are excluded before the tile test and the
+        BH correction. Default False tests every detected partition.
     min_cpgs_per_tile : int
         Skip tiles with fewer than this many CpGs (per sample) during the
         per-sample aggregation step. Default 5 to reduce noise at sparse
@@ -1353,14 +1388,9 @@ def call_dmr_tile_based(
     store = Path(methylstore_path)
     all_samples = samples_case + samples_control
 
-    if chromosomes is None:
-        chromosomes = sorted(
-            {
-                d.name.removeprefix("chrom=")
-                for s in store.glob("sample=*")
-                for d in s.glob("chrom=*")
-            }
-        )
+    chromosomes = _resolve_tile_chromosomes(
+        methylstore_path, chromosomes, canonical_only=canonical_only
+    )
 
     if not chromosomes:
         return pl.DataFrame(schema=_DMR_TILE_SCHEMA)
@@ -1975,7 +2005,9 @@ def empirical_fdr_for_dmr(
     **dmr_kwargs
         Forwarded to ``call_dmr_tile_based`` for each permutation; should
         match the observed run's settings (tile_size_bp, test, alpha,
-        min_abs_meth_diff, dispersion, reference, etc.).
+        min_abs_meth_diff, dispersion, reference, chromosomes,
+        canonical_only, etc.). Pass the resolved ``chromosomes`` list of
+        the observed run so every permutation tests the same universe.
 
     Returns
     -------
