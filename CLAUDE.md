@@ -82,7 +82,7 @@ Four callers — DSS-compatible `chain_merge` (default) with presets (`strict`/`
 
 ### Logging convention (load-bearing)
 
-Library code (everything under `epykit.*` except `epykit.cli`) emits progress through the stdlib `logging` module via `logger = logging.getLogger(__name__)` and **never calls `print()`**. The CLI entry point (`epykit/cli.py`) reserves `print` for final user-facing result lines on stdout; structured progress logs go through logging and are controlled via `-v`/`-q`. This split is what lets host applications and notebooks consume epykit without stdout pollution — preserve it when adding new modules.
+Library code (everything under `epykit.*` except `epykit.cli`) emits progress through the stdlib `logging` module via `logger = logging.getLogger(__name__)` and **never calls `print()`**. The CLI package (`epykit/cli/`) reserves `print` for final user-facing result lines on stdout; structured progress logs go through logging and are controlled via `-v`/`-q`. This split is what lets host applications and notebooks consume epykit without stdout pollution — preserve it when adding new modules.
 
 ### `set_tmp_dir`
 
@@ -120,4 +120,4 @@ Don't change `lr+` knob defaults without re-running the relevant ablations (and 
 - `pl/` — matplotlib plotters with shared theme in `_style.py`; Plotly twins live in `report.py`.
 - `report.py` + `templates/` — self-contained Jinja2 + Plotly HTML report.
 - `export.py` / `anndata_io.py` / `mudata_io.py` / `methylkit_io.py` / `multiqc_export.py` — interop sinks.
-- `cli.py` — argparse entry point exposed as the `epykit` console script.
+- `cli/` — argparse entry point exposed as the `epykit` console script; `cli/__init__.py` holds `build_parser` and `main`, `_common.py` the shared options, and `_ingest.py` / `_dmc.py` / `_dmr.py` / `_downstream.py` register the commands.
