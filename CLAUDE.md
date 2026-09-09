@@ -78,7 +78,7 @@ When `neighbour_combine=True`, **`pvalue`/`qvalue` remain the raw per-CpG values
 
 ### DMR engines (`dmr.py`)
 
-Four callers — DSS-compatible `chain_merge` (default) with presets (`strict`/`default`/`permissive`), tile-based (read-pooled), sliding-window with signed Stouffer combining, and HMM segmentation. Permutation empirical FDR is implemented for `method='tile'` only; the tile path shuffles labels, re-runs the engine, and adds `empirical_pvalue` / `empirical_qvalue`. The other callers raise `NotImplementedError` on `empirical_fdr=True` (per-method permutation harnesses are deferred to a Batch-4 follow-up — each caller's region-definition needs its own shuffle scheme).
+Four callers — DSS-compatible `chain_merge` (default) with presets (`strict`/`default`/`permissive`), tile-based (read-pooled), sliding-window with signed Stouffer combining, and HMM segmentation. Permutation empirical FDR is implemented for `method='tile'` and `method='chain_merge'`: the tile path shuffles labels and re-runs the tile engine; the chain_merge path (`empirical_fdr_for_chain_merge`) replays the observed DMC recorded in `md.uns["dmc"]` per permutation in a private temporary store, then chain-merges and filters like the observed run. Both add `empirical_pvalue` / `empirical_qvalue`; `fdr_method='max_t'` (default, Westfall-Young min-P) or `'region'` (count-ratio target-decoy FDR) picks the estimator. `sliding_window` and `segment` raise `NotImplementedError` on `empirical_fdr=True` (each needs its own shuffle scheme).
 
 ### Logging convention (load-bearing)
 
