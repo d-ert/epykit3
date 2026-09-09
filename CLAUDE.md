@@ -78,7 +78,7 @@ When `neighbour_combine=True`, **`pvalue`/`qvalue` remain the raw per-CpG values
 
 ### DMR engines (`dmr.py`)
 
-Four callers — DSS-compatible `chain_merge` (default) with presets (`strict`/`default`/`permissive`), tile-based (read-pooled), sliding-window with signed Stouffer combining, and HMM segmentation. Permutation empirical FDR is implemented for `method='tile'` only; the tile path shuffles labels, re-runs the engine, and adds `empirical_pvalue` / `empirical_qvalue`. The other callers raise `NotImplementedError` on `empirical_fdr=True` (per-method permutation harnesses are deferred to a Batch-4 follow-up — each caller's region-definition needs its own shuffle scheme).
+Four callers — DSS-compatible `chain_merge` (default) with presets (`strict`/`default`/`permissive`), tile-based (read-pooled), sliding-window with signed Stouffer combining, and HMM segmentation. Permutation empirical FDR is implemented for `method='tile'` and `method='chain_merge'`: the tile path shuffles labels and re-runs the tile engine; the chain_merge path (`empirical_fdr_for_chain_merge`) replays the observed DMC recorded in `md.uns["dmc"]` per permutation in a private temporary store, then chain-merges and filters like the observed run. Both add `empirical_pvalue` / `empirical_qvalue`; `fdr_method='max_t'` (default, Westfall-Young min-P) or `'region'` (count-ratio target-decoy FDR) picks the estimator. `sliding_window` and `segment` raise `NotImplementedError` on `empirical_fdr=True` (each needs its own shuffle scheme).
 
 ### Logging convention (load-bearing)
 
@@ -98,15 +98,21 @@ Library code (everything under `epykit.*` except `epykit.cli`) emits progress th
 
 Don't change `lr+` knob defaults without re-running the relevant ablations (and remember `lr+` is now positioned as a research knob, not a recommended default — see "lr+ power stack" above).
 
+### Deprecated names stay until a maintainer decides otherwise
+
+1.2 retains every deprecated surface: `pp.unite` (replacement `pp.set_unite_type`, warning names 2.0), the `epykit.dmr_hmm` shim (replacement `epykit.dmr_segment.call_dmr_rule_segment`), the NaN-filled `log2_odds_ratio` DMC column (replacements `log2_odds_ratio_pooled` for pooled-count engines and `coef_treatment_log2` for the GLM; the `FutureWarning` lives in the `finish` stage of `_dmc_stages.py`), the `csv` / `csv_full` / `csv_alpha` keyword aliases on `tl.qc`, `tl.dmc`, `tl.dmr`, `tl.dvc` and `tl.annotate` (replacements `tsv` / `tsv_full` / `tsv_alpha`, resolved by `_resolve_tsv_output` and `_resolve_auto_tsv` in `tl.py`), and the `__getattr__` shim for the demoted top-level DMC names in `__init__.py`. Warnings that name no version say "a future major release". Removing any of these needs an explicit maintainer decision on version and migration; do not treat the warning text as that decision. `docs/reference/deprecations.md` is the user-facing table.
+
 ## Module map (when to look where)
 
 - `methyldata.py` — `MethylData` dataclass, save/load, `.dmc` / `.treatment_ids` / `.control_ids` properties, `region_beta()`.
 - `io.py` / `convert.py` — Bismark / MethylDackel / combined-strand BED / nf-core methylseq ingestion → partitioned Parquet.
 - `pp.py` — preprocessing wrappers; each function appends to `uns["_store_history"]` and repoints `md.store`.
 - `dmc.py` + `_dmc_store.py` — per-CpG engines + streaming store handle.
-- `_dmc_config.py` — `DMCConfig`, the `tl.dmc` knobs as one frozen record: removed-engine and `materialize` validation, `lr+` power-stack resolution, the resume fingerprint params, and the single writer of `md.uns["dmc"]`.
+- `_dmc_config.py` — `DMCConfig`, the `tl.dmc` knobs as one frozen record: engine-name and `materialize` validation, `lr+` power-stack resolution, the resume fingerprint params, and the single writer of `md.uns["dmc"]`.
+- `_dmc_stages.py` — the nine stages `tl.dmc` runs in order (`plan_run` through `finish`) and the frozen plan / outcome records they hand each other; `publish` is the only writer of `md.uns["dmc"]`.
+- `_dmc_engines.py` — the engine registry: one frozen `EngineSpec` per engine (`name`, `public`, `power_stack_applies`, `effect_column`), `PUBLIC_ENGINES` (the CLI `--test` choice list) and `REMOVED_ENGINES` (the 0.7.5 migration hints). Stdlib-only, so config, stages and CLI import it without `dmc.py`.
 - `_glm.py` — Wilkinson formula → design matrix, batched IRLS binomial GLM, Wald/F contrasts. `_glm_gpu.py` is a CuPy/JAX backend gated behind extras.
-- `dmr.py` + `_hmm.py` + `dmr_hmm.py` — tile / sliding-window / HMM / chain-merge DMR callers + permutation FDR.
+- `dmr.py` + `dmr_segment.py` + `_hmm.py` — tile / sliding-window / segment / chain-merge DMR callers + permutation FDR. `dmr_hmm.py` is the deprecated import shim for `dmr_segment.py`.
 - `dvc.py` — iEVORA-style differentially variable CpG calling.
 - `annotate.py` — GTF + UCSC `refGene.txt` gene features and CpG-island/shore/shelf/open-sea context.
 - `qc.py` — bisulfite conversion rate, coverage uniformity, sex check, contamination estimate, sample correlation, power calc.

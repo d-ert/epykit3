@@ -43,9 +43,9 @@ The WGBS analysis ecosystem is fragmented across R/Bioconductor (methylKit, DSS,
 ## Highlights
 
 - **Partitioned Parquet methylstore.** Per-chromosome, per-sample columnar storage — never load a whole genome into RAM. DMC results follow the same convention: `tl.dmc` writes per-chromosome parquet files under `<methylstore>/.cache/dmc/<test>/` and exposes a streaming `DMCStore` handle (`md.dmc_store`), so DMC computation and the downstream sliding-window DMR caller stay at O(largest chromosome) on whole-genome inputs (~22 M CpGs). By default the per-CpG table is then materialised onto `md.varm` for plotting/report/export; pass `tl.dmc(md, materialize=False)` to keep peak memory O(largest chromosome) end-to-end (`md.dmc` then materialises on demand). Advanced users can drive the streaming engines directly via `from epykit.dmc import process_chromosomes_dmc, apply_multiple_testing_correction`.
-- **Statistical engines.** Four per-CpG DMC backends: `lr` (quasi-binomial likelihood-ratio, the default at n ≥ 2; closed-form with McCullagh-Nelder dispersion), `welch_t` (Welch t on raw β), `fisher` (pooled Fisher exact, n = 1 fallback), and `glm` (full IRLS binomial GLM with covariates). `auto` resolves to `fisher` at n < 2 and `lr` at n ≥ 2. Every test surfaces 95 % Wald CIs on `meth_diff`. Permutation empirical FDR shuffles labels, re-runs the engine, and adds `empirical_pvalue` / `empirical_qvalue` columns: `tl.dmc(..., empirical_fdr=True)` on the binary treatment/control path, and `tl.dmr(method="tile", empirical_fdr=True)` for regions (the tile caller is the only DMR method with the permutation harness wired in; the others raise `NotImplementedError`).
+- **Statistical engines.** Four per-CpG DMC backends: `lr` (quasi-binomial likelihood-ratio, the default at n ≥ 2; closed-form with McCullagh-Nelder dispersion), `welch_t` (Welch t on raw β), `fisher` (pooled Fisher exact, n = 1 fallback), and `glm` (full IRLS binomial GLM with covariates). `auto` resolves to `fisher` at n < 2 and `lr` at n ≥ 2. Every test surfaces 95 % Wald CIs on `meth_diff`. Permutation empirical FDR shuffles labels, re-runs the engine, and adds `empirical_pvalue` / `empirical_qvalue` columns: `tl.dmc(..., empirical_fdr=True)` on the binary treatment/control path, and `tl.dmr(method="tile", empirical_fdr=True)` or `tl.dmr(method="chain_merge", empirical_fdr=True)` for regions (`sliding_window` and `segment` raise `NotImplementedError`). `fdr_method="max_t"` (default) keeps the Westfall-Young min-P estimator; `fdr_method="region"` selects the count-ratio target-decoy FDR.
 - **Multi-group & covariate contrasts.** `tl.dmc(formula="~ group + age", contrast="group")` runs a joint F-test across factor levels; `contrast="age"` runs a Wald test on a continuous covariate as the primary effect.
-- **Four DMR engines plus permutation FDR.** A DSS-compatible **chain-merge** caller (`tl.dmr(method="chain_merge", preset="strict" | "default" | "permissive")`, the default) that mirrors DSS `callDMR` semantics, plus tile-based (read-pooled) aggregation, per-CpG sliding-window with signed Stouffer's combining, and rule-based 3-state segmentation over `meth_diff` (`method="segment"`). `tl.dmr(method="tile", empirical_fdr=True, n_perm=100)` re-runs the tile engine on shuffled labels and reports empirical p- and q-values (tile only). `tl.diagnose_dmr_calling(md, reference_dmrs)` buckets unrecovered reference DMRs into actionable categories (coverage loss vs. weak test vs. structural filter) for triage.
+- **Four DMR engines plus permutation FDR.** A DSS-compatible **chain-merge** caller (`tl.dmr(method="chain_merge", preset="strict" | "default" | "permissive")`, the default) that mirrors DSS `callDMR` semantics, plus tile-based (read-pooled) aggregation, per-CpG sliding-window with signed Stouffer's combining, and rule-based 3-state segmentation over `meth_diff` (`method="segment"`). `tl.dmr(method="tile", empirical_fdr=True, n_perm=100)` re-runs the tile engine on shuffled labels and reports empirical p- and q-values; with `method="chain_merge"` each permutation replays the observed DMC in a private store and chain-merges the result. `tl.diagnose_dmr_calling(md, reference_dmrs)` buckets unrecovered reference DMRs into actionable categories (coverage loss vs. weak test vs. structural filter) for triage.
 - **Differential variability.** `tl.dvc(md)` finds CpGs whose between-replicate variance differs between groups even when the means don't — the iEVORA signal that mean-based DMC misses.
 - **Clinical / cohort QC.** Opt-in `qc.sex_check` (chrX mean β), `qc.contamination_estimate` (β-distribution bimodality), `qc.sample_correlation` (sample-swap detection), and `qc.power` (sample-size calculator). Bisulfite conversion rate is reported (CHH context, dashboard + MultiQC) but **not applied** to per-CpG counts — matching `bsseq` / `methylKit` defaults. A poorly converted library should be re-prepped, not papered over with a multiplicative count adjustment.
 - **Replicate-aware throughout.** Per-site `min_samples_treatment` / `min_samples_control` guards, per-site or chromosome-level McCullagh-Nelder dispersion, optional covariate design matrices via Wilkinson formulas.
@@ -200,11 +200,11 @@ The `epykit` script mirrors the Python pipeline. Every subcommand takes `--methy
 
 | Subcommand          | Purpose |
 |---------------------|---------|
-| `convert`           | Bismark `.cov[.gz]` → partitioned Parquet |
+| `convert`           | Bismark `.cov[.gz]` or MethylDackel `.bedGraph[.gz]` → partitioned Parquet. `--canonical-only` keeps the fixed human-style chromosome set (`1`-`22`, `X`, `Y`, `M`/`MT`). |
 | `filter`            | Coverage / blacklist filtering |
 | `summary`           | Per-sample summary statistics |
-| `dmc`               | Per-CpG differential methylation. `--test {auto,lr,glm,welch_t,fisher}`, plus `--formula` / `--contrast` / `--covariates` for covariate-adjusted and multi-group designs. `--fdr-method` and `--dispersion` are exposed. The `lr+` power stack (`power_stack`, `neighbour_combine`, `sep_fallback`) is Python API only; no CLI flags are planned. |
-| `dmr`               | DMR calling — `--method chain_merge` (default), `tile`, `sliding_window` or `segment`. `--empirical-fdr --n-perm N` is supported with `--method tile`. |
+| `dmc`               | Per-CpG differential methylation. `--test {lr,glm,welch_t,fisher}`, plus `--formula` / `--contrast` / `--covariates` for covariate-adjusted and multi-group designs, `--smoothing` / `--smoothing-span-bp` for DSS-style count smoothing on `lr`, and `--canonical-only`. The `lr+` power-stack knobs (`power_stack`, `neighbour_combine`, `sep_fallback`) are Python-API-only. |
+| `dmr`               | DMR calling — `--method chain_merge` (default), `tile`, `sliding_window` or `segment`. `--empirical-fdr --n-perm N` and `--canonical-only` are supported with `--method tile`. |
 | `annotate`          | Add gene-feature (`--gtf`) and CpG-island (`--cpg-islands`) annotation. |
 | `qc-report`         | QC + coverage uniformity report. |
 | `smooth`            | Gaussian-kernel β smoothing along the genome. |
@@ -222,6 +222,7 @@ Run `epykit <subcommand> --help` for the full flag list.
   `chrom`, `start`, `end`, `methylation_percent`, `count_methylated`, `count_unmethylated`. Read with `ep.read_bismark(...)` or `epykit convert --format bismark`.
 - **MethylDackel `.bedGraph` / `.bedGraph.gz`** — same 6 columns as Bismark with a single `track type="bedGraph" ...` header line that is skipped automatically. Read with `ep.read_methyldackel(...)` or `epykit convert --format methyldackel`.
 - **Samplesheet** (CSV) — required columns `sample_id`, `group`, `path`. Any extra column is preserved on `md.obs` and can be referenced as a GLM covariate.
+- **Canonical chromosomes only** — every reader, `ep.tl.dmc()` and `ep.tl.dmr(method="tile")` take an opt-in `canonical_only=True` (`--canonical-only` on the CLI) that keeps `1`-`22`, `X`, `Y` and `M`/`MT`, with or without `chr`, and drops unplaced, unlocalised and alt contigs. See [`docs/io/read-bismark.md`](docs/io/read-bismark.md#canonical-chromosomes-only).
 - **GTF** — Ensembl / GENCODE / UCSC; gene features are extracted via [bioframe](https://github.com/open2c/bioframe). `gene_type` (GENCODE) and `gene_biotype` (Ensembl) are both honoured.
 - **UCSC `refGene.txt[.gz]`** — HOMER's default gene catalog. Pass `ep.tl.annotate(md, refgene=...)` (Python API; not yet wired into `epykit annotate`). Schema-compatible with the GTF path.
 - **CpG-island BED** — UCSC `cpgIslandExt` 4-column BED.
@@ -269,7 +270,7 @@ The canonical architecture reference is [`docs/advanced/architecture.md`](docs/a
 | `io.py`            | `read_bismark`, `read_nfcore_methylseq`, `load` |
 | `convert.py`       | `.cov` → partitioned Parquet |
 | `filter.py`        | Coverage filter, coverage normalisation, blacklist intersect |
-| `pp.py`            | Preprocessing wrappers (`filter_coverage`, `normalize_coverage`, `unite`, `smooth`, `aggregate_regions`) |
+| `pp.py`            | Preprocessing wrappers (`filter_coverage`, `normalize_coverage`, `set_unite_type`, `smooth`, `aggregate_regions`) |
 | `dmc.py`           | Streaming per-CpG accumulators + statistical engines (`lr`, `glm`, `welch_t`, `fisher`), BH correction |
 | `_dmc_store.py`    | `DMCStore` handle — persistent per-chromosome DMC parquet directory + manifest; lets BH and sliding-window DMR stream from disk so peak memory is O(largest chrom), not O(genome) |
 | `dmr.py`           | `call_dmr_chain_merge` (default, DSS-style), `call_dmr_tile_based`, `call_dmr_sliding_window`, `empirical_fdr_for_dmr`, `smooth_methylation_gaussian`, `smooth_methylation_bsmooth` |
@@ -288,6 +289,10 @@ The canonical architecture reference is [`docs/advanced/architecture.md`](docs/a
 | `cli.py`           | `epykit` CLI entry point |
 | `_glm.py`          | Wilkinson formula → design matrix, batched IRLS binomial GLM, Wald test on contrasts |
 | `_style.py`        | Shared matplotlib palette / theme |
+
+### Deprecated names
+
+1.2 removes no public API. `pp.unite()` (use `pp.set_unite_type()`), the `epykit.dmr_hmm` import path (use `epykit.dmr_segment.call_dmr_rule_segment`), the NaN-filled `log2_odds_ratio` DMC column (read `log2_odds_ratio_pooled` or, for the GLM, `coef_treatment_log2`), and the `csv` / `csv_full` / `csv_alpha` keywords (use `tsv` / `tsv_full` / `tsv_alpha`) all still work and warn. The keyword never selects the delimiter: a `.csv` path suffix does. Removal dates and the full table are in [`docs/reference/deprecations.md`](docs/reference/deprecations.md).
 
 ---
 

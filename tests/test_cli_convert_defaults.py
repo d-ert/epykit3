@@ -19,7 +19,7 @@ import argparse
 def _capture_merge_strands(monkeypatch, *, merge_cpg) -> object:
     """Run ``_cmd_convert`` with a captured ``convert_sample`` and return the
     ``merge_strands`` value it was called with."""
-    import epykit.cli as cli
+    from epykit.cli import _ingest
 
     captured: dict = {}
 
@@ -28,7 +28,7 @@ def _capture_merge_strands(monkeypatch, *, merge_cpg) -> object:
         captured["_positional"] = args
         return None
 
-    monkeypatch.setattr(cli, "convert_sample", _fake_convert_sample)
+    monkeypatch.setattr(_ingest, "convert_sample", _fake_convert_sample)
 
     args = argparse.Namespace(
         input="in.cov",
@@ -39,7 +39,7 @@ def _capture_merge_strands(monkeypatch, *, merge_cpg) -> object:
         merge_cpg=merge_cpg,
         format="bismark",
     )
-    cli._cmd_convert(args)
+    _ingest._cmd_convert(args)
     return captured["merge_strands"]
 
 

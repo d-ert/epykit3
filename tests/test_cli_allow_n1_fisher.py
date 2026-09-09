@@ -31,7 +31,7 @@ def _checks_namespace(*, test, allow_n1, n_treat=1, n_ctrl=1):
 
 def test_allow_n1_resolves_lr_to_fisher():
     """Bare ``--allow-n1`` (default --test lr) at n=1 must resolve to fisher."""
-    from epykit.cli import _cli_n1_and_footgun_checks
+    from epykit.cli._common import _cli_n1_and_footgun_checks
 
     args = _checks_namespace(test="lr", allow_n1=True)
     with warnings.catch_warnings():
@@ -43,7 +43,7 @@ def test_allow_n1_resolves_lr_to_fisher():
 def test_allow_n1_explicit_welch_t_not_overridden():
     """An explicit ``--test welch_t`` at n=1 + --allow-n1 is left as the user
     chose it (fisher is NOT silently substituted)."""
-    from epykit.cli import _cli_n1_and_footgun_checks
+    from epykit.cli._common import _cli_n1_and_footgun_checks
 
     args = _checks_namespace(test="welch_t", allow_n1=True)
     with warnings.catch_warnings():
@@ -55,7 +55,7 @@ def test_allow_n1_explicit_welch_t_not_overridden():
 def test_allow_n1_resolves_auto_to_fisher():
     """``--test auto`` is in the resolve set: at n=1 with --allow-n1 it must
     resolve to fisher (auto has no n=1 path of its own at this layer)."""
-    from epykit.cli import _cli_n1_and_footgun_checks
+    from epykit.cli._common import _cli_n1_and_footgun_checks
 
     args = _checks_namespace(test="auto", allow_n1=True)
     with warnings.catch_warnings():
@@ -67,7 +67,7 @@ def test_allow_n1_resolves_auto_to_fisher():
 def test_allow_n1_n2_lr_not_changed():
     """Isolates the ``n_min < 2`` gate: at n>=2, lr + --allow-n1 is left
     untouched (allow_n1 alone must not trigger the fisher resolution)."""
-    from epykit.cli import _cli_n1_and_footgun_checks
+    from epykit.cli._common import _cli_n1_and_footgun_checks
 
     args = _checks_namespace(test="lr", allow_n1=True, n_treat=2, n_ctrl=2)
     with warnings.catch_warnings():
@@ -77,7 +77,7 @@ def test_allow_n1_n2_lr_not_changed():
 
 
 def test_allow_n1_explicit_glm_not_overridden():
-    from epykit.cli import _cli_n1_and_footgun_checks
+    from epykit.cli._common import _cli_n1_and_footgun_checks
 
     args = _checks_namespace(test="glm", allow_n1=True)
     with warnings.catch_warnings():
@@ -88,7 +88,7 @@ def test_allow_n1_explicit_glm_not_overridden():
 
 def test_n2_lr_not_changed():
     """At n>=2, lr is left untouched (no fisher substitution)."""
-    from epykit.cli import _cli_n1_and_footgun_checks
+    from epykit.cli._common import _cli_n1_and_footgun_checks
 
     args = _checks_namespace(test="lr", allow_n1=False, n_treat=2, n_ctrl=2)
     with warnings.catch_warnings():
@@ -99,7 +99,7 @@ def test_n2_lr_not_changed():
 
 def test_allow_n1_resolution_warns():
     """The lr->fisher resolution must emit a user-facing warning."""
-    from epykit.cli import _cli_n1_and_footgun_checks
+    from epykit.cli._common import _cli_n1_and_footgun_checks
 
     args = _checks_namespace(test="lr", allow_n1=True)
     with warnings.catch_warnings(record=True) as caught:

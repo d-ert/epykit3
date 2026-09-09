@@ -1869,13 +1869,17 @@ def _aggregate_region_perm_results(
                 UserWarning,
                 stacklevel=3,
             )
-        emp_p, emp_q, fdr_set = _region_count_ratio_fdr(
-            observed_pvalues=obs_safe,
+        finite_p, finite_q, fdr_set = _region_count_ratio_fdr(
+            observed_pvalues=obs_p[obs_finite_mask],
             null_pools=null_pools,
             n_perm_used=n_perm_used,
         )
-        emp_p = np.where(obs_finite_mask, emp_p, np.nan)
-        emp_q = np.where(obs_finite_mask, emp_q, np.nan)
+        # Missing statistics must not count as observed survivors or lower
+        # finite regions' q-values through the suffix minimum.
+        emp_p = np.full_like(obs_p, np.nan)
+        emp_q = np.full_like(obs_p, np.nan)
+        emp_p[obs_finite_mask] = finite_p
+        emp_q[obs_finite_mask] = finite_q
         logger.info("%s[region]: set-level FDR=%.4f", label, fdr_set)
         return emp_p, emp_q, fdr_set
 
@@ -1945,6 +1949,7 @@ def empirical_fdr_for_dmr(
     merge_adjacent: bool = True,
     backend: str = "sequential",
     fdr_method: Literal["max_t", "region"] = "max_t",
+    min_mean_qvalue: float | None = None,
     **dmr_kwargs,
 ) -> pl.DataFrame:
     """Empirical (permutation) FDR for tile-based DMRs.
@@ -1977,6 +1982,10 @@ def empirical_fdr_for_dmr(
     observed_dmr
         The DMR DataFrame returned by the observed (unpermuted) run.
         Empirical columns are appended to a copy of this frame.
+    min_mean_qvalue
+        The q-value post-filter applied to the observed tiles. Each
+        permutation applies the same cutoff before counting survivors.
+        None disables this extra filter.
     n_perm
         Number of permutations. Must be positive.
     seed
@@ -2063,6 +2072,7 @@ def empirical_fdr_for_dmr(
                 backend=backend,
                 **kwargs,
             )
+            null_df = apply_region_qfilter(null_df, min_mean_qvalue, candidate_cols=("qvalue",))
         except Exception as exc:
             logger.warning("permutation %d failed: %s", perm_idx, exc)
             return (is_self, None)
