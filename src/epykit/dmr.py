@@ -1660,12 +1660,10 @@ def _is_self_or_mirror_perm(
     """True if a permutation reproduces the observed contrast or its mirror.
 
     A shuffle whose treatment set equals the observed treatment set (self)
-    or the observed control set (mirror swap) yields statistics identical to
-    the observed run; for a two-sided test the mirror gives the same
-    p-values. Such draws are not samples from the label-permutation null.
-    Counting them biases the decoy survivor count toward the observed run
-    and inflates the empirical FDR, which matters most at small n where
-    these draws are likely.
+    or the observed control set (mirror swap) can reproduce the observed
+    statistic. These are nevertheless valid draws from the label-assignment
+    space and must stay in randomization inference. The flag is retained
+    for diagnostics; it must not select which completed scans are counted.
     """
     perm_set = set(perm_treatment)
     return perm_set == set(observed_treatment) or perm_set == set(observed_control)
@@ -1750,9 +1748,10 @@ def _region_count_ratio_fdr(
         fdr(t) = V(t) / R(t)
 
     The per-region q-value is the monotone suffix-min of ``fdr(t)`` for
-    ``t >= p_j``, clipped to ``[0, 1]``. Because decoys inherit the same
-    overdispersion as the observed scan, the inflation that makes the
-    asymptotic per-region p-value anti-conservative cancels in the ratio.
+    ``t >= p_j``, clipped to ``[0, 1]``. Decoys replay the observed scan's
+    selection and filtering. The ratio remains an approximate estimate:
+    its finite-sample performance needs empirical validation, and a zero
+    estimate from a finite decoy pool is not proof of zero error.
 
     Parameters
     ----------
@@ -1760,9 +1759,9 @@ def _region_count_ratio_fdr(
         Raw per-region p-values of the observed survivors (any order; the
         output is returned in the same order).
     null_pools
-        One array per usable permutation, holding that permutation's null
-        survivor p-values. Self/mirror permutations and failed runs must be
-        excluded by the caller. A clean zero-survivor permutation is passed
+        One array per completed permutation, holding that permutation's null
+        survivor p-values, including self/mirror assignments. Failed scans
+        must abort inference. A clean zero-survivor permutation is passed
         as an empty array: it contributes 0 to ``V`` and stays counted in
         ``n_perm_used``.
     n_perm_used
@@ -1838,41 +1837,31 @@ def _aggregate_region_perm_results(
     compatibility alias for the scan-adjusted p-value, without a second BH.
     Complete-null family-wise control requires exchangeable sample labels.
 
-    ``fdr_method="region"`` is the count-ratio target-decoy FDR of
-    :func:`_region_count_ratio_fdr`: self/mirror assignments and failed
-    runs are excluded, a clean zero-survivor run counts as a zero
-    contribution, and zero usable assignments yield NaN estimates with a
-    ``UserWarning``.
+    ``fdr_method="region"`` is the count-ratio target-decoy estimate of
+    :func:`_region_count_ratio_fdr`. Every completed assignment is included,
+    including self/mirror and zero-survivor scans. This is an approximate
+    FDR estimate, not the complete-null family-wise test provided by max_t.
+    Both modes refuse incomplete or invalid scans rather than condition
+    inference on which computations happened to succeed.
     """
     obs_p = np.asarray(observed_pvalues, dtype=np.float64)
     obs_finite_mask = np.isfinite(obs_p)
     obs_safe = np.where(obs_finite_mask, obs_p, 1.0)
 
+    if len(results) != n_perm or any(arr is None for _, arr in results):
+        raise RuntimeError("Incomplete permutation scan; refusing biased inference")
+    usable = [np.asarray(arr, dtype=float) for _, arr in results]
+    if any(arr.ndim != 1 or np.any(~np.isfinite(arr)) or
+           np.any((arr < 0) | (arr > 1)) for arr in usable):
+        raise ValueError("Invalid permutation region scores")
+    if np.any((obs_p[obs_finite_mask] < 0) | (obs_p[obs_finite_mask] > 1)):
+        raise ValueError("Invalid observed region scores")
+
     if fdr_method == "region":
-        n_self = sum(1 for is_self, _ in results if is_self)
-        n_failed = sum(1 for is_self, arr in results if (not is_self) and arr is None)
-        null_pools = [arr for is_self, arr in results if (not is_self) and arr is not None]
-        n_perm_used = len(null_pools)
-        if n_self or n_failed:
-            logger.info(
-                "%s[region]: excluded %d self/mirror and %d failed permutation(s); n_perm_used=%d.",
-                label,
-                n_self,
-                n_failed,
-                n_perm_used,
-            )
-        if n_perm_used == 0:
-            warnings.warn(
-                f"{label}: all {n_perm} permutations were self/mirror assignments "
-                f"or failed; the region empirical FDR is undefined and is "
-                f"reported as NaN. Raise n_perm or use larger groups.",
-                UserWarning,
-                stacklevel=3,
-            )
         finite_p, finite_q, fdr_set = _region_count_ratio_fdr(
             observed_pvalues=obs_p[obs_finite_mask],
-            null_pools=null_pools,
-            n_perm_used=n_perm_used,
+            null_pools=usable,
+            n_perm_used=n_perm,
         )
         # Missing statistics must not count as observed survivors or lower
         # finite regions' q-values through the suffix minimum.
@@ -1886,11 +1875,6 @@ def _aggregate_region_perm_results(
     # A successful empty scan is a null maximum of -infinity (min-P of
     # +infinity). It MUST remain in the randomization denominator. Failed
     # permutations cannot be omitted conditionally on computational success.
-    if len(results) != n_perm or any(arr is None for _, arr in results):
-        raise RuntimeError("Incomplete permutation scan; refusing biased inference")
-    usable = [np.asarray(arr, dtype=float) for _, arr in results]
-    if any(np.any(~np.isfinite(arr)) or np.any((arr < 0) | (arr > 1)) for arr in usable):
-        raise ValueError("Invalid permutation region scores")
     minima = np.array([float(arr.min()) if arr.size else np.inf for arr in usable])
     # Uniform Monte Carlo assignments include self/mirror draws. The +1
     # correction includes the observed assignment and prevents zero p-values.
@@ -1925,18 +1909,19 @@ def empirical_fdr_for_dmr(
     permutation (decoy) survivors. Two constructions are available through
     ``fdr_method``:
 
-    - ``"max_t"`` (default): Westfall-Young min-P. ``empirical_pvalue`` is
-      the fraction of permutations whose genome-wide minimum null p-value is
-      ``<=`` the observed p-value, and ``empirical_qvalue`` is its BH
-      transform. This controls the family-wise error rate and is very
-      conservative at genome scale under realistic dispersion.
+    - ``"max_t"`` (default): complete-scan min-P. ``empirical_pvalue`` is
+      ``(1 + #shuffled minima <= observed p) / (n_perm + 1)``.
+      ``empirical_qvalue`` is a compatibility alias for that already
+      scan-adjusted p-value; no second BH correction is applied.
+      Complete-null family-wise control requires exchangeable labels;
+      strong control under partial alternatives needs extra assumptions.
     - ``"region"``: count-ratio target-decoy FDR (BSmooth / SAM).
       ``empirical_qvalue`` is the monotone suffix-min of
       ``mean(#null survivors with p <= t) / (#observed survivors with p <= t)``.
-      Because the decoys inherit the observed overdispersion, the inflation
-      cancels in the ratio. Self/mirror assignments and failed permutations
-      are excluded from the null; a clean zero-survivor permutation counts
-      as a zero contribution. ``empirical_pvalue`` is the pooled-null tail
+      This is an approximate FDR estimate. All completed assignments,
+      including self/mirror assignments, stay in the null population.
+      A clean zero-survivor scan counts as a zero contribution; a failed
+      scan aborts inference. ``empirical_pvalue`` is the pooled-null tail
       fraction, a diagnostic rather than a calibrated per-tile p-value. The
       set-level FDR ``mean(#null survivors) / #observed`` is returned in the
       constant ``empirical_fdr_set`` column.

@@ -3,7 +3,7 @@
 Hand-computable fixtures. The helper is caller-agnostic: it takes observed
 survivor p-values plus per-permutation null survivor pools and returns
 ``(empirical_pvalue, empirical_qvalue, fdr_set)``. ``_is_self_or_mirror_perm``
-is the assignment filter the region mode applies before pooling.
+records repeated contrasts for diagnostics; valid assignments remain in pooling.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from epykit.dmr import _is_self_or_mirror_perm, _region_count_ratio_fdr
 
 def test_self_perm_detected():
     """A shuffle reproducing the observed treatment set is the observed
-    contrast itself, not a null draw."""
+    contrast itself, which remains a valid label assignment."""
     assert _is_self_or_mirror_perm(
         perm_treatment=["b", "a", "c"],  # same set as observed treatment
         observed_treatment=["a", "b", "c"],
@@ -44,7 +44,7 @@ def test_genuine_perm_not_excluded():
 
 def test_unequal_groups_have_no_mirror():
     """With 2 vs 3 samples the control set can never be a treatment draw, so
-    only the exact self assignment is excluded."""
+    only the exact self assignment is flagged."""
     assert not _is_self_or_mirror_perm(
         perm_treatment=["c", "d"],
         observed_treatment=["a", "b"],

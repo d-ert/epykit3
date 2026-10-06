@@ -1,0 +1,28 @@
+{
+  "signal": {
+    "permutations": 99,
+    "self_or_mirror": 1,
+    "failed": 0,
+    "scope": [
+      "chr22"
+    ],
+    "n_sites": 562970,
+    "n_regions": 63,
+    "n_eligible": 350942
+  },
+  "null": {
+    "permutations": 99,
+    "self_or_mirror": 1,
+    "failed": 0,
+    "scope": [
+      "chr22"
+    ],
+    "n_sites": 562970,
+    "n_regions": 0,
+    "n_eligible": 351004
+  },
+  "benchmark_source": "/scratch/wgbs_benchmark_v4/results/genome_baseline",
+  "baseline_package_commit": "0566519",
+  "seed": 20261006,
+  "limitations": "Existing development seed, chromosome 22 only; approximate region estimates need independent validation. Benefits compare inference modes and cannot be attributed solely to the permutation-population patch."
+}

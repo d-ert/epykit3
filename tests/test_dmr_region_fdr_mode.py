@@ -92,29 +92,12 @@ def test_max_t_is_the_default(monkeypatch):
     assert np.all(np.isnan(implicit.get_column("empirical_fdr_set").to_numpy()))
 
 
-def test_max_t_with_failed_and_empty_permutations_matches_main(monkeypatch):
-    """One permutation raises, one yields zero survivors, three succeed.
-    Main's max_t excluded both kinds from the denominator, so
-    emp_p = (#successful perms with min null p <= p_obs + 1) / (3 + 1)."""
-    script = [
-        RuntimeError("engine blew up"),
-        None,
-        [0.5, 0.9],  # min 0.5
-        [0.05, 0.7],  # min 0.05
-        [0.001],  # min 0.001
-    ]
-    observed = _observed(pvalues=[0.01, 0.3, 1e-5])
+def test_max_t_refuses_failed_permutations(monkeypatch):
+    """A failed scan cannot be dropped from the randomization population."""
+    script = [RuntimeError("engine blew up"), None, [0.5], [0.05], [0.001]]
     monkeypatch.setattr(dmr_mod, "call_dmr_tile_based", _scripted_engine(script))
-    implicit = _run(observed, n_perm=5)
-    monkeypatch.setattr(dmr_mod, "call_dmr_tile_based", _scripted_engine(script))
-    explicit = _run(observed, n_perm=5, fdr_method="max_t")
-    assert implicit.equals(explicit)
-
-    emp_p = implicit.get_column("empirical_pvalue").to_numpy()
-    # p_obs=0.01: one min null (0.001) <= it -> (1+1)/4; p_obs=0.3: two
-    # (0.05, 0.001) -> (2+1)/4; p_obs=1e-5: none -> (0+1)/4.
-    assert emp_p == pytest.approx([2 / 4, 3 / 4, 1 / 4])
-    assert np.all(np.isnan(implicit.get_column("empirical_fdr_set").to_numpy()))
+    with pytest.raises(RuntimeError, match="Incomplete permutation scan"):
+        _run(_observed(pvalues=[0.01, 0.3, 1e-5]), n_perm=5)
 
 
 def test_max_t_does_not_exclude_self_or_mirror(monkeypatch):
@@ -161,48 +144,26 @@ def test_region_mode_significant_where_maxt_saturates(monkeypatch):
     assert out.get_column("empirical_fdr_set")[0] == pytest.approx(0.04, abs=1e-6)
 
 
-def test_region_distinguishes_failed_empty_and_excluded(monkeypatch):
-    """Failed runs and self/mirror assignments leave the null; a clean
-    zero-survivor run stays as a zero contribution."""
-    seen: list[bool] = []
-
+def test_region_includes_self_mirror_and_empty_scans(monkeypatch):
+    seen = []
     def fake(**kw):
         is_self = set(kw["samples_treatment"]) in (set(_TREAT), set(_CTRL))
         seen.append(is_self)
-        if is_self:
-            # Would poison the null if counted: a decoy that beats every target.
-            return pl.DataFrame({"pvalue": [1e-12] * 100})
-        idx = len(seen) - 1
-        if idx % 3 == 1:
-            raise RuntimeError("engine failure")
-        if idx % 3 == 2:
-            return pl.DataFrame({"pvalue": []}, schema={"pvalue": pl.Float64})
-        return pl.DataFrame({"pvalue": [0.5]})
-
+        return pl.DataFrame({"pvalue": [0.001, 0.002] if is_self else []},
+                            schema={"pvalue": pl.Float64})
     monkeypatch.setattr(dmr_mod, "call_dmr_tile_based", fake)
     out = _run(_observed(pvalues=[0.01, 0.02]), n_perm=30, fdr_method="region")
-    assert any(seen), "seed 0 draws no self/mirror assignment; adjust n_perm"
-    non_self = [i for i, s in enumerate(seen) if not s]
-    n_used = sum(1 for i in non_self if i % 3 != 1)
-    n_with_null = sum(1 for i in non_self if i % 3 == 0)
-    # Every usable null (0.5) is above both observed p-values: q = 0 and the
-    # set-level FDR is the mean survivor count over the usable runs only.
-    assert out.get_column("empirical_qvalue").to_numpy() == pytest.approx([0.0, 0.0])
-    assert out.get_column("empirical_fdr_set")[0] == pytest.approx(n_with_null / n_used / 2)
+    assert any(seen)
+    expected = sum(seen) / 30
+    assert out["empirical_qvalue"].to_numpy() == pytest.approx([expected, expected])
+    assert out["empirical_fdr_set"][0] == pytest.approx(expected)
 
 
-def test_region_zero_usable_assignments_returns_nan_with_warning(monkeypatch):
-    """Every permutation fails: NaN estimates and a UserWarning, never 0."""
-
-    def fake(**kw):
-        raise RuntimeError("no engine")
-
-    monkeypatch.setattr(dmr_mod, "call_dmr_tile_based", fake)
-    with pytest.warns(UserWarning, match="undefined"):
-        out = _run(_observed(pvalues=[0.01, 0.02]), n_perm=4, fdr_method="region")
-    assert np.all(np.isnan(out.get_column("empirical_qvalue").to_numpy()))
-    assert np.all(np.isnan(out.get_column("empirical_pvalue").to_numpy()))
-    assert np.all(np.isnan(out.get_column("empirical_fdr_set").to_numpy()))
+def test_region_refuses_failed_scan(monkeypatch):
+    monkeypatch.setattr(dmr_mod, "call_dmr_tile_based",
+                        _scripted_engine([[], RuntimeError("no engine"), [0.1]]))
+    with pytest.raises(RuntimeError, match="Incomplete permutation scan"):
+        _run(_observed(pvalues=[0.01, 0.02]), n_perm=3, fdr_method="region")
 
 
 def test_region_preserves_nonfinite_observed_as_nan(monkeypatch):

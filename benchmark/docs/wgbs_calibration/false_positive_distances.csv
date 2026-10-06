@@ -1,0 +1,17 @@
+dataset,tool,distance,false_positive_sites,true_positive_sites
+null,DSS,0-100bp,0,0
+null,DSS,101-500bp,0,0
+null,DSS,501-1000bp,0,0
+null,DSS,>1000bp,82940,0
+null,epykit,0-100bp,0,0
+null,epykit,101-500bp,0,0
+null,epykit,501-1000bp,0,0
+null,epykit,>1000bp,239,0
+signal,DSS,0-100bp,5241,24313
+signal,DSS,101-500bp,3180,0
+signal,DSS,501-1000bp,146,0
+signal,DSS,>1000bp,103628,0
+signal,epykit,0-100bp,0,75
+signal,epykit,101-500bp,4,0
+signal,epykit,501-1000bp,2,0
+signal,epykit,>1000bp,317,0

@@ -1,0 +1,7 @@
+dataset,method,matched_regions,true_regions,called_regions,region_precision,region_recall,region_f1,matched_direction_accuracy,start_boundary_mae_bp,end_boundary_mae_bp,fragmented_true_regions,merged_called_regions,calls_without_eligible_cpg,calls_without_positive_eligible_cpg,strict_unmatched_fraction,null_region_fdp,cpg_tp,cpg_fp,cpg_fn,cpg_precision,cpg_recall,cpg_recall_full_truth
+signal,asymptotic,28,63,98,0.2857142857142857,0.4444444444444444,0.34782608695652173,1.0,298.92857142857144,222.75,3,0,0,62,0.7142857142857143,0.6326530612244898,393,392,419,0.5006369426751592,0.4839901477832512,0.30324074074074076
+signal,region,25,63,33,0.7575757575757576,0.3968253968253968,0.5208333333333334,1.0,283.6,212.72,3,0,0,1,0.24242424242424243,0.030303030303030304,372,33,440,0.9185185185185185,0.458128078817734,0.28703703703703703
+signal,max_t,8,63,8,1.0,0.12698412698412698,0.22535211267605634,1.0,361.875,149.625,0,0,0,0,0.0,0.0,149,5,663,0.9675324675324676,0.1834975369458128,0.11496913580246913
+null,asymptotic,0,0,47,0.0,,0.0,,,,0,0,0,47,1.0,1.0,0,275,0,0.0,,
+null,region,0,0,0,,,,,,,0,0,0,0,,0.0,0,0,0,,,
+null,max_t,0,0,0,,,,,,,0,0,0,0,,0.0,0,0,0,,,

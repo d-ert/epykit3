@@ -6,6 +6,13 @@ SemVer (`MAJOR.MINOR.PATCH`).
 
 ## [Unreleased]
 
+### Fixed
+
+- Region permutation inference retains valid self/mirror assignments and
+  refuses failed, incomplete or invalid scans instead of conditioning region
+  FDR estimates on computational success. Max-T documentation now identifies
+  its already scan-adjusted p-value without implying a second BH correction.
+
 ## [1.2.0] — 2026-09-09
 
 Upgrading from 1.1.0: no public API is removed, and every deprecated
