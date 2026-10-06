@@ -120,6 +120,7 @@ def _dmc_input_signature(
     """
     msp = Path(methylstore_path).resolve()
     fields: list[tuple[str, str]] = [
+        ("variance_revision", "2026-09-depth-aware-F-v1"),
         ("store", str(msp)),
         ("case", ",".join(samples_case)),
         ("ctrl", ",".join(samples_control)),
@@ -204,29 +205,11 @@ _TEST_RECOMMENDATIONS = {
 # Shared epsilon for boundary clipping in logit / log-OR computations.
 _BETA_EPSILON: float = 1e-6
 
-# Used in _score_finalize to floor df_phi when reference="adaptive" or "F".
-#
-# Empirical justification. The F(1, nu) tail probability is heavier than
-# chi^2(1) at finite nu and converges to chi^2(1) as nu -> infinity. The
-# bug the floor was introduced to fix (epykit 0.7.2 EB-mode FPR
-# inflation) was that EB shrinkage can leave df_phi ~ 4, where F(1, 4)
-# is ~540% inflated relative to chi^2(1) at the p = 0.05 critical
-# region (chi^2 95th percentile ~ 3.841): F(1, 4).sf(3.841) ~ 0.121 vs
-# chi^2(1).sf(3.841) = 0.050. Lifting the floor to nu = 50 reduces the
-# F-vs-chi^2 disagreement to ~ 11% relative at p = 0.05, which is
-# below the per-CpG calibration noise floor observed on real data
-# (see benchmark/scripts/run_null_calibration.py outputs).
-#
-# This constant is therefore *empirically* justified, not derived from
-# a first-principles asymptotic. ``tests/test_principled_df.py`` pins
-# the agreement number so a future change to the floor cannot silently
-# move the calibration. The user's Linux re-run (Track 1 Layer B)
-# regenerates the calibration figure that ultimately validates the
-# choice in the methods appendix.
-DF_PHI_FLOOR: float = 50.0
-# Documented agreement at the chi^2(1) 95th percentile, used by the
-# pin test. Update only with a calibration figure backing the change.
-_DF_PHI_FLOOR_F_VS_CHI2_TOL_AT_P05: float = 0.12
+# Numerical lower bound only. Estimated dispersion degrees of freedom must not
+# be increased to make the F distribution approximate chi-square. This research
+# candidate requires empirical calibration before replacing a published default.
+DF_PHI_FLOOR: float = 1.0
+_DF_PHI_FLOOR_F_VS_CHI2_TOL_AT_P05: float = 0.12  # legacy import compatibility
 
 
 # Core statistical tests (public, used by unit tests)
@@ -615,6 +598,8 @@ def _score_finalize(
     reference: str = "adaptive",
     sep_fallback: bool = False,
     sep_threshold: float = 0.9,
+    sn2_case: np.ndarray | None = None,
+    sn2_ctrl: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, np.ndarray, np.ndarray]:
     """Compute per-site score p-values with McCullagh-Nelder overdispersion.
 
@@ -677,24 +662,11 @@ def _score_finalize(
             the boundaries (pi near 0 or 1) -- exactly where DMR tiles tend
             to live.
     reference : {"adaptive", "chi2", "F"}
-        Reference distribution used to convert the test statistic to a
-        p-value.
-
-        ``"adaptive"`` (default)
-            Per-site: F(1, df_residual_i) where the per-site dispersion
-            phi_i > 1 (real overdispersion signal made it past the
-            min-dispersion floor), chi^2(1) where phi_i was clamped to 1. This
-            is the right behaviour for quasi-binomial GLMs whose
-            dispersion estimate is noisy at small samples -- F handles the
-            overdispersed sites, chi^2 handles the ones where the
-            quasi-binomial collapses to a binomial.
-        ``"chi2"``
-            Always reference to chi^2(1). Over-liberal at tiles with real
-            overdispersion (typical DMR setting).
-        ``"F"``
-            Always reference to F(1, df_residual_i). Wildly conservative
-            at sites where phi is clamped to 1 -- will reject ~zero
-            genome-wide CpGs on typical n=3+3 WGBS.
+        Adaptive and F both retain estimated-dispersion uncertainty, including
+        sites clamped to scale one. Chi2 is an explicit asymptotic option.
+        bb_site and bb_eb additionally use squared-depth accumulators to map
+        estimated beta-binomial rho to the pooled contrast design effect.
+        bb_eb is an experimental moment shrinkage option, not exact Bayes.
 
     Returns
     -------
@@ -714,9 +686,9 @@ def _score_finalize(
         Per-site degrees of freedom backing ``phi_eff`` (NOT pre-floored;
         callers apply ``DF_PHI_FLOOR`` to match the p-value's reference).
     """
-    if dispersion not in {"site", "chrom", "shrink", "eb"}:
+    if dispersion not in {"site", "chrom", "shrink", "eb", "bb_site", "bb_eb"}:
         raise ValueError(
-            f"dispersion must be 'site', 'chrom', 'shrink', or 'eb'; got {dispersion!r}"
+            f"Unsupported dispersion {dispersion!r}; choose site/chrom/shrink/eb/bb_site/bb_eb"
         )
     if statistic not in {"lr"}:
         raise ValueError(f"statistic must be 'lr'; got {statistic!r}")
@@ -885,6 +857,16 @@ def _score_finalize(
         # so df_phi here is df_chrom (often >> 1e5, making F(1, df_phi) -> chi^2(1)).
         df_phi = np.full_like(sn_case, max(df_chrom, 1.0), dtype=np.float64)
 
+    if dispersion in ("bb_site", "bb_eb"):
+        if sn2_case is None or sn2_ctrl is None:
+            raise ValueError("Depth-aware dispersion requires sum of squared depths")
+        from ._bb_variance import estimate_scale
+        pooled_mu = (sm_case + sm_ctrl) / np.maximum(sn_case + sn_ctrl, 1.)
+        phi_eff, df_phi, _rho = estimate_scale(
+            sn_case, sn2_case, nv_case, chi_case,
+            sn_ctrl, sn2_ctrl, nv_ctrl, chi_ctrl, pooled_mu,
+            moderate=dispersion == "bb_eb")
+
     # --- Test for H0: pi_case = pi_ctrl --------------------------------------
     # Both the score and LR statistics use the same per-group sufficient
     # statistics (sn_*, sm_*) and the same dispersion phi_eff. They differ
@@ -938,22 +920,13 @@ def _score_finalize(
     # chi^2(1) where phi was clamped to 1. F handles the overdispersed sites;
     # chi^2 handles the ones where the quasi-binomial collapses to a binomial.
     #
-    # df_phi is the df backing the phi estimate (NOT the per-site residual df
-    # nv_case+nv_ctrl-2). It differs across dispersion modes:
-    #   - "site":   per-site Pearson sum has df ~= 4 at n=3+3
-    #   - "chrom":  chromosome-pooled phi has df_chrom (often >> 1e5)
-    #   - "shrink/eb": df_i + shrink_pseudo_df (or w_eb), can collapse to ~4
-    # In "eb" mode with small w_eb (the homogeneous-dispersion / easy
-    # case), df_phi falls back to ~4 and F(1, 4) is ~250x more conservative
-    # than chi^2(1) at typical test statistics -- this is the bug behind
-    # the artifactually low FPR in eb mode in 0.7.2. Floor df_phi at 50
-    # so F(1, 50) is within ~1% of chi^2(1) at typical statistics on
-    # the F branch; the chi^2 branch (clamped phi) is unaffected.
+    # Use estimated dispersion degrees of freedom, with a numerical minimum
+    # of one. The legacy hard floor of 50 overstated small-sample information.
     if reference == "adaptive":
         df_phi_floored = np.maximum(df_phi, DF_PHI_FLOOR)
         p_F = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi_floored)
         p_chi2 = sp_stats.chi2.sf(chi2_stat, df=1)
-        pvals = np.where(phi_eff > 1.0, p_F, p_chi2)
+        pvals = p_F  # Estimated dispersion remains uncertain even when clamped at one.
     elif reference == "F":
         df_phi_floored = np.maximum(df_phi, DF_PHI_FLOOR)
         pvals = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi_floored)
@@ -1440,6 +1413,8 @@ class EngineResult:
     """The df behind ``phi_eff``, floored to ``DF_PHI_FLOOR``: the Newcombe
     reference on the lr path."""
     multigroup: MultigroupResult | None = None
+    phi_case: np.ndarray | None = None
+    phi_ctrl: np.ndarray | None = None
 
 
 def _run_fisher(inp: EngineInput) -> EngineResult:
@@ -1514,6 +1489,8 @@ def _run_lr(inp: EngineInput) -> EngineResult:
     w_ctrl = _welford_init(n_sites)
     sn_case, sm_case, sm2n_case, nv_case = _score_init(n_sites)
     sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl = _score_init(n_sites)
+    sn2_case = np.zeros(n_sites, dtype=float)
+    sn2_ctrl = np.zeros(n_sites, dtype=float)
     chrom_positions = canonical_pos.to_series().to_numpy() if inp.smoothing else None
 
     for sample in inp.samples_case:
@@ -1525,6 +1502,7 @@ def _run_lr(inp: EngineInput) -> EngineResult:
                 chrom_positions,
                 inp.smoothing_span_bp,
             )
+        sn2_case += cov.astype(float)**2
         _score_update(sn_case, sm_case, sm2n_case, nv_case, meth, cov)
         # Welford accumulators are also updated so that the finalizer's
         # n_valid_case guard sees the same per-site sample count. The Welford
@@ -1542,6 +1520,7 @@ def _run_lr(inp: EngineInput) -> EngineResult:
                 chrom_positions,
                 inp.smoothing_span_bp,
             )
+        sn2_ctrl += cov.astype(float)**2
         _score_update(sn_ctrl, sm_ctrl, sm2n_ctrl, nv_ctrl, meth, cov)
         _welford_update(*w_ctrl, meth, cov)
         del meth, cov
@@ -1561,6 +1540,7 @@ def _run_lr(inp: EngineInput) -> EngineResult:
         reference=inp.reference,
         sep_fallback=inp.sep_fallback,
         sep_threshold=inp.sep_threshold,
+        sn2_case=sn2_case, sn2_ctrl=sn2_ctrl,
     )
 
     # Coverage-weighted (= pooled MLE) group methylation for output.
@@ -1571,6 +1551,17 @@ def _run_lr(inp: EngineInput) -> EngineResult:
     mean_case, mean_ctrl = w_case[0], w_ctrl[0]
     mean_case[:] = np.where(np.isnan(pi_case), 0.0, pi_case)
     mean_ctrl[:] = np.where(np.isnan(pi_ctrl), 0.0, pi_ctrl)
+
+    phi_case = phi_ctrl = None
+    if inp.dispersion.startswith("bb_"):
+        a = np.maximum(sn_case, 1.)
+        b = np.maximum(sn_ctrl, 1.)
+        leverage_case = np.maximum(sn2_case / a - 1, 0.)
+        leverage_ctrl = np.maximum(sn2_ctrl / b - 1, 0.)
+        leverage = (leverage_case / a + leverage_ctrl / b) / (1/a + 1/b)
+        rho = np.divide(phi_eff - 1, leverage, out=np.zeros(n_sites), where=leverage > 0)
+        phi_case = 1 + rho * leverage_case
+        phi_ctrl = 1 + rho * leverage_ctrl
 
     return EngineResult(
         pvals=pvals,
@@ -1587,6 +1578,8 @@ def _run_lr(inp: EngineInput) -> EngineResult:
         # overdispersion-aware p-value (M1).
         phi_eff=phi_eff,
         df_phi=np.maximum(df_phi, DF_PHI_FLOOR),
+        phi_case=phi_case,
+        phi_ctrl=phi_ctrl,
     )
 
 
@@ -1983,6 +1976,8 @@ def _finalise_chromosome(inp: EngineInput, res: EngineResult) -> pl.DataFrame:
                 *res.pooled_counts,
                 phi=res.phi_eff,
                 df=res.df_phi,
+                phi_a=res.phi_case,
+                phi_b=res.phi_ctrl,
             )
         elif "coef_treatment" in extras:
             # M2: covariate-ADJUSTED effect + CI for the single-coef GLM paths

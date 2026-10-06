@@ -1055,6 +1055,8 @@ def newcombe_diff_ci(
     *,
     phi: np.ndarray | None = None,
     df: np.ndarray | None = None,
+    phi_a: np.ndarray | None = None,
+    phi_b: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Newcombe (1998) hybrid Wilson-score CI for pi_a - pi_b on POOLED counts.
 
@@ -1095,12 +1097,15 @@ def newcombe_diff_ci(
         # Mirror the adaptive p-value: inflate by sqrt(phi) with a t(df) tail
         # only where there is genuine overdispersion (phi > 1); fall back to
         # the binomial normal interval where phi was clamped to 1.
-        z_eff = np.where(phi > 1.0, np.sqrt(phi) * t_mult, z_norm)
+        z_eff = np.sqrt(np.maximum(phi,1.0)) * t_mult
 
-    def _wilson(m, n):
+    def _wilson(m, n, group_phi=None):
         m = m.astype(np.float64)
         n = n.astype(np.float64)
         z = z_eff  # scalar (fisher) or per-site array (lr); broadcasts on n
+        if group_phi is not None:
+            multiplier = z_norm if df is None else sp_stats.t.isf(alpha/2, np.maximum(df,1.))
+            z = np.sqrt(np.maximum(group_phi,1.)) * multiplier
         with np.errstate(invalid="ignore", divide="ignore"):
             p_hat = np.where(n > 0, m / n, np.nan)
             denom = 1.0 + (z * z) / np.maximum(n, 1e-12)
@@ -1120,8 +1125,8 @@ def newcombe_diff_ci(
             hi = np.clip(centre + half, 0.0, 1.0)
         return p_hat, lo, hi
 
-    p_a, l_a, u_a = _wilson(np.asarray(meth_a), np.asarray(cov_a))
-    p_b, l_b, u_b = _wilson(np.asarray(meth_b), np.asarray(cov_b))
+    p_a, l_a, u_a = _wilson(np.asarray(meth_a), np.asarray(cov_a), phi_a)
+    p_b, l_b, u_b = _wilson(np.asarray(meth_b), np.asarray(cov_b), phi_b)
     diff = p_a - p_b
     lo = diff - np.sqrt(np.maximum((p_a - l_a) ** 2 + (u_b - p_b) ** 2, 0.0))
     hi = diff + np.sqrt(np.maximum((u_a - p_a) ** 2 + (p_b - l_b) ** 2, 0.0))

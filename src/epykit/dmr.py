@@ -1832,11 +1832,11 @@ def _aggregate_region_perm_results(
     ``observed_pvalues``. Non-finite observed p-values come back as NaN in
     both mode.
 
-    ``fdr_method="max_t"`` is the Westfall-Young min-P (FWER) construction:
-    every permutation with at least one survivor contributes its minimum
-    null p-value, failed and zero-survivor permutations drop out of the
-    denominator, self/mirror assignments are not special-cased, and the
-    empirical p-values are BH-adjusted. ``fdr_set`` is NaN.
+    ``fdr_method="max_t"`` uses one minimum score per complete label-shuffled
+    scan, including empty scans (+infinity). Failed scans abort inference.
+    The +1 Monte Carlo correction is applied once; empirical_qvalue is a
+    compatibility alias for the scan-adjusted p-value, without a second BH.
+    Complete-null family-wise control requires exchangeable sample labels.
 
     ``fdr_method="region"`` is the count-ratio target-decoy FDR of
     :func:`_region_count_ratio_fdr`: self/mirror assignments and failed
@@ -1883,57 +1883,23 @@ def _aggregate_region_perm_results(
         logger.info("%s[region]: set-level FDR=%.4f", label, fdr_set)
         return emp_p, emp_q, fdr_set
 
-    # max_t: Westfall-Young min-P (FWER). Failed permutations (engine
-    # exception, zero null DMRs) MUST be excluded from the empirical-p
-    # denominator. Pre-fix code divided by n_perm + 1 regardless, biasing
-    # emp_p downward by the failure rate.
-    # See docs/review/2026-06-07-epykit-codebase-audit.md (m-perm-1).
-    usable = [arr for _, arr in results if arr is not None and arr.size > 0]
-    n_perm_used = len(usable)
-    n_perm_failed = n_perm - n_perm_used
-    if n_perm_failed > 0:
-        logger.info(
-            "%s[max_t]: %d/%d permutations produced zero null DMRs; "
-            "denominator uses n_perm_used=%d.",
-            label,
-            n_perm_failed,
-            n_perm,
-            n_perm_used,
-        )
-    if n_perm_used == 0:
-        logger.warning(
-            "%s[max_t]: all %d permutations produced zero null DMRs. Empirical "
-            "p-values default to 1.0 (most conservative).",
-            label,
-            n_perm,
-        )
-
-    # Per-permutation tail count (max-T style):
-    # For each observed DMR with p = p_obs, count the number of *successful*
-    # permutations that produced at least one null DMR with p <= p_obs.
-    # Denominator is n_perm_used + 1 (not n_perm + 1, not |pooled null| + 1)
-    # so the empirical-p floor is 1 / (n_perm_used + 1), independent of how
-    # many DMRs each permutation emitted but honest about how many perms
-    # actually contributed a null. Pooling p-values across perms would
-    # inflate the denominator and anti-conservatively shrink emp_p.
-    min_null_p_per_perm = np.array([float(arr.min()) for arr in usable], dtype=np.float64)
-    emp_p = _empirical_pvalues_from_null_pool(
-        observed_pvalues=obs_safe,
-        null_pvalues_pool=min_null_p_per_perm,
-        n_perm_used=n_perm_used,
-    )
-    emp_p = np.clip(emp_p, 0.0, 1.0)
+    # A successful empty scan is a null maximum of -infinity (min-P of
+    # +infinity). It MUST remain in the randomization denominator. Failed
+    # permutations cannot be omitted conditionally on computational success.
+    if len(results) != n_perm or any(arr is None for _, arr in results):
+        raise RuntimeError("Incomplete permutation scan; refusing biased inference")
+    usable = [np.asarray(arr, dtype=float) for _, arr in results]
+    if any(np.any(~np.isfinite(arr)) or np.any((arr < 0) | (arr > 1)) for arr in usable):
+        raise ValueError("Invalid permutation region scores")
+    minima = np.array([float(arr.min()) if arr.size else np.inf for arr in usable])
+    # Uniform Monte Carlo assignments include self/mirror draws. The +1
+    # correction includes the observed assignment and prevents zero p-values.
+    emp_p = (1 + np.searchsorted(np.sort(minima), obs_safe, side="right")) / (n_perm + 1)
     emp_p = np.where(obs_finite_mask, emp_p, np.nan)
-
-    # BH-adjust to empirical q-value
-    from statsmodels.stats.multitest import multipletests
-
-    finite = np.isfinite(emp_p)
-    emp_q = np.full_like(emp_p, np.nan, dtype=np.float64)
-    if finite.any():
-        _, q_finite, _, _ = multipletests(emp_p[finite], method="fdr_bh")
-        emp_q[finite] = q_finite
-    return emp_p, emp_q, float("nan")
+    # Already adjusted for the complete scan; a second BH step is unnecessary.
+    # This gives complete-null family-wise control under exchangeability.
+    # Strong FWER under partial alternatives needs additional assumptions.
+    return emp_p, emp_p.copy(), float("nan")
 
 
 def empirical_fdr_for_dmr(
