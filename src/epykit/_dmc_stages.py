@@ -59,7 +59,7 @@ _LOG2_ODDS_RATIO_NOTICE = (
     "The 'log2_odds_ratio' column is deprecated and is slated for removal "
     "in a future major release. Use 'log2_odds_ratio_pooled' for "
     "pooled-count tests (lr, fisher) or 'coef_treatment_log2' for the glm "
-    "backend. The transitional column is NaN-filled."
+    "backend, or log2_odds_ratio_bb for the beta_binomial engine. The transitional column is NaN-filled."
 )
 
 
@@ -404,6 +404,7 @@ def run_engine(md: MethylData, plan: DMCPlan, store_path: str) -> DMCStore:
         smoothing_span_bp=cfg.smoothing_span_bp,
         sep_fallback=cfg.sep_fallback,
         sep_threshold=cfg.sep_threshold,
+        **({'beta_binomial_ci':cfg.beta_binomial_ci} if plan.selected_test=='beta_binomial' else {}),
     )
     return apply_multiple_testing_correction(store, method=cfg.fdr_method)
 

@@ -336,13 +336,6 @@ def test_dmc_emits_meth_diff_ci_columns(synth_md_filtered, test):
         assert frac_inside >= 0.95
 
 
-def test_beta_binomial_is_rejected(synth_md_filtered):
-    """test='beta_binomial' was removed; it should now raise an error."""
-    md = synth_md_filtered
-    with pytest.raises((ValueError, KeyError, NotImplementedError)):
-        ep.tl.dmc(md, test="beta_binomial")
-
-
 def test_bb_lr_is_removed(synth_md_filtered):
     """test='bb_lr' was removed in 0.7.5; it should now raise ValueError."""
     md = synth_md_filtered

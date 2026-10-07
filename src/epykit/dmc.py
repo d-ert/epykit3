@@ -1,10 +1,14 @@
 """Differential methylation calling (DMC) on partitioned Parquet stores.
 
-Per-replicate state is accumulated via Welford's online algorithm, so peak
-memory is O(n_sites) per chromosome, independent of sample count.
+Legacy count tests accumulate per-replicate state via Welford. The GLM and
+beta-binomial paths retain chromosome-level replicate matrices; BB counts
+alone require 16*n_sites*n_samples bytes, with bounded fitting workspaces.
 
 Tests
 -----
+  beta_binomial -- Genuine per-replicate beta-binomial likelihood, count-based
+                  EB log-dispersion shrinkage and approximate small-sample F
+                  reference. Two-group raw counts; opt-in new engine.
   lr            -- Quasi-binomial likelihood-ratio chi-square with per-site
                   McCullagh-Nelder dispersion. The default at n>=2.
                   Closed-form on the streaming (S0_g, S1_g, Sigmam^2/n_g)
@@ -32,6 +36,7 @@ Tests
 from __future__ import annotations
 
 import gc
+import hashlib
 import logging
 import tempfile
 import time
@@ -102,6 +107,7 @@ def _dmc_input_signature(
     smoothing_span_bp: int = 500,
     sep_fallback: bool = False,
     sep_threshold: float = 0.9,
+    beta_binomial_ci: bool = True,
 ) -> str:
     """SHA-256 fingerprint of inputs that materially affect DMC results.
 
@@ -132,6 +138,9 @@ def _dmc_input_signature(
         ("disp", str(dispersion)),
         ("ref", str(reference)),
     ]
+    if test == 'beta_binomial':
+        from ._beta_binomial import ALGORITHM_REVISION
+        fields.extend([('bb_revision',ALGORITHM_REVISION),('bb_ci',str(bool(beta_binomial_ci)))])
     if samples_all_ordered is not None:
         fields.append(("all", ",".join(samples_all_ordered)))
     if group_labels_per_sample is not None:
@@ -1364,6 +1373,8 @@ class EngineInput:
     smoothing_span_bp: int
     sep_fallback: bool
     sep_threshold: float
+    beta_binomial_ci: bool = True
+    beta_binomial_prior_dir: Path | None = None
 
     @property
     def canonical_pos(self) -> pl.DataFrame:
@@ -1581,6 +1592,50 @@ def _run_lr(inp: EngineInput) -> EngineResult:
         phi_case=phi_case,
         phi_ctrl=phi_ctrl,
     )
+
+
+def _run_beta_binomial(inp: EngineInput) -> EngineResult:
+    """Genuine replicate-count BB likelihood with continuous EB log-rho shrinkage."""
+    from . import _beta_binomial as bb
+    if min(len(inp.samples_case),len(inp.samples_control))<2:
+        raise ValueError('beta_binomial requires at least two biological replicates per group')
+    samples = inp.samples_case+inp.samples_control
+    n_case = len(inp.samples_case)
+    m = np.empty((inp.n_sites,len(samples)),dtype=np.int64)
+    n = np.empty_like(m)
+    w_case,w_ctrl = _welford_init(inp.n_sites),_welford_init(inp.n_sites)
+    for j,sample in enumerate(samples):
+        meth,cov = _load_sample_chrom(inp.methylstore_path,inp.chrom,sample,inp.canonical_pos)
+        m[:,j],n[:,j] = meth,cov
+        _welford_update(*(w_case if j<n_case else w_ctrl),meth,cov)
+    prior = bb.estimate_prior(m,n,n_case)
+    if not prior['converged']:
+        logger.warning('%s: BB empirical prior reached its iteration limit; convergence is recorded.',inp.chrom)
+    metadata = {k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in prior.items()}
+    metadata['start_rho_weights'] = [v.tolist() for v in prior['start_rho_weights']]
+    metadata.update(chrom=inp.chrom,samples_case=inp.samples_case,samples_control=inp.samples_control,
+                    training_selection='deterministic seed 20261007; at most 4096 replicate groups')
+    if inp.beta_binomial_prior_dir is not None:
+        inp.beta_binomial_prior_dir.mkdir(parents=True,exist_ok=True)
+        _cache.write_json(inp.beta_binomial_prior_dir/(_chrom_filename(inp.chrom).removesuffix('.parquet')+'.json'),metadata)
+    names = ['pvalue','mu_case','mu_control','rho','lr','df']
+    if inp.beta_binomial_ci:
+        names += ['ci_lo','ci_hi']
+    arrays = {key:np.empty(inp.n_sites) for key in names}
+    for start in range(0,inp.n_sites,32768):
+        stop = min(start+32768,inp.n_sites)
+        fitted = bb.test_lognormal(m[start:stop],n[start:stop],n_case,prior=prior,
+                                  reference=inp.reference,intervals=inp.beta_binomial_ci)
+        for key in names:
+            arrays[key][start:stop] = fitted[key]
+    w_case[0][:] = np.nan_to_num(arrays['mu_case'],nan=0.)
+    w_ctrl[0][:] = np.nan_to_num(arrays['mu_control'],nan=0.)
+    a,b = np.clip(arrays['mu_case'],1e-12,1-1e-12),np.clip(arrays['mu_control'],1e-12,1-1e-12)
+    log2_or = (np.log(a/(1-a))-np.log(b/(1-b)))/np.log(2)
+    return EngineResult(pvals=arrays['pvalue'],log2_ors=log2_or,welford_case=w_case,welford_ctrl=w_ctrl,
+        extras={'bb_rho':arrays['rho'],'bb_lr':arrays['lr'],'bb_df':arrays['df'],
+                'bb_ci_lo':arrays.get('ci_lo',np.full(inp.n_sites,np.nan)),
+                'bb_ci_hi':arrays.get('ci_hi',np.full(inp.n_sites,np.nan))})
 
 
 def _run_welch_t(inp: EngineInput) -> EngineResult:
@@ -1863,6 +1918,7 @@ _ENGINE_RUNNERS: dict[str, Callable[[EngineInput], EngineResult]] = {
     "welch_t": _run_welch_t,
     "glm": _run_glm,
     "glm_contrast": _run_glm_contrast,
+    "beta_binomial": _run_beta_binomial,
 }
 
 
@@ -1889,6 +1945,8 @@ def _process_one_chromosome(
     smoothing_span_bp: int = 500,
     sep_fallback: bool = False,
     sep_threshold: float = 0.9,
+    beta_binomial_ci: bool = True,
+    beta_binomial_prior_dir: Path | None = None,
 ) -> pl.DataFrame:
     """Run DMC for one chromosome, loading one sample at a time.
 
@@ -1928,6 +1986,8 @@ def _process_one_chromosome(
         smoothing_span_bp=smoothing_span_bp,
         sep_fallback=sep_fallback,
         sep_threshold=sep_threshold,
+        beta_binomial_ci=beta_binomial_ci,
+        beta_binomial_prior_dir=beta_binomial_prior_dir,
     )
     return _finalise_chromosome(inp, runner(inp))
 
@@ -1968,7 +2028,9 @@ def _finalise_chromosome(inp: EngineInput, res: EngineResult) -> pl.DataFrame:
     from . import _glm as _glm_for_ci
 
     if res.multigroup is None:
-        if res.pooled_counts is not None:
+        if 'bb_ci_lo' in extras:
+            ci_lo,ci_hi = extras.pop('bb_ci_lo'),extras.pop('bb_ci_hi')
+        elif res.pooled_counts is not None:
             # P1-3: lr and fisher paths -- use Newcombe CI on pooled counts.
             # lr passes per-site phi/df so the interval shares the test's
             # overdispersion model (M1); fisher passes None (binomial).
@@ -2102,6 +2164,9 @@ def _finalise_chromosome(inp: EngineInput, res: EngineResult) -> pl.DataFrame:
     if "coef_treatment" in extras and "coef_se" in extras:
         out_cols["coef_treatment"] = pl.Series(extras["coef_treatment"])
         out_cols["coef_se"] = pl.Series(extras["coef_se"])
+    for key in ('bb_rho','bb_lr','bb_df'):
+        if key in extras:
+            out_cols[key] = pl.Series(extras[key])
     if res.multigroup is not None:
         mg = res.multigroup
         out_cols["f_stat"] = pl.Series(mg.f_stat)
@@ -2211,6 +2276,7 @@ def process_chromosomes_dmc(
     sep_fallback: bool = ...,
     sep_threshold: float = ...,
     canonical_only: bool = ...,
+    beta_binomial_ci: bool = ...,
 ) -> DMCStore: ...
 
 
@@ -2244,6 +2310,7 @@ def process_chromosomes_dmc(
     sep_fallback: bool = ...,
     sep_threshold: float = ...,
     canonical_only: bool = ...,
+    beta_binomial_ci: bool = ...,
 ) -> pl.DataFrame: ...
 
 
@@ -2276,6 +2343,7 @@ def process_chromosomes_dmc(
     sep_fallback: bool = False,
     sep_threshold: float = 0.9,
     canonical_only: bool = False,
+    beta_binomial_ci: bool = True,
 ) -> pl.DataFrame | DMCStore:
     """Process differential methylation for all chromosomes.
 
@@ -2366,6 +2434,12 @@ def process_chromosomes_dmc(
     # without DMCConfig, so the name is checked here too, before the store
     # directory is resolved or created.
     engine_spec(test)
+    if test == 'beta_binomial':
+        if (dispersion!='eb' or smoothing or sep_fallback or design_full is not None
+            or design_reduced is not None or contrast_matrix is not None):
+            raise ValueError('beta_binomial requires raw-count EB two-group inputs without GLM design or smoothing')
+        if min(len(samples_treatment),len(samples_control))<2:
+            raise ValueError('beta_binomial requires at least two biological replicates per group')
     samples_case = samples_treatment
     min_samples_case = min_samples_treatment
 
@@ -2436,6 +2510,8 @@ def process_chromosomes_dmc(
             smoothing_span_bp=smoothing_span_bp,
             sep_fallback=sep_fallback,
             sep_threshold=sep_threshold,
+            beta_binomial_ci=beta_binomial_ci,
+            beta_binomial_prior_dir=staging/'priors'/input_sig if test=='beta_binomial' else None,
         )
 
     staging = _resolve_dmc_store_dir(store, test, out_dir, smoothing=smoothing)
@@ -2463,6 +2539,7 @@ def process_chromosomes_dmc(
         smoothing_span_bp=smoothing_span_bp,
         sep_fallback=sep_fallback,
         sep_threshold=sep_threshold,
+        beta_binomial_ci=beta_binomial_ci,
     )
     from ._dmc_store import _MANIFEST_NAME
 
@@ -2483,6 +2560,12 @@ def process_chromosomes_dmc(
             if not f.exists():
                 all_present = False
                 break
+            if test == 'beta_binomial':
+                prior_file = staging/entry.get('prior_file','missing-prior')
+                if (not prior_file.is_file() or hashlib.sha256(prior_file.read_bytes()).hexdigest()
+                    != entry.get('prior_sha256')):
+                    all_present = False
+                    break
         if not strict_hit and all_present:
             # On weak hit, additionally verify sizes match what the
             # manifest claims -- guards against half-written parquets.
@@ -2567,6 +2650,10 @@ def process_chromosomes_dmc(
                 "file": out_file.name,
             }
         )
+        if test == 'beta_binomial':
+            prior_file = staging/'priors'/input_sig/(_chrom_filename(chrom).removesuffix('.parquet')+'.json')
+            written_entries[-1].update(prior_file=str(prior_file.relative_to(staging)),
+                prior_sha256=hashlib.sha256(prior_file.read_bytes()).hexdigest())
         logger.info("  %s sites -> staged to disk (%s)", f"{n_sites:,}", chrom)
         del chrom_result
         gc.collect()

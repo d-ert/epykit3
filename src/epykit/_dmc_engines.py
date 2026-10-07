@@ -61,6 +61,12 @@ ENGINES = MappingProxyType(
                 effect_column="log2_odds_ratio_pooled",
             ),
             EngineSpec(
+                name="beta_binomial",
+                public=True,
+                power_stack_applies=False,
+                effect_column="log2_odds_ratio_bb",
+            ),
+            EngineSpec(
                 name="glm_contrast",
                 public=False,
                 power_stack_applies=False,

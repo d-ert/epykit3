@@ -68,6 +68,7 @@ class DMCConfig:
     csv: str | None = None
     csv_full: bool = False
     csv_alpha: float = 0.05
+    beta_binomial_ci: bool = True
 
     def __post_init__(self) -> None:
         if self.min_samples_treatment is None:
@@ -86,6 +87,17 @@ class DMCConfig:
         """
         if self.test != "auto":
             engine_spec(self.test)
+        if self.test == "beta_binomial":
+            incompatible = [name for name,on in (
+                ('formula',self.formula is not None),('contrast',self.contrast is not None),
+                ('covariates',bool(self.covariates)),('smoothing',self.smoothing),
+                ('use_smoothed',self.use_smoothed),('sep_fallback',self.sep_fallback),
+                ('neighbour_combine',self.neighbour_combine),('empirical_fdr',self.empirical_fdr),
+                ('dispersion',self.dispersion != 'eb'),
+            ) if on]
+            if incompatible:
+                raise ValueError('beta_binomial implements raw-count, two-group likelihood inference; '
+                                 'unsupported: '+', '.join(incompatible))
 
     def validate_resolved(self) -> None:
         """Checks that need the power stack resolved first.
@@ -173,7 +185,7 @@ class DMCConfig:
         span is keyed only while smoothing is on, so changing an unused
         span does not invalidate a cache.
         """
-        return {
+        params = {
             "test": selected_test,
             "chromosomes": self.chromosomes,
             "canonical_only": self.canonical_only,
@@ -194,6 +206,11 @@ class DMCConfig:
             "smoothing": self.smoothing,
             "smoothing_span_bp": self.smoothing_span_bp if self.smoothing else None,
         }
+        if selected_test == 'beta_binomial':
+            from ._beta_binomial import ALGORITHM_REVISION
+            params.update(beta_binomial_ci=self.beta_binomial_ci,
+                          beta_binomial_revision=ALGORITHM_REVISION)
+        return params
 
     def to_uns(
         self,
@@ -232,7 +249,7 @@ class DMCConfig:
         def binary_only(value: Any) -> Any:
             return value if binary else None
 
-        return {
+        metadata = {
             "test_requested": self.test,
             "test_used": test_used,
             "n_sites": n_sites,
@@ -275,3 +292,17 @@ class DMCConfig:
             "covariates": None if binary else (list(self.covariates) if self.covariates else None),
             "treatment_col": None if binary else self.treatment_col,
         }
+        if test_used == 'beta_binomial':
+            from ._beta_binomial import ALGORITHM_REVISION
+            metadata.update(statistical_model='per-replicate beta-binomial',
+                beta_binomial_revision=ALGORITHM_REVISION,beta_binomial_ci=self.beta_binomial_ci,
+                beta_binomial_prior='count-likelihood EB with continuous log-rho shrinkage',
+                beta_binomial_reference='chi2 asymptotic diagnostic' if self.reference=='chi2'
+                    else 'methylSig-inspired F(1,n_valid-2) approximation',
+                beta_binomial_df_column='bb_df records n_valid-2, the F denominator df; '
+                    'chi2 diagnostic always has one reference df',
+                beta_binomial_interval='conditional profile likelihood, fitted rho fixed'
+                    if self.beta_binomial_ci else 'not computed',
+                beta_binomial_limitations='shared within-site rho; no covariate adjustment; '
+                    'small-sample reference is approximate; low site power with few replicates')
+        return metadata

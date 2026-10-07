@@ -491,8 +491,28 @@ def dmc(
     csv: str | None = None,
     csv_full: bool = False,
     csv_alpha: float = 0.05,
+    beta_binomial_ci: bool = True,
 ) -> None:
     """Run DMC calling and store result in md.varm['dmc_<test>'].
+
+    New count engine
+    ----------------
+    ``test="beta_binomial"`` fits a genuine per-replicate beta-binomial
+    likelihood, retaining individual coverages and biological overdispersion.
+    It learns a latent mean/dispersion mixture from a bounded raw-count sample,
+    projects it to a continuous log-rho shrinkage prior, and fits group/null
+    means by likelihood optimization. ``reference="adaptive"`` uses the
+    methylSig-inspired F(1,n_valid-2) approximation; ``"chi2"`` is an
+    asymptotic diagnostic. This is a new engine, not the old ``bb_eb``
+    quasi-binomial dispersion option. Few replicates can still have very low
+    site-level power, and the reference is not exact finite-sample inference.
+
+    ``beta_binomial_ci=True`` computes conditional profile-likelihood
+    intervals with fitted rho fixed. These can be costly genome-wide.
+    Set False to omit their computation; CI columns then contain NaN and
+    metadata records the omission. The engine requires raw counts and at
+    least two replicates per group, and refuses covariate/formula requests,
+    count smoothing and legacy LR post-processors it cannot honor.
 
     Smoothed-input mode (``use_smoothed=True``)
     -------------------------------------------
@@ -570,7 +590,7 @@ def dmc(
         treatment/control sample lists.
     test : str
         One of ``"auto"``, ``"lr"``, ``"welch_t"``, ``"fisher"``, or
-        ``"glm"``. ``"auto"`` resolves to ``"fisher"`` at n<2 and ``"lr"``
+        ``"glm"`` or ``"beta_binomial"``. ``"auto"`` resolves to ``"fisher"`` at n<2 and ``"lr"``
         (the recommended default) at n>=2.
 
         Engines removed in 0.7.5 (raise ``ValueError`` with a migration
@@ -579,7 +599,8 @@ def dmc(
         ``formula='~ group + batch'``).
 
         When ``formula`` and/or ``contrast`` are supplied, the test is
-        forced to a GLM-based path regardless of ``test=``.
+        forced to a GLM-based path; ``beta_binomial`` explicitly refuses
+        formula, contrast and covariate requests.
     formula : str, optional
         patsy formula on ``md.obs`` columns, e.g. ``"~ group"`` for a
         multi-group test or ``"~ age + sex"`` for a continuous-covariate
@@ -650,6 +671,7 @@ def dmc(
         min_samples_control=min_samples_control,
         dispersion=dispersion,
         reference=reference,
+        beta_binomial_ci=beta_binomial_ci,
         allow_n1=allow_n1,
         formula=formula,
         contrast=contrast,

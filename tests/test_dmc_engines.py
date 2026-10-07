@@ -35,7 +35,7 @@ def _tree(md) -> list[Path]:
 
 
 def test_public_engines_are_both_cli_choice_lists_in_order():
-    assert PUBLIC_ENGINES == ("lr", "glm", "welch_t", "fisher")
+    assert PUBLIC_ENGINES == ("lr", "glm", "welch_t", "fisher", "beta_binomial")
     assert set(ENGINES) == {*PUBLIC_ENGINES, "glm_contrast"}
     parser = build_parser()
     for command in ("dmc", "dmr"):
