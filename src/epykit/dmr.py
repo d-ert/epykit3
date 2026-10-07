@@ -90,6 +90,7 @@ def _dmr_chain_merge_cache_key(
     return _cache.fingerprint(
         [
             ("base", base_sig),
+            ("region_correction", "complete-interval-family-by-v1"),
             ("alpha", f"{float(alpha):.10g}"),
             ("delta", f"{float(min_abs_meth_diff):.10g}"),
             ("dismerge", str(int(dis_merge_bp))),
@@ -759,8 +760,9 @@ def apply_region_qfilter(
     is empty, the frame is returned unchanged.
 
     - chain_merge / sliding_window use the default
-      ``("combined_qvalue", "combined_pvalue")`` (BH-corrected combined
-      q-value, falling back to the raw combined p-value).
+      ``("combined_qvalue", "combined_pvalue")`` (adjusted combined
+      value: complete-interval-family BY for chain_merge, selected-window BH
+      for sliding_window; falling back to the raw combined p-value).
     - tile uses ``("qvalue",)`` (its own per-tile BH q-value); the
       "first present candidate else unchanged" rule reproduces the prior
       ``"qvalue" in dmr_df.columns`` guard exactly.
@@ -806,7 +808,12 @@ def call_dmr_chain_merge(
          Stouffer's Z (reused from ``call_dmr_sliding_window``); classify
          direction (``hyper`` / ``hypo`` / ``mixed``) from the mean
          ``meth_diff`` and per-site sign tally.
-      6. BH-correct the surviving combined p-values genome-wide.
+      6. BY-correct against every geometry-admissible contiguous interval
+         genome-wide, assigning p=1 to unreported intervals. The family is
+         defined from positions, count, length and gap limits before selecting
+         significant CpGs. This accounts for the interval search and overlap
+         dependence; validity still requires calibrated fixed-interval raw
+         p-values, which signed Stouffer does not guarantee for correlated CpGs.
 
     Differences from DSS callDMR (do not treat the two as interchangeable)
     ----------------------------------------------------------------------
@@ -986,12 +993,15 @@ def call_dmr_chain_merge(
     )
 
     all_records: list[dict] = []
+    family_size = 0
+    from ._region_search import adjust_selected, count_intervals
 
     for chrom, chrom_df in chrom_iter:
         if len(chrom_df) == 0:
             continue
 
         positions = chrom_df["pos"].to_numpy()
+        family_size += count_intervals(positions, min_cpgs, minlen_bp, dis_merge_bp)
         meth_diffs = chrom_df["meth_diff"].to_numpy(allow_copy=True).astype(np.float32)
         # pvals is always the raw pvalue column (used by Stouffer's Z).
         pvals = chrom_df["pvalue"].to_numpy(allow_copy=True).astype(np.float64)
@@ -1108,15 +1118,12 @@ def call_dmr_chain_merge(
         .sort(["chrom", "start"])
     )
 
-    # BH correction (mirrors call_dmr_sliding_window) so downstream
-    # filters can operate on q-values consistently.
-    from .dmc import apply_multiple_testing_correction
-
-    dmr_df = apply_multiple_testing_correction(
-        dmr_df,
-        method="fdr_bh",
-        pvalue_col="combined_pvalue",
-        qvalue_col="combined_qvalue",
+    logger.info("chain_merge: correcting %d selected spans over %d admissible intervals (BY)",
+                len(dmr_df), family_size)
+    corrected = adjust_selected(dmr_df["combined_pvalue"].to_numpy(), family_size)
+    dmr_df = dmr_df.with_columns(
+        pl.Series("combined_qvalue", corrected),
+        pl.Series("combined_qvalue_reject", corrected <= .05),
     )
     if dmr_cache_path is not None:
         dmr_df.write_parquet(str(dmr_cache_path))

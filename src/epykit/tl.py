@@ -79,10 +79,10 @@ _DMR_FDR_NOTED = False
 def _note_dmr_fdr_calibration_once() -> None:
     """One-shot note that asymptotic DMR q-values are not a calibrated FDR.
 
-    The region ``combined_qvalue`` / tile ``qvalue`` are BH corrections of
-    Stouffer-combined per-CpG p-values; under CpG spatial correlation they
-    are anti-conservative (a ranking signal, not a calibrated region-level
-    FDR). Emitted at INFO (not a warning) so it informs interactive users
+    Chain-merge uses BY over its complete interval search; other callers
+    retain their own corrections. These adjustments do not repair invalid
+    raw interval p-values caused by site miscalibration or CpG correlation.
+    Emitted at INFO (not a warning) so it informs interactive users
     without polluting stderr. Fired on every ``tl.dmr`` call (M2): the
     caveat applies to the asymptotic ``combined_qvalue`` even when an
     empirical-FDR run is overlaid on top, and was previously hidden from
@@ -94,12 +94,11 @@ def _note_dmr_fdr_calibration_once() -> None:
         return
     _DMR_FDR_NOTED = True
     logger.info(
-        "DMR q-values (combined_qvalue / tile qvalue) are asymptotic BH on "
-        "Stouffer-combined p-values: a well-calibrated *ranking* signal, but "
-        "anti-conservative as a region-level FDR under CpG spatial "
-        "correlation. For calibrated region inference pass empirical_fdr=True "
-        "with method='tile' or method='chain_merge' (sliding_window and "
-        "segment raise NotImplementedError) and threshold empirical_qvalue."
+        "DMR scores use asymptotic per-CpG combinations. chain_merge applies "
+        "BY over the complete interval search; other callers retain their "
+        "own corrections. CpG miscalibration or within-region correlation "
+        "can invalidate nominal region significance; empirical validation "
+        "is required before interpreting these scores as calibrated FDR."
     )
 
 
@@ -949,19 +948,21 @@ def dmr(
 
     Region-level FDR calibration (important)
     ----------------------------------------
-    The DMR-level ``combined_qvalue`` (chain_merge / sliding_window /
-    segment) and tile ``qvalue`` are BH corrections of **asymptotic** region
-    p-values built by combining per-CpG p-values with signed Stouffer's Z.
-    Stouffer's combination assumes the per-CpG statistics are independent;
-    adjacent WGBS CpGs are positively correlated, so the combined null
-    variance exceeds 1 and these region q-values are **anti-conservative**
-    (too small) in CpG-dense regions. Treat them as a well-calibrated
-    *ranking* signal, **not** a calibrated region-level FDR. For trustworthy
-    region-level inference pass ``empirical_fdr=True`` with ``method="tile"``
+    Chain-merge ``combined_qvalue`` uses BY over every geometry-admissible
+    interval, with unreported intervals assigned p=1. This accounts for
+    data-dependent span selection and dependence between overlapping
+    interval hypotheses, provided fixed-interval raw p-values are valid.
+    Sliding-window / segment ``combined_qvalue`` and tile ``qvalue`` retain
+    their BH corrections. These region scores use **asymptotic** per-CpG
+    combinations. Signed Stouffer assumes independent CpG statistics;
+    within-region correlation or miscalibrated site p-values can invalidate
+    nominal region significance even after search correction. Empirical
+    validation is therefore required before interpreting them as region FDR.
+    An optional label-permutation calculation uses ``empirical_fdr=True`` with ``method="tile"``
     or ``method="chain_merge"``, which re-runs the caller on shuffled labels
     and adds permutation ``empirical_pvalue`` / ``empirical_qvalue`` /
     ``empirical_fdr_set`` columns; threshold ``empirical_qvalue`` instead of
-    ``combined_qvalue`` for FDR control. ``fdr_method="max_t"`` (default)
+    ``combined_qvalue``. ``fdr_method="max_t"`` (default)
     keeps the Westfall-Young min-P construction; ``fdr_method="region"``
     selects the count-ratio target-decoy FDR and records the set-level
     estimate in ``md.uns["dmr_params"]["empirical_fdr_set"]``. Every
@@ -1375,8 +1376,7 @@ def dmr(
         }
         dmr_df = call_dmr_chain_merge(dmc_input, **cm_kwargs)
 
-        # Same post-hoc q-value filter as the sliding-window path: drop
-        # candidate DMRs whose BH-corrected combined q-value isn't sig.
+        # Filter the complete-search BY adjusted values from chain_merge.
         # Shared with the CLI via apply_region_qfilter (default candidate cols).
         dmr_df = apply_region_qfilter(dmr_df, min_mean_qvalue)
 
@@ -1413,6 +1413,7 @@ def dmr(
         md.uns["dmr"] = dmr_df
         md.uns["dmr_params"] = {
             "method": "chain_merge",
+            "region_correction": "complete-interval-family-by-v1",
             "alpha": alpha,
             "min_abs_meth_diff": min_abs_meth_diff,
             "dis_merge_bp": dis_merge_bp,
