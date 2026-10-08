@@ -55,6 +55,37 @@ paired donors. Region selection and spatial correlation remain separate
 issues. The current comparison retains the accepted interval-family/BY
 region correction unchanged.
 
+## Completed genome benchmark
+
+The frozen 7 October implementation was rerun on the full signal and null
+simulations and GSE64177. All three finished; the real-data run had no
+benchmark memory cap. Recorded competitors were reused.
+
+| Epykit version | Region precision | Region recall | Region F1 | Signal minutes |
+|---|---:|---:|---:|---:|
+| Original | 33.2% | 41.5% | 0.369 | 6.18 |
+| Region-only correction | 90.9% | 30.8% | 0.460 | 6.27 |
+| Experimental BB-F | 91.3% | 26.9% | 0.416 | 58.99 |
+
+Region matching requires 50% reciprocal overlap in eligible CpGs. BB-F
+called no significant CpGs in either simulation, including the signal
+dataset's 34,889 eligible true positives. Its ranking average precision
+was 0.0599 versus original epykit's 0.0357 and DSS's 0.3751. Zero null calls
+accompany zero site-level recall at BH q<=0.05.
+
+On real data, 46 of 48 BB-F regions overlapped the published list in the
+same direction, covering 47 paper regions. DSS covered 180. This high
+agreement fraction comes with low recovery of the published list; the
+paper is not biological ground truth. BB-F used 41.46 minutes and 4.83 GiB
+peak RSS. The complete all-tool comparison, figures, workbook and independent
+checks are stored in the separate benchmark project under
+`results/beta_binomial_20261007_full/comparison`.
+
+These results support continued methodological development, rather than
+automatic default promotion. In particular, the small-sample reference and
+dispersion uncertainty need a justified treatment with adequate power on
+fresh simulations. The implementation remains explicitly experimental.
+
 References: [WGBS survey](https://doi.org/10.1093/bib/bbx013),
 [DSS](https://pmc.ncbi.nlm.nih.gov/articles/PMC4005660/),
 [RADMeth](https://pmc.ncbi.nlm.nih.gov/articles/PMC4230021/),
