@@ -1,0 +1,57 @@
+dataset	dimension	stratum	truth_regions	legacy_recall	native_recall	native_candidate_coverage
+independent_signal_n5	eligible_cpgs	1-4	75	0.0	0.013333333333333334	0.06666666666666667
+independent_signal_n5	eligible_cpgs	5-9	199	0.20100502512562815	0.4020100502512563	0.6130653266331658
+independent_signal_n5	eligible_cpgs	10-19	286	0.44755244755244755	0.7692307692307693	0.8496503496503497
+independent_signal_n5	eligible_cpgs	20+	99	0.494949494949495	0.9191919191919192	0.9494949494949495
+independent_signal_n5	span_bp	<100	25	0.16	0.08	0.12
+independent_signal_n5	span_bp	100-249	86	0.32558139534883723	0.2441860465116279	0.313953488372093
+independent_signal_n5	span_bp	250-499	109	0.3577981651376147	0.5137614678899083	0.6788990825688074
+independent_signal_n5	span_bp	500+	439	0.3325740318906606	0.7129840546697038	0.8200455580865603
+independent_signal_n5	baseline	low	89	0.5056179775280899	0.29213483146067415	0.30337078651685395
+independent_signal_n5	baseline	intermediate	118	0.11864406779661017	0.423728813559322	0.6694915254237288
+independent_signal_n5	baseline	high	452	0.3495575221238938	0.6991150442477876	0.7920353982300885
+independent_signal_n5	biological_dispersion	(-0.0008990000000000001, 0.109]	220	0.55	0.65	0.6681818181818182
+independent_signal_n5	biological_dispersion	(0.109, 0.174]	219	0.3333333333333333	0.6986301369863014	0.7853881278538812
+independent_signal_n5	biological_dispersion	(0.174, 0.277]	220	0.10454545454545454	0.43636363636363634	0.6590909090909091
+holdout_independent_signal_n3	eligible_cpgs	1-4	6	0.0	0.0	0.16666666666666666
+holdout_independent_signal_n3	eligible_cpgs	5-9	12	0.0	0.16666666666666666	0.5833333333333334
+holdout_independent_signal_n3	eligible_cpgs	10-19	33	0.030303030303030304	0.24242424242424243	0.7272727272727273
+holdout_independent_signal_n3	eligible_cpgs	20+	16	0.0625	0.75	1.0
+holdout_independent_signal_n3	span_bp	<100	1	0.0	0.0	0.0
+holdout_independent_signal_n3	span_bp	100-249	15	0.0	0.13333333333333333	0.4666666666666667
+holdout_independent_signal_n3	span_bp	250-499	11	0.09090909090909091	0.36363636363636365	0.7272727272727273
+holdout_independent_signal_n3	span_bp	500+	40	0.025	0.4	0.825
+holdout_independent_signal_n3	baseline	low	6	0.0	0.0	0.0
+holdout_independent_signal_n3	baseline	intermediate	16	0.0	0.125	0.75
+holdout_independent_signal_n3	baseline	high	45	0.044444444444444446	0.4444444444444444	0.8
+holdout_independent_signal_n3	biological_dispersion	(-0.0008990000000000001, 0.129]	23	0.043478260869565216	0.4782608695652174	0.7391304347826086
+holdout_independent_signal_n3	biological_dispersion	(0.129, 0.193]	22	0.045454545454545456	0.36363636363636365	0.7272727272727273
+holdout_independent_signal_n3	biological_dispersion	(0.193, 0.265]	22	0.0	0.13636363636363635	0.6818181818181818
+holdout2_independent_signal_n3	eligible_cpgs	1-4	4	0.0	0.0	0.0
+holdout2_independent_signal_n3	eligible_cpgs	5-9	18	0.0	0.05555555555555555	0.3333333333333333
+holdout2_independent_signal_n3	eligible_cpgs	10-19	32	0.125	0.53125	0.875
+holdout2_independent_signal_n3	eligible_cpgs	20+	13	0.0	0.7692307692307693	1.0
+holdout2_independent_signal_n3	span_bp	<100	3	0.3333333333333333	0.0	0.0
+holdout2_independent_signal_n3	span_bp	100-249	8	0.0	0.0	0.25
+holdout2_independent_signal_n3	span_bp	250-499	13	0.07692307692307693	0.38461538461538464	0.6923076923076923
+holdout2_independent_signal_n3	span_bp	500+	43	0.046511627906976744	0.5348837209302325	0.8372093023255814
+holdout2_independent_signal_n3	baseline	low	8	0.125	0.0	0.125
+holdout2_independent_signal_n3	baseline	intermediate	12	0.0	0.25	0.75
+holdout2_independent_signal_n3	baseline	high	47	0.06382978723404255	0.5319148936170213	0.7872340425531915
+holdout2_independent_signal_n3	biological_dispersion	(-0.0008990000000000001, 0.138]	23	0.13043478260869565	0.5652173913043478	0.6956521739130435
+holdout2_independent_signal_n3	biological_dispersion	(0.138, 0.186]	22	0.045454545454545456	0.45454545454545453	0.7272727272727273
+holdout2_independent_signal_n3	biological_dispersion	(0.186, 0.273]	22	0.0	0.22727272727272727	0.6818181818181818
+spatial_signal_n3	eligible_cpgs	1-4	4	0.0	0.0	0.0
+spatial_signal_n3	eligible_cpgs	5-9	18	0.0	0.0	0.3888888888888889
+spatial_signal_n3	eligible_cpgs	10-19	25	0.04	0.0	0.44
+spatial_signal_n3	eligible_cpgs	20+	13	0.0	0.0	0.8461538461538461
+spatial_signal_n3	span_bp	<100	2	0.0	0.0	0.0
+spatial_signal_n3	span_bp	100-249	4	0.0	0.0	0.0
+spatial_signal_n3	span_bp	250-499	14	0.07142857142857142	0.0	0.2857142857142857
+spatial_signal_n3	span_bp	500+	40	0.0	0.0	0.625
+spatial_signal_n3	baseline	low	4	0.25	0.0	0.0
+spatial_signal_n3	baseline	intermediate	9	0.0	0.0	0.5555555555555556
+spatial_signal_n3	baseline	high	47	0.0	0.0	0.5106382978723404
+spatial_signal_n3	biological_dispersion	(-0.0008990000000000001, 0.152]	20	0.05	0.0	0.5
+spatial_signal_n3	biological_dispersion	(0.152, 0.19]	20	0.0	0.0	0.55
+spatial_signal_n3	biological_dispersion	(0.19, 0.274]	20	0.0	0.0	0.4

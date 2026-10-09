@@ -186,6 +186,7 @@ class DMCConfig:
         span does not invalidate a cache.
         """
         params = {
+            "support_schema_revision": "2026-10-09-observed-replicates-v1",
             "test": selected_test,
             "chromosomes": self.chromosomes,
             "canonical_only": self.canonical_only,

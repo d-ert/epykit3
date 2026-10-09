@@ -1,0 +1,146 @@
+{
+  "independent_signal_n5": {
+    "legacy": {
+      "truth_bp": 619561,
+      "predicted_bp": 171484,
+      "intersection_bp": 167084,
+      "precision": 0.9743416295397821,
+      "recall": 0.2696812743216568,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    },
+    "native": {
+      "truth_bp": 619561,
+      "predicted_bp": 382979,
+      "intersection_bp": 339421,
+      "precision": 0.8862653043639468,
+      "recall": 0.5478411326729733,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    }
+  },
+  "independent_null_n5": {
+    "legacy": {
+      "truth_bp": 0,
+      "predicted_bp": 0,
+      "intersection_bp": 0,
+      "precision": null,
+      "recall": null,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    },
+    "native": {
+      "truth_bp": 0,
+      "predicted_bp": 0,
+      "intersection_bp": 0,
+      "precision": null,
+      "recall": null,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    }
+  },
+  "holdout_independent_signal_n3": {
+    "legacy": {
+      "truth_bp": 63919,
+      "predicted_bp": 1815,
+      "intersection_bp": 1815,
+      "precision": 1.0,
+      "recall": 0.02839531281778501,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    },
+    "native": {
+      "truth_bp": 63919,
+      "predicted_bp": 26597,
+      "intersection_bp": 24635,
+      "precision": 0.9262322818362974,
+      "recall": 0.3854096590997982,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    }
+  },
+  "holdout_independent_null_n3": {
+    "legacy": {
+      "truth_bp": 0,
+      "predicted_bp": 0,
+      "intersection_bp": 0,
+      "precision": null,
+      "recall": null,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    },
+    "native": {
+      "truth_bp": 0,
+      "predicted_bp": 0,
+      "intersection_bp": 0,
+      "precision": null,
+      "recall": null,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    }
+  },
+  "holdout2_independent_signal_n3": {
+    "legacy": {
+      "truth_bp": 57524,
+      "predicted_bp": 1411,
+      "intersection_bp": 1411,
+      "precision": 1.0,
+      "recall": 0.024528892288436133,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    },
+    "native": {
+      "truth_bp": 57524,
+      "predicted_bp": 29896,
+      "intersection_bp": 27437,
+      "precision": 0.9177481937382928,
+      "recall": 0.4769661358737223,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    }
+  },
+  "holdout2_independent_null_n3": {
+    "legacy": {
+      "truth_bp": 0,
+      "predicted_bp": 0,
+      "intersection_bp": 0,
+      "precision": null,
+      "recall": null,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    },
+    "native": {
+      "truth_bp": 0,
+      "predicted_bp": 0,
+      "intersection_bp": 0,
+      "precision": null,
+      "recall": null,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    }
+  },
+  "spatial_signal_n3": {
+    "legacy": {
+      "truth_bp": 60551,
+      "predicted_bp": 265,
+      "intersection_bp": 265,
+      "precision": 1.0,
+      "recall": 0.004376476028471867,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    },
+    "native": {
+      "truth_bp": 60551,
+      "predicted_bp": 0,
+      "intersection_bp": 0,
+      "precision": null,
+      "recall": 0.0,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    }
+  },
+  "spatial_null_n3": {
+    "legacy": {
+      "truth_bp": 0,
+      "predicted_bp": 0,
+      "intersection_bp": 0,
+      "precision": null,
+      "recall": null,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    },
+    "native": {
+      "truth_bp": 0,
+      "predicted_bp": 0,
+      "intersection_bp": 0,
+      "precision": null,
+      "recall": null,
+      "definition": "union of spans bounded by first/last positive CpG; genomic geometry, not biological FDP"
+    }
+  }
+}

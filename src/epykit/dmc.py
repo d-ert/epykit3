@@ -65,6 +65,8 @@ _EMPTY_SCHEMA = {
     "strand": pl.Utf8,
     "n_case": pl.Int32,
     "n_control": pl.Int32,
+    "n_valid_case": pl.Int32,
+    "n_valid_control": pl.Int32,
     "mean_beta_case": pl.Float32,
     "mean_beta_control": pl.Float32,
     "pvalue": pl.Float64,
@@ -127,6 +129,7 @@ def _dmc_input_signature(
     msp = Path(methylstore_path).resolve()
     fields: list[tuple[str, str]] = [
         ("variance_revision", "2026-09-depth-aware-F-v1"),
+        ("support_schema_revision", "2026-10-09-observed-replicates-v1"),
         ("store", str(msp)),
         ("case", ",".join(samples_case)),
         ("ctrl", ",".join(samples_control)),
@@ -2151,6 +2154,8 @@ def _finalise_chromosome(inp: EngineInput, res: EngineResult) -> pl.DataFrame:
         "strand": inp.canonical_df["strand"],
         "n_case": pl.Series(np.full(n_sites, len(inp.samples_case), dtype=np.int32)),
         "n_control": pl.Series(np.full(n_sites, len(inp.samples_control), dtype=np.int32)),
+        "n_valid_case": pl.Series(n_valid_case.astype(np.int32)),
+        "n_valid_control": pl.Series(n_valid_ctrl.astype(np.int32)),
         "mean_beta_case": pl.Series(mean_beta_case),
         "mean_beta_control": pl.Series(mean_beta_ctrl),
         "pvalue": pl.Series(pvals),

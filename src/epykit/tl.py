@@ -952,7 +952,18 @@ def dmr(
     ``method="sliding_window"`` path operates on the in-memory DMC table
     and is unaffected by this setting.
 
-    Four methods are supported (see ``method`` below for the full list):
+    Five methods are supported (see ``method`` below for the full list):
+
+    * ``method="regional_gls"`` -- experimental effect-based region discovery,
+      CpG-level spatial GLS with locus intercepts and a biological sample
+      effect, and pooled full-discovery label permutations. Requires independent
+      exchangeable samples (at least two per group); no upstream DMC table.
+      Uses ``window_bp``, ``min_cpgs`` (default 5), ``dis_merge_bp``,
+      ``minlen_bp``, ``min_abs_meth_diff``, ``n_perm`` and ``perm_seed``.
+      ``min_mean_qvalue`` filters permutation BH values; all candidates remain
+      in ``md.uns['dmr_candidates']``. ``n_workers`` controls native region-fit
+      threads (up to eight by default). Identical inputs/settings reuse complete
+      inference under ``analysis_root/.cache/regional_gls``. Calibration is experimental.
 
     * ``method="chain_merge"`` (default, recommended) -- DSS-style
       chaining of significant CpGs into regions; tune via ``preset``.
@@ -1083,6 +1094,22 @@ def dmr(
     if min_samples_treatment is None:
         min_samples_treatment = 0
     tsv, _, _, _tsv_is_auto = _resolve_auto_tsv(md, tsv, csv, default_name="dmr.tsv")
+    if method == "regional_gls":
+        if design is not None or covariates or empirical_strata is not None:
+            raise NotImplementedError("regional_gls currently requires independent exchangeable samples; covariate/paired permutation designs are not yet implemented")
+        if preset is not None or backend != "sequential":
+            raise ValueError("regional_gls requires explicit geometry and backend='sequential'")
+        from ._regional_gls import run_regional_gls
+        frame, candidates, params = run_regional_gls(md, chromosomes=chromosomes,
+            canonical_only=canonical_only, window_bp=window_bp,
+            min_cpgs=5 if min_cpgs is None else min_cpgs, max_gap=dis_merge_bp,
+            min_length=minlen_bp, min_effect=min_abs_meth_diff, n_perm=n_perm,
+            seed=perm_seed, q_cutoff=min_mean_qvalue, workers=n_workers)
+        md.uns["dmr"], md.uns["dmr_candidates"], md.uns["dmr_params"] = frame, candidates, params
+        if tsv is not None:
+            from .export import dmr_to_tsv
+            _emit_result_tsv(lambda: dmr_to_tsv(md, tsv), tsv, is_auto=_tsv_is_auto)
+        return
     # M2 (Batch-1): empirical_fdr is wired for method='tile' and, since the
     # chain_merge harness landed, method='chain_merge'. The sliding_window /
     # segment branches previously accepted the kwarg and silently no-op'd
@@ -1431,7 +1458,7 @@ def dmr(
 
     raise ValueError(
         f"Unknown DMR method '{method}'. Expected 'tile', 'sliding_window', "
-        f"'segment', or 'chain_merge'."
+        f"'segment', 'chain_merge', or 'regional_gls'."
     )
 
 

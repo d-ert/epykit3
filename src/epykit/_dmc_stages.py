@@ -400,6 +400,9 @@ def run_engine(md: MethylData, plan: DMCPlan, store_path: str) -> DMCStore:
         n_workers=cfg.n_workers,
         glm_backend=cfg.glm_backend,
         return_store=True,
+        out_dir=(Path(md.analysis_root) / ".cache" / "dmc" /
+                 (f"{plan.selected_test}_smooth" if cfg.smoothing else plan.selected_test))
+                if md.analysis_root else None,
         smoothing=cfg.smoothing,
         smoothing_span_bp=cfg.smoothing_span_bp,
         sep_fallback=cfg.sep_fallback,

@@ -19,7 +19,7 @@
 <p align="center">
   <a href="https://d-ert.github.io/epykit3/">Documentation</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="benchmark/paper/report/REPORT.md">Benchmark</a>
+  <a href="docs/regional-gls-benchmark-2026-10-10.md">Regional GLS benchmark</a>
 </p>
 
 ---
@@ -27,6 +27,12 @@
 epykit ingests Bismark / MethylDackel coverage output into a partitioned Parquet **methylstore** and runs the whole downstream analysis (QC → filtering → DMC → DMR → annotation → plotting → report) over that store with [polars](https://pola.rs) and lazy I/O. Whole-genome data (~22 M CpGs) is never held in RAM as a single frame — every step streams over the partition tree. The Python API is organised in a scanpy-style `pp` / `tl` / `pl` namespace; a CLI mirrors the same operations for scripting.
 
 > **Status:** version 1.2.0 — stable API. MIT licensed. Linux / macOS / Windows.
+
+The `minimal` branch also includes an **experimental regional GLS** caller:
+`ep.tl.dmr(md, method="regional_gls")`. It discovers regions from methylation
+effects, retains sample and CpG structure, and uses native parallel REML fits
+with full discovery replay under permutations. No DMC run is required first.
+See the [measured speed, power gains and unresolved limitations](docs/regional-gls-benchmark-2026-10-10.md).
 
 ---
 
