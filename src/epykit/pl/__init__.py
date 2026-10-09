@@ -2,59 +2,60 @@ from __future__ import annotations
 
 from .._style import PALETTE, set_palette
 from .._style import apply_theme as _apply_theme
-
-_apply_theme()
-
-from .annotation import (
-    plot_annotation_counts,
-    plot_categorical,
-    plot_coannotations,
-    plot_numerical_by_annotation,
+from ._plotly import (
+    coverage_histogram_plotly,
+    cpg_island_pie_plotly,
+    dmr_size_hist_plotly,
+    feature_direction_stacked_plotly,
+    feature_pie_plotly,
+    global_methylation_bar_plotly,
+    ma_plot_plotly,
+    manhattan_plotly,
+    pca_plotly,
+    pvalue_histogram_plotly,
+    sample_correlation_plotly,
+    scree_plotly,
+    tss_metaplot_plotly,
+    volcano_plotly,
 )
-from .clustering import pca
-from .composer import figure_grid
-from .correlation import sample_correlation
-from .dashboard import qc_dashboard
-from .differential import ma_plot, manhattan, volcano
-from .dmr_boxplot import dmr_boxplot
-from .dmr_summary import dmr_heatmap, dmr_violin
-from .embedding import umap
-from .genomic import cpg_island_pie, genomic_context_bar, karyogram
-from .metaplot import gene_body_metaplot, tss_metaplot
-from .overlap import dmr_overlap
-from .qc import coverage_histogram, mbias_plot, methylation_heatmap
+
+# Interactive Plotly aliases for standard plotting functions
+volcano = volcano_plotly
+ma_plot = ma_plot_plotly
+manhattan = manhattan_plotly
+coverage_histogram = coverage_histogram_plotly
+pca = pca_plotly
+feature_pie = feature_pie_plotly
+cpg_island_pie = cpg_island_pie_plotly
+tss_metaplot = tss_metaplot_plotly
+pvalue_histogram = pvalue_histogram_plotly
+dmr_size_hist = dmr_size_hist_plotly
+global_methylation_bar = global_methylation_bar_plotly
+sample_correlation = sample_correlation_plotly
+scree = scree_plotly
+feature_direction_stacked = feature_direction_stacked_plotly
 
 __all__ = [
     "PALETTE",
     "apply_theme",
     "coverage_histogram",
     "cpg_island_pie",
-    "dmr_boxplot",
-    "dmr_heatmap",
-    "dmr_overlap",
-    "dmr_violin",
-    "figure_grid",
-    "gene_body_metaplot",
-    "genomic_context_bar",
-    "karyogram",
+    "dmr_size_hist",
+    "feature_direction_stacked",
+    "feature_pie",
+    "global_methylation_bar",
     "ma_plot",
     "manhattan",
-    "mbias_plot",
-    "methylation_heatmap",
     "pca",
-    "plot_annotation_counts",
-    "plot_categorical",
-    "plot_coannotations",
-    "plot_numerical_by_annotation",
-    "qc_dashboard",
+    "pvalue_histogram",
     "sample_correlation",
+    "scree",
     "set_palette",
     "tss_metaplot",
-    "umap",
     "volcano",
 ]
 
 
 def apply_theme(context: str = "paper") -> None:
-    """Re-apply the matplotlib theme. See :func:`epykit._style.apply_theme`."""
+    """Re-apply the plot theme. See :func:`epykit._style.apply_theme`."""
     return _apply_theme(context)

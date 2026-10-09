@@ -888,10 +888,3 @@ def power(
         if _power_at_n(n) >= target:
             return n
     return 10_000
-
-
-def report_multiqc(md, output_dir: str) -> str:
-    """Re-export of the MultiQC writer; defined in multiqc_export.py."""
-    from .multiqc_export import report_multiqc as _impl
-
-    return _impl(md, output_dir)

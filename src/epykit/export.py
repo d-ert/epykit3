@@ -424,33 +424,6 @@ def dmc_to_tsv(
     return _write_table(out_df, path)
 
 
-def dvc_to_tsv(
-    md: MethylData,
-    path: str,
-    *,
-    alpha: float = 0.05,
-    full: bool = False,
-) -> str:
-    """Write the DVC table (md.varm['dvc']) as TSV/CSV.
-
-    Default: significant-only (q_variance < alpha) sorted by q_variance
-    ascending. full=True keeps every row in (chrom, pos) order.
-    Delimiter is derived from the path suffix.
-    """
-    df = md.varm.get("dvc")
-    if df is None or len(df) == 0:
-        raise ValueError("No DVC results on this MethylData. Run ep.tl.dvc(md) first.")
-    if full:
-        sort_cols = ["chrom", "pos"] if "pos" in df.columns else ["chrom"]
-        out_df = df.sort(sort_cols)
-    else:
-        gate = "q_variance" if "q_variance" in df.columns else "p_variance"
-        out_df = df.filter(
-            pl.col(gate).is_not_null() & pl.col(gate).is_not_nan() & (pl.col(gate) < alpha)
-        ).sort(gate)
-    return _write_table(out_df, path)
-
-
 def qc_to_tsv(md: MethylData, path: str) -> str:
     """Write the per-sample QC summary (md.obs) as TSV/CSV.
 
@@ -470,21 +443,18 @@ def export_tables(
     fmt: Literal["tsv", "csv"] = "tsv",
     dmc: bool = True,
     dmr: bool = True,
-    dvc: bool = True,
     qc: bool = True,
 ) -> dict[str, str]:
     """Dump every available result table to ``out_dir`` in one call.
 
     A convenience over the individual ``*_to_tsv`` writers: it writes whichever
-    of the DMC / DMR / DVC / QC tables are present on ``md`` and skips the rest
+    of the DMC / DMR / QC tables are present on ``md`` and skips the rest
     silently (nothing is raised for a missing table). Files written:
 
     * ``<dmc_key>.significant.<ext>`` -- significant DMCs (``qvalue < alpha``).
       With ``full=True``, also ``<dmc_key>.<ext>`` (every row of the resolved
       DMC frame; after annotation that frame is the annotated subset).
     * ``dmr.<ext>``                   -- the DMR table (``md.uns['dmr']``).
-    * ``dvc.significant.<ext>``       -- significant DVCs (``q_variance < alpha``).
-      With ``full=True``, also ``dvc.<ext>``.
     * ``qc_summary.<ext>``            -- per-sample QC summary (``md.obs``).
 
     Parameters
@@ -493,20 +463,20 @@ def export_tables(
     out_dir : str
         Directory to write into (created if absent).
     alpha : float
-        Significance threshold for the significant-only DMC / DVC tables.
+        Significance threshold for the significant-only DMC table.
     full : bool
-        Also emit the full (all-rows) DMC and DVC tables alongside the
+        Also emit the full (all-rows) DMC table alongside the
         significant ones.
     fmt : {"tsv", "csv"}
         ``"tsv"`` -> tab-delimited ``.tsv`` files; ``"csv"`` -> comma ``.csv``.
-    dmc, dmr, dvc, qc : bool
+    dmc, dmr, qc : bool
         Per-table switches; set any to False to skip it.
 
     Returns
     -------
     dict[str, str]
         Logical table name (``"dmc_significant"``, ``"dmc_full"``, ``"dmr"``,
-        ``"dvc_significant"``, ``"dvc_full"``, ``"qc"``) -> absolute path written.
+        ``"qc"``) -> absolute path written.
         Keys are only present for tables that existed and were exported.
     """
     ext = "csv" if fmt == "csv" else "tsv"
@@ -527,15 +497,6 @@ def export_tables(
         if isinstance(dmr_df, pl.DataFrame) and len(dmr_df):
             written["dmr"] = dmr_to_tsv(md, str(out / f"dmr.{ext}"))
 
-    if dvc:
-        dvc_df = md.varm.get("dvc")
-        if isinstance(dvc_df, pl.DataFrame) and len(dvc_df):
-            written["dvc_significant"] = dvc_to_tsv(
-                md, str(out / f"dvc.significant.{ext}"), alpha=alpha
-            )
-            if full:
-                written["dvc_full"] = dvc_to_tsv(md, str(out / f"dvc.{ext}"), full=True)
-
     if qc and md.obs is not None and len(md.obs):
         written["qc"] = qc_to_tsv(md, str(out / f"qc_summary.{ext}"))
 
@@ -553,7 +514,6 @@ __all__ = [
     "dmcs_to_bed",
     "dmr_to_tsv",
     "dmrs_to_bed",
-    "dvc_to_tsv",
     "export_tables",
     "qc_to_tsv",
     "to_bedgraph",

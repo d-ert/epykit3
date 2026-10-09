@@ -528,13 +528,12 @@ class MethylData:
         fmt: Literal["tsv", "csv"] = "tsv",
         dmc: bool = True,
         dmr: bool = True,
-        dvc: bool = True,
         qc: bool = True,
     ) -> dict:
-        """Dump all available result tables (DMC/DMR/DVC/QC) to ``out_dir``.
+        """Dump all available result tables (DMC/DMR/QC) to ``out_dir``.
 
-        One call instead of four ``ep.export.*_to_tsv`` writers: emits whichever
-        of the DMC / DMR / DVC / QC tables are present and skips the rest. See
+        One call instead of separate ``ep.export.*_to_tsv`` writers: emits whichever
+        of the DMC / DMR / QC tables are present and skips the rest. See
         :func:`epykit.export.export_tables` for the file names and switches.
 
         Returns a dict mapping logical table name -> path written.
@@ -542,7 +541,7 @@ class MethylData:
         Examples
         --------
         >>> md.export_tables("results/tables")           # significant tables
-        >>> md.export_tables("results/tables", full=True)  # + full DMC/DVC
+        >>> md.export_tables("results/tables", full=True)  # + full DMC
         """
         from .export import export_tables
 
@@ -554,27 +553,8 @@ class MethylData:
             fmt=fmt,
             dmc=dmc,
             dmr=dmr,
-            dvc=dvc,
             qc=qc,
         )
-
-    def to_anndata(self, **kwargs):
-        """Return an AnnData of this MethylData (requires `pp.unite` first)."""
-        from .anndata_io import to_anndata
-
-        return to_anndata(self, **kwargs)
-
-    def to_mudata(self, **kwargs):
-        """Return a MuData with methylation as the ``'meth'`` modality."""
-        from .anndata_io import to_mudata
-
-        return to_mudata(self, **kwargs)
-
-    def to_methylkit_tabix(self, output_dir: str, samples=None):
-        """Export per-sample methylKit tabix-friendly tables."""
-        from .methylkit_io import to_methylkit_tabix
-
-        return to_methylkit_tabix(self, output_dir, samples=samples)
 
     def region_beta(
         self,

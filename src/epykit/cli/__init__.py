@@ -10,8 +10,8 @@ CLI surface:
   ``--min-samples-treatment`` / ``--min-samples-control``
   filters, and ``--allow-n1`` to opt into the (anti-conservative) Fisher fallback when
   there are fewer than 2 replicates per group.
-* ``dmr`` -- ``--method {chain_merge,tile,sliding_window,segment}`` (default
-  ``chain_merge``). chain_merge / sliding_window / segment take a DMC parquet
+* ``dmr`` -- ``--method {chain_merge,tile,sliding_window}`` (default
+  ``chain_merge``). chain_merge / sliding_window take a DMC parquet
   (``--dmc-results``); the tile path takes a methylstore + samplesheet and
   pools reads per tile.
 

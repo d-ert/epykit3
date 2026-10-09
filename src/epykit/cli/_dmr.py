@@ -156,19 +156,6 @@ def _cmd_dmr(args: argparse.Namespace):
                 min_samples_treatment=args.min_samples_treatment,
                 min_samples_control=args.min_samples_control,
             )
-    elif args.method == "segment":
-        # --- Rule-based segmentation path: takes a DMC parquet ---
-        if not args.dmc_results:
-            raise ValueError("method=segment requires --dmc-results.")
-        from ..dmr_segment import call_dmr_rule_segment
-
-        dmc_results = pl.read_parquet(args.dmc_results)
-        dmr_results = call_dmr_rule_segment(
-            dmc_results,
-            min_cpgs=args.min_cpgs if args.min_cpgs is not None else _DMR_DEFAULT_MIN_CPGS,
-            min_abs_meth_diff=args.min_abs_meth_diff,
-            alpha=args.alpha,
-        )
     else:
         # --- Legacy sliding-window path: takes a DMC parquet ---
         if not args.dmc_results:
@@ -215,11 +202,11 @@ def register(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     """Add ``dmr`` to ``sub``."""
     # dmr
     p_dmr = sub.add_parser(
-        "dmr", help="DMR calling (chain-merge, tile, segment, or sliding-window)"
+        "dmr", help="DMR calling (chain-merge, tile, or sliding-window)"
     )
     p_dmr.add_argument(
         "--method",
-        choices=["chain_merge", "tile", "sliding_window", "segment"],
+        choices=["chain_merge", "tile", "sliding_window"],
         default="chain_merge",
         help=(
             "DMR algorithm. "
@@ -229,9 +216,7 @@ def register(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
             "'tile' pools reads across CpGs within each fixed-size tile and "
             "runs one test per tile. "
             "'sliding_window' takes a precomputed DMC parquet and combines "
-            "per-CpG p-values with signed Stouffer's Z (legacy). "
-            "'segment' rule-based 3-state segmentation on meth_diff signal "
-            "with Stouffer-combined per-segment p-values."
+            "per-CpG p-values with signed Stouffer's Z (legacy)."
         ),
     )
     p_dmr.add_argument("--output", required=True)
@@ -322,7 +307,7 @@ def register(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     # Sliding-window-method options
     p_dmr.add_argument(
         "--dmc-results",
-        help="(chain_merge, sliding_window, segment) Parquet file from 'epykit dmc'",
+        help="(chain_merge, sliding_window) Parquet file from 'epykit dmc'",
     )
     p_dmr.add_argument("--window-bp", type=int, default=500)
     p_dmr.add_argument("--step-bp", type=int, default=250)
@@ -331,8 +316,8 @@ def register(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
         type=int,
         default=None,
         help="Minimum CpGs per DMR. Default when unset: the active --preset's "
-        "value if a preset is given, otherwise 5 (chain_merge, "
-        "sliding_window, and segment all share this default).",
+        "value if a preset is given, otherwise 5 (chain_merge "
+        "and sliding_window share this default).",
     )
     p_dmr.add_argument("--min-sites-significant", type=int, default=3)
 

@@ -51,17 +51,15 @@ except PackageNotFoundError:
     # editable install or running from source without install
     __version__ = "0.0.0+unknown"
 
-from . import pl, pp, query, tl
+from . import pl, pp, tl
 from ._config import get_tmp_dir, set_tmp_dir
 from ._dmc_store import DMCStore
 from ._glm import build_design
-from .anndata_io import to_anndata, to_mudata
 from .annotate import (
     HOMER_FEATURES,
     annotate_cpg_islands,
     annotate_features,
 )
-from .clocks import age_clock, deconvolve
 from .convert import convert_sample
 from .dmr import (
     DMR_PRESETS,
@@ -70,11 +68,9 @@ from .dmr import (
     smooth_methylation_bsmooth,
     smooth_methylation_gaussian,
 )
-from .dvc import call_dvr_density, process_chromosomes_dvc
 
-# Export / interop (lazy heavy deps inside)
+# Export (lazy heavy deps inside)
 from .export import dmcs_to_bed, dmrs_to_bed, export_tables, to_bedgraph, to_bigwig
-from .impute import impute_knn_anndata, impute_knn_beta
 from .io import (
     load,
     read_bismark,
@@ -83,9 +79,6 @@ from .io import (
     read_nfcore_methylseq,
 )
 from .methyldata import MethylData
-from .methylkit_io import to_methylkit_tabix
-from .multiqc_export import report_multiqc
-from .nfcore_qc import read_nfcore_methylseq_qc
 from .qc import (
     bisulfite_conversion_rate,
     contamination_estimate,
@@ -111,49 +104,37 @@ __all__ = [
     "DMCStore",
     "MethylData",
     "__version__",
-    "age_clock",
     "annotate_cpg_islands",
     "annotate_features",
     "bisulfite_conversion_rate",
     "build_design",
     "call_dmr_chain_merge",
     "call_dmr_sliding_window",
-    "call_dvr_density",
     "contamination_estimate",
     "convert_sample",
     "coverage_uniformity",
-    "deconvolve",
     "dmcs_to_bed",
     "dmrs_to_bed",
     "export_tables",
     "generate_report",
     "get_tmp_dir",
     "global_methylation_report",
-    "impute_knn_anndata",
-    "impute_knn_beta",
     "load",
     "pl",
     "power_calc",
     "pp",
-    "process_chromosomes_dvc",
-    "query",
     "read_bismark",
     "read_combined_strand_bed",
     "read_methyldackel",
     "read_nfcore_methylseq",
-    "read_nfcore_methylseq_qc",
-    "report_multiqc",
     "sample_correlation_qc",
     "set_tmp_dir",
     "sex_check",
     "smooth_methylation_bsmooth",
     "smooth_methylation_gaussian",
     "tl",
-    "to_anndata",
     "to_bedgraph",
     "to_bigwig",
-    "to_methylkit_tabix",
-    "to_mudata",
 ]
 
 # --- Deprecation shim for demoted top-level names (1.0; kept until a future major release) ---

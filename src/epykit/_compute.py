@@ -31,7 +31,9 @@ import polars as pl
 logger = logging.getLogger(__name__)
 
 
-ChromHandler = Callable[[str], pl.DataFrame | None]
+from typing import Optional
+
+ChromHandler = Callable[[str], Optional[pl.DataFrame]]
 
 
 def run_chrom_pipeline(

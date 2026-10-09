@@ -79,44 +79,15 @@ report = [
 export = [
   "pyBigWig>=0.3.22; sys_platform != 'win32'",
 ]
-anndata = [
-  "anndata>=0.10",
-  "mudata>=0.2",
-]
-# Plan 2 §6: visualization extras
-viz = [
-  "umap-learn>=0.5",
-  "scipy>=1.11",
-]
-# Plan 2 §7: methylKit tabix export (Linux/macOS only; pysam has no Windows wheel)
-methylkit = [
-  "pysam>=0.22",
-]
-# Plan 4 #5: BAM ingestion (ASM, methylation entropy). Linux/macOS only.
-bam = [
-  "pysam>=0.22",
-]
-# Plan 4 #1: distributed compute via Dask
 distributed = [
   "dask[distributed]>=2024.1",
 ]
-# Plan 4 #1: distributed compute via Ray (alternative)
 ray = [
   "ray>=2.9",
 ]
-# Plan 4 #2: GPU IRLS via CuPy (CUDA 12). Heavy wheel, not in "all".
-# (The only implemented GPU backend is CuPy; there is no JAX backend, so a
-# `gpu_jax` extra was removed to avoid pulling a heavy CUDA wheel nothing uses.)
-gpu = [
-  "cupy-cuda12x>=13.0",
-]
-# Plan 3 P1-9: dip-test for sex_check unimodal fallback
 qc = [
   "diptest",
 ]
-# Parallel permutation FDR: tl.dmc/tl.dmr(empirical_fdr=True, perm_n_jobs>1)
-# fan out via joblib. Pure-Python; without it the n_jobs kwarg silently falls
-# back to serial execution (a logged warning).
 parallel = [
   "joblib>=1.3",
 ]
@@ -124,10 +95,6 @@ all = [
   "jinja2>=3.1",
   "plotly>=5.20",
   "pyBigWig>=0.3.22; sys_platform != 'win32'",
-  "anndata>=0.10",
-  "mudata>=0.2",
-  "umap-learn>=0.5",
-  "scipy>=1.11",
   "dask[distributed]>=2024.1",
   "diptest",
   "joblib>=1.3",

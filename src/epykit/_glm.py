@@ -290,11 +290,7 @@ def irls_dispatch(
     backend = (backend or "cpu").lower()
     if backend == "cpu":
         return irls_binomial_batch(meth, cov, X, **kwargs)
-    if backend == "gpu":
-        from ._glm_gpu import irls_binomial_batch_gpu
-
-        return irls_binomial_batch_gpu(meth, cov, X, **kwargs)
-    raise ValueError(f"Unknown glm_backend {backend!r}. Use 'cpu' (default) or 'gpu'.")
+    raise ValueError(f"Unknown glm_backend {backend!r}. Only 'cpu' is supported in minimal build.")
 
 
 def irls_binomial_batch(
