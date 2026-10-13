@@ -28,7 +28,17 @@ def prepare_discovery(pos, window_bp, min_cpgs, max_gap):
 
 @njit(cache=True, nogil=True)
 def discover_prepared(
-    pos, effects, left, right, starts, stops, min_effect, min_cpgs, max_gap, min_length
+    pos,
+    effects,
+    left,
+    right,
+    starts,
+    stops,
+    min_effect,
+    min_cpgs,
+    max_gap,
+    min_length,
+    boundary_min_effect=0.0,
 ):
     cumulative = np.empty(len(pos))
     regions = []
@@ -38,24 +48,67 @@ def discover_prepared(
         for j in range(lo, hi):
             total += effects[j]
             cumulative[j] = total
-        first, last, direction = -1, -1, 0
-        for j in range(lo, hi):
-            value = cumulative[right[j] - 1]
-            if left[j] > lo:
-                value -= cumulative[left[j] - 1]
-            value /= right[j] - left[j]
-            if abs(value) < min_effect:
-                continue
-            sign = 1 if value > 0 else -1
-            if first >= 0 and (pos[j] - pos[last] > max_gap or sign != direction):
-                if last - first + 1 >= min_cpgs and pos[last] - pos[first] + 1 >= min_length:
-                    regions.append((first, last + 1))
-                first = -1
-            if first < 0:
-                first, direction = j, sign
-            last = j
-        if first >= 0 and last - first + 1 >= min_cpgs and pos[last] - pos[first] + 1 >= min_length:
-            regions.append((first, last + 1))
+        if boundary_min_effect > 0.0:
+            first, last, direction = -1, -1, 0
+            has_seed = False
+            for j in range(lo, hi):
+                value = cumulative[right[j] - 1]
+                if left[j] > lo:
+                    value -= cumulative[left[j] - 1]
+                value /= right[j] - left[j]
+                if abs(value) < boundary_min_effect:
+                    if first >= 0:
+                        if (
+                            has_seed
+                            and last - first + 1 >= min_cpgs
+                            and pos[last] - pos[first] + 1 >= min_length
+                        ):
+                            regions.append((first, last + 1))
+                        first = -1
+                        has_seed = False
+                    continue
+                sign = 1 if value > 0 else -1
+                if first >= 0 and sign != direction:
+                    if (
+                        has_seed
+                        and last - first + 1 >= min_cpgs
+                        and pos[last] - pos[first] + 1 >= min_length
+                    ):
+                        regions.append((first, last + 1))
+                    first = -1
+                    has_seed = False
+                if first < 0:
+                    first, direction = j, sign
+                    has_seed = False
+                last = j
+                if abs(value) >= min_effect:
+                    has_seed = True
+            if (
+                first >= 0
+                and has_seed
+                and last - first + 1 >= min_cpgs
+                and pos[last] - pos[first] + 1 >= min_length
+            ):
+                regions.append((first, last + 1))
+        else:
+            first, last, direction = -1, -1, 0
+            for j in range(lo, hi):
+                value = cumulative[right[j] - 1]
+                if left[j] > lo:
+                    value -= cumulative[left[j] - 1]
+                value /= right[j] - left[j]
+                if abs(value) < min_effect:
+                    continue
+                sign = 1 if value > 0 else -1
+                if first >= 0 and (pos[j] - pos[last] > max_gap or sign != direction):
+                    if last - first + 1 >= min_cpgs and pos[last] - pos[first] + 1 >= min_length:
+                        regions.append((first, last + 1))
+                    first = -1
+                if first < 0:
+                    first, direction = j, sign
+                last = j
+            if first >= 0 and last - first + 1 >= min_cpgs and pos[last] - pos[first] + 1 >= min_length:
+                regions.append((first, last + 1))
     result = np.empty((len(regions), 2), dtype=np.int64)
     for j in range(len(regions)):
         result[j, 0], result[j, 1] = regions[j]

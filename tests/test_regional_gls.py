@@ -180,3 +180,185 @@ def test_regional_cache_reuses_valid_fit_and_invalidates_changed_counts(tmp_path
         ep.tl.dmr(md, method="regional_gls", n_perm=20, tsv=False)
     with pytest.raises(ValueError, match="geometry"):
         ep.tl.dmr(md, method="regional_gls", window_bp=0, tsv=False)
+
+
+def test_discovery_boundary_validation():
+    from epykit._regional_gls import discover_regions
+
+    pos = np.arange(10) * 20
+    effect = np.full(10, 0.15)
+    with pytest.raises(ValueError, match="Invalid region discovery inputs"):
+        discover_regions(pos, effect, boundary_min_effect=0.0)
+    with pytest.raises(ValueError, match="Invalid region discovery inputs"):
+        discover_regions(pos, effect, boundary_min_effect=-0.05)
+    with pytest.raises(ValueError, match="Invalid region discovery inputs"):
+        discover_regions(pos, effect, min_effect=0.1, boundary_min_effect=0.15)
+
+
+def test_discovery_boundary_recovers_tapered_shoulders_and_rejects_unseeded():
+    from epykit._regional_gls import discover_regions
+
+    pos = np.arange(10) * 20
+    effect = np.array([0.07, 0.07, 0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.07, 0.07])
+    legacy = discover_regions(
+        pos,
+        effect,
+        window_bp=60,
+        min_cpgs=5,
+        max_gap=100,
+        min_length=50,
+        min_effect=0.1,
+        boundary_min_effect=None,
+    )
+    extended = discover_regions(
+        pos,
+        effect,
+        window_bp=60,
+        min_cpgs=5,
+        max_gap=100,
+        min_length=50,
+        min_effect=0.1,
+        boundary_min_effect=0.05,
+    )
+    assert len(legacy) == 1
+    assert len(extended) == 1
+    assert extended[0][0] <= legacy[0][0] and extended[0][1] >= legacy[0][1]
+    assert extended[0] == (0, 10)
+
+    unseeded_effect = np.full(10, 0.07)
+    unseeded = discover_regions(
+        pos,
+        unseeded_effect,
+        window_bp=60,
+        min_cpgs=5,
+        max_gap=100,
+        min_length=50,
+        min_effect=0.1,
+        boundary_min_effect=0.05,
+    )
+    assert unseeded == []
+
+
+def test_discovery_boundary_stops_at_sign_gap_and_sub_boundary():
+    from epykit._regional_gls import discover_regions
+
+    pos = np.arange(12) * 20
+    effect = np.array([0.07, 0.15, 0.15, 0.15, 0.07, 0.0, 0.07, 0.15, 0.15, 0.15, 0.15, 0.07])
+    regions = discover_regions(
+        pos,
+        effect,
+        window_bp=40,
+        min_cpgs=4,
+        max_gap=100,
+        min_length=40,
+        min_effect=0.1,
+        boundary_min_effect=0.05,
+    )
+    assert regions == [(0, 5), (6, 12)]
+
+    effect_opp = np.array([0.07, 0.15, 0.15, 0.15, 0.07, -0.07, -0.15, -0.15, -0.15, -0.15, -0.07, 0.0])
+    regions_opp = discover_regions(
+        pos,
+        effect_opp,
+        window_bp=40,
+        min_cpgs=4,
+        max_gap=100,
+        min_length=40,
+        min_effect=0.1,
+        boundary_min_effect=0.05,
+    )
+    assert (0, 5) in regions_opp
+    assert (5, 11) in regions_opp
+
+
+def test_discovery_boundary_sign_reversal_symmetry():
+    from epykit._regional_gls import discover_regions
+
+    rng = np.random.default_rng(42)
+    pos = np.cumsum(rng.integers(10, 100, 200))
+    effects = rng.uniform(-0.3, 0.3, 200)
+    pos_res = discover_regions(
+        pos,
+        effects,
+        window_bp=300,
+        min_cpgs=5,
+        max_gap=500,
+        min_length=50,
+        min_effect=0.1,
+        boundary_min_effect=0.05,
+    )
+    neg_res = discover_regions(
+        pos,
+        -effects,
+        window_bp=300,
+        min_cpgs=5,
+        max_gap=500,
+        min_length=50,
+        min_effect=0.1,
+        boundary_min_effect=0.05,
+    )
+    assert pos_res == neg_res
+
+
+def test_native_discovery_matches_numpy_with_boundary_floor():
+    from epykit._regional_gls import discover_regions
+    from epykit._regional_gls_native import discover_prepared, prepare_discovery
+
+    rng = np.random.default_rng(888)
+    pos = np.cumsum(rng.integers(1, 400, 5000))
+    effects = rng.uniform(-0.35, 0.35, len(pos))
+    geom = prepare_discovery(pos, 500, 5, 500)
+    native = discover_prepared(pos, effects, *geom, 0.1, 5, 500, 50, 0.05)
+    ref = discover_regions(
+        pos,
+        effects,
+        window_bp=500,
+        min_cpgs=5,
+        max_gap=500,
+        min_length=50,
+        min_effect=0.1,
+        boundary_min_effect=0.05,
+    )
+    assert native.tolist() == [list(r) for r in ref]
+
+
+def test_public_api_records_boundary_and_isolates_cache(tmp_path):
+    import polars as pl
+
+    import epykit as ep
+
+    rng = np.random.default_rng(123)
+    rows = []
+    for j in range(6):
+        sample = f"s{j}"
+        rows.append(dict(sample_id=sample, treatment=int(j >= 3)))
+        part = tmp_path / "counts" / f"sample={sample}" / "chrom=chr1"
+        part.mkdir(parents=True)
+        m = rng.binomial(40, 0.70 if j >= 3 else 0.25, 40)
+        pl.DataFrame(dict(pos=np.arange(40) * 20, N_meth=m, coverage=[40] * 40)).write_parquet(
+            part / "part-0.parquet"
+        )
+    md = ep.MethylData(
+        obs=pl.DataFrame(rows),
+        store=str(tmp_path / "counts"),
+        analysis_root=str(tmp_path / "analysis"),
+    )
+    with pytest.raises(ValueError, match=r"[Bb]oundary"):
+        ep.tl.dmr(md, method="regional_gls", boundary_min_effect=-0.01, tsv=False)
+    with pytest.raises(ValueError, match=r"[Bb]oundary"):
+        ep.tl.dmr(md, method="regional_gls", min_abs_meth_diff=0.1, boundary_min_effect=0.2, tsv=False)
+
+    ep.tl.dmr(md, method="regional_gls", n_perm=20, boundary_min_effect=0.05, tsv=False)
+    assert md.uns["dmr_params"]["boundary_min_effect"] == 0.05
+    assert md.uns["dmr_params"]["cache_hit"] is False
+    key_with_boundary = md.uns["dmr_params"]["cache_key"]
+
+    ep.tl.dmr(md, method="regional_gls", n_perm=20, boundary_min_effect=None, tsv=False)
+    assert md.uns["dmr_params"]["boundary_min_effect"] is None
+    assert md.uns["dmr_params"]["cache_hit"] is False
+    key_without_boundary = md.uns["dmr_params"]["cache_key"]
+    assert key_with_boundary != key_without_boundary
+
+    ep.tl.dmr(md, method="regional_gls", n_perm=20, boundary_min_effect=0.05, tsv=False)
+    assert md.uns["dmr_params"]["cache_hit"] is True
+    assert md.uns["dmr_params"]["cache_key"] == key_with_boundary

@@ -137,7 +137,15 @@ def fit_region(
 
 
 def discover_regions(
-    positions, effects, *, window_bp=500, min_cpgs=5, max_gap=500, min_length=50, min_effect=0.1
+    positions,
+    effects,
+    *,
+    window_bp=500,
+    min_cpgs=5,
+    max_gap=500,
+    min_length=50,
+    min_effect=0.1,
+    boundary_min_effect=None,
 ):
     """Effect-based discovery without a single-CpG significance prerequisite."""
     pos, effect = np.asarray(positions, np.int64), np.asarray(effects, float)
@@ -152,6 +160,10 @@ def discover_regions(
         or max_gap < 1
         or min_length < 1
         or not 0 < min_effect <= 1
+        or (
+            boundary_min_effect is not None
+            and not (0 < boundary_min_effect <= min_effect)
+        )
     ):
         raise ValueError("Invalid region discovery inputs")
     regions = []
@@ -164,19 +176,59 @@ def discover_regions(
         right = np.searchsorted(p, p + (window_bp + 1) // 2, side="right")
         sums = np.r_[0.0, np.cumsum(effect[lo:hi])]
         smooth = (sums[right] - sums[left]) / (right - left)
-        seeds = np.flatnonzero(np.abs(smooth) >= min_effect)
-        if not len(seeds):
-            continue
-        splits = np.r_[
-            0,
-            np.flatnonzero((np.diff(p[seeds]) > max_gap) | (np.diff(np.sign(smooth[seeds])) != 0))
-            + 1,
-            len(seeds),
-        ]
-        for a, b in pairwise(splits):
-            start, end = int(seeds[a]), int(seeds[b - 1]) + 1
-            if end - start >= min_cpgs and p[end - 1] - p[start] + 1 >= min_length:
-                regions.append((int(lo + start), int(lo + end)))
+        if boundary_min_effect is not None:
+            first, last, direction = -1, -1, 0
+            has_seed = False
+            for j in range(hi - lo):
+                val = smooth[j]
+                if abs(val) < boundary_min_effect:
+                    if first >= 0:
+                        if (
+                            has_seed
+                            and last - first + 1 >= min_cpgs
+                            and p[last] - p[first] + 1 >= min_length
+                        ):
+                            regions.append((int(lo + first), int(lo + last + 1)))
+                        first = -1
+                        has_seed = False
+                    continue
+                sign = 1 if val > 0 else -1
+                if first >= 0 and sign != direction:
+                    if (
+                        has_seed
+                        and last - first + 1 >= min_cpgs
+                        and p[last] - p[first] + 1 >= min_length
+                    ):
+                        regions.append((int(lo + first), int(lo + last + 1)))
+                    first = -1
+                    has_seed = False
+                if first < 0:
+                    first, direction = j, sign
+                    has_seed = False
+                last = j
+                if abs(val) >= min_effect:
+                    has_seed = True
+            if (
+                first >= 0
+                and has_seed
+                and last - first + 1 >= min_cpgs
+                and p[last] - p[first] + 1 >= min_length
+            ):
+                regions.append((int(lo + first), int(lo + last + 1)))
+        else:
+            seeds = np.flatnonzero(np.abs(smooth) >= min_effect)
+            if not len(seeds):
+                continue
+            splits = np.r_[
+                0,
+                np.flatnonzero((np.diff(p[seeds]) > max_gap) | (np.diff(np.sign(smooth[seeds])) != 0))
+                + 1,
+                len(seeds),
+            ]
+            for a, b in pairwise(splits):
+                start, end = int(seeds[a]), int(seeds[b - 1]) + 1
+                if end - start >= min_cpgs and p[end - 1] - p[start] + 1 >= min_length:
+                    regions.append((int(lo + start), int(lo + end)))
     return regions
 
 
@@ -196,26 +248,72 @@ def _precompute_discovery_geometry(pos: np.ndarray, window_bp: int, min_cpgs: in
 
 
 def _fast_discover_with_geom(
-    geom, effect_arr: np.ndarray, min_effect: float, min_cpgs: int, max_gap: int, min_length: int
+    geom,
+    effect_arr: np.ndarray,
+    min_effect: float,
+    min_cpgs: int,
+    max_gap: int,
+    min_length: int,
+    boundary_min_effect: float | None = None,
 ):
     """Fast candidate region discovery using precomputed chromosome geometry."""
     regions = []
     for lo, hi, p, left, right, denom in geom:
         sums = np.r_[0.0, np.cumsum(effect_arr[lo:hi])]
         smooth = (sums[right] - sums[left]) / denom
-        seeds = np.flatnonzero(np.abs(smooth) >= min_effect)
-        if not len(seeds):
-            continue
-        splits = np.r_[
-            0,
-            np.flatnonzero((np.diff(p[seeds]) > max_gap) | (np.diff(np.sign(smooth[seeds])) != 0))
-            + 1,
-            len(seeds),
-        ]
-        for a, b in pairwise(splits):
-            start, end = int(seeds[a]), int(seeds[b - 1]) + 1
-            if end - start >= min_cpgs and p[end - 1] - p[start] + 1 >= min_length:
-                regions.append((int(lo + start), int(lo + end)))
+        if boundary_min_effect is not None:
+            first, last, direction = -1, -1, 0
+            has_seed = False
+            for j in range(hi - lo):
+                val = smooth[j]
+                if abs(val) < boundary_min_effect:
+                    if first >= 0:
+                        if (
+                            has_seed
+                            and last - first + 1 >= min_cpgs
+                            and p[last] - p[first] + 1 >= min_length
+                        ):
+                            regions.append((int(lo + first), int(lo + last + 1)))
+                        first = -1
+                        has_seed = False
+                    continue
+                sign = 1 if val > 0 else -1
+                if first >= 0 and sign != direction:
+                    if (
+                        has_seed
+                        and last - first + 1 >= min_cpgs
+                        and p[last] - p[first] + 1 >= min_length
+                    ):
+                        regions.append((int(lo + first), int(lo + last + 1)))
+                    first = -1
+                    has_seed = False
+                if first < 0:
+                    first, direction = j, sign
+                    has_seed = False
+                last = j
+                if abs(val) >= min_effect:
+                    has_seed = True
+            if (
+                first >= 0
+                and has_seed
+                and last - first + 1 >= min_cpgs
+                and p[last] - p[first] + 1 >= min_length
+            ):
+                regions.append((int(lo + first), int(lo + last + 1)))
+        else:
+            seeds = np.flatnonzero(np.abs(smooth) >= min_effect)
+            if not len(seeds):
+                continue
+            splits = np.r_[
+                0,
+                np.flatnonzero((np.diff(p[seeds]) > max_gap) | (np.diff(np.sign(smooth[seeds])) != 0))
+                + 1,
+                len(seeds),
+            ]
+            for a, b in pairwise(splits):
+                start, end = int(seeds[a]), int(seeds[b - 1]) + 1
+                if end - start >= min_cpgs and p[end - 1] - p[start] + 1 >= min_length:
+                    regions.append((int(lo + start), int(lo + end)))
     return regions
 
 
@@ -400,6 +498,7 @@ def run_regional_gls(
     max_gap=500,
     min_length=50,
     min_effect=0.1,
+    boundary_min_effect=None,
     n_perm=100,
     seed=42,
     q_cutoff=0.05,
@@ -408,7 +507,17 @@ def run_regional_gls(
     cache=True,
 ):
     """Stream one common-support chromosome at a time; repeat the entire search."""
-    if window_bp < 1 or min_cpgs < 2 or max_gap < 1 or min_length < 1 or not 0 < min_effect <= 1:
+    if (
+        window_bp < 1
+        or min_cpgs < 2
+        or max_gap < 1
+        or min_length < 1
+        or not 0 < min_effect <= 1
+        or (
+            boundary_min_effect is not None
+            and not (0 < boundary_min_effect <= min_effect)
+        )
+    ):
         raise ValueError("Invalid regional discovery geometry or effect threshold")
     if q_cutoff is not None and not 0 < q_cutoff <= 1:
         raise ValueError("q cutoff must be in (0,1]")
@@ -482,6 +591,7 @@ def run_regional_gls(
             max_gap=max_gap,
             min_length=min_length,
             min_effect=min_effect,
+            boundary_min_effect=boundary_min_effect,
             n_perm=n_perm,
             seed=seed,
             numpy=np.__version__,
@@ -558,8 +668,9 @@ def run_regional_gls(
 
         # Observed scan with REML profiling
         obs_effects = beta[:, labels == 1].mean(axis=1) - beta[:, labels == 0].mean(axis=1)
+        b_eff = 0.0 if boundary_min_effect is None else float(boundary_min_effect)
         obs_regions = discover_prepared(
-            pos, obs_effects, *geom, min_effect, min_cpgs, max_gap, min_length
+            pos, obs_effects, *geom, min_effect, min_cpgs, max_gap, min_length, b_eff
         )
         current = []
         from ._regional_gls_native import fit_regions
@@ -607,7 +718,7 @@ def run_regional_gls(
                 g_flt = g.astype(float)
                 effects = beta[:, g == 1].mean(axis=1) - beta[:, g == 0].mean(axis=1)
                 regions = discover_prepared(
-                    pos, effects, *geom, min_effect, min_cpgs, max_gap, min_length
+                    pos, effects, *geom, min_effect, min_cpgs, max_gap, min_length, b_eff
                 )
                 for lo, hi in regions:
                     stat = _fast_decoy_statistic(
@@ -625,7 +736,7 @@ def run_regional_gls(
             for g in representatives:
                 effects = beta[:, g == 1].mean(axis=1) - beta[:, g == 0].mean(axis=1)
                 regions = discover_prepared(
-                    pos, effects, *geom, min_effect, min_cpgs, max_gap, min_length
+                    pos, effects, *geom, min_effect, min_cpgs, max_gap, min_length, b_eff
                 )
                 fit = fit_regions(pos, yc_full, h_full, g, regions, workers=workers)
                 unique_scores.append(fit[:, 2] / fit[:, 3])
@@ -674,6 +785,7 @@ def run_regional_gls(
         dis_merge_bp=max_gap,
         minlen_bp=min_length,
         min_abs_meth_diff=min_effect,
+        boundary_min_effect=boundary_min_effect,
         perm_seed=seed,
         requested_permutations=n_perm,
         min_mean_qvalue=q_cutoff,

@@ -919,6 +919,7 @@ def dmr(
     # Shared filters --------------------------------------------------------
     alpha: float = 0.05,
     min_abs_meth_diff: float = 0.1,
+    boundary_min_effect: float | None = None,
     min_mean_qvalue: float | None = 0.05,
     # Replicate-count guard --------------------------------------------------
     allow_n1: bool = False,
@@ -1099,17 +1100,27 @@ def dmr(
             raise NotImplementedError("regional_gls currently requires independent exchangeable samples; covariate/paired permutation designs are not yet implemented")
         if preset is not None or backend != "sequential":
             raise ValueError("regional_gls requires explicit geometry and backend='sequential'")
+        if boundary_min_effect is not None and not (0 < boundary_min_effect <= min_abs_meth_diff):
+            raise ValueError(
+                f"boundary_min_effect must satisfy 0 < boundary_min_effect <= min_abs_meth_diff "
+                f"({min_abs_meth_diff}), got {boundary_min_effect}"
+            )
         from ._regional_gls import run_regional_gls
         frame, candidates, params = run_regional_gls(md, chromosomes=chromosomes,
             canonical_only=canonical_only, window_bp=window_bp,
             min_cpgs=5 if min_cpgs is None else min_cpgs, max_gap=dis_merge_bp,
-            min_length=minlen_bp, min_effect=min_abs_meth_diff, n_perm=n_perm,
+            min_length=minlen_bp, min_effect=min_abs_meth_diff,
+            boundary_min_effect=boundary_min_effect, n_perm=n_perm,
             seed=perm_seed, q_cutoff=min_mean_qvalue, workers=n_workers)
         md.uns["dmr"], md.uns["dmr_candidates"], md.uns["dmr_params"] = frame, candidates, params
         if tsv is not None:
             from .export import dmr_to_tsv
             _emit_result_tsv(lambda: dmr_to_tsv(md, tsv), tsv, is_auto=_tsv_is_auto)
         return
+    if boundary_min_effect is not None:
+        raise ValueError(
+            f"boundary_min_effect is only supported for method='regional_gls'; got method={method!r}"
+        )
     # M2 (Batch-1): empirical_fdr is wired for method='tile' and, since the
     # chain_merge harness landed, method='chain_merge'. The sliding_window /
     # segment branches previously accepted the kwarg and silently no-op'd
