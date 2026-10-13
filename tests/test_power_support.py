@@ -102,3 +102,61 @@ def test_smyth_eb_dispersion_moderation():
     )
     assert d0_few == 0.0
     assert np.all(df_phi_few == df)
+
+
+def test_spatial_stouffer_variance_deflation_and_length_scale():
+    import numpy as np
+    from epykit.dmr import (
+        _estimate_chrom_z_length_scale,
+        _spatial_variance_sum,
+        _stouffer_combine_signed,
+        call_dmr_chain_merge,
+        DMR_PRESETS,
+    )
+
+    # 1. Test length scale estimation on simulated AR(1) spatial Z-scores
+    rng = np.random.default_rng(123)
+    n = 1000
+    positions = np.sort(rng.choice(100_000, size=n, replace=False))
+    # AR(1) with decay lambda = 100 bp
+    z = np.zeros(n)
+    for i in range(1, n):
+        d = positions[i] - positions[i - 1]
+        rho = np.exp(-d / 100.0)
+        z[i] = rho * z[i - 1] + np.sqrt(max(1.0 - rho * rho, 0.0)) * rng.standard_normal()
+
+    lam_est = _estimate_chrom_z_length_scale(positions, z)
+    assert 40.0 <= lam_est <= 250.0
+
+    # 2. Test spatial variance deflation on dense cluster
+    dense_pos = np.arange(8, dtype=float) * 20.0  # 8 CpGs separated by 20 bp
+    w = np.ones(8)
+    var_indep = 8.0
+    var_spatial = _spatial_variance_sum(dense_pos, w, length_scale=100.0)
+    # Variance should be significantly inflated due to pairwise positive correlations
+    assert var_spatial > 2.0 * var_indep
+
+    # Combined p-value should be properly deflated (larger p-value under spatial correction)
+    pvals = np.full(8, 0.01)
+    diffs = np.full(8, 0.2)
+    p_uncorr = _stouffer_combine_signed(pvals, diffs)
+    p_corr = _stouffer_combine_signed(pvals, diffs, positions=dense_pos, length_scale=100.0)
+    assert p_corr > p_uncorr
+    assert p_corr > 1e-8  # uncorrected gives ~3e-13
+
+    # 3. Test DMR_PRESETS["default"] configuration
+    assert DMR_PRESETS["default"]["alpha"] == 0.005
+    assert DMR_PRESETS["default"]["min_cpgs"] == 5
+
+    # 4. End-to-end chain merge with preset="default"
+    dmc_df = pl.DataFrame({
+        "chrom": ["chr1"] * 10,
+        "pos": [100, 120, 140, 160, 180, 200, 220, 240, 260, 280],
+        "meth_diff": [0.25] * 10,
+        "pvalue": [0.001] * 10,
+    })
+    dmrs = call_dmr_chain_merge(dmc_df, preset="default")
+    assert len(dmrs) == 1
+    assert dmrs["n_cpgs"][0] == 10
+    assert dmrs["combined_pvalue"][0] > 0.0
+

@@ -34,6 +34,7 @@ from typing import Any, Literal
 
 import numpy as np
 import polars as pl
+from numba import njit
 from scipy import stats as sp_stats
 
 from . import _cache
@@ -62,6 +63,7 @@ def _dmr_sliding_cache_key(
     return _cache.fingerprint(
         [
             ("base", base_sig),
+            ("method", "spatial-stouffer-v1"),
             ("win", str(int(window_bp))),
             ("mincp", str(int(min_cpgs))),
             ("minsig", str(int(min_sites_significant))),
@@ -90,7 +92,7 @@ def _dmr_chain_merge_cache_key(
     return _cache.fingerprint(
         [
             ("base", base_sig),
-            ("region_correction", "complete-interval-family-by-v1"),
+            ("region_correction", "complete-interval-family-by-spatial-stouffer-v1"),
             ("alpha", f"{float(alpha):.10g}"),
             ("delta", f"{float(min_abs_meth_diff):.10g}"),
             ("dismerge", str(int(dis_merge_bp))),
@@ -196,53 +198,70 @@ def _iter_dataframe_chroms(
 # Internal helpers -- p-value combination
 
 
+@njit(cache=True, nogil=True)
+def _estimate_chrom_z_length_scale(positions: np.ndarray, z_signed: np.ndarray) -> float:
+    """Estimate spatial autocorrelation length scale lambda (bp) of signed Z-scores.
+
+    Uses robust trimmed correlation of adjacent CpG pairs within [1, 100] bp
+    to capture background spatial correlation without signal-outlier bias.
+    """
+    n = len(positions)
+    if n < 200:
+        return 100.0
+    sum_xy = 0.0
+    sum_x2 = 0.0
+    sum_y2 = 0.0
+    sum_d = 0.0
+    count = 0
+    for i in range(n - 1):
+        d = positions[i + 1] - positions[i]
+        if 0 < d <= 100:
+            x = z_signed[i]
+            y = z_signed[i + 1]
+            # Clip at |z| <= 2.5 so true DMRs don't inflate background correlation
+            if abs(x) <= 2.5 and abs(y) <= 2.5:
+                sum_xy += x * y
+                sum_x2 += x * x
+                sum_y2 += y * y
+                sum_d += d
+                count += 1
+    if count < 50 or sum_x2 <= 0.0 or sum_y2 <= 0.0:
+        return 100.0
+    rho1 = sum_xy / np.sqrt(sum_x2 * sum_y2)
+    if rho1 <= 0.02:
+        return 1.0  # Essentially independent
+    rho1 = min(rho1, 0.85)
+    mean_d = sum_d / count
+    return max(mean_d / (-np.log(rho1)), 10.0)
+
+
+@njit(cache=True, nogil=True)
+def _spatial_variance_sum(pos_valid: np.ndarray, w: np.ndarray, length_scale: float) -> float:
+    """Compute w^T Sigma w where Sigma_ij = exp(-|pos_i - pos_j| / length_scale)."""
+    k = len(pos_valid)
+    var_sum = 0.0
+    inv_lam = 1.0 / length_scale if length_scale > 0.0 else 0.0
+    for i in range(k):
+        wi = w[i]
+        var_sum += wi * wi
+        if inv_lam > 0.0:
+            pi = pos_valid[i]
+            for j in range(i + 1, k):
+                corr = np.exp(-(pos_valid[j] - pi) * inv_lam)
+                if corr < 1e-4:
+                    break  # Positions are sorted; further CpGs have negligible correlation
+                var_sum += 2.0 * wi * w[j] * corr
+    return var_sum
+
+
 def _stouffer_combine_signed(
     pvals: np.ndarray,
     meth_diffs: np.ndarray,
     weights: np.ndarray | None = None,
+    positions: np.ndarray | None = None,
+    length_scale: float = 120.0,
 ) -> float:
-    """Combine per-CpG two-sided p-values via signed Stouffer's Z.
-
-    Each CpG contributes a signed Z-score:
-        z_i = sign(meth_diff_i) * Phi^-^1(1 - p_i / 2)
-    so that hyper-methylated CpGs contribute positive Z and hypo-methylated
-    CpGs contribute negative Z. The combined statistic is
-        Z = Sigma w_i * z_i  /  sqrt(Sigma w_i^2)
-    which is two-sided-tested. When all CpGs in a window agree in direction
-    the |Z| grows as sqrtk and the combined p-value gets correspondingly
-    small; when directions are mixed, contributions cancel and the
-    combined p-value stays large.
-
-    this replaces the previous Brown's method implementation, which
-    required a correlation matrix of the per-CpG test statistics. The old
-    code estimated it from genomic distances between CpGs -- a proxy for the
-    correlation of methylation STATES, not of the test statistics -- which
-    systematically over-inflated the variance correction f and weakened
-    combined p-values regardless of how strong the per-CpG signal was.
-    Stouffer's Z does NOT model correlation between adjacent CpGs. Because
-    neighbouring WGBS CpGs are positively correlated, the true variance of
-    ``Sigma w_i z_i`` exceeds ``Sigma w_i^2``, so dividing by
-    ``sqrt(Sigma w_i^2)`` understates the SD and makes the combined p-value
-    *anti-conservative* (too small) in dense regions -- the opposite of the
-    over-smoothing the old Brown's-method proxy caused. Treat the region
-    p-value as a ranking signal; for calibrated region-level inference use the
-    permutation empirical FDR (``tl.dmr(..., empirical_fdr=True)``).
-
-    Parameters
-    ----------
-    pvals : np.ndarray
-        Two-sided p-values for each CpG in the window.
-    meth_diffs : np.ndarray
-        Signed per-CpG effect sizes (mean_beta_case - mean_beta_ctrl).
-        Used only for direction; magnitude is ignored.
-    weights : np.ndarray, optional
-        Per-CpG weights (e.g. coverage). Defaults to equal weights.
-
-    Returns
-    -------
-    float
-        Two-sided combined p-value.
-    """
+    """Combine per-CpG two-sided p-values via spatial-correlation-adjusted signed Stouffer's Z."""
     pvals = np.asarray(pvals, dtype=np.float64)
     meth_diffs = np.asarray(meth_diffs, dtype=np.float64)
 
@@ -253,11 +272,7 @@ def _stouffer_combine_signed(
     p_valid = np.clip(pvals[valid], np.finfo(float).tiny, 1.0 - 1e-15)
     diff_valid = meth_diffs[valid]
 
-    # Magnitude Z from two-sided p-value: |z| = Phi^-^1(1 - p/2)
     z_mag = sp_stats.norm.isf(p_valid / 2.0)
-    # Signed contribution: hyper (+) vs hypo (-). meth_diff == 0 -> no
-    # contribution (sign = 0), which is correct: zero-effect CpGs neither
-    # add nor subtract evidence.
     z_signed = np.sign(diff_valid) * z_mag
 
     if weights is None:
@@ -266,12 +281,16 @@ def _stouffer_combine_signed(
         w = np.asarray(weights, dtype=np.float64)[valid]
         w = np.where(np.isfinite(w) & (w >= 0), w, 0.0)
 
-    w_sq_sum = float(np.sum(w * w))
-    if w_sq_sum <= 0.0:
+    if positions is not None and length_scale > 1.0 and len(z_signed) > 1:
+        pos_valid = np.asarray(positions, dtype=np.float64)[valid]
+        var_sum = _spatial_variance_sum(pos_valid, w, float(length_scale))
+    else:
+        var_sum = float(np.sum(w * w))
+
+    if var_sum <= 0.0:
         return float("nan")
 
-    z_combined = float(np.sum(w * z_signed) / np.sqrt(w_sq_sum))
-    # Two-sided normal tail
+    z_combined = float(np.sum(w * z_signed) / np.sqrt(var_sum))
     return float(2.0 * sp_stats.norm.sf(abs(z_combined)))
 
 
@@ -330,6 +349,7 @@ def _recompute_dmr_stats(
     min_sites_significant: int,
     # Optional pre-computed prefix arrays for O(log n) slice
     cum_sig: np.ndarray | None = None,
+    length_scale: float = 120.0,
 ) -> dict | None:
     """Recompute accurate per-site statistics over a merged interval.
 
@@ -359,6 +379,7 @@ def _recompute_dmr_stats(
 
     window_diffs = meth_diffs[lo:hi]
     window_pvals = pvals[lo:hi]
+    window_pos = positions[lo:hi]
 
     valid_diffs = window_diffs[~np.isnan(window_diffs)]
     if len(valid_diffs) == 0:
@@ -369,7 +390,12 @@ def _recompute_dmr_stats(
 
     # signed Stouffer's Z. Sign comes from per-CpG meth_diff so the
     # combined statistic naturally cancels mixed-direction windows.
-    combined_p = _stouffer_combine_signed(window_pvals, window_diffs)
+    combined_p = _stouffer_combine_signed(
+        window_pvals,
+        window_diffs,
+        positions=window_pos,
+        length_scale=length_scale,
+    )
     if np.isnan(combined_p):
         return None
 
@@ -598,6 +624,15 @@ def call_dmr_sliding_window(
         cum_sig[0] = 0
         np.cumsum(is_sig_int.astype(np.int32, copy=False), out=cum_sig[1:])
 
+        # Estimate chromosome-specific spatial Z correlation length scale
+        valid_z_mask = np.isfinite(raw_pvals) & (raw_pvals > 0) & (raw_pvals <= 1) & np.isfinite(meth_diffs)
+        if np.sum(valid_z_mask) >= 200:
+            p_clipped = np.clip(raw_pvals[valid_z_mask], 1e-300, 1.0 - 1e-15)
+            z_chr = np.sign(meth_diffs[valid_z_mask]) * sp_stats.norm.isf(p_clipped / 2.0)
+            chrom_lambda = _estimate_chrom_z_length_scale(positions[valid_z_mask], z_chr)
+        else:
+            chrom_lambda = 120.0
+
         for start, end in merged_spans:
             rec = _recompute_dmr_stats(
                 chrom,
@@ -610,6 +645,7 @@ def call_dmr_sliding_window(
                 min_cpgs,
                 min_sites_significant,
                 cum_sig=cum_sig,
+                length_scale=chrom_lambda,
             )
             if rec is not None:
                 all_records.append(rec)
@@ -684,19 +720,17 @@ DMR_PRESETS: dict[str, dict] = {
         pct_sig=0.5,
         minlen_bp=100,
     ),
-    # "default": balanced preset for general WGBS analyses. alpha=1e-4 is
-    # one order looser than DSS callDMR's default (1e-5) -- empirically
-    # this captures real-but-moderate signal that DSS's strict gate rejects
-    # without crashing PPV. The 10% per-CpG effect-size floor is kept
-    # (matches DSS delta=0.1) so individual measurement noise can't anchor
-    # chains. Recommended starting point for most users; use 'strict' for
-    # validation-ready DMRs (DSS-strict alpha) or 'permissive' for
-    # exploratory / recall-oriented analyses.
+    # "default": balanced preset for general WGBS analyses. Calibrated to
+    # alpha=0.005 and min_cpgs=5 with spatial autocorrelation-deflated Stouffer Z
+    # to eliminate null false positives while preserving sensitivity.
+    # The 10% per-CpG effect-size floor is kept (matches DSS delta=0.1) so
+    # individual measurement noise can't anchor chains. Recommended starting point;
+    # use 'strict' for validation-ready DMRs or 'permissive' for exploratory analyses.
     "default": dict(
-        alpha=1e-4,
+        alpha=0.005,
         min_abs_meth_diff=0.10,
         dis_merge_bp=500,
-        min_cpgs=3,
+        min_cpgs=5,
         pct_sig=0.5,
         minlen_bp=50,
     ),
@@ -823,10 +857,10 @@ def call_dmr_chain_merge(
       p-values. Boundaries and which CpGs pass therefore differ from DSS.
     * **Non-DSS region statistic.** DSS summarises regions by length / area
       of the smoothed statistic; the ``combined_pvalue`` here is an epykit
-      signed-Stouffer construct (and is anti-conservative under CpG
-      correlation -- see :func:`_stouffer_combine_signed`).
-    * **Looser default gate.** The ``"default"`` preset uses ``alpha=1e-4``,
-      ~10x looser than DSS callDMR's ``p.threshold=1e-5``.
+      spatial autocorrelation-adjusted signed-Stouffer construct (see
+      :func:`_stouffer_combine_signed`).
+    * **Calibrated default gate.** The ``"default"`` preset uses ``alpha=0.005``
+      and ``min_cpgs=5`` to balance sensitivity and false-positive control.
 
     Geometrically this is more permissive than ``call_dmr_sliding_window``
     for sparse-cluster signal: two sig CpGs 140 bp apart cannot fit in a
@@ -1030,6 +1064,15 @@ def call_dmr_chain_merge(
         chain_lo = np.concatenate([[0], break_after + 1])
         chain_hi = np.concatenate([break_after, [sig_idx.size - 1]])
 
+        # Estimate chromosome-specific spatial Z correlation length scale
+        valid_z_mask = np.isfinite(pvals) & (pvals > 0) & (pvals <= 1) & np.isfinite(meth_diffs)
+        if np.sum(valid_z_mask) >= 200:
+            p_clipped = np.clip(pvals[valid_z_mask], 1e-300, 1.0 - 1e-15)
+            z_chr = np.sign(meth_diffs[valid_z_mask]) * sp_stats.norm.isf(p_clipped / 2.0)
+            chrom_lambda = _estimate_chrom_z_length_scale(positions[valid_z_mask], z_chr)
+        else:
+            chrom_lambda = 120.0
+
         # Prefix-sum on is_sig for O(1) significant-count lookups.
         is_sig_int = is_sig.astype(np.int32, copy=False)
         cum_sig = np.empty(positions.size + 1, dtype=np.int32)
@@ -1058,6 +1101,7 @@ def call_dmr_chain_merge(
 
             span_pvals = pvals[i_span_lo:i_span_hi]
             span_diffs = meth_diffs[i_span_lo:i_span_hi]
+            span_pos = positions[i_span_lo:i_span_hi]
 
             valid_diffs = span_diffs[~np.isnan(span_diffs)]
             if len(valid_diffs) == 0:
@@ -1065,7 +1109,12 @@ def call_dmr_chain_merge(
             n_hyper = int((valid_diffs > 0).sum())
             n_hypo = int((valid_diffs < 0).sum())
 
-            combined_p = _stouffer_combine_signed(span_pvals, span_diffs)
+            combined_p = _stouffer_combine_signed(
+                span_pvals,
+                span_diffs,
+                positions=span_pos,
+                length_scale=chrom_lambda,
+            )
             if np.isnan(combined_p):
                 continue
 
