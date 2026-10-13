@@ -633,32 +633,88 @@ def run_regional_gls(
             common_support[chrom] = 0
             continue
 
-        # Fast in-memory join across samples in Polars
-        res = frames[0].rename({"N_meth": "m_0", "coverage": "n_0"})
-        for i, f in enumerate(frames[1:], 1):
-            res = res.join(
-                f.rename({"N_meth": f"m_{i}", "coverage": f"n_{i}"}), on="pos", how="inner"
-            )
+        # Union join across samples with minimum group presence filter
+        renamed = [
+            f.rename({"N_meth": f"m_{i}", "coverage": f"n_{i}"})
+            for i, f in enumerate(frames)
+        ]
+        res = renamed[0]
+        for f in renamed[1:]:
+            res = res.join(f, on="pos", how="full", coalesce=True)
 
-        if len(res) == 0:
-            common_support[chrom] = 0
+        m_cols = [f"m_{i}" for i in range(len(samples))]
+        n_cols = [f"n_{i}" for i in range(len(samples))]
+        res = res.with_columns(
+            [pl.col(c).fill_null(0) for c in m_cols + n_cols]
+        )
+
+        # Require >= 2 valid replicates per group (or min(2, group_size)) and >= 50% total sample support
+        ctrl_n_cols = [f"n_{i}" for i in np.flatnonzero(labels == 0)]
+        case_n_cols = [f"n_{i}" for i in np.flatnonzero(labels == 1)]
+        min_group_obs = min(2, len(ctrl_n_cols), len(case_n_cols))
+        min_total_obs = max(min_group_obs * 2, int(np.ceil(0.5 * len(samples))))
+
+        res = res.filter(
+            (pl.sum_horizontal([pl.col(c) > 0 for c in ctrl_n_cols]) >= min_group_obs)
+            & (pl.sum_horizontal([pl.col(c) > 0 for c in case_n_cols]) >= min_group_obs)
+            & (pl.sum_horizontal([pl.col(c) > 0 for c in n_cols]) >= min_total_obs)
+        ).sort("pos")
+
+        if len(res) < min_cpgs:
+            common_support[chrom] = len(res)
             continue
 
-        res = res.sort("pos")
         pos = res["pos"].to_numpy()
         common_support[chrom] = len(pos)
-        if len(pos) < min_cpgs:
-            continue
 
-        m = res.select([f"m_{i}" for i in range(len(samples))]).to_numpy()
-        n = res.select([f"n_{i}" for i in range(len(samples))]).to_numpy()
+        m = res.select(m_cols).to_numpy().astype(np.float64)
+        n = res.select(n_cols).to_numpy().astype(np.float64)
+        valid_mask = n > 0
 
-        beta = m / n
+        # Safe arcsin transformation on positive coverage; missing filled via group mean
+        n_safe = np.where(valid_mask, n, 1.0)
+        m_safe = np.where(valid_mask, m, 0.0)
+        y_raw = np.arcsin(2.0 * (m_safe + 0.05) / (n_safe + 0.1) - 1.0)  # (K, S)
 
-        # Precompute chromosome-wide arrays
-        y_full = transform_counts(m, n).T
-        depth_full = np.median(n, axis=1)
-        h_full = np.sqrt(depth_full)
+        # Precomputed matrices for fast group effect computation with partial support
+        beta_clean = np.where(valid_mask, m_safe / n_safe, 0.0)  # (K, S)
+        valid_flt = valid_mask.astype(np.float64)  # (K, S)
+
+        def _calc_effects(g_arr: np.ndarray) -> np.ndarray:
+            g_c = g_arr.astype(np.float64)
+            g_k = 1.0 - g_c
+            k_case = valid_flt @ g_c
+            k_ctrl = valid_flt @ g_k
+            mean_case = np.where(k_case > 0, (beta_clean @ g_c) / np.maximum(k_case, 1.0), 0.0)
+            mean_ctrl = np.where(k_ctrl > 0, (beta_clean @ g_k) / np.maximum(k_ctrl, 1.0), 0.0)
+            return mean_case - mean_ctrl
+
+        obs_effects = _calc_effects(labels)
+
+        # Fill missing y_{k, s} with group-conditional transformed mean so missing
+        # entries introduce zero artificial variance and zero attenuation of treatment effect
+        ctrl_mask = valid_mask[:, labels == 0]
+        case_mask = valid_mask[:, labels == 1]
+        y_ctrl_mean = np.sum(y_raw[:, labels == 0] * ctrl_mask, axis=1) / np.maximum(
+            np.sum(ctrl_mask, axis=1), 1
+        )
+        y_case_mean = np.sum(y_raw[:, labels == 1] * case_mask, axis=1) / np.maximum(
+            np.sum(case_mask, axis=1), 1
+        )
+        y_filled = y_raw.copy()
+        for s_idx in range(len(samples)):
+            miss = ~valid_mask[:, s_idx]
+            if np.any(miss):
+                y_filled[miss, s_idx] = (
+                    y_case_mean[miss] if labels[s_idx] == 1 else y_ctrl_mean[miss]
+                )
+
+        y_full = y_filled.T  # (S, K)
+        # Effective depth per CpG: median over observed samples, scaled by observed sample fraction
+        n_sorted = np.where(valid_mask, n, np.nan)
+        obs_frac = np.sum(valid_mask, axis=1) / float(len(samples))
+        depth_full = np.nanmedian(n_sorted, axis=1) * obs_frac
+        h_full = np.sqrt(np.maximum(depth_full, 1.0))
         yc_full = (y_full - y_full.mean(axis=0)) * h_full
 
         # Precompute discovery geometry for this chromosome
@@ -666,8 +722,6 @@ def run_regional_gls(
 
         geom = prepare_discovery(pos, window_bp, min_cpgs, max_gap)
 
-        # Observed scan with REML profiling
-        obs_effects = beta[:, labels == 1].mean(axis=1) - beta[:, labels == 0].mean(axis=1)
         b_eff = 0.0 if boundary_min_effect is None else float(boundary_min_effect)
         obs_regions = discover_prepared(
             pos, obs_effects, *geom, min_effect, min_cpgs, max_gap, min_length, b_eff
@@ -707,8 +761,6 @@ def run_regional_gls(
             logger.warning(
                 "Experimental pooled covariance changes the decoy fitting procedure; nominal calibration is unvalidated"
             )
-            # Retained for comparison only. These label-selected observed
-            # medians do not replay the observed per-region fitting procedure.
             valid_lens = [f["length_scale"] for f in current if f["length_scale"] > 0]
             valid_fracs = [f["donor_fraction"] for f in current]
             chrom_len = float(np.median(valid_lens)) if valid_lens else 50.0
@@ -716,7 +768,7 @@ def run_regional_gls(
 
             for j, g in enumerate(assignments):
                 g_flt = g.astype(float)
-                effects = beta[:, g == 1].mean(axis=1) - beta[:, g == 0].mean(axis=1)
+                effects = _calc_effects(g)
                 regions = discover_prepared(
                     pos, effects, *geom, min_effect, min_cpgs, max_gap, min_length, b_eff
                 )
@@ -730,11 +782,11 @@ def run_regional_gls(
                         chrom_len,
                         chrom_donor,
                     )
-                    null_scans[j].append(stat)  # Invalid scores abort calibration.
+                    null_scans[j].append(stat)
         else:
             unique_scores = []
             for g in representatives:
-                effects = beta[:, g == 1].mean(axis=1) - beta[:, g == 0].mean(axis=1)
+                effects = _calc_effects(g)
                 regions = discover_prepared(
                     pos, effects, *geom, min_effect, min_cpgs, max_gap, min_length, b_eff
                 )
@@ -771,7 +823,7 @@ def run_regional_gls(
         method="regional_gls",
         experimental=True,
         promoted=False,
-        algorithm_revision="spatial-gls-native-reml-v3",
+        algorithm_revision="spatial-gls-native-reml-v4",
         accelerator="numba-native-analytical-donor-reml",
         unique_null_fits=len(representatives),
         workers=workers,

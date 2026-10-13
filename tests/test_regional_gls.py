@@ -362,3 +362,41 @@ def test_public_api_records_boundary_and_isolates_cache(tmp_path):
     ep.tl.dmr(md, method="regional_gls", n_perm=20, boundary_min_effect=0.05, tsv=False)
     assert md.uns["dmr_params"]["cache_hit"] is True
     assert md.uns["dmr_params"]["cache_key"] == key_with_boundary
+
+
+def test_regional_gls_union_support_handles_partial_missingness(tmp_path):
+    import polars as pl
+    import epykit as ep
+
+    rng = np.random.default_rng(999)
+    rows = []
+    # 6 samples: s0, s1, s2 control (0); s3, s4, s5 case (1)
+    for j in range(6):
+        sample = f"s{j}"
+        rows.append(dict(sample_id=sample, treatment=int(j >= 3)))
+        part = tmp_path / "counts" / f"sample={sample}" / "chrom=chr1"
+        part.mkdir(parents=True)
+        # 40 CpGs. Let sample s0 drop positions [10, 11] and sample s3 drop positions [20, 21]
+        all_pos = np.arange(40) * 20
+        if j == 0:
+            keep = ~np.isin(np.arange(40), [10, 11])
+        elif j == 3:
+            keep = ~np.isin(np.arange(40), [20, 21])
+        else:
+            keep = np.ones(40, dtype=bool)
+        pos = all_pos[keep]
+        m = rng.binomial(40, 0.70 if j >= 3 else 0.25, len(pos))
+        pl.DataFrame(dict(pos=pos, N_meth=m, coverage=[40] * len(pos))).write_parquet(
+            part / "part-0.parquet"
+        )
+
+    md = ep.MethylData(
+        obs=pl.DataFrame(rows),
+        store=str(tmp_path / "counts"),
+        analysis_root=str(tmp_path / "analysis"),
+    )
+    ep.tl.dmr(md, method="regional_gls", n_perm=20, min_cpgs=5, tsv=False)
+    # Under old inner join, common_support was 36 (dropped 4 CpGs completely).
+    # Under union join with min 2 per group, all 40 CpGs are retained!
+    assert md.uns["dmr_params"]["common_cpgs"]["chr1"] == 40
+    assert len(md.uns["dmr_candidates"]) > 0
