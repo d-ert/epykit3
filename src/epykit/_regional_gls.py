@@ -166,70 +166,12 @@ def discover_regions(
         )
     ):
         raise ValueError("Invalid region discovery inputs")
-    regions = []
-    cuts = np.r_[0, np.flatnonzero(np.diff(pos) > max_gap) + 1, len(pos)]
-    for lo, hi in pairwise(cuts):
-        if hi - lo < min_cpgs:
-            continue
-        p = pos[lo:hi]
-        left = np.searchsorted(p, p - window_bp // 2)
-        right = np.searchsorted(p, p + (window_bp + 1) // 2, side="right")
-        sums = np.r_[0.0, np.cumsum(effect[lo:hi])]
-        smooth = (sums[right] - sums[left]) / (right - left)
-        if boundary_min_effect is not None:
-            first, last, direction = -1, -1, 0
-            has_seed = False
-            for j in range(hi - lo):
-                val = smooth[j]
-                if abs(val) < boundary_min_effect:
-                    if first >= 0:
-                        if (
-                            has_seed
-                            and last - first + 1 >= min_cpgs
-                            and p[last] - p[first] + 1 >= min_length
-                        ):
-                            regions.append((int(lo + first), int(lo + last + 1)))
-                        first = -1
-                        has_seed = False
-                    continue
-                sign = 1 if val > 0 else -1
-                if first >= 0 and sign != direction:
-                    if (
-                        has_seed
-                        and last - first + 1 >= min_cpgs
-                        and p[last] - p[first] + 1 >= min_length
-                    ):
-                        regions.append((int(lo + first), int(lo + last + 1)))
-                    first = -1
-                    has_seed = False
-                if first < 0:
-                    first, direction = j, sign
-                    has_seed = False
-                last = j
-                if abs(val) >= min_effect:
-                    has_seed = True
-            if (
-                first >= 0
-                and has_seed
-                and last - first + 1 >= min_cpgs
-                and p[last] - p[first] + 1 >= min_length
-            ):
-                regions.append((int(lo + first), int(lo + last + 1)))
-        else:
-            seeds = np.flatnonzero(np.abs(smooth) >= min_effect)
-            if not len(seeds):
-                continue
-            splits = np.r_[
-                0,
-                np.flatnonzero((np.diff(p[seeds]) > max_gap) | (np.diff(np.sign(smooth[seeds])) != 0))
-                + 1,
-                len(seeds),
-            ]
-            for a, b in pairwise(splits):
-                start, end = int(seeds[a]), int(seeds[b - 1]) + 1
-                if end - start >= min_cpgs and p[end - 1] - p[start] + 1 >= min_length:
-                    regions.append((int(lo + start), int(lo + end)))
-    return regions
+    from ._regional_gls_native import discover_prepared, prepare_discovery
+
+    geom = prepare_discovery(pos, window_bp, min_cpgs, max_gap)
+    b_eff = 0.0 if boundary_min_effect is None else float(boundary_min_effect)
+    res = discover_prepared(pos, effect, *geom, min_effect, min_cpgs, max_gap, min_length, b_eff)
+    return [tuple(r) for r in res.tolist()]
 
 
 def _precompute_discovery_geometry(pos: np.ndarray, window_bp: int, min_cpgs: int, max_gap: int):

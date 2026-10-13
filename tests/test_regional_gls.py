@@ -400,3 +400,39 @@ def test_regional_gls_union_support_handles_partial_missingness(tmp_path):
     # Under union join with min 2 per group, all 40 CpGs are retained!
     assert md.uns["dmr_params"]["common_cpgs"]["chr1"] == 40
     assert len(md.uns["dmr_candidates"]) > 0
+
+
+def test_kadane_boundary_refinement_and_valley_splitting():
+    from epykit._regional_gls import discover_regions
+
+    # 1. Halo trimming: 6 positive CpGs with 3 zero-effect flanks on each side
+    pos_halo = np.arange(12) * 25
+    eff_halo = np.array([0.0, 0.0, 0.0, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.0, 0.0, 0.0])
+    # A 500 bp window smears across the whole segment, but Kadane trims neutral flanks
+    regions = discover_regions(
+        pos_halo,
+        eff_halo,
+        window_bp=500,
+        min_cpgs=5,
+        max_gap=500,
+        min_length=50,
+        min_effect=0.1,
+    )
+    assert len(regions) == 1
+    assert regions[0] == (3, 9)
+
+    # 2. Valley splitting: Two distinct peaks separated by 4 neutral CpGs spanning 160 bp
+    pos_valley = np.arange(14) * 40
+    eff_valley = np.array([0.25, 0.25, 0.25, 0.25, 0.25, 0.0, 0.0, 0.0, 0.0, 0.25, 0.25, 0.25, 0.25, 0.25])
+    split_regions = discover_regions(
+        pos_valley,
+        eff_valley,
+        window_bp=500,
+        min_cpgs=5,
+        max_gap=500,
+        min_length=50,
+        min_effect=0.1,
+    )
+    assert len(split_regions) == 2
+    assert split_regions[0] == (0, 5)
+    assert split_regions[1] == (9, 14)
