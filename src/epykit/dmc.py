@@ -49,6 +49,7 @@ from typing import Literal, overload
 import numpy as np
 import polars as pl
 from scipy import stats as sp_stats
+from scipy.special import digamma, polygamma
 
 from . import _cache
 from ._chroms import filter_canonical_logged
@@ -128,7 +129,7 @@ def _dmc_input_signature(
     """
     msp = Path(methylstore_path).resolve()
     fields: list[tuple[str, str]] = [
-        ("variance_revision", "2026-09-depth-aware-F-v1"),
+        ("variance_revision", "2026-10-smyth-log-f-eb-v1"),
         ("support_schema_revision", "2026-10-09-observed-replicates-v1"),
         ("store", str(msp)),
         ("case", ",".join(samples_case)),
@@ -592,6 +593,70 @@ def _smooth_sample_counts_box(
     return meth_sm, cov_sm
 
 
+def _smyth_eb_moderation(
+    chi_sum: np.ndarray,
+    df_i: np.ndarray,
+    valid_mask: np.ndarray,
+    min_dispersion: float = 1.0,
+    min_disp_sites: int = 100,
+) -> tuple[np.ndarray, np.ndarray, float, float]:
+    """Smyth (2004) Exact Log-F Empirical Bayes dispersion moderation.
+
+    Deconvolves chi-square sampling variance from biological dispersion variance
+    in log-space using trigamma moments, returning moderated phi and (df_i + d0).
+    """
+    df_safe = np.maximum(df_i, 1.0)
+    phi_raw = np.where(valid_mask, chi_sum / df_safe, min_dispersion)
+
+    # Filter to strictly positive, finite residuals for log-moment estimation
+    pos_mask = valid_mask & (phi_raw > 1e-4) & np.isfinite(phi_raw)
+    if np.sum(pos_mask) < min_disp_sites:
+        phi_clamped = np.maximum(phi_raw, min_dispersion)
+        return phi_clamped, df_safe, 0.0, float(min_dispersion)
+
+    z = np.log(phi_raw[pos_mask])
+    d = df_safe[pos_mask]
+
+    # Theoretical mean and variance of log(chi^2_d / d)
+    e_log_chi2 = digamma(d / 2.0) - np.log(d / 2.0)
+    var_log_chi2 = polygamma(1, d / 2.0)
+
+    # Center log-residuals by subtracting sampling bias
+    z_corr = z - e_log_chi2
+    # Robust variance via IQR-scaled estimator to prevent outlier inflation
+    q25, q75 = np.percentile(z_corr, [25.0, 75.0])
+    robust_sd = (q75 - q25) / 1.3489795
+    sample_var = float(robust_sd * robust_sd)
+    expected_sampling_var = float(np.mean(var_log_chi2))
+
+    # Excess variance attributable to prior biological heterogeneity: psi_1(d0 / 2)
+    trigamma_d0_half = max(sample_var - expected_sampling_var, 1e-4)
+
+    # Invert trigamma(x) ~= 1/x + 1/(2x^2) -> x ~= (1 + sqrt(1 + 2*y)) / (2*y)
+    d0_half = (1.0 + np.sqrt(1.0 + 2.0 * trigamma_d0_half)) / (2.0 * trigamma_d0_half)
+    for _ in range(2):
+        f = polygamma(1, d0_half) - trigamma_d0_half
+        f_prime = polygamma(2, d0_half)
+        if abs(f_prime) > 1e-12:
+            d0_half = max(d0_half - f / f_prime, 0.5)
+
+    d0 = float(np.clip(2.0 * d0_half, 4.0, 120.0))
+
+    # Prior scale phi_0
+    log_phi0 = float(np.median(z_corr)) + float(digamma(d0 / 2.0) - np.log(d0 / 2.0))
+    phi0 = float(np.clip(np.exp(log_phi0), min_dispersion, 20.0))
+
+    # Posterior moderated dispersion and degrees of freedom
+    phi_site_clamped = np.maximum(phi_raw, min_dispersion)
+    df_mod = np.where(valid_mask, df_safe + d0, d0)
+    phi_mod = np.where(
+        valid_mask,
+        (df_safe * phi_site_clamped + d0 * phi0) / df_mod,
+        phi0,
+    )
+    return np.maximum(phi_mod, min_dispersion), df_mod, d0, phi0
+
+
 def _score_finalize(
     sn_case: np.ndarray,
     sm_case: np.ndarray,
@@ -800,51 +865,19 @@ def _score_finalize(
             # Per-site phi is estimated from this site's 4 df Pearson sum.
             df_phi = df_i_safe.copy()
         elif dispersion == "eb":
-            # Empirical-Bayes shrinkage with data-driven shrinkage weight.
-            # Treat phi_site_i as a noisy estimator of an unknown true phi_i,
-            # and assume phi_i ~ inverse-Gamma(a, b) across sites with a, b
-            # estimated by method of moments from the chromosome-wide
-            # distribution of phi_site values. The posterior mean of phi_i
-            # given phi_site_i and df_i is the same weighted-average form as
-            # `shrink`, but the weight on phi_chrom is now
-            #     w_eb = 2 * a   (the implied pseudo-df from the IG prior)
-            # rather than the fixed 4 of `shrink`. When the per-site phi
-            # estimates have high variance relative to phi_chrom, w_eb grows
-            # large (shrink toward mean); when low variance, w_eb -> 0
-            # (trust the site).
             valid_phi = sites_dispers & (df_i > 0)
-            if int(np.sum(valid_phi)) >= min_disp_sites:
-                phi_obs = phi_site[valid_phi]
-                # Method-of-moments on inverse-Gamma:
-                #   mean = b / (a - 1),  var = b^2 / ((a-1)^2 (a-2))
-                # => a = mean^2 / var + 2,  b = mean * (a - 1)
-                m = float(np.mean(phi_obs))
-                v = float(np.var(phi_obs))
-                if v > 1e-9 and m > 0:
-                    a_mom = m * m / v + 2.0
-                    w_eb = max(1.0, 2.0 * a_mom)
-                else:
-                    w_eb = float(shrink_pseudo_df)
-            else:
-                w_eb = float(shrink_pseudo_df)
-            num = df_i_safe * phi_site + w_eb * phi_hat
-            den = df_i_safe + w_eb
-            phi_eff = np.maximum(num / den, min_dispersion)
-            phi_eff = np.where(sites_dispers & (df_i > 0), phi_eff, phi_hat)
-            # Weighted-average phi has effective df = (df_i + w_eb). Where we
-            # fell back to phi_chrom, the df is the chrom-pool df.
-            df_phi = np.where(
-                sites_dispers & (df_i > 0),
-                df_i_safe + float(w_eb),
-                max(df_chrom, 1.0),
+            phi_eff, df_phi, w_eb, phi_hat = _smyth_eb_moderation(
+                chi_case + chi_ctrl,
+                df_i_safe,
+                valid_phi,
+                min_dispersion=min_dispersion,
+                min_disp_sites=min_disp_sites,
             )
             logger.info(
-                "%s: empirical-Bayes shrinkage with w_eb=%.2f (phi_chrom=%.3f, "
-                "phi_site var=%.2g over %d sites).",
+                "%s: Smyth log-F EB moderation d0=%.2f, phi0=%.3f over %d sites.",
                 chrom_name,
                 w_eb,
                 phi_hat,
-                v if "v" in locals() else float("nan"),
                 int(np.sum(valid_phi)),
             )
         else:  # "shrink": James-Stein-style weighted average toward chrom mean
@@ -1934,7 +1967,7 @@ def _process_one_chromosome(
     test: str,
     min_samples_case: int = 0,
     min_samples_control: int = 0,
-    dispersion: str = "site",
+    dispersion: str = "eb",
     reference: str = "adaptive",
     design_full: np.ndarray | None = None,
     design_reduced: np.ndarray | None = None,
@@ -2328,7 +2361,7 @@ def process_chromosomes_dmc(
     unite: bool = True,
     min_samples_treatment: int | None = None,
     min_samples_control: int = 0,
-    dispersion: str = "site",
+    dispersion: str = "eb",
     reference: str = "adaptive",
     design_full: np.ndarray | None = None,
     design_reduced: np.ndarray | None = None,
@@ -2399,13 +2432,13 @@ def process_chromosomes_dmc(
         p-value masked to NaN before FDR correction. Use this with
         ``unite=False`` (union mode) to drop tests that effectively run on
         a singleton observation in one group.
-    dispersion : {"site", "chrom", "shrink", "eb"}, default "site"
+    dispersion : {"site", "chrom", "shrink", "eb"}, default "eb"
         Per-site dispersion estimator for the LR engine. ``"site"`` uses
         the unconstrained per-site method-of-moments estimate. ``"chrom"``
         pools to a per-chromosome dispersion. ``"shrink"`` applies the
         Smyth-style shrinkage toward the per-chromosome mean. ``"eb"``
-        (empirical Bayes) shrinks toward a beta-binomial prior fit across
-        chromosomes; this is the default in the high-level ``tl.dmc`` wrapper.
+        (empirical Bayes) applies Smyth (2004) log-F trigamma dispersion
+        moderation across chromosomes.
         See :func:`_score_finalize` for details. Ignored for other tests.
     reference : {"adaptive", "chi2", "F"}
         Reference distribution for the quasi-binomial test statistic.

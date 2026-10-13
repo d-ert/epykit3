@@ -75,3 +75,30 @@ def test_paper_coordinates_do_not_create_boundary_overlap():
     calls = pd.DataFrame(dict(chrom=["chr1"], start=[20], end=[30], mean_meth_diff=[0.2]))
     p, e = comparison.standardize_columns(paper, calls)
     assert comparison.find_overlaps(p, e, min_overlap_bp=1).empty
+
+
+def test_smyth_eb_dispersion_moderation():
+    import numpy as np
+    from epykit.dmc import _smyth_eb_moderation
+
+    rng = np.random.default_rng(42)
+    n = 1000
+    df = 4.0
+    true_phi = 1.8
+    # Raw Pearson statistics under quasi-binomial with df=4
+    chi_sum = true_phi * rng.chisquare(df, size=n)
+    df_arr = np.full(n, df)
+    valid = np.ones(n, dtype=bool)
+
+    phi_eff, df_phi, d0, phi0 = _smyth_eb_moderation(chi_sum, df_arr, valid, min_dispersion=1.0)
+    assert d0 >= 20.0
+    assert 1.0 <= phi0 <= 3.0
+    assert np.all(df_phi >= df + 20.0)
+    assert np.all(phi_eff >= 1.0)
+
+    # Fallback with few sites
+    phi_eff_few, df_phi_few, d0_few, phi0_few = _smyth_eb_moderation(
+        chi_sum[:20], df_arr[:20], valid[:20], min_dispersion=1.0, min_disp_sites=100
+    )
+    assert d0_few == 0.0
+    assert np.all(df_phi_few == df)

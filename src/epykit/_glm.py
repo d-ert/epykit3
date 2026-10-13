@@ -684,31 +684,23 @@ def compute_dispersion_phi(
         return phi_site, phi_hat, df_safe.astype(np.float64).copy()
 
     if dispersion == "eb":
-        n_usable_eb = int(usable.sum())
-        if n_usable_eb >= min_disp_sites:
-            phi_obs = phi_site[usable]
-            m = float(np.mean(phi_obs))
-            v = float(np.var(phi_obs))
-            if v > 1e-9 and m > 0:
-                a_mom = m * m / v + 2.0
-                w_eb = max(1.0, 2.0 * a_mom)
-            else:
-                w_eb = float(shrink_pseudo_df)
-        else:
-            w_eb = float(shrink_pseudo_df)
-        num = df_safe * phi_site + w_eb * phi_hat
-        den = df_safe + w_eb
-        phi_eff = np.maximum(num / den, min_dispersion)
-        phi_eff = np.where(usable, phi_eff, phi_hat)
-        # Effective df of the weighted average. Where we fell back to phi_chrom,
-        # use the chrom-pool df.
-        df_phi = np.where(usable, df_safe + float(w_eb), df_chrom).astype(np.float64)
+        from .dmc import _smyth_eb_moderation
+
+        phi_eff, df_phi, w_eb, phi_eb_hat = _smyth_eb_moderation(
+            pearson_stat,
+            df_safe,
+            usable,
+            min_dispersion=min_dispersion,
+            min_disp_sites=min_disp_sites,
+        )
         logger.info(
-            "%s: empirical-Bayes shrinkage w_eb=%.2f",
+            "%s: Smyth log-F EB moderation d0=%.2f, phi0=%.3f over %d sites.",
             chrom_name,
             w_eb,
+            phi_eb_hat,
+            int(np.sum(usable)),
         )
-        return phi_eff, phi_hat, df_phi
+        return phi_eff, phi_eb_hat, df_phi
 
     # shrink
     w = float(shrink_pseudo_df)
