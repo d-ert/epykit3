@@ -129,7 +129,7 @@ def _dmc_input_signature(
     """
     msp = Path(methylstore_path).resolve()
     fields: list[tuple[str, str]] = [
-        ("variance_revision", "2026-10-smyth-log-f-eb-v1"),
+        ("variance_revision", "2026-10-observed-log-moment-eb-v2"),
         ("support_schema_revision", "2026-10-09-observed-replicates-v1"),
         ("store", str(msp)),
         ("case", ",".join(samples_case)),
@@ -600,16 +600,21 @@ def _smyth_eb_moderation(
     min_dispersion: float = 1.0,
     min_disp_sites: int = 100,
 ) -> tuple[np.ndarray, np.ndarray, float, float]:
-    """Smyth (2004) Exact Log-F Empirical Bayes dispersion moderation.
+    """Fit scaled inverse-chi-square prior by corrected log moments.
 
-    Deconvolves chi-square sampling variance from biological dispersion variance
-    in log-space using trigamma moments, returning moderated phi and (df_i + d0).
+    Known per-site log-chi-square means and variances account for unequal
+    residual degrees of freedom. This is a moment fit, not a robust normal-IQR
+    approximation. Clamp the posterior, not its input sufficient statistic.
     """
-    df_safe = np.maximum(df_i, 1.0)
-    phi_raw = np.where(valid_mask, chi_sum / df_safe, min_dispersion)
-
-    # Filter to strictly positive, finite residuals for log-moment estimation
-    pos_mask = valid_mask & (phi_raw > 1e-4) & np.isfinite(phi_raw)
+    chi_sum = np.asarray(chi_sum, dtype=float)
+    df_i = np.asarray(df_i, dtype=float)
+    valid_mask = np.asarray(valid_mask, dtype=bool)
+    if chi_sum.shape != df_i.shape or chi_sum.shape != valid_mask.shape:
+        raise ValueError("Residual sums, degrees of freedom and mask must have identical shapes")
+    usable = valid_mask & np.isfinite(chi_sum) & (chi_sum >= 0) & np.isfinite(df_i) & (df_i > 0)
+    df_safe = np.where(np.isfinite(df_i) & (df_i > 0), df_i, 1.0)
+    phi_raw = np.where(usable, chi_sum / df_safe, min_dispersion)
+    pos_mask = usable & (phi_raw > 0)
     if np.sum(pos_mask) < min_disp_sites:
         phi_clamped = np.maximum(phi_raw, min_dispersion)
         return phi_clamped, df_safe, 0.0, float(min_dispersion)
@@ -621,42 +626,29 @@ def _smyth_eb_moderation(
     e_log_chi2 = digamma(d / 2.0) - np.log(d / 2.0)
     var_log_chi2 = polygamma(1, d / 2.0)
 
-    # Center log-residuals by subtracting sampling bias
+    # Subtract log sampling bias, retaining the common dispersion location.
     z_corr = z - e_log_chi2
-    # Standardize by known per-site sampling SD before IQR so variable df_i in union mode
-    # does not inflate variance estimation
-    sd_sampling = np.sqrt(var_log_chi2)
-    z_std = z_corr / sd_sampling
-    q25, q75 = np.percentile(z_std, [25.0, 75.0])
-    robust_sd_ratio = (q75 - q25) / 1.3489795
-    mean_sampling_var = float(np.median(var_log_chi2))
-    sample_var = float(robust_sd_ratio * robust_sd_ratio) * mean_sampling_var
+    excess = float(np.var(z_corr, ddof=1) - np.mean(var_log_chi2))
+    if excess <= 0:
+        # No detectable prior heterogeneity: pooled scale is the limiting MLE.
+        phi0 = float(max(min_dispersion, np.sum(chi_sum[usable]) / np.sum(df_i[usable])))
+        return np.full_like(phi_raw, phi0), np.full_like(df_safe, np.inf), np.inf, phi0
 
-    # Excess variance attributable to prior biological heterogeneity: psi_1(d0 / 2)
-    trigamma_d0_half = max(sample_var - mean_sampling_var, 1e-4)
-
-    # Invert trigamma(x) via 2-step Newton-Raphson from asymptotic start
-    d0_half = (1.0 + np.sqrt(1.0 + 2.0 * trigamma_d0_half)) / (2.0 * trigamma_d0_half)
-    for _ in range(2):
-        f = polygamma(1, d0_half) - trigamma_d0_half
-        f_prime = polygamma(2, d0_half)
-        if abs(f_prime) > 1e-12:
-            d0_half = max(d0_half - f / f_prime, 0.5)
-
-    d0 = float(np.clip(2.0 * d0_half, 4.0, 120.0))
-
-    # Prior scale phi_0
-    log_phi0 = float(np.median(z_corr)) + float(digamma(d0 / 2.0) - np.log(d0 / 2.0))
-    phi0 = float(np.clip(np.exp(log_phi0), min_dispersion, 20.0))
-
-    # Posterior moderated dispersion and degrees of freedom
-    phi_site_clamped = np.maximum(phi_raw, min_dispersion)
-    df_mod = np.where(valid_mask, df_safe + d0, d0)
-    phi_mod = np.where(
-        valid_mask,
-        (df_safe * phi_site_clamped + d0 * phi0) / df_mod,
-        phi0,
-    )
+    # Invert trigamma by safeguarded Newton iteration; no arbitrary prior-df cap.
+    d0_half = 0.5 + 1.0 / excess
+    for _ in range(50):
+        value = float(polygamma(1, d0_half))
+        step = (value - excess) / float(polygamma(2, d0_half))
+        next_half = max(d0_half - step, d0_half / 2.0)
+        if abs(next_half - d0_half) <= 1e-10 * d0_half:
+            d0_half = next_half
+            break
+        d0_half = next_half
+    d0 = 2.0 * d0_half
+    log_phi0 = float(np.mean(z_corr) + digamma(d0_half) - np.log(d0_half))
+    phi0 = float(max(min_dispersion, np.exp(log_phi0)))
+    df_mod = np.where(usable, df_safe + d0, d0)
+    phi_mod = np.where(usable, (chi_sum + d0 * phi0) / df_mod, phi0)
     return np.maximum(phi_mod, min_dispersion), df_mod, d0, phi0
 
 
@@ -970,14 +962,11 @@ def _score_finalize(
     #
     # Use estimated dispersion degrees of freedom, with a numerical minimum
     # of one. The legacy hard floor of 50 overstated small-sample information.
-    if reference == "adaptive":
+    if reference in {"adaptive", "F"}:
+        from ._glm import _f_survival
+
         df_phi_floored = np.maximum(df_phi, DF_PHI_FLOOR)
-        p_F = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi_floored)
-        p_chi2 = sp_stats.chi2.sf(chi2_stat, df=1)
-        pvals = p_F  # Estimated dispersion remains uncertain even when clamped at one.
-    elif reference == "F":
-        df_phi_floored = np.maximum(df_phi, DF_PHI_FLOOR)
-        pvals = sp_stats.f.sf(chi2_stat, dfn=1, dfd=df_phi_floored)
+        pvals = _f_survival(chi2_stat, 1, df_phi_floored)
     else:  # "chi2"
         pvals = sp_stats.chi2.sf(chi2_stat, df=1)
 
@@ -2894,6 +2883,7 @@ def combine_neighbour_pvalues(
         raise ValueError(f"dmc_df missing required column {meth_diff_col!r}")
 
     from scipy.stats import norm as _norm
+
     from .dmr import _estimate_chrom_z_length_scale, _spatial_variance_sum
 
     out_p_chunks: list[np.ndarray] = []
@@ -2936,8 +2926,8 @@ def combine_neighbour_pvalues(
             if n_window <= 1:
                 z_sum[i] = z[i]
                 var_sum[i] = 1.0
-                n_in[i] = 1
-                n_agree[i] = 1
+                n_in[i] = int(np.isfinite(z[i]))
+                n_agree[i] = n_in[i]
             else:
                 slice_z = z[lo:hi]
                 slice_sign = sign[lo:hi]

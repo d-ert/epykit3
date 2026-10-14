@@ -712,6 +712,18 @@ def compute_dispersion_phi(
     return phi_eff, phi_hat, df_phi
 
 
+def _f_survival(stat, dfn, dfd):
+    """F survival function including the infinite-denominator-df limit."""
+    from scipy import stats as sp_stats
+
+    dfd = np.asarray(dfd, dtype=float)
+    return np.where(
+        np.isposinf(dfd),
+        sp_stats.chi2.sf(np.asarray(stat) * dfn, df=dfn),
+        sp_stats.f.sf(stat, dfn=dfn, dfd=dfd),
+    )
+
+
 def reference_pvalues(
     stat: np.ndarray,
     phi_eff: np.ndarray,
@@ -744,11 +756,11 @@ def reference_pvalues(
     df_eff = np.maximum(df_resid, df_floor) if df_floor else df_resid
 
     if reference == "adaptive":
-        p_F = sp_stats.f.sf(stat, dfn=1, dfd=df_eff)
+        p_F = _f_survival(stat, 1, df_eff)
         p_chi2 = sp_stats.chi2.sf(stat, df=1)
         return np.where(phi_eff > 1.0, p_F, p_chi2)
     if reference == "F":
-        return sp_stats.f.sf(stat, dfn=1, dfd=df_eff)
+        return _f_survival(stat, 1, df_eff)
     return sp_stats.chi2.sf(stat, df=1)
 
 
@@ -928,10 +940,10 @@ def wald_test(
         pvalue = sp_stats.chi2.sf(stat, df=k)
     elif reference == "F":
         f_stat = stat / k
-        pvalue = sp_stats.f.sf(f_stat, dfn=k, dfd=df_eff)
+        pvalue = _f_survival(f_stat, k, df_eff)
     else:  # adaptive: per-site switch between F and chi2
         f_stat = stat / k
-        p_F = sp_stats.f.sf(f_stat, dfn=k, dfd=df_eff)
+        p_F = _f_survival(f_stat, k, df_eff)
         p_chi2 = sp_stats.chi2.sf(stat, df=k)
         if phi_eff is None:
             pvalue = p_chi2
