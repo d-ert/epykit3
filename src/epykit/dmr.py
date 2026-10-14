@@ -92,7 +92,7 @@ def _dmr_chain_merge_cache_key(
     return _cache.fingerprint(
         [
             ("base", base_sig),
-            ("region_correction", "complete-interval-family-by-spatial-stouffer-v1"),
+            ("region_correction", "complete-interval-family-prds-bh-spatial-stouffer-v2"),
             ("alpha", f"{float(alpha):.10g}"),
             ("delta", f"{float(min_abs_meth_diff):.10g}"),
             ("dismerge", str(int(dis_merge_bp))),
@@ -1263,7 +1263,8 @@ def _merge_adjacent_tiles(dmr_df: pl.DataFrame) -> pl.DataFrame:
 
     def _finalise(c: dict, sum_z: float, n_z: int) -> dict:
         if n_z > 0:
-            z_comb = sum_z / math.sqrt(n_z)
+            var_z = float(n_z) + 2.0 * max(n_z - 1, 0) * 0.25
+            z_comb = sum_z / math.sqrt(var_z)
             c["pvalue"] = float(2.0 * sp_stats.norm.sf(abs(z_comb)))
         return c
 

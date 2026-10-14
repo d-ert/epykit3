@@ -613,14 +613,15 @@ def run_regional_gls(
         n = res.select(n_cols).to_numpy().astype(np.float64)
         valid_mask = n > 0
 
-        # Safe arcsin transformation on positive coverage; missing filled via group mean
+        # Safe arcsin transformation on positive coverage
         n_safe = np.where(valid_mask, n, 1.0)
         m_safe = np.where(valid_mask, m, 0.0)
         y_raw = np.arcsin(2.0 * (m_safe + 0.05) / (n_safe + 0.1) - 1.0)  # (K, S)
 
-        # Precomputed matrices for fast group effect computation with partial support
+        # Precomputed matrices for fast group effect computation with partial-support shrinkage
         beta_clean = np.where(valid_mask, m_safe / n_safe, 0.0)  # (K, S)
         valid_flt = valid_mask.astype(np.float64)  # (K, S)
+        full_harm = 2.0 * len(ctrl_n_cols) * len(case_n_cols) / float(len(samples))
 
         def _calc_effects(g_arr: np.ndarray) -> np.ndarray:
             g_c = g_arr.astype(np.float64)
@@ -629,35 +630,30 @@ def run_regional_gls(
             k_ctrl = valid_flt @ g_k
             mean_case = np.where(k_case > 0, (beta_clean @ g_c) / np.maximum(k_case, 1.0), 0.0)
             mean_ctrl = np.where(k_ctrl > 0, (beta_clean @ g_k) / np.maximum(k_ctrl, 1.0), 0.0)
-            return mean_case - mean_ctrl
+            harm_k = np.where(
+                (k_case > 0) & (k_ctrl > 0),
+                2.0 * k_case * k_ctrl / np.maximum(k_case + k_ctrl, 1.0),
+                0.0,
+            )
+            # Shrink noisy partial-support sites proportionally to sqrt(harmonic sample support)
+            shrink = np.sqrt(np.minimum(harm_k / full_harm, 1.0))
+            return (mean_case - mean_ctrl) * shrink
 
         obs_effects = _calc_effects(labels)
 
-        # Fill missing y_{k, s} with group-conditional transformed mean so missing
-        # entries introduce zero artificial variance and zero attenuation of treatment effect
-        ctrl_mask = valid_mask[:, labels == 0]
-        case_mask = valid_mask[:, labels == 1]
-        y_ctrl_mean = np.sum(y_raw[:, labels == 0] * ctrl_mask, axis=1) / np.maximum(
-            np.sum(ctrl_mask, axis=1), 1
-        )
-        y_case_mean = np.sum(y_raw[:, labels == 1] * case_mask, axis=1) / np.maximum(
-            np.sum(case_mask, axis=1), 1
-        )
-        y_filled = y_raw.copy()
-        for s_idx in range(len(samples)):
-            miss = ~valid_mask[:, s_idx]
-            if np.any(miss):
-                y_filled[miss, s_idx] = (
-                    y_case_mean[miss] if labels[s_idx] == 1 else y_ctrl_mean[miss]
-                )
+        # Center y_raw at each CpG using ONLY the valid observed samples at that CpG.
+        # Missing entries are set to 0.0 in yc_full so they are 100% exchangeable across
+        # all label permutations g and never leak observed group means into decoy fits!
+        obs_counts = np.maximum(np.sum(valid_mask, axis=1), 1.0)
+        y_locus_mean = np.sum(y_raw * valid_mask, axis=1) / obs_counts
+        y_centered = np.where(valid_mask, y_raw - y_locus_mean[:, None], 0.0).T  # (S, K)
 
-        y_full = y_filled.T  # (S, K)
         # Effective depth per CpG: median over observed samples, scaled by observed sample fraction
         n_sorted = np.where(valid_mask, n, np.nan)
-        obs_frac = np.sum(valid_mask, axis=1) / float(len(samples))
+        obs_frac = obs_counts / float(len(samples))
         depth_full = np.nanmedian(n_sorted, axis=1) * obs_frac
         h_full = np.sqrt(np.maximum(depth_full, 1.0))
-        yc_full = (y_full - y_full.mean(axis=0)) * h_full
+        yc_full = y_centered * h_full
 
         # Precompute discovery geometry for this chromosome
         from ._regional_gls_native import discover_prepared, prepare_discovery
@@ -765,7 +761,7 @@ def run_regional_gls(
         method="regional_gls",
         experimental=True,
         promoted=False,
-        algorithm_revision="spatial-gls-native-reml-v4",
+        algorithm_revision="spatial-gls-native-reml-v5",
         accelerator="numba-native-analytical-donor-reml",
         unique_null_fits=len(representatives),
         workers=workers,

@@ -687,7 +687,7 @@ def compute_dispersion_phi(
         from .dmc import _smyth_eb_moderation
 
         phi_eff, df_phi, w_eb, phi_eb_hat = _smyth_eb_moderation(
-            pearson_stat,
+            pearson_per_site,
             df_safe,
             usable,
             min_dispersion=min_dispersion,

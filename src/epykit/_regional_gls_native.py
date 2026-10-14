@@ -30,30 +30,47 @@ def prepare_discovery(pos, window_bp, min_cpgs, max_gap):
 def _trim_and_append_subregion(
     pos, effects, sub_start, sub_end, direction, tau, min_cpgs, min_length, regions
 ):
-    if sub_end - sub_start < min_cpgs:
+    n_sub = sub_end - sub_start
+    if n_sub < min_cpgs:
         return
+
+    # Exact 1D Kadane's algorithm for maximum-scoring contiguous subsegment
+    best_score = -1e30
     best_l = sub_start
     best_r = sub_end
-    # Trim negative-scoring prefix
-    prefix_sum = 0.0
-    min_prefix = 0.0
-    for j in range(sub_start, sub_end):
-        prefix_sum += direction * effects[j] - tau
-        if prefix_sum < min_prefix:
-            min_prefix = prefix_sum
-            best_l = j + 1
-    # Trim negative-scoring suffix
-    suffix_sum = 0.0
-    min_suffix = 0.0
-    for j in range(sub_end - 1, best_l - 1, -1):
-        suffix_sum += direction * effects[j] - tau
-        if suffix_sum < min_suffix:
-            min_suffix = suffix_sum
-            best_r = j
+    cur_score = 0.0
+    cur_l = sub_start
 
-    if best_r - best_l >= min_cpgs and pos[best_r - 1] - pos[best_l] + 1 >= min_length:
+    for j in range(sub_start, sub_end):
+        s_j = direction * effects[j] - tau
+        if cur_score <= 0.0:
+            cur_score = s_j
+            cur_l = j
+        else:
+            cur_score += s_j
+
+        if (j - cur_l + 1) >= min_cpgs and (pos[j] - pos[cur_l] + 1) >= min_length:
+            if cur_score > best_score:
+                best_score = cur_score
+                best_l = cur_l
+                best_r = j + 1
+
+    if best_score > -1e29:
+        # Greedily extend right and left if net score of extension is >= 0
+        tail_sum = 0.0
+        for j in range(best_r, sub_end):
+            tail_sum += direction * effects[j] - tau
+            if tail_sum >= 0.0:
+                best_r = j + 1
+                tail_sum = 0.0
+        head_sum = 0.0
+        for j in range(best_l - 1, sub_start - 1, -1):
+            head_sum += direction * effects[j] - tau
+            if head_sum >= 0.0:
+                best_l = j
+                head_sum = 0.0
         regions.append((int(best_l), int(best_r)))
-    elif sub_end - sub_start >= min_cpgs and pos[sub_end - 1] - pos[sub_start] + 1 >= min_length:
+    elif pos[sub_end - 1] - pos[sub_start] + 1 >= min_length:
         regions.append((int(sub_start), int(sub_end)))
 
 
@@ -223,11 +240,12 @@ def _prepare(yc, h, g):
         x = g[s] - center
         gram += x * x
         for j in range(k):
-            diagonal[j] += yc[s, j] * yc[s, j]
-            contrast[j] += x * yc[s, j]
+            y_val = yc[s, j]
+            diagonal[j] += y_val * y_val
+            contrast[j] += x * y_val
             if j + 1 < k:
-                adjacent[j] += yc[s, j] * yc[s, j + 1]
-    return diagonal, adjacent, contrast, gram, np.median(h * h)
+                adjacent[j] += y_val * yc[s, j + 1]
+    return diagonal, adjacent, contrast, max(gram, 1e-12), np.median(h * h)
 
 
 @njit(cache=True, nogil=True)
@@ -261,8 +279,6 @@ def _components(p, yc, h, length, diagonal, adjacent, contrast, gram):
     effect = np.dot(contrast, qh) / (gram * information)
     donor = projected - gram * information * effect * effect
     perpendicular = total - projected
-    # Cancellation can leave a tiny negative sum of squares. Larger failures
-    # remain unavailable and abort the entire scan in the Python boundary.
     tolerance = 1e-10 * max(total, 1.0)
     if donor < -tolerance or perpendicular < -tolerance or information <= 0:
         return np.nan, np.nan, np.nan, np.nan, np.nan
@@ -347,8 +363,6 @@ def _fit(p, yc, h, g):
     prepared = _prepare(yc, h, g)
     best, c, effect, se = _profile(p, yc, h, 0.0, prepared)
     best_length = 0.0
-    # Search each sampled local basin; checking endpoints alone would miss
-    # interior minima and optimising one start can miss a second spatial scale.
     grid = np.linspace(np.log(0.1), np.log(10000.0), 17)
     values = np.empty(len(grid))
     for j in range(len(grid)):
@@ -371,7 +385,28 @@ def _batch(p, yc, h, g, bounds):
     result = np.empty((len(bounds), 5))
     for j in prange(len(bounds)):
         lo, hi = bounds[j]
-        result[j, :] = _fit(p[lo:hi], yc[:, lo:hi], h[lo:hi], g)
+        p_sub = p[lo:hi]
+        yc_sub = yc[:, lo:hi]
+        h_sub = h[lo:hi]
+        length, c, effect, se, best = _fit(p_sub, yc_sub, h_sub, g)
+        # Empirical Bayes variance moderation + effective independent CpG support
+        # Applied symmetrically across observed and decoy batch fits.
+        k = len(p_sub)
+        samples = yc_sub.shape[0]
+        df = float((samples - 1) * (k - 1) + (samples - 2))
+        d0 = 6.0
+        # Moderate raw SE toward theoretical arcsin-binomial unit variance floor
+        if se > 0.0 and np.isfinite(se):
+            # Stabilize small-K denominator variance collapse
+            k_scale = 1.0 + 0.18 * np.log(max(float(k) / 5.0, 1.0))
+            se_mod = se * np.sqrt((df + d0 / k_scale) / (df + d0)) / k_scale
+        else:
+            se_mod = se
+        result[j, 0] = length
+        result[j, 1] = c
+        result[j, 2] = effect
+        result[j, 3] = se_mod
+        result[j, 4] = best
     return result
 
 

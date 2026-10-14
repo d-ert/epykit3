@@ -623,16 +623,19 @@ def _smyth_eb_moderation(
 
     # Center log-residuals by subtracting sampling bias
     z_corr = z - e_log_chi2
-    # Robust variance via IQR-scaled estimator to prevent outlier inflation
-    q25, q75 = np.percentile(z_corr, [25.0, 75.0])
-    robust_sd = (q75 - q25) / 1.3489795
-    sample_var = float(robust_sd * robust_sd)
-    expected_sampling_var = float(np.mean(var_log_chi2))
+    # Standardize by known per-site sampling SD before IQR so variable df_i in union mode
+    # does not inflate variance estimation
+    sd_sampling = np.sqrt(var_log_chi2)
+    z_std = z_corr / sd_sampling
+    q25, q75 = np.percentile(z_std, [25.0, 75.0])
+    robust_sd_ratio = (q75 - q25) / 1.3489795
+    mean_sampling_var = float(np.median(var_log_chi2))
+    sample_var = float(robust_sd_ratio * robust_sd_ratio) * mean_sampling_var
 
     # Excess variance attributable to prior biological heterogeneity: psi_1(d0 / 2)
-    trigamma_d0_half = max(sample_var - expected_sampling_var, 1e-4)
+    trigamma_d0_half = max(sample_var - mean_sampling_var, 1e-4)
 
-    # Invert trigamma(x) ~= 1/x + 1/(2x^2) -> x ~= (1 + sqrt(1 + 2*y)) / (2*y)
+    # Invert trigamma(x) via 2-step Newton-Raphson from asymptotic start
     d0_half = (1.0 + np.sqrt(1.0 + 2.0 * trigamma_d0_half)) / (2.0 * trigamma_d0_half)
     for _ in range(2):
         f = polygamma(1, d0_half) - trigamma_d0_half
@@ -2891,6 +2894,7 @@ def combine_neighbour_pvalues(
         raise ValueError(f"dmc_df missing required column {meth_diff_col!r}")
 
     from scipy.stats import norm as _norm
+    from .dmr import _estimate_chrom_z_length_scale, _spatial_variance_sum
 
     out_p_chunks: list[np.ndarray] = []
     out_n_chunks: list[np.ndarray] = []
@@ -2903,23 +2907,20 @@ def combine_neighbour_pvalues(
         diffs = sub_sorted[meth_diff_col].to_numpy().astype(np.float64)
         n = len(positions)
 
-        # Convert per-site p to signed z. p=0 -> +inf z (clamp), p=1 -> 0.
         p_clip = np.clip(pvals, 1e-300, 1.0 - 1e-12)
-        # Two-sided p -> one-sided absolute z, then attach sign of effect.
         abs_z = _norm.isf(p_clip / 2.0)
         sign = np.sign(diffs)
-        sign[sign == 0] = 1.0  # zero meth_diff: still combine, treat as +
+        sign[sign == 0] = 1.0
         z = sign * abs_z
-        # Untested sites (NaN p) keep z = NaN so the window mask below
-        # (~np.isnan(slice_z)) excludes them from both the Stouffer sum AND
-        # the neighbour count. The old `z = where(isnan(p), 0.0, z)` line
-        # set them to 0, which passed the mask -> untested CpGs were counted
-        # as contributing neighbours (strictly conservative power loss + a
-        # wrong `_n_neighbours` audit count) (D9).
 
-        # Two-pointer sliding window: for each i, advance left/right to
-        # the bounds [pos_i - W, pos_i + W]. O(n_sites) per chromosome.
+        valid_z = np.isfinite(z)
+        if np.sum(valid_z) >= 200:
+            chrom_lambda = _estimate_chrom_z_length_scale(positions[valid_z], z[valid_z])
+        else:
+            chrom_lambda = 100.0
+
         z_sum = np.zeros(n, dtype=np.float64)
+        var_sum = np.ones(n, dtype=np.float64)
         n_in = np.zeros(n, dtype=np.int64)
         n_agree = np.zeros(n, dtype=np.int64)
         lo = 0
@@ -2931,30 +2932,33 @@ def combine_neighbour_pvalues(
                 lo += 1
             while hi < n and positions[hi] <= target_hi:
                 hi += 1
-            # Window is [lo, hi). i is in this range by construction.
             n_window = hi - lo
-            if n_window == 0:
+            if n_window <= 1:
                 z_sum[i] = z[i]
+                var_sum[i] = 1.0
                 n_in[i] = 1
                 n_agree[i] = 1
             else:
                 slice_z = z[lo:hi]
                 slice_sign = sign[lo:hi]
+                slice_pos = positions[lo:hi]
                 mask = ~np.isnan(slice_z) & np.isfinite(slice_z)
                 n_eff = int(mask.sum())
                 if n_eff == 0:
                     z_sum[i] = 0.0
+                    var_sum[i] = 1.0
                     n_in[i] = 0
                     n_agree[i] = 0
                 else:
                     z_sum[i] = slice_z[mask].sum()
+                    pos_valid = slice_pos[mask].astype(np.float64)
+                    w_ones = np.ones(n_eff, dtype=np.float64)
+                    var_sum[i] = _spatial_variance_sum(pos_valid, w_ones, chrom_lambda)
                     n_in[i] = n_eff
-                    # Count how many neighbours share the focal site's
-                    # effect direction (used by the sign-agreement guard).
                     focal_sign = sign[i]
                     n_agree[i] = int(np.sum(slice_sign[mask] == focal_sign))
         with np.errstate(invalid="ignore", divide="ignore"):
-            z_combined = np.where(n_in > 0, z_sum / np.sqrt(n_in), 0.0)
+            z_combined = np.where((n_in > 0) & (var_sum > 0), z_sum / np.sqrt(var_sum), 0.0)
         p_combined = 2.0 * _norm.sf(np.abs(z_combined))
 
         # Sign-agreement guard: drop combined p-values where the focal
