@@ -55,6 +55,22 @@ def _chol_solve(chol, rhs):
 
 
 @njit(cache=True, nogil=True)
+def _donor_products(diagonal, off, donor_residual, qr):
+    """Apply the tridiagonal precision once to all contiguous donor columns."""
+    donor = np.ascontiguousarray(donor_residual)
+    applied = np.empty_like(donor)
+    for a in range(len(diagonal)):
+        for t in range(donor.shape[1]):
+            value = diagonal[a] * donor[a, t]
+            if a > 0:
+                value += off[a - 1] * donor[a - 1, t]
+            if a + 1 < len(diagonal):
+                value += off[a] * donor[a + 1, t]
+            applied[a, t] = value
+    return donor.T @ applied, donor.T @ qr
+
+
+@njit(cache=True, nogil=True)
 def _exact_design_fit(y, h, g, mask):
     """Detect roundoff-zero residuals without a biological variance floor.
 
@@ -165,11 +181,9 @@ def _spectral_prepare(p, y, h, g, mask, length):
                 )
         qr = _apply_car(diagonal, off, residual)
         rss0 += np.dot(residual, qr)
-        for t in range(samples):
-            qv = _apply_car(diagonal, off, donor_residual[:, t])
-            donor_response[t] += np.dot(donor_residual[:, t].copy(), qr)
-            for u in range(samples):
-                donor_gram[u, t] += np.dot(donor_residual[:, u].copy(), qv)
+        sample_gram, sample_response = _donor_products(diagonal, off, donor_residual, qr)
+        donor_gram += sample_gram
+        donor_response += sample_response
     eigenvalues, vectors = np.linalg.eigh((donor_gram + donor_gram.T) / 2.0)
     tolerance = 1e-10 * max(1.0, np.max(np.abs(eigenvalues)))
     for t in range(samples):
