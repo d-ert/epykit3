@@ -499,18 +499,51 @@ def _scan_group_effects(beta_clean, valid_flt, labels, min_group_obs):
 
 
 def _prepare_label_scan(pos, yc, h, mask, beta, valid, labels, min_group_obs,
-                        window_bp, min_cpgs, max_gap, min_length, min_effect, boundary):
+                        window_bp, min_cpgs, max_gap, min_length, min_effect, boundary, discovery_method):
     from ._regional_gls_native import discover_prepared, prepare_discovery
 
     raw, effects, eligible = _scan_group_effects(beta, valid, labels, min_group_obs)
     scan_pos, scan_h = pos[eligible], h[eligible]
     scan_yc, scan_mask = yc[:, eligible], mask[:, eligible]
     raw, effects = raw[eligible], effects[eligible]
-    geometry = prepare_discovery(scan_pos, window_bp, min_cpgs, max_gap)
-    bounds = discover_prepared(
-        scan_pos, effects, *geometry, min_effect, min_cpgs, max_gap, min_length, boundary
-    )
+    if discovery_method == "precision_multiscale":
+        from ._regional_gls_discovery import discover_multiscale
+
+        case, control = np.asarray(labels, float), 1.0-np.asarray(labels, float)
+        n_case, n_control = valid @ case, valid @ control
+        precision = h*h*n_case*n_control/np.maximum(n_case+n_control, 1.0)
+        bounds = discover_multiscale(scan_pos, raw, precision[eligible], window_bp,
+                                     min_effect, min_cpgs, max_gap, min_length, boundary)
+    else:
+        geometry = prepare_discovery(scan_pos, window_bp, min_cpgs, max_gap)
+        bounds = discover_prepared(
+            scan_pos, effects, *geometry, min_effect, min_cpgs, max_gap, min_length, boundary,
+            boundary_effects=raw,
+        )
     return scan_pos, scan_yc, scan_h, scan_mask, raw, bounds
+
+
+def _validate_regional_settings(window_bp, min_cpgs, max_gap, min_length, min_effect,
+                                boundary_min_effect, q_cutoff, calibration,
+                                record_scan_scores, pooled_decoy_covariance):
+    if (
+        window_bp < 1
+        or min_cpgs < 2
+        or max_gap < 1
+        or min_length < 1
+        or not 0 < min_effect <= 1
+        or (
+            boundary_min_effect is not None
+            and not (0 < boundary_min_effect <= min_effect)
+        )
+    ):
+        raise ValueError("Invalid regional discovery geometry or effect threshold")
+    if q_cutoff is not None and not 0 < q_cutoff <= 1:
+        raise ValueError("q cutoff must be in (0,1]")
+    if calibration not in {"permutation_fdp", "pooled_bh"}:
+        raise ValueError("Unknown regional calibration")
+    if record_scan_scores and pooled_decoy_covariance:
+        raise ValueError("Complete scan score diagnostics require per-region covariance replay")
 
 
 def run_regional_gls(
@@ -530,28 +563,16 @@ def run_regional_gls(
     pooled_decoy_covariance=False,
     calibration="permutation_fdp",
     record_scan_scores=False,
+    discovery_method="precision_multiscale",
     workers=None,
     cache=True,
 ):
     """Stream a label-independent union; replay support, discovery and fitting."""
-    if (
-        window_bp < 1
-        or min_cpgs < 2
-        or max_gap < 1
-        or min_length < 1
-        or not 0 < min_effect <= 1
-        or (
-            boundary_min_effect is not None
-            and not (0 < boundary_min_effect <= min_effect)
-        )
-    ):
-        raise ValueError("Invalid regional discovery geometry or effect threshold")
-    if q_cutoff is not None and not 0 < q_cutoff <= 1:
-        raise ValueError("q cutoff must be in (0,1]")
-    if calibration not in {"permutation_fdp", "pooled_bh"}:
-        raise ValueError("Unknown regional calibration")
-    if record_scan_scores and pooled_decoy_covariance:
-        raise ValueError("Complete scan score diagnostics require per-region covariance replay")
+    _validate_regional_settings(window_bp, min_cpgs, max_gap, min_length, min_effect,
+                                boundary_min_effect, q_cutoff, calibration,
+                                record_scan_scores, pooled_decoy_covariance)
+    if discovery_method not in {"boxcar", "precision_multiscale"}:
+        raise ValueError("Unknown regional discovery method")
     samples = list(md.control_ids) + list(md.treatment_ids)
     if len(samples) != len(set(samples)):
         raise ValueError("Regional GLS requires unique biological sample IDs")
@@ -603,6 +624,7 @@ def run_regional_gls(
         Path(__file__).read_bytes()
         + Path(__file__).with_name("_regional_gls_native.py").read_bytes()
         + Path(__file__).with_name("_regional_gls_masked.py").read_bytes()
+        + Path(__file__).with_name("_regional_gls_discovery.py").read_bytes()
     ).hexdigest()
     if cache and md.analysis_root and not pooled_decoy_covariance:
         inputs = []
@@ -629,6 +651,7 @@ def run_regional_gls(
             seed=seed,
             calibration=calibration,
             record_scan_scores=record_scan_scores,
+            discovery_method=discovery_method,
             numpy=np.__version__,
         )
         key = hashlib.sha256(json.dumps(signature, sort_keys=True).encode()).hexdigest()
@@ -721,7 +744,7 @@ def run_regional_gls(
 
         b_eff = 0.0 if boundary_min_effect is None else float(boundary_min_effect)
         scan_args = (pos, yc_full, h_full, valid_mask.T, beta_clean, valid_flt)
-        discovery_args = (min_group_obs, window_bp, min_cpgs, max_gap, min_length, min_effect, b_eff)
+        discovery_args = (min_group_obs, window_bp, min_cpgs, max_gap, min_length, min_effect, b_eff, discovery_method)
         obs_pos, obs_yc, obs_h, obs_mask, obs_effects, obs_regions = _prepare_label_scan(
             *scan_args, labels, *discovery_args
         )
@@ -827,7 +850,7 @@ def run_regional_gls(
         method="regional_gls",
         experimental=True,
         promoted=False,
-        algorithm_revision="spatial-gls-observed-data-scan-count-reml-v7",
+        algorithm_revision="spatial-gls-observed-data-multiscale-scan-count-reml-v8",
         accelerator="numba-native-analytical-donor-reml",
         masked_accelerator="numba-native-observed-CAR-residual-donor-eigensystem-REML",
         likelihood="observed-cells-with-locus-intercepts-and-shared-treatment",
@@ -841,6 +864,11 @@ def run_regional_gls(
         union_cpgs=union_support,
         support_filter="label-independent-total-union; minimum-group-support-replayed-per-scan",
         residual_variance="unmodified-profiled-REML",
+        discovery_method=discovery_method,
+        discovery_kernel="tricube" if discovery_method == "precision_multiscale" else "boxcar",
+        discovery_radii_bp=sorted({max(1, window_bp//4), max(1, window_bp//2), window_bp}) if discovery_method == "precision_multiscale" else [window_bp//2],
+        discovery_precision="positive median-depth times harmonic observed group support, capped at 4x median",
+        boundary_effect="raw observed group mean difference",
         window_bp=window_bp,
         min_cpgs=min_cpgs,
         dis_merge_bp=max_gap,

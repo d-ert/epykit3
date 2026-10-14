@@ -127,8 +127,11 @@ def discover_prepared(
     max_gap,
     min_length,
     boundary_min_effect=0.0,
+    smoothed=None,
+    boundary_effects=None,
 ):
     cumulative = np.empty(len(pos))
+    trim_effects = effects if boundary_effects is None else boundary_effects
     regions = [(np.int64(0), np.int64(0))][:0]
     threshold = boundary_min_effect if boundary_min_effect > 0.0 else min_effect
 
@@ -141,10 +144,13 @@ def discover_prepared(
         first, last, direction = -1, -1, 0
         has_seed = False
         for j in range(lo, hi):
-            value = cumulative[right[j] - 1]
-            if left[j] > lo:
-                value -= cumulative[left[j] - 1]
-            value /= right[j] - left[j]
+            if smoothed is None:
+                value = cumulative[right[j] - 1]
+                if left[j] > lo:
+                    value -= cumulative[left[j] - 1]
+                value /= right[j] - left[j]
+            else:
+                value = smoothed[j]
             if abs(value) < threshold:
                 if first >= 0:
                     if (
@@ -154,7 +160,7 @@ def discover_prepared(
                     ):
                         _refine_and_append_region(
                             pos,
-                            effects,
+                            trim_effects,
                             first,
                             last + 1,
                             direction,
@@ -176,7 +182,7 @@ def discover_prepared(
                 ):
                     _refine_and_append_region(
                         pos,
-                        effects,
+                        trim_effects,
                         first,
                         last + 1,
                         direction,
@@ -202,7 +208,7 @@ def discover_prepared(
         ):
             _refine_and_append_region(
                 pos,
-                effects,
+                trim_effects,
                 first,
                 last + 1,
                 direction,
