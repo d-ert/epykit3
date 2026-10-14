@@ -129,7 +129,7 @@ def _dmc_input_signature(
     """
     msp = Path(methylstore_path).resolve()
     fields: list[tuple[str, str]] = [
-        ("variance_revision", "2026-10-observed-log-moment-eb-v2"),
+        ("variance_revision", "2026-10-depth-relative-log-moment-eb-v3"),
         ("support_schema_revision", "2026-10-09-observed-replicates-v1"),
         ("store", str(msp)),
         ("case", ",".join(samples_case)),
@@ -861,20 +861,26 @@ def _score_finalize(
             df_phi = df_i_safe.copy()
         elif dispersion == "eb":
             valid_phi = sites_dispers & (df_i > 0)
-            phi_eff, df_phi, w_eb, phi_hat = _smyth_eb_moderation(
-                chi_case + chi_ctrl,
-                df_i_safe,
-                valid_phi,
-                min_dispersion=min_dispersion,
-                min_disp_sites=min_disp_sites,
-            )
-            logger.info(
-                "%s: Smyth log-F EB moderation d0=%.2f, phi0=%.3f over %d sites.",
-                chrom_name,
-                w_eb,
-                phi_hat,
-                int(np.sum(valid_phi)),
-            )
+            if sn2_case is not None and sn2_ctrl is not None:
+                from ._bb_variance import moderate_depth_scale
+
+                phi_eff, df_phi, rho_center = moderate_depth_scale(
+                    sn_case, sn2_case, nv_case, np.where(valid_phi, chi_case, np.nan),
+                    sn_ctrl, sn2_ctrl, nv_ctrl, np.where(valid_phi, chi_ctrl, np.nan),
+                    min_dispersion=min_dispersion, min_disp_sites=min_disp_sites,
+                )
+                phi_hat = float(np.mean(phi_eff[valid_phi])) if valid_phi.any() else min_dispersion
+                logger.info("%s: depth-relative EB rho center=%.5f, mean contrast phi=%.3f over %d sites.",
+                            chrom_name, rho_center, phi_hat, int(valid_phi.sum()))
+            else:
+                # Older private sufficient-statistic callers may not supply
+                # squared depth. Their generic quasi-binomial model is retained.
+                phi_eff, df_phi, w_eb, phi_hat = _smyth_eb_moderation(
+                    chi_case + chi_ctrl, df_i_safe, valid_phi,
+                    min_dispersion=min_dispersion, min_disp_sites=min_disp_sites,
+                )
+                logger.info("%s: generic log-F EB d0=%.2f, phi0=%.3f (squared depth unavailable).",
+                            chrom_name, w_eb, phi_hat)
         else:  # "shrink": James-Stein-style weighted average toward chrom mean
             # phi_shrunk_i = (df_i * phi_site_i + w * phi_chrom) / (df_i + w)
             w = float(shrink_pseudo_df)
@@ -2429,8 +2435,9 @@ def process_chromosomes_dmc(
         the unconstrained per-site method-of-moments estimate. ``"chrom"``
         pools to a per-chromosome dispersion. ``"shrink"`` applies the
         Smyth-style shrinkage toward the per-chromosome mean. ``"eb"``
-        (empirical Bayes) applies Smyth (2004) log-F trigamma dispersion
-        moderation across chromosomes.
+        (empirical Bayes) learns a depth-relative log-F scale within each
+        chromosome and maps biological rho to the pooled contrast variance.
+        Its small-sample count reference remains approximate.
         See :func:`_score_finalize` for details. Ignored for other tests.
     reference : {"adaptive", "chi2", "F"}
         Reference distribution for the quasi-binomial test statistic.

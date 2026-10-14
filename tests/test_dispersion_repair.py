@@ -84,3 +84,34 @@ def test_small_invalid_residual_sets_return_finite_conservative_dispersion():
     assert np.isfinite(phi).all()
     assert (phi >= 1).all()
     assert np.isfinite(df).all()
+
+
+def test_depth_aware_eb_preserves_constant_rho_across_varying_read_depth():
+    from epykit._bb_variance import moderate_depth_scale
+
+    rng = np.random.default_rng(81)
+    n = np.tile([10., 100.], 100000)
+    replicates = np.full(len(n), 5.)
+    phi = 1 + (n-1)*.03
+    chi_case = phi*rng.chisquare(4., len(n))
+    chi_control = phi*rng.chisquare(4., len(n))
+    got, _, rho_center = moderate_depth_scale(
+        5*n, 5*n*n, replicates, chi_case, 5*n, 5*n*n, replicates, chi_control,
+    )
+    assert rho_center == pytest.approx(.03, rel=.025)
+    assert np.mean(got[n == 10.]) == pytest.approx(1.27, rel=.025)
+    assert np.mean(got[n == 100.]) == pytest.approx(3.97, rel=.025)
+
+
+def test_depth_aware_eb_null_reference_does_not_underestimate_deep_loci():
+    from epykit._bb_variance import moderate_depth_scale
+
+    rng = np.random.default_rng(812)
+    n = np.tile([10., 100.], 50000)
+    replicates = np.full(len(n), 5.)
+    phi = 1 + (n-1)*.03
+    case, control = phi*rng.chisquare(4., len(n)), phi*rng.chisquare(4., len(n))
+    scale, df_mod, _ = moderate_depth_scale(5*n, 5*n*n, replicates, case, 5*n, 5*n*n, replicates, control)
+    p = reference_pvalues(phi*rng.chisquare(1, len(n))/scale, scale, df_mod, "F")
+    assert np.isfinite(p).all()
+    assert .04 < np.mean(p[n == 100.] < .05) < .06

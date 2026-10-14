@@ -970,6 +970,10 @@ def dmr(
       pooled score-tail value, not an exact per-region randomization p-value.
       Balanced 3+3 designs have only ten distinct two-sided label scans;
       pooled regions do not provide extra independent permutation resolution.
+      ``empirical_fdr=True, fdr_method="max_t"`` selects ``maxT_pvalue``
+      instead: this whole-scan maximum diagnostic includes observed/mirror
+      scans and tests the joint all-null model. Exact 3+3 designs cannot
+      make discoveries at .05 because their minimum two-sided p-value is .1.
 
     * ``method="chain_merge"`` (default, recommended) -- DSS-style
       chaining of significant CpGs into regions; tune via ``preset``.
@@ -1110,12 +1114,15 @@ def dmr(
                 f"({min_abs_meth_diff}), got {boundary_min_effect}"
             )
         from ._regional_gls import run_regional_gls
+        if empirical_fdr and fdr_method not in {"max_t", "region"}:
+            raise ValueError("regional_gls empirical fdr_method must be max_t or region")
         frame, candidates, params = run_regional_gls(md, chromosomes=chromosomes,
             canonical_only=canonical_only, window_bp=window_bp,
             min_cpgs=5 if min_cpgs is None else min_cpgs, max_gap=dis_merge_bp,
             min_length=minlen_bp, min_effect=min_abs_meth_diff,
             boundary_min_effect=boundary_min_effect, n_perm=n_perm,
-            seed=perm_seed, q_cutoff=min_mean_qvalue, workers=n_workers)
+            seed=perm_seed, q_cutoff=min_mean_qvalue, workers=n_workers,
+            selection_method="max_t" if empirical_fdr and fdr_method == "max_t" else "experimental_fdp")
         md.uns["dmr"], md.uns["dmr_candidates"], md.uns["dmr_params"] = frame, candidates, params
         if tsv is not None:
             from .export import dmr_to_tsv

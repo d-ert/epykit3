@@ -391,6 +391,31 @@ def _permutation_fdp_qvalues(scores, null_scans):
     return curve[::-1][np.searchsorted(thresholds[::-1], scores)]
 
 
+def _maximum_scan_pvalues(scores, null_scans, *, observed_copies):
+    """Whole-scan maximum tails under the joint all-null permutation model.
+
+    Include the observed scan and its sampled mirror. Strong partial-null
+    region control would require additional subset-pivotality assumptions.
+    """
+    scores = np.abs(np.asarray(scores, float))
+    scans = [np.abs(np.asarray(scan, float)) for scan in null_scans]
+    if not np.isfinite(scores).all() or any(not np.isfinite(scan).all() for scan in scans):
+        raise ValueError("Failed scan scores must not be dropped")
+    if observed_copies < 1:
+        raise ValueError("Maximum-statistic calibration must include the observed scan")
+    maximum = float(scores.max()) if len(scores) else 0.0
+    maxima = np.array([float(scan.max()) if len(scan) else 0.0 for scan in scans]
+                      + [maximum]*observed_copies)
+    return (len(maxima)-np.searchsorted(np.sort(maxima), scores, side="left"))/len(maxima)
+
+
+def _attach_maximum_scores(observed, null_scans, observed_copies):
+    pvalues = _maximum_scan_pvalues([row["statistic"] for row in observed], null_scans,
+                                    observed_copies=observed_copies)
+    for row, value in zip(observed, pvalues, strict=True):
+        row["maxT_pvalue"] = float(value)
+
+
 def calibrate_regions(observed, null_scans, *, correction="pooled_bh"):
     """Calibrate selected scores; pooled-BH retained for historical migrations."""
     null = (
@@ -456,7 +481,7 @@ def remove_self_mirror_scores(observed, null_region_count, duplicates):
     return result
 
 
-def _load_regional_cache(paths, key, q_cutoff, workers):
+def _load_regional_cache(paths, key, q_cutoff, workers, selection_column="combined_qvalue"):
     table_path, meta_path = paths
     if not table_path.is_file() or not meta_path.is_file():
         return None
@@ -471,7 +496,7 @@ def _load_regional_cache(paths, key, q_cutoff, workers):
         result = (
             all_regions
             if q_cutoff is None
-            else all_regions.filter(pl.col("combined_qvalue") <= q_cutoff)
+            else all_regions.filter(pl.col(selection_column) <= q_cutoff)
         )
         meta.update(cache_hit=True, min_mean_qvalue=q_cutoff, workers=workers)
         logger.info(
@@ -564,6 +589,7 @@ def run_regional_gls(
     calibration="permutation_fdp",
     record_scan_scores=False,
     discovery_method="precision_multiscale",
+    selection_method="experimental_fdp",
     workers=None,
     cache=True,
 ):
@@ -573,6 +599,9 @@ def run_regional_gls(
                                 record_scan_scores, pooled_decoy_covariance)
     if discovery_method not in {"boxcar", "precision_multiscale"}:
         raise ValueError("Unknown regional discovery method")
+    if selection_method not in {"experimental_fdp", "max_t"}:
+        raise ValueError("Unknown regional selection method")
+    selection_column = "maxT_pvalue" if selection_method == "max_t" else "combined_qvalue"
     samples = list(md.control_ids) + list(md.treatment_ids)
     if len(samples) != len(set(samples)):
         raise ValueError("Regional GLS requires unique biological sample IDs")
@@ -652,12 +681,13 @@ def run_regional_gls(
             calibration=calibration,
             record_scan_scores=record_scan_scores,
             discovery_method=discovery_method,
+            selection_method=selection_method,
             numpy=np.__version__,
         )
         key = hashlib.sha256(json.dumps(signature, sort_keys=True).encode()).hexdigest()
         directory = Path(md.analysis_root) / ".cache" / "regional_gls"
         cache_paths = directory / f"{key}.parquet", directory / f"{key}.json"
-        cached = _load_regional_cache(cache_paths, key, q_cutoff, workers)
+        cached = _load_regional_cache(cache_paths, key, q_cutoff, workers, selection_column)
         if cached is not None:
             return cached
     observed, null_scans = [], [[] for _ in assignments]
@@ -817,6 +847,7 @@ def run_regional_gls(
                 null_scans[j].extend(sign * unique_scores[index])
 
     observed, meta = calibrate_regions(observed, null_scans, correction=calibration)
+    _attach_maximum_scores(observed, null_scans, generated_assignments-len(assignments))
     if record_scan_scores:
         meta["scan_scores"] = dict(
             observed=[r["statistic"] for r in observed], unique_null=representative_scans,
@@ -839,12 +870,13 @@ def run_regional_gls(
         "n_control": pl.Int64,
         "combined_pvalue": pl.Float64,
         "combined_qvalue": pl.Float64,
+        "maxT_pvalue": pl.Float64,
     }
     all_regions = pl.DataFrame(observed, schema=schema) if observed else pl.DataFrame(schema=schema)
     result = (
         all_regions
         if q_cutoff is None
-        else all_regions.filter(pl.col("combined_qvalue") <= q_cutoff)
+        else all_regions.filter(pl.col(selection_column) <= q_cutoff)
     )
     meta.update(
         method="regional_gls",
@@ -864,6 +896,11 @@ def run_regional_gls(
         union_cpgs=union_support,
         support_filter="label-independent-total-union; minimum-group-support-replayed-per-scan",
         residual_variance="unmodified-profiled-REML",
+        selection_method=selection_method,
+        selection_column=selection_column,
+        maxT_scope="joint whole-genome all-null error under exchangeable samples; strong region control not established",
+        full_assignment_space=comb(len(labels), int(labels.sum())),
+        minimum_full_orbit_two_sided_pvalue=(2.0 if len(md.control_ids) == len(md.treatment_ids) else 1.0)/comb(len(labels), int(labels.sum())),
         discovery_method=discovery_method,
         discovery_kernel="tricube" if discovery_method == "precision_multiscale" else "boxcar",
         discovery_radii_bp=sorted({max(1, window_bp//4), max(1, window_bp//2), window_bp}) if discovery_method == "precision_multiscale" else [window_bp//2],

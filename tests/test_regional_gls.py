@@ -66,6 +66,11 @@ def test_public_backend_runs_without_dmc_and_records_full_discovery(tmp_path):
     assert len(md.uns["dmr_candidates"]) > 0
     assert md.uns["dmr_candidates"]["start"].min() == 0
     assert md.uns["dmr_candidates"]["end"].max() == 581
+    ep.tl.dmr(md, method="regional_gls", n_perm=20, min_cpgs=5,
+              empirical_fdr=True, fdr_method="max_t", tsv=False)
+    assert len(md.uns["dmr"]) == 0
+    assert md.uns["dmr_params"]["selection_column"] == "maxT_pvalue"
+    assert md.uns["dmr_candidates"]["maxT_pvalue"].min() >= .1
     with pytest.raises(NotImplementedError, match="exchangeable"):
         ep.tl.dmr(md, method="regional_gls", covariates=["batch"], tsv=False)
     md.store = str(tmp_path / "missing")

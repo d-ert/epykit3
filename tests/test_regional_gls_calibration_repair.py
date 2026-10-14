@@ -40,3 +40,14 @@ def test_zero_tail_is_an_estimate_and_failed_scores_cannot_be_dropped():
     assert _regional_gls._permutation_fdp_qvalues([5.], [[]]).tolist() == [0.]
     with pytest.raises(ValueError, match="Failed"):
         _regional_gls._permutation_fdp_qvalues([5.], [[float("nan")]])
+
+
+def test_maximum_statistic_tail_includes_empty_scans_and_observed_mirror():
+    p = _regional_gls._maximum_scan_pvalues([10., 5.], [[9.], [], [4.]], observed_copies=2)
+    assert p == pytest.approx([.4, .6])
+
+
+def test_three_versus_three_exact_maximum_tail_cannot_claim_five_percent():
+    p = _regional_gls._maximum_scan_pvalues([100.], [[] for _ in range(18)], observed_copies=2)
+    assert p == pytest.approx([.1])
+    assert not np.any(p <= .05)
