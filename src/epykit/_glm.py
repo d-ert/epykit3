@@ -14,8 +14,8 @@ The implementation is a single-pass batched IRLS:
     z_ij    = eta_ij + (y_ij/n_ij - mu_ij) / (mu_ij * (1 - mu_ij))
     beta_i  = (X' W_i X)^{-1} X' W_i z_i
 
-At each iteration we build a (n_sites, p, p) batch of normal equations via
-``np.einsum`` and solve them in a single batched ``np.linalg.solve`` call.
+At each iteration we build normal equations for active sites via
+``np.einsum`` and solve finite batches while isolating singular systems.
 With p <= 6 and tile-level n_sites ~ 10^4 to 10^5, the whole IRLS converges
 in well under a second.
 
@@ -371,30 +371,25 @@ def irls_binomial_batch(
     valid &= np.isfinite(beta).all(axis=1)
     converged = np.zeros(n_sites, dtype=bool)
 
-    # ---- IRLS iterations ---------------------------------------------------
+    # ---- IRLS iterations: converged coefficients are accepted and frozen. ----
     for _it in range(max_iter):
-        eta = beta @ X.T  # (n_sites, n_samples)
-        # clip eta to avoid sigmoid saturation breaking the weights
-        eta = np.clip(eta, -30.0, 30.0)
-        mu = 1.0 / (1.0 + np.exp(-eta))
-        mu = np.clip(mu, _PROP_CLIP, 1.0 - _PROP_CLIP)
-        var = mu * (1.0 - mu)
-
-        # Working weights: w = n * mu * (1 - mu). Zero where no coverage.
-        w = np.where(has_cov, cov_f * var, 0.0)
-        # Working response: z = eta + (y/n - mu) / var.
-        with np.errstate(invalid="ignore", divide="ignore"):
-            resid_over_var = np.where(has_cov, (meth_f / np.maximum(cov_f, 1.0) - mu) / var, 0.0)
-        z = eta + resid_over_var
-
-        beta_new = _solve_weighted_lsq(X, z, w)
-
-        delta = np.max(np.abs(beta_new - beta), axis=1)
-        beta = beta_new
-        newly_converged = delta < tol
-        converged |= newly_converged
-        if converged.all():
+        active = np.flatnonzero(valid & ~converged)
+        if not len(active):
             break
+        old = beta[active]
+        covered = has_cov[active]
+        depths = cov_f[active]
+        eta = np.clip(old @ X.T, -30.0, 30.0)
+        mu = np.clip(1.0 / (1.0 + np.exp(-eta)), _PROP_CLIP, 1.0 - _PROP_CLIP)
+        var = mu * (1.0 - mu)
+        w = np.where(covered, depths * var, 0.0)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            adjustment = np.where(covered, (meth_f[active] / np.maximum(depths, 1.0) - mu) / var, 0.0)
+        new = _solve_weighted_lsq(X, eta + adjustment, w)
+        finite = np.isfinite(new).all(axis=1)
+        beta[active] = new
+        valid[active] &= finite
+        converged[active] = finite & (np.max(np.abs(new - old), axis=1) < tol)
 
     # ---- Final diagnostics (deviance, Pearson chi-sq, SE) ------------------
     eta_unclipped = beta @ X.T
