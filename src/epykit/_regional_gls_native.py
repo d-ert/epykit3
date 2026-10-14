@@ -173,7 +173,8 @@ def discover_prepared(
     boundary_effects=None,
 ):
     cumulative = np.empty(len(pos))
-    seed_values = np.empty(len(pos)) if smoothed is None else smoothed
+    generated_seeds = np.empty(len(pos)) if smoothed is None else np.empty(0)
+    seed_values = generated_seeds if smoothed is None else smoothed
     trim_effects = effects if boundary_effects is None else boundary_effects
     regions = [(np.int64(0), np.int64(0))][:0]
     threshold = boundary_min_effect if boundary_min_effect > 0.0 else min_effect
@@ -192,9 +193,9 @@ def discover_prepared(
                 if left[j] > lo:
                     value -= cumulative[left[j] - 1]
                 value /= right[j] - left[j]
+                generated_seeds[j] = value
             else:
                 value = smoothed[j]
-            seed_values[j] = value
             if abs(value) < threshold:
                 if first >= 0:
                     if (

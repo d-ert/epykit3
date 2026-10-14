@@ -43,6 +43,18 @@ def test_split_fragment_must_keep_its_own_smoothed_seed():
     assert negative.tolist() == positive.tolist()
 
 
+def test_discovery_accepts_readonly_smoothed_arrays_without_mutation():
+    pos = np.arange(13) * 60
+    raw = np.r_[np.full(5, .07), np.full(3, .01), np.full(5, .20)]
+    smooth = np.r_[np.full(8, .06), np.full(5, .15)]
+    smooth.flags.writeable = False
+    geometry = prepare_discovery(pos, 500, 5, 500)
+    got = discover_prepared(pos, raw, *geometry, .1, 5, 500, 50, .05,
+                            smoothed=smooth, boundary_effects=raw)
+    assert got.tolist() == [[8, 13]]
+    np.testing.assert_array_equal(smooth, np.r_[np.full(8, .06), np.full(5, .15)])
+
+
 def test_boundary_extension_does_not_lower_split_penalty():
     pos = np.arange(7) * 50
     effects = np.array([.2, .2, .052, .052, .052, .2, .2])
@@ -82,7 +94,7 @@ def test_seed_constrained_trimming_matches_exhaustive_intervals():
         for _ in range(100):
             pos = np.cumsum(rng.integers(1, 40, 12))
             effect = direction * rng.uniform(-.2, .5, 12)
-            seeds = rng.uniform(-.05, .2, 12)
+            seeds = direction * rng.uniform(-.05, .2, 12)
             min_count, min_span, tau, min_seed = 3, 55, .08, .1
             admissible = [
                 (sum(direction * effect[a:b] - tau), a, b)
@@ -117,3 +129,14 @@ def test_batch_returns_profiled_standard_error_without_length_boost():
     row = fit_regions(pos, y, h, g, [[0, 20]], workers=1)[0]
     raw = profile_covariance(pos, y, h, g, row[0])
     assert row[3] == pytest.approx(raw[3], abs=1e-10)
+
+
+def test_seed_threshold_equality_and_tied_optima_keep_first_interval():
+    for direction in (-1, 1):
+        out = []
+        _trim_and_append_subregion.py_func(
+            np.arange(5)*20, direction*np.full(5, .08), 0, 5,
+            direction, .08, 3, 1, out,
+            direction*np.array([0., 0., 0., .1, 0.]), .1,
+        )
+        assert out == [(0, 4)]
