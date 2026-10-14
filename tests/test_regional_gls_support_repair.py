@@ -40,10 +40,13 @@ def test_union_scan_preserves_chromosome_absent_from_first_sample(tmp_path):
     md = ep.MethylData(obs=pl.DataFrame(rows), store=str(tmp_path / "counts"))
     _, candidates, meta = _regional_gls.run_regional_gls(
         md, n_perm=20, min_cpgs=5, min_effect=.1, q_cutoff=None, cache=False, workers=1,
+        record_scan_scores=True,
     )
     assert meta["common_cpgs"]["chr1"] == 15
     assert meta["union_cpgs"]["chr1"] == 15
     assert len(candidates) > 0
+    assert len(meta["scan_scores"]["observed"]) == len(candidates)
+    assert len(meta["scan_scores"]["unique_null"]) == meta["unique_null_fits"]
     counts = np.array(observed_m)
     raw_effect = counts[2:].mean(axis=0)/40-counts[:2].mean(axis=0)/40
     for row in candidates.to_dicts():

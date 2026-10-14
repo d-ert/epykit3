@@ -961,10 +961,15 @@ def dmr(
       exchangeable samples (at least two per group); no upstream DMC table.
       Uses ``window_bp``, ``min_cpgs`` (default 5), ``dis_merge_bp``,
       ``minlen_bp``, ``min_abs_meth_diff``, ``n_perm`` and ``perm_seed``.
-      ``min_mean_qvalue`` filters permutation BH values; all candidates remain
+      ``min_mean_qvalue`` filters experimental permutation FDP estimates; all candidates remain
       in ``md.uns['dmr_candidates']``. ``n_workers`` controls native region-fit
       threads (up to eight by default). Identical inputs/settings reuse complete
       inference under ``analysis_root/.cache/regional_gls``. Calibration is experimental.
+      Complete decoy scans, including empty scans, estimate false discovery
+      counts at each score threshold. ``combined_pvalue`` is a descriptive
+      pooled score-tail value, not an exact per-region randomization p-value.
+      Balanced 3+3 designs have only ten distinct two-sided label scans;
+      pooled regions do not provide extra independent permutation resolution.
 
     * ``method="chain_merge"`` (default, recommended) -- DSS-style
       chaining of significant CpGs into regions; tune via ``preset``.

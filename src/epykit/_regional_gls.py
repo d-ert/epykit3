@@ -365,7 +365,34 @@ def label_assignments(labels, n_perm, seed):
     return result
 
 
-def calibrate_regions(observed, null_scans):
+def _permutation_fdp_qvalues(scores, null_scans):
+    """Monotone expected-false-count FDP estimates over complete scan exposure.
+
+    This is not an exact randomization test or a finite-sample FDR guarantee.
+    A zero tail is a point estimate of zero false calls, not proof of zero risk.
+    Score ties form one threshold and all scans, including empty scans, count.
+    """
+    scores = np.abs(np.asarray(scores, float))
+    if not np.isfinite(scores).all():
+        raise ValueError("Failed observed scores must not be dropped")
+    if not null_scans:
+        raise ValueError("At least one complete null scan is required")
+    null = np.sort(np.abs(np.concatenate([np.asarray(s, float) for s in null_scans])))
+    if not np.isfinite(null).all():
+        raise ValueError("Failed permutation scores must not be dropped")
+    if not len(scores):
+        return np.empty(0)
+    thresholds = np.unique(scores)[::-1]
+    tails = len(null) - np.searchsorted(null, thresholds, side="left")
+    discoveries = len(scores) - np.searchsorted(np.sort(scores), thresholds, side="left")
+    fdp = np.minimum(1.0, tails / (len(null_scans) * discoveries))
+    curve = np.minimum.accumulate(fdp[::-1])[::-1]
+    # Thresholds are descending; search on the ascending view preserves ties.
+    return curve[::-1][np.searchsorted(thresholds[::-1], scores)]
+
+
+def calibrate_regions(observed, null_scans, *, correction="pooled_bh"):
+    """Calibrate selected scores; pooled-BH retained for historical migrations."""
     null = (
         np.sort(np.abs(np.concatenate([np.asarray(s, float) for s in null_scans])))
         if null_scans
@@ -380,14 +407,23 @@ def calibrate_regions(observed, null_scans):
     q[order] = np.minimum(
         1, np.minimum.accumulate((p[order] * len(p) / np.arange(1, len(p) + 1))[::-1])[::-1]
     )
+    if correction == "permutation_fdp":
+        q = _permutation_fdp_qvalues(scores, null_scans)
+    elif correction != "pooled_bh":
+        raise ValueError("Unknown regional score correction")
     for r, pv, qv in zip(observed, p, q, strict=False):
         r.update(combined_pvalue=float(pv), combined_qvalue=float(qv))
     return observed, dict(
         null_scans=len(null_scans),
         null_regions=len(null),
         empty_null_scans=sum(len(s) == 0 for s in null_scans),
-        correction="pooled-full-discovery-permutation-bh-experimental",
+        correction=("full-discovery-permutation-expected-false-count-experimental"
+                    if correction == "permutation_fdp" else "pooled-full-discovery-permutation-bh-experimental"),
         score_assumption="comparable selected regional null statistics; exchangeable samples",
+        pvalue_semantics="descriptive pooled selected-region score tail, not an exact per-region randomization p-value",
+        qvalue_semantics=("threshold-wise expected decoy discoveries per complete scan divided by observed discoveries"
+                          if correction == "permutation_fdp" else "BH transform of descriptive pooled score tails"),
+        finite_sample_fdr_guarantee=False,
     )
 
 
@@ -492,6 +528,8 @@ def run_regional_gls(
     seed=42,
     q_cutoff=0.05,
     pooled_decoy_covariance=False,
+    calibration="permutation_fdp",
+    record_scan_scores=False,
     workers=None,
     cache=True,
 ):
@@ -510,6 +548,10 @@ def run_regional_gls(
         raise ValueError("Invalid regional discovery geometry or effect threshold")
     if q_cutoff is not None and not 0 < q_cutoff <= 1:
         raise ValueError("q cutoff must be in (0,1]")
+    if calibration not in {"permutation_fdp", "pooled_bh"}:
+        raise ValueError("Unknown regional calibration")
+    if record_scan_scores and pooled_decoy_covariance:
+        raise ValueError("Complete scan score diagnostics require per-region covariance replay")
     samples = list(md.control_ids) + list(md.treatment_ids)
     if len(samples) != len(set(samples)):
         raise ValueError("Regional GLS requires unique biological sample IDs")
@@ -585,6 +627,8 @@ def run_regional_gls(
             boundary_min_effect=boundary_min_effect,
             n_perm=n_perm,
             seed=seed,
+            calibration=calibration,
+            record_scan_scores=record_scan_scores,
             numpy=np.__version__,
         )
         key = hashlib.sha256(json.dumps(signature, sort_keys=True).encode()).hexdigest()
@@ -594,6 +638,7 @@ def run_regional_gls(
         if cached is not None:
             return cached
     observed, null_scans = [], [[] for _ in assignments]
+    representative_scans = [[] for _ in representatives]
     common_support, union_support = {}, {}
 
     for chrom in chroms:
@@ -737,16 +782,24 @@ def run_regional_gls(
                     null_scans[j].append(effect / se)
         else:
             unique_scores = []
-            for g in representatives:
+            for index, g in enumerate(representatives):
                 scan_p, scan_y, scan_h, scan_mask, _, regions = _prepare_label_scan(
                     *scan_args, g, *discovery_args
                 )
                 fit = fit_regions(scan_p, scan_y, scan_h, g, regions, workers=workers, obs_mask=scan_mask)
                 unique_scores.append(fit[:, 2] / fit[:, 3])
+                if record_scan_scores:
+                    representative_scans[index].extend(float(v) for v in unique_scores[-1])
             for j, (index, sign) in enumerate(scan_map):
                 null_scans[j].extend(sign * unique_scores[index])
 
-    observed, meta = calibrate_regions(observed, null_scans)
+    observed, meta = calibrate_regions(observed, null_scans, correction=calibration)
+    if record_scan_scores:
+        meta["scan_scores"] = dict(
+            observed=[r["statistic"] for r in observed], unique_null=representative_scans,
+            unique_labels=[g.tolist() for g in representatives],
+            observed_labels=labels.tolist(), scan_map=scan_map,
+        )
     schema = {
         "chrom": pl.String,
         "start": pl.Int64,
@@ -774,7 +827,7 @@ def run_regional_gls(
         method="regional_gls",
         experimental=True,
         promoted=False,
-        algorithm_revision="spatial-gls-observed-data-reml-v6",
+        algorithm_revision="spatial-gls-observed-data-scan-count-reml-v7",
         accelerator="numba-native-analytical-donor-reml",
         masked_accelerator="numba-native-observed-CAR-residual-donor-eigensystem-REML",
         likelihood="observed-cells-with-locus-intercepts-and-shared-treatment",
