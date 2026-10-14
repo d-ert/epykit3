@@ -55,6 +55,45 @@ def _chol_solve(chol, rhs):
 
 
 @njit(cache=True, nogil=True)
+def _exact_design_fit(y, h, g, mask):
+    """Detect roundoff-zero residuals without a biological variance floor.
+
+    The independent-error observed design has the same column space as every
+    positive-definite CAR/donor covariance. Explicit residuals avoid subtracting
+    two nearly equal quadratic forms. A 64-ulp relative response tolerance covers
+    elementary centering/contrast roundoff and scales with the input response.
+    """
+    samples, k = y.shape
+    means, group_means = np.zeros(k), np.zeros(k)
+    numerator, denominator, response_energy = 0.0, 0.0, 0.0
+    for j in range(k):
+        count = 0
+        for s in range(samples):
+            if mask[s, j]:
+                means[j] += y[s, j] / h[j]
+                group_means[j] += g[s]
+                count += 1
+                response_energy += y[s, j] * y[s, j]
+        means[j] /= count
+        group_means[j] /= count
+        for s in range(samples):
+            if mask[s, j]:
+                x = h[j] * (g[s] - group_means[j])
+                numerator += x * (y[s, j] - h[j]*means[j])
+                denominator += x*x
+    if denominator <= 0:
+        return False  # The likelihood reports the separate identifiability error.
+    effect = numerator / denominator
+    residual_energy = 0.0
+    for j in range(k):
+        for s in range(samples):
+            if mask[s, j]:
+                residual = y[s, j] - h[j]*(means[j] + (g[s]-group_means[j])*effect)
+                residual_energy += residual*residual
+    return residual_energy <= (64*np.finfo(np.float64).eps)**2 * response_energy
+
+
+@njit(cache=True, nogil=True)
 def _spectral_prepare(p, y, h, g, mask, length):
     samples, k = y.shape
     shared_locus = False
@@ -235,6 +274,8 @@ def _length_golden(p, y, h, g, mask, left, right):
 
 @njit(cache=True, nogil=True)
 def _fit_masked(p, y, h, g, mask):
+    if _exact_design_fit(y, h, g, mask):
+        return 0.0, 0.0, np.nan, np.nan, np.inf
     best, c, effect, se = _profile_masked(p, y, h, g, mask, 0.0)
     best_length = 0.0
     grid = np.linspace(np.log(.1), np.log(10000.0), 17)

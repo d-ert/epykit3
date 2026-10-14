@@ -409,7 +409,11 @@ def _maximum_scan_pvalues(scores, null_scans, *, observed_copies):
     return (len(maxima)-np.searchsorted(np.sort(maxima), scores, side="left"))/len(maxima)
 
 
-def _attach_maximum_scores(observed, null_scans, observed_copies):
+def _attach_maximum_scores(observed, null_scans, observed_copies, available=True):
+    if not available:
+        for row in observed:
+            row["maxT_pvalue"] = float("nan")
+        return
     pvalues = _maximum_scan_pvalues([row["statistic"] for row in observed], null_scans,
                                     observed_copies=observed_copies)
     for row, value in zip(observed, pvalues, strict=True):
@@ -550,7 +554,7 @@ def _prepare_label_scan(pos, yc, h, mask, beta, valid, labels, min_group_obs,
 
 def _validate_regional_settings(window_bp, min_cpgs, max_gap, min_length, min_effect,
                                 boundary_min_effect, q_cutoff, calibration,
-                                record_scan_scores, pooled_decoy_covariance):
+                                record_scan_scores, pooled_decoy_covariance, selection_method):
     if (
         window_bp < 1
         or min_cpgs < 2
@@ -567,6 +571,10 @@ def _validate_regional_settings(window_bp, min_cpgs, max_gap, min_length, min_ef
         raise ValueError("q cutoff must be in (0,1]")
     if calibration not in {"permutation_fdp", "pooled_bh"}:
         raise ValueError("Unknown regional calibration")
+    if selection_method not in {"experimental_fdp", "max_t"}:
+        raise ValueError("Unknown regional selection method")
+    if selection_method == "max_t" and pooled_decoy_covariance:
+        raise ValueError("Maximum-statistic selection requires per-region covariance replay")
     if record_scan_scores and pooled_decoy_covariance:
         raise ValueError("Complete scan score diagnostics require per-region covariance replay")
 
@@ -596,11 +604,9 @@ def run_regional_gls(
     """Stream a label-independent union; replay support, discovery and fitting."""
     _validate_regional_settings(window_bp, min_cpgs, max_gap, min_length, min_effect,
                                 boundary_min_effect, q_cutoff, calibration,
-                                record_scan_scores, pooled_decoy_covariance)
+                                record_scan_scores, pooled_decoy_covariance, selection_method)
     if discovery_method not in {"boxcar", "precision_multiscale"}:
         raise ValueError("Unknown regional discovery method")
-    if selection_method not in {"experimental_fdp", "max_t"}:
-        raise ValueError("Unknown regional selection method")
     selection_column = "maxT_pvalue" if selection_method == "max_t" else "combined_qvalue"
     samples = list(md.control_ids) + list(md.treatment_ids)
     if len(samples) != len(set(samples)):
@@ -847,7 +853,8 @@ def run_regional_gls(
                 null_scans[j].extend(sign * unique_scores[index])
 
     observed, meta = calibrate_regions(observed, null_scans, correction=calibration)
-    _attach_maximum_scores(observed, null_scans, generated_assignments-len(assignments))
+    _attach_maximum_scores(observed, null_scans, generated_assignments-len(assignments),
+                           available=not pooled_decoy_covariance)
     if record_scan_scores:
         meta["scan_scores"] = dict(
             observed=[r["statistic"] for r in observed], unique_null=representative_scans,
@@ -882,7 +889,7 @@ def run_regional_gls(
         method="regional_gls",
         experimental=True,
         promoted=False,
-        algorithm_revision="spatial-gls-observed-data-multiscale-scan-count-reml-v8",
+        algorithm_revision="spatial-gls-observed-data-multiscale-scan-count-reml-v9",
         accelerator="numba-native-analytical-donor-reml",
         masked_accelerator="numba-native-observed-CAR-residual-donor-eigensystem-REML",
         likelihood="observed-cells-with-locus-intercepts-and-shared-treatment",
@@ -898,7 +905,9 @@ def run_regional_gls(
         residual_variance="unmodified-profiled-REML",
         selection_method=selection_method,
         selection_column=selection_column,
-        maxT_scope="joint whole-genome all-null error under exchangeable samples; strong region control not established",
+        maxT_available=not pooled_decoy_covariance,
+        maxT_scope=("unavailable: observed and decoy covariance procedures differ" if pooled_decoy_covariance
+                    else "joint whole-genome all-null error under exchangeable samples; strong region control not established"),
         full_assignment_space=comb(len(labels), int(labels.sum())),
         minimum_full_orbit_two_sided_pvalue=(2.0 if len(md.control_ids) == len(md.treatment_ids) else 1.0)/comb(len(labels), int(labels.sum())),
         discovery_method=discovery_method,

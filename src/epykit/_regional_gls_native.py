@@ -13,6 +13,7 @@ import numpy as np
 from numba import get_num_threads, njit, prange, set_num_threads
 
 from ._regional_gls_masked import (
+    _exact_design_fit,
     _fit_masked,
     _profile_masked,
     _spectral_evaluate,
@@ -357,6 +358,8 @@ def _golden(p, yc, h, prepared, left, right):
 
 @njit(cache=True, nogil=True)
 def _fit(p, yc, h, g):
+    if _exact_design_fit(yc, h, g, np.ones(yc.shape, dtype=np.bool_)):
+        return 0.0, 0.0, np.nan, np.nan, np.inf
     prepared = _prepare(yc, h, g)
     best, c, effect, se = _profile(p, yc, h, 0.0, prepared)
     best_length = 0.0
@@ -425,6 +428,8 @@ def _observation_mask(yc, obs_mask):
 
 def evaluate_covariance(p, yc, h, g, length, c, *, obs_mask=None):
     p, yc, h, g = _validate(p, yc, h, g)
+    if _exact_design_fit(yc, h, g, _observation_mask(yc, obs_mask)):
+        raise ValueError("Degenerate regional residual covariance; exact design fit")
     if length < 0 or not 0 <= c < 1:
         raise ValueError("Invalid covariance parameters")
     if obs_mask is not None:
@@ -435,6 +440,8 @@ def evaluate_covariance(p, yc, h, g, length, c, *, obs_mask=None):
 
 def profile_covariance(p, yc, h, g, length, *, obs_mask=None):
     p, yc, h, g = _validate(p, yc, h, g)
+    if _exact_design_fit(yc, h, g, _observation_mask(yc, obs_mask)):
+        raise ValueError("Degenerate regional residual covariance; exact design fit")
     if obs_mask is not None:
         mask = _observation_mask(yc, obs_mask)
         return _profile_masked(p, yc, h, g, mask, length)
