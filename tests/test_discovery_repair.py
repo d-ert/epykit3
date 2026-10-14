@@ -20,6 +20,27 @@ def test_minimum_span_trimming_retains_best_admissible_prefix():
     assert got.tolist() == [[2, 7]]
 
 
+def test_split_fragment_must_keep_its_own_smoothed_seed():
+    from epykit._regional_gls_native import discover_prepared
+
+    pos = np.arange(13) * 60
+    raw = np.r_[np.full(5, .07), np.full(3, .01), np.full(5, .20)]
+    smooth = np.r_[np.full(8, .06), np.full(5, .15)]
+    geometry = prepare_discovery(pos, 500, 5, 500)
+
+    positive = discover_prepared(
+        pos, raw, *geometry, .1, 5, 500, 50, .05,
+        smoothed=smooth, boundary_effects=raw,
+    )
+    negative = discover_prepared(
+        pos, -raw, *geometry, .1, 5, 500, 50, .05,
+        smoothed=-smooth, boundary_effects=-raw,
+    )
+
+    assert positive.tolist() == [[8, 13]]
+    assert negative.tolist() == positive.tolist()
+
+
 def test_constrained_trimming_matches_exhaustive_admissible_segments():
     rng = np.random.default_rng(895)
     for _ in range(100):
@@ -38,6 +59,37 @@ def test_constrained_trimming_matches_exhaustive_admissible_segments():
             assert sum(effect[a:b] - tau) == pytest.approx(best[0], abs=1e-12)
         else:
             assert out == []
+
+
+def test_seed_constrained_trimming_matches_exhaustive_intervals():
+    rng = np.random.default_rng(7712)
+    for direction in (-1, 1):
+        for _ in range(100):
+            pos = np.cumsum(rng.integers(1, 40, 12))
+            effect = direction * rng.uniform(-.2, .5, 12)
+            seeds = rng.uniform(-.05, .2, 12)
+            min_count, min_span, tau, min_seed = 3, 55, .08, .1
+            admissible = [
+                (sum(direction * effect[a:b] - tau), a, b)
+                for a in range(12)
+                for b in range(a + min_count, 13)
+                if pos[b - 1] - pos[a] + 1 >= min_span
+                and np.any(direction * seeds[a:b] >= min_seed)
+            ]
+            out = []
+            _trim_and_append_subregion.py_func(
+                pos, effect, 0, 12, direction, tau, min_count, min_span,
+                out, seeds, min_seed,
+            )
+            if admissible:
+                best_score = max(item[0] for item in admissible)
+                got = out[0]
+                got_score = sum(direction * effect[got[0]:got[1]] - tau)
+                assert got_score == pytest.approx(best_score, abs=1e-12)
+                assert np.any(direction * seeds[got[0]:got[1]] >= min_seed)
+                assert pos[got[1] - 1] - pos[got[0]] + 1 >= min_span
+            else:
+                assert out == []
 
 
 def test_batch_returns_profiled_standard_error_without_length_boost():

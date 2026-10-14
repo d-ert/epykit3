@@ -36,7 +36,17 @@ def prepare_discovery(pos, window_bp, min_cpgs, max_gap):
 
 @njit(inline="always")
 def _trim_and_append_subregion(
-    pos, effects, sub_start, sub_end, direction, tau, min_cpgs, min_length, regions
+    pos,
+    effects,
+    sub_start,
+    sub_end,
+    direction,
+    tau,
+    min_cpgs,
+    min_length,
+    regions,
+    seed_signal=None,
+    min_seed_effect=0.0,
 ):
     n_sub = sub_end - sub_start
     if n_sub < min_cpgs:
@@ -48,12 +58,22 @@ def _trim_and_append_subregion(
     prefix = np.zeros(n_sub + 1)
     for j in range(n_sub):
         prefix[j + 1] = prefix[j] + direction * effects[sub_start + j] - tau
-    next_start, min_start = 0, 0
+    next_start, min_start, latest_seed = 0, 0, -1
     min_prefix, best_score = np.inf, -np.inf
     best_l, best_r = -1, -1
+    if seed_signal is not None:
+        for j in range(min_cpgs):
+            if direction * seed_signal[sub_start + j] >= min_seed_effect:
+                latest_seed = j
     for end in range(min_cpgs, n_sub + 1):
+        if (
+            seed_signal is None
+            or direction * seed_signal[sub_start + end - 1] >= min_seed_effect
+        ):
+            latest_seed = end - 1
         while (
             next_start <= end - min_cpgs
+            and next_start <= latest_seed
             and pos[sub_start + end - 1] - pos[sub_start + next_start] + 1 >= min_length
         ):
             if prefix[next_start] < min_prefix:
@@ -78,6 +98,7 @@ def _refine_and_append_region(
     min_length,
     regions,
     boundary_min_effect=0.0,
+    seed_signal=None,
 ):
     """Trim neutral boxcar halos and split valley bridges via penalized CUSUM."""
     tau = boundary_min_effect if boundary_min_effect > 0.0 else 0.55 * min_effect
@@ -104,14 +125,34 @@ def _refine_and_append_region(
                 or (low_start > 0 and pos[j] - pos[low_start - 1] >= 150)
             ):
                 _trim_and_append_subregion(
-                    pos, effects, sub_start, low_start, direction, tau, min_cpgs, min_length, regions
+                    pos,
+                    effects,
+                    sub_start,
+                    low_start,
+                    direction,
+                    tau,
+                    min_cpgs,
+                    min_length,
+                    regions,
+                    seed_signal,
+                    min_effect,
                 )
                 sub_start = j
             run_low = 0
 
     if stop_excl - sub_start >= min_cpgs:
         _trim_and_append_subregion(
-            pos, effects, sub_start, stop_excl, direction, tau, min_cpgs, min_length, regions
+            pos,
+            effects,
+            sub_start,
+            stop_excl,
+            direction,
+            tau,
+            min_cpgs,
+            min_length,
+            regions,
+            seed_signal,
+            min_effect,
         )
 
 
@@ -132,6 +173,7 @@ def discover_prepared(
     boundary_effects=None,
 ):
     cumulative = np.empty(len(pos))
+    seed_values = np.empty(len(pos)) if smoothed is None else smoothed
     trim_effects = effects if boundary_effects is None else boundary_effects
     regions = [(np.int64(0), np.int64(0))][:0]
     threshold = boundary_min_effect if boundary_min_effect > 0.0 else min_effect
@@ -152,6 +194,7 @@ def discover_prepared(
                 value /= right[j] - left[j]
             else:
                 value = smoothed[j]
+            seed_values[j] = value
             if abs(value) < threshold:
                 if first >= 0:
                     if (
@@ -170,6 +213,7 @@ def discover_prepared(
                             min_length,
                             regions,
                             boundary_min_effect,
+                            seed_values,
                         )
                     first = -1
                     has_seed = False
@@ -192,6 +236,7 @@ def discover_prepared(
                         min_length,
                         regions,
                         boundary_min_effect,
+                        seed_values,
                     )
                 first = -1
                 has_seed = False
@@ -218,6 +263,7 @@ def discover_prepared(
                 min_length,
                 regions,
                 boundary_min_effect,
+                seed_values,
             )
 
     result = np.empty((len(regions), 2), dtype=np.int64)
