@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 _EPS = 1e-9
 _PROP_CLIP = 1e-6
+GLM_ALGORITHM_REVISION = "binomial-irls-estimable-active-v1"
 
 
 # Design matrix construction
@@ -364,7 +365,10 @@ def irls_binomial_batch(
     # weights for init: coverage (mass) only where covered
     w_init = np.where(has_cov, cov_f, 0.0)
 
-    beta = _solve_weighted_lsq(X, z_init, w_init)  # (n_sites, p)
+    valid = _estimable_sites(X, has_cov)
+    beta = np.full((n_sites, p), np.nan)
+    beta[valid] = _solve_weighted_lsq(X, z_init[valid], w_init[valid])
+    valid &= np.isfinite(beta).all(axis=1)
     converged = np.zeros(n_sites, dtype=bool)
 
     # ---- IRLS iterations ---------------------------------------------------
@@ -448,32 +452,14 @@ def irls_binomial_batch(
     XtWX = np.einsum("jp,ij,jq->ipq", X, w_final, X)
     se_beta = np.full((n_sites, p), np.nan, dtype=np.float64)
     cov_beta = np.full((n_sites, p, p), np.nan, dtype=np.float64)
-    try:
-        XtWX_inv = np.linalg.inv(XtWX)
-        cov_beta = XtWX_inv
-        diag = np.einsum("ipp->ip", XtWX_inv)
-        se_beta = np.sqrt(np.where(diag > 0, diag, np.nan))
-    except np.linalg.LinAlgError:
-        # Batched inversion failed: at least one site has a singular
-        # X'WX. Fall back per-site and surface how many sites needed the
-        # rescue so users can spot a globally ill-conditioned design
-        # (collinear covariates, perfect separation, etc).
-        n_fallback_failures = 0
-        for i in range(n_sites):
-            try:
-                inv = np.linalg.inv(XtWX[i])
-                cov_beta[i] = inv
-                se_beta[i] = np.sqrt(np.where(np.diag(inv) > 0, np.diag(inv), np.nan))
-            except np.linalg.LinAlgError:
-                n_fallback_failures += 1
-                continue
-        logger.warning(
-            "GLM design matrix singular under batched inversion; fell back "
-            "to per-site solve. %d / %d sites still failed and were NaN'd. "
-            "Check for collinear covariates or perfect separation.",
-            n_fallback_failures,
-            n_sites,
-        )
+    identity = np.broadcast_to(np.eye(p), (int(valid.sum()), p, p))
+    cov_beta[valid] = _solve_stacked_systems(XtWX[valid], identity)
+    diag = np.diagonal(cov_beta, axis1=1, axis2=2)
+    se_beta = np.sqrt(np.where(diag > 0, diag, np.nan))
+    valid &= np.isfinite(cov_beta).all(axis=(1, 2)) & np.isfinite(se_beta).all(axis=1)
+    if np.any(~valid):
+        logger.warning("GLM: %d / %d sites have an unidentifiable or unsolved design; inference is NaN",
+                       int((~valid).sum()), n_sites)
 
     # Sites with no usable data are degenerate. Sites where the GLM
     # separated (any covered sample's eta hit the clip bound) are also
@@ -484,7 +470,7 @@ def irls_binomial_batch(
     # Non-converged sites are also degenerate: the iterate just before
     # divergence is unreliable and must not silently emit Wald statistics.
     site_nonconverged = ~converged
-    degenerate = (n_eff < 2) | site_separated | site_nonconverged
+    degenerate = ~valid | (n_eff < 2) | site_separated | site_nonconverged
     deviance = np.where(degenerate, np.nan, deviance)
     pearson_chi2 = np.where(degenerate, np.nan, pearson_chi2)
     beta = np.where(degenerate[:, None], np.nan, beta)
@@ -513,7 +499,7 @@ def irls_binomial_batch(
     # Only count sites that are non-converged but NOT already flagged as
     # separated (separated sites are a subset of unreliable sites and are
     # reported above).
-    n_nonconverged_only = int((site_nonconverged & ~site_separated).sum())
+    n_nonconverged_only = int((site_nonconverged & ~site_separated & valid).sum())
     if n_nonconverged_only > 0:
         nonconv_frac = n_nonconverged_only / max(n_sites, 1)
         if nonconv_frac > 0.01:
@@ -553,34 +539,50 @@ def _solve_weighted_lsq(
     # X' W_i z_i : (n_sites, p)
     XtWz = np.einsum("jp,ij,ij->ip", X, w, z)
 
-    # Ridge guard for sites that have only a couple of covered samples or
-    # collinearity in their effective design. We add a tiny multiple of I
-    # *only* where the matrix is otherwise singular, so that well-posed
-    # sites stay numerically identical to a plain solve.
+    return _solve_stacked_systems(XtWX, XtWz[..., None])[..., 0]
+
+
+def _estimable_sites(X: np.ndarray, has_cov: np.ndarray) -> np.ndarray:
+    """Classify each distinct covered-row design once, before weighting."""
     p = X.shape[1]
-    eye = np.eye(p, dtype=np.float64)
+    complete = has_cov.all(axis=1)
+    result = np.zeros(len(has_cov), dtype=bool)
+    result[complete] = np.linalg.matrix_rank(X) == p
+    partial = np.flatnonzero(~complete)
+    if len(partial):
+        patterns, inverse = np.unique(has_cov[partial], axis=0, return_inverse=True)
+        ranks = np.zeros(len(patterns), dtype=bool)
+        for i, mask in enumerate(patterns):
+            if mask.sum() >= p:
+                # NumPy's default SVD tolerance is eps*max(shape)*largest singular value.
+                ranks[i] = np.linalg.matrix_rank(X[mask]) == p
+        result[partial] = ranks[inverse]
+    return result
 
-    # NumPy 2.x: np.linalg.solve no longer broadcasts a 2-D RHS against a
-    # batched 3-D LHS, so we promote b to (n_sites, p, 1) and squeeze back.
-    try:
-        beta = np.linalg.solve(XtWX, XtWz[..., None])[..., 0]
-        return beta
-    except np.linalg.LinAlgError:
-        pass
 
-    # Per-site fallback with a ridge.
-    n_sites = z.shape[0]
-    beta = np.full((n_sites, p), np.nan, dtype=np.float64)
-    for i in range(n_sites):
-        A = XtWX[i]
+def _solve_stacked_systems(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+    """Solve finite stacks, bisecting singular batches down to failed rows.
+
+    Chunking limits temporary allocations; one bad site does not cause scalar
+    dispatch for every other site. No ridge or pseudoinverse changes the model.
+    """
+    result = np.full(B.shape, np.nan, dtype=np.float64)
+    finite = np.flatnonzero(np.isfinite(A).all(axis=(1, 2)) & np.isfinite(B).all(axis=(1, 2)))
+
+    def solve(indices):
         try:
-            beta[i] = np.linalg.solve(A, XtWz[i])
+            values = np.linalg.solve(A[indices], B[indices])
+            good = np.isfinite(values).all(axis=(1, 2))
+            result[indices[good]] = values[good]
         except np.linalg.LinAlgError:
-            try:
-                beta[i] = np.linalg.solve(A + 1e-8 * eye, XtWz[i])
-            except np.linalg.LinAlgError:
-                pass
-    return beta
+            if len(indices) > 1:
+                middle = len(indices) // 2
+                solve(indices[:middle])
+                solve(indices[middle:])
+
+    for start in range(0, len(finite), 8192):
+        solve(finite[start:start + 8192])
+    return result
 
 
 # Dispersion + reference-distribution helpers (shared with _score_finalize)

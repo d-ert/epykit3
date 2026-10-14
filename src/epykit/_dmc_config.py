@@ -207,6 +207,9 @@ class DMCConfig:
             "smoothing": self.smoothing,
             "smoothing_span_bp": self.smoothing_span_bp if self.smoothing else None,
         }
+        if selected_test == 'glm':
+            from ._glm import GLM_ALGORITHM_REVISION
+            params['glm_algorithm_revision'] = GLM_ALGORITHM_REVISION
         if selected_test == 'beta_binomial':
             from ._beta_binomial import ALGORITHM_REVISION
             params.update(beta_binomial_ci=self.beta_binomial_ci,
@@ -293,6 +296,9 @@ class DMCConfig:
             "covariates": None if binary else (list(self.covariates) if self.covariates else None),
             "treatment_col": None if binary else self.treatment_col,
         }
+        if test_used in {'glm', 'glm_contrast'}:
+            from ._glm import GLM_ALGORITHM_REVISION
+            metadata['glm_algorithm_revision'] = GLM_ALGORITHM_REVISION
         if test_used == 'beta_binomial':
             from ._beta_binomial import ALGORITHM_REVISION
             metadata.update(statistical_model='per-replicate beta-binomial',
