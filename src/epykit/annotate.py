@@ -1134,6 +1134,33 @@ def _check_chrom_name_overlap(site_chroms, feature_chroms, *, kind: str) -> None
         )
 
 
+def _nearest_tss_arrays(site_chroms, site_mids, tss_by_chrom):
+    """Vectorized chromosome searches with the scalar left-neighbour tie rule."""
+    import pandas as pd
+
+    count = len(site_mids)
+    genes = np.full(count, "", dtype=object)
+    distances = np.full(count, np.iinfo(np.int32).min, dtype=np.int64)
+    codes, chromosomes = pd.factorize(np.asarray(site_chroms, dtype=object), sort=False)
+    centers = np.asarray(site_mids).astype(np.int64)
+    for code, chrom in enumerate(chromosomes):
+        entry = tss_by_chrom.get(chrom)
+        if entry is None or not len(entry[0]):
+            continue
+        positions, names, strands = (np.asarray(v) for v in entry)
+        rows = np.flatnonzero(codes == code)
+        mids = centers[rows]
+        right = np.searchsorted(positions, mids, side="left")
+        left = np.maximum(right - 1, 0)
+        right = np.minimum(right, len(positions) - 1)
+        choose_left = np.abs(mids - positions[left]) <= np.abs(positions[right] - mids)
+        best = np.where(choose_left, left, right)
+        genes[rows] = names[best].astype(str)
+        signs = np.where(strands[best] == "-", -1, 1)
+        distances[rows] = signs * (mids - positions[best])
+    return genes, distances
+
+
 def annotate_features(
     sites: pl.DataFrame,
     annotation: str,
@@ -1392,31 +1419,9 @@ def annotate_features(
     multi_columns: list[pl.Series] = []
     if multi_annotation:
         _log("Step 8b/8: computing nearest-TSS (annotatr/HOMER-style) ...")
-        site_chroms = sites["chrom"].to_list()
-        # Reuse site_mids computed just above
-        nearest_genes = np.full(n, "", dtype=object)
-        nearest_dist = np.full(n, np.iinfo(np.int32).min, dtype=np.int64)
-        for i in range(n):
-            chrom = site_chroms[i]
-            entry = tss_by_chrom.get(chrom)
-            if entry is None:
-                continue
-            sorted_pos, sorted_names, sorted_strands = entry
-            center = int(site_mids[i])
-            # Two candidates around bisect_left, pick whichever has smaller
-            # |center - tss|. Handles both edges via list indexing guards.
-            idx = int(np.searchsorted(sorted_pos, center, side="left"))
-            cand_idxs = []
-            if idx > 0:
-                cand_idxs.append(idx - 1)
-            if idx < len(sorted_pos):
-                cand_idxs.append(idx)
-            if not cand_idxs:
-                continue
-            best_i = min(cand_idxs, key=lambda k: abs(int(sorted_pos[k]) - center))
-            sign = -1 if sorted_strands[best_i] == "-" else 1
-            nearest_genes[i] = str(sorted_names[best_i])
-            nearest_dist[i] = sign * (center - int(sorted_pos[best_i]))
+        nearest_genes, nearest_dist = _nearest_tss_arrays(
+            sites["chrom"].to_list(), site_mids, tss_by_chrom,
+        )
 
         # Clip to int32 range to keep the polars dtype small; sentinel for
         # chroms missing from the GTF is "" gene + NaN distance.
