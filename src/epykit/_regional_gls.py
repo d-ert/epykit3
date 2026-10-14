@@ -96,6 +96,7 @@ def fit_region(
     precomputed_yc=None,
     precomputed_depth=None,
     precomputed_h=None,
+    obs_mask=None,
 ):
     """Fit locus intercepts and one treatment contrast across biological samples.
 
@@ -111,25 +112,41 @@ def fit_region(
     if precomputed_yc is not None and precomputed_depth is not None and precomputed_h is not None:
         yc, h = precomputed_yc, precomputed_h
     else:
-        y = transform_counts(methylated, coverage).T
-        if y.shape != (len(g), len(pos)):
+        m, n = np.asarray(methylated, float), np.asarray(coverage, float)
+        if m.shape != n.shape or m.shape != (len(pos), len(g)):
             raise ValueError("Shape mismatch between counts and labels")
-        h = np.sqrt(np.median(coverage, axis=1))
-        yc = (y - y.mean(axis=0)) * h
-    from ._regional_gls_native import _fit, _validate, evaluate_covariance
+        if not np.isfinite(m).all() or not np.isfinite(n).all() or np.any(n < 0) or np.any(m < 0) or np.any(m > n):
+            raise ValueError("Regional counts must be finite and satisfy 0 <= methylated <= coverage")
+        valid = n > 0
+        if np.any(valid.sum(axis=1) == 0):
+            raise ValueError("Each regional locus must have at least one observed sample")
+        if obs_mask is not None and not np.array_equal(np.asarray(obs_mask, bool), valid.T):
+            raise ValueError("Count observation mask must match positive coverage")
+        obs_mask = valid.T if not valid.all() else None
+        y = np.arcsin(2*(m+.05)/(np.maximum(n, 1)+.1)-1).T
+        locus_mean = np.sum(y.T*valid, axis=1) / valid.sum(axis=1)
+        h = np.sqrt(np.nanmedian(np.where(valid, n, np.nan), axis=1))
+        yc = np.where(valid.T, y-locus_mean, 0.0) * h
+    from ._regional_gls_native import _fit, _observation_mask, _validate, evaluate_covariance
 
     pos, yc, h, g = _validate(pos, yc, h, g)
+    mask = _observation_mask(yc, obs_mask)
     if covariance is None:
-        length, fraction, effect, se, objective = _fit(pos, yc, h, g)
+        if mask.all():
+            length, fraction, effect, se, objective = _fit(pos, yc, h, g)
+        else:
+            from ._regional_gls_masked import _fit_masked
+
+            length, fraction, effect, se, objective = _fit_masked(pos, yc, h, g, mask)
     else:
         length, fraction = covariance
-        objective, effect, se = evaluate_covariance(pos, yc, h, g, length, fraction)
+        objective, effect, se = evaluate_covariance(pos, yc, h, g, length, fraction, obs_mask=obs_mask)
     if not np.isfinite(objective) or not np.isfinite(se) or se <= 0:
         raise ValueError("Degenerate regional residual covariance; inference cannot be calibrated")
     return dict(
         effect_transformed=float(effect),
         statistic=float(effect / se),
-        residual_df=int((len(g) - 1) * len(pos) - 1),
+        residual_df=int(mask.sum() - len(pos) - 1),
         length_scale=float(length),
         donor_fraction=float(fraction),
         standard_error=float(se),
@@ -430,6 +447,36 @@ def _load_regional_cache(paths, key, q_cutoff, workers):
         return None
 
 
+def _scan_group_effects(beta_clean, valid_flt, labels, min_group_obs):
+    """Raw/reporting and support-shrunk/discovery effects for one label split."""
+    case = np.asarray(labels, dtype=float)
+    control = 1.0 - case
+    n_case, n_control = valid_flt @ case, valid_flt @ control
+    mean_case = (beta_clean @ case) / np.maximum(n_case, 1.0)
+    mean_control = (beta_clean @ control) / np.maximum(n_control, 1.0)
+    raw = mean_case - mean_control
+    harmonic = 2.0 * n_case * n_control / np.maximum(n_case + n_control, 1.0)
+    full_harmonic = 2.0 * case.sum() * control.sum() / len(case)
+    discovery = raw * np.sqrt(np.minimum(harmonic / full_harmonic, 1.0))
+    eligible = (n_case >= min_group_obs) & (n_control >= min_group_obs)
+    return raw, discovery, eligible
+
+
+def _prepare_label_scan(pos, yc, h, mask, beta, valid, labels, min_group_obs,
+                        window_bp, min_cpgs, max_gap, min_length, min_effect, boundary):
+    from ._regional_gls_native import discover_prepared, prepare_discovery
+
+    raw, effects, eligible = _scan_group_effects(beta, valid, labels, min_group_obs)
+    scan_pos, scan_h = pos[eligible], h[eligible]
+    scan_yc, scan_mask = yc[:, eligible], mask[:, eligible]
+    raw, effects = raw[eligible], effects[eligible]
+    geometry = prepare_discovery(scan_pos, window_bp, min_cpgs, max_gap)
+    bounds = discover_prepared(
+        scan_pos, effects, *geometry, min_effect, min_cpgs, max_gap, min_length, boundary
+    )
+    return scan_pos, scan_yc, scan_h, scan_mask, raw, bounds
+
+
 def run_regional_gls(
     md,
     *,
@@ -448,7 +495,7 @@ def run_regional_gls(
     workers=None,
     cache=True,
 ):
-    """Stream one common-support chromosome at a time; repeat the entire search."""
+    """Stream a label-independent union; replay support, discovery and fitting."""
     if (
         window_bp < 1
         or min_cpgs < 2
@@ -498,7 +545,8 @@ def run_regional_gls(
             "Regional count store must contain each sample partition; use md.store from ingestion"
         )
     available = {
-        p.name.removeprefix("chrom=") for p in (root / f"sample={samples[0]}").glob("chrom=*")
+        p.name.removeprefix("chrom=")
+        for sample in samples for p in (root / f"sample={sample}").glob("chrom=*")
     }
     if not available:
         raise ValueError("Regional count store contains no chromosome partitions")
@@ -512,6 +560,7 @@ def run_regional_gls(
     code_digest = hashlib.sha256(
         Path(__file__).read_bytes()
         + Path(__file__).with_name("_regional_gls_native.py").read_bytes()
+        + Path(__file__).with_name("_regional_gls_masked.py").read_bytes()
     ).hexdigest()
     if cache and md.analysis_root and not pooled_decoy_covariance:
         inputs = []
@@ -545,37 +594,30 @@ def run_regional_gls(
         if cached is not None:
             return cached
     observed, null_scans = [], [[] for _ in assignments]
-    common_support = {}
+    common_support, union_support = {}, {}
 
     for chrom in chroms:
         # Optimized Parquet scan and multi-sample common support join
         frames = []
-        missing_sample = False
         for sample in samples:
             sample_dir = root / f"sample={sample}" / f"chrom={chrom}"
-            if not sample_dir.is_dir():
-                missing_sample = True
-                break
             parts = sorted(sample_dir.glob("*.parquet"))
             if not parts:
-                missing_sample = True
-                break
+                frames.append(pl.DataFrame(schema={"pos": pl.Int64, "N_meth": pl.Int64, "coverage": pl.Int64}))
+                continue
             pattern = str(sample_dir / "*.parquet")
             frame = (
                 pl.scan_parquet(pattern)
                 .select(["pos", "N_meth", "coverage"])
                 .filter(pl.col("coverage") > 0)
+                .with_columns(pl.all().cast(pl.Int64))
                 .collect()
             )
             if frame["pos"].n_unique() != len(frame):
                 raise ValueError(f"Duplicate CpG coordinates in {sample}/{chrom}")
             frames.append(frame)
 
-        if missing_sample or not frames:
-            common_support[chrom] = 0
-            continue
-
-        # Union join across samples with minimum group presence filter
+        # Only label-independent support is applied to the shared universe.
         renamed = [
             f.rename({"N_meth": f"m_{i}", "coverage": f"n_{i}"})
             for i, f in enumerate(frames)
@@ -591,23 +633,19 @@ def run_regional_gls(
         )
 
         # Require >= 2 valid replicates per group (or min(2, group_size)) and >= 50% total sample support
-        ctrl_n_cols = [f"n_{i}" for i in np.flatnonzero(labels == 0)]
-        case_n_cols = [f"n_{i}" for i in np.flatnonzero(labels == 1)]
-        min_group_obs = min(2, len(ctrl_n_cols), len(case_n_cols))
+        min_group_obs = min(2, len(md.control_ids), len(md.treatment_ids))
         min_total_obs = max(min_group_obs * 2, int(np.ceil(0.5 * len(samples))))
 
         res = res.filter(
-            (pl.sum_horizontal([pl.col(c) > 0 for c in ctrl_n_cols]) >= min_group_obs)
-            & (pl.sum_horizontal([pl.col(c) > 0 for c in case_n_cols]) >= min_group_obs)
-            & (pl.sum_horizontal([pl.col(c) > 0 for c in n_cols]) >= min_total_obs)
+            pl.sum_horizontal([pl.col(c) > 0 for c in n_cols]) >= min_total_obs
         ).sort("pos")
 
+        union_support[chrom] = len(res)
         if len(res) < min_cpgs:
             common_support[chrom] = len(res)
             continue
 
         pos = res["pos"].to_numpy()
-        common_support[chrom] = len(pos)
 
         m = res.select(m_cols).to_numpy().astype(np.float64)
         n = res.select(n_cols).to_numpy().astype(np.float64)
@@ -621,25 +659,6 @@ def run_regional_gls(
         # Precomputed matrices for fast group effect computation with partial-support shrinkage
         beta_clean = np.where(valid_mask, m_safe / n_safe, 0.0)  # (K, S)
         valid_flt = valid_mask.astype(np.float64)  # (K, S)
-        full_harm = 2.0 * len(ctrl_n_cols) * len(case_n_cols) / float(len(samples))
-
-        def _calc_effects(g_arr: np.ndarray) -> np.ndarray:
-            g_c = g_arr.astype(np.float64)
-            g_k = 1.0 - g_c
-            k_case = valid_flt @ g_c
-            k_ctrl = valid_flt @ g_k
-            mean_case = np.where(k_case > 0, (beta_clean @ g_c) / np.maximum(k_case, 1.0), 0.0)
-            mean_ctrl = np.where(k_ctrl > 0, (beta_clean @ g_k) / np.maximum(k_ctrl, 1.0), 0.0)
-            harm_k = np.where(
-                (k_case > 0) & (k_ctrl > 0),
-                2.0 * k_case * k_ctrl / np.maximum(k_case + k_ctrl, 1.0),
-                0.0,
-            )
-            # Shrink noisy partial-support sites proportionally to sqrt(harmonic sample support)
-            shrink = np.sqrt(np.minimum(harm_k / full_harm, 1.0))
-            return (mean_case - mean_ctrl) * shrink
-
-        obs_effects = _calc_effects(labels)
 
         # Center y_raw at each CpG using ONLY the valid observed samples at that CpG.
         # Missing entries are set to 0.0 in yc_full so they are 100% exchangeable across
@@ -648,41 +667,39 @@ def run_regional_gls(
         y_locus_mean = np.sum(y_raw * valid_mask, axis=1) / obs_counts
         y_centered = np.where(valid_mask, y_raw - y_locus_mean[:, None], 0.0).T  # (S, K)
 
-        # Effective depth per CpG: median over observed samples, scaled by observed sample fraction
+        # Missing sample support is already accounted for in the observed-data
+        # information matrix. Depth weights use only positive observed depths.
         n_sorted = np.where(valid_mask, n, np.nan)
-        obs_frac = obs_counts / float(len(samples))
-        depth_full = np.nanmedian(n_sorted, axis=1) * obs_frac
+        depth_full = np.nanmedian(n_sorted, axis=1)
         h_full = np.sqrt(np.maximum(depth_full, 1.0))
         yc_full = y_centered * h_full
 
-        # Precompute discovery geometry for this chromosome
-        from ._regional_gls_native import discover_prepared, prepare_discovery
-
-        geom = prepare_discovery(pos, window_bp, min_cpgs, max_gap)
-
         b_eff = 0.0 if boundary_min_effect is None else float(boundary_min_effect)
-        obs_regions = discover_prepared(
-            pos, obs_effects, *geom, min_effect, min_cpgs, max_gap, min_length, b_eff
+        scan_args = (pos, yc_full, h_full, valid_mask.T, beta_clean, valid_flt)
+        discovery_args = (min_group_obs, window_bp, min_cpgs, max_gap, min_length, min_effect, b_eff)
+        obs_pos, obs_yc, obs_h, obs_mask, obs_effects, obs_regions = _prepare_label_scan(
+            *scan_args, labels, *discovery_args
         )
+        common_support[chrom] = len(obs_pos)
         current = []
         from ._regional_gls_native import fit_regions
 
-        native = fit_regions(pos, yc_full, h_full, labels, obs_regions, workers=workers)
+        native = fit_regions(obs_pos, obs_yc, obs_h, labels, obs_regions, workers=workers, obs_mask=obs_mask)
         for (lo, hi), (length, fraction, effect, se, _objective) in zip(
             obs_regions, native, strict=True
         ):
             fit = dict(
                 effect_transformed=float(effect),
                 statistic=float(effect / se),
-                residual_df=int((len(labels) - 1) * (hi - lo) - 1),
+                residual_df=int(obs_mask[:, lo:hi].sum() - (hi - lo) - 1),
                 length_scale=float(length),
                 donor_fraction=float(fraction),
                 standard_error=float(se),
             )
             fit.update(
                 chrom=chrom,
-                start=int(pos[lo]),
-                end=int(pos[hi - 1]) + 1,
+                start=int(obs_pos[lo]),
+                end=int(obs_pos[hi - 1]) + 1,
                 n_cpgs=hi - lo,
                 mean_meth_diff=float(obs_effects[lo:hi].mean()),
                 n_case=int(labels.sum()),
@@ -705,30 +722,26 @@ def run_regional_gls(
             chrom_donor = float(np.median(valid_fracs)) if valid_fracs else 0.05
 
             for j, g in enumerate(assignments):
-                g_flt = g.astype(float)
-                effects = _calc_effects(g)
-                regions = discover_prepared(
-                    pos, effects, *geom, min_effect, min_cpgs, max_gap, min_length, b_eff
+                scan_p, scan_y, scan_h, scan_mask, _, regions = _prepare_label_scan(
+                    *scan_args, g, *discovery_args
                 )
                 for lo, hi in regions:
-                    stat = _fast_decoy_statistic(
-                        pos[lo:hi],
-                        yc_full[:, lo:hi],
-                        depth_full[lo:hi],
-                        h_full[lo:hi],
-                        g_flt,
-                        chrom_len,
-                        chrom_donor,
+                    from ._regional_gls_native import evaluate_covariance
+
+                    _, effect, se = evaluate_covariance(
+                        scan_p[lo:hi], scan_y[:, lo:hi], scan_h[lo:hi], g,
+                        chrom_len, chrom_donor, obs_mask=scan_mask[:, lo:hi]
                     )
-                    null_scans[j].append(stat)
+                    if not np.isfinite(effect / se):
+                        raise ValueError("Failed pooled covariance score cannot be dropped")
+                    null_scans[j].append(effect / se)
         else:
             unique_scores = []
             for g in representatives:
-                effects = _calc_effects(g)
-                regions = discover_prepared(
-                    pos, effects, *geom, min_effect, min_cpgs, max_gap, min_length, b_eff
+                scan_p, scan_y, scan_h, scan_mask, _, regions = _prepare_label_scan(
+                    *scan_args, g, *discovery_args
                 )
-                fit = fit_regions(pos, yc_full, h_full, g, regions, workers=workers)
+                fit = fit_regions(scan_p, scan_y, scan_h, g, regions, workers=workers, obs_mask=scan_mask)
                 unique_scores.append(fit[:, 2] / fit[:, 3])
             for j, (index, sign) in enumerate(scan_map):
                 null_scans[j].extend(sign * unique_scores[index])
@@ -761,8 +774,10 @@ def run_regional_gls(
         method="regional_gls",
         experimental=True,
         promoted=False,
-        algorithm_revision="spatial-gls-native-reml-v5",
+        algorithm_revision="spatial-gls-observed-data-reml-v6",
         accelerator="numba-native-analytical-donor-reml",
+        masked_accelerator="numba-native-observed-CAR-residual-donor-eigensystem-REML",
+        likelihood="observed-cells-with-locus-intercepts-and-shared-treatment",
         unique_null_fits=len(representatives),
         workers=workers,
         approximate_decoy_covariance=pooled_decoy_covariance,
@@ -770,6 +785,9 @@ def run_regional_gls(
         excluded_self_or_mirror=generated_assignments - len(assignments),
         chromosomes=chroms,
         common_cpgs=common_support,
+        union_cpgs=union_support,
+        support_filter="label-independent-total-union; minimum-group-support-replayed-per-scan",
+        residual_variance="unmodified-profiled-REML",
         window_bp=window_bp,
         min_cpgs=min_cpgs,
         dis_merge_bp=max_gap,

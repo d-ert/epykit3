@@ -12,6 +12,13 @@ from __future__ import annotations
 import numpy as np
 from numba import get_num_threads, njit, prange, set_num_threads
 
+from ._regional_gls_masked import (
+    _fit_masked,
+    _profile_masked,
+    _spectral_evaluate,
+    _spectral_prepare,
+)
+
 
 def prepare_discovery(pos, window_bp, min_cpgs, max_gap):
     """One coordinate search per chromosome, with gaps respected at every scale."""
@@ -365,14 +372,18 @@ def _fit(p, yc, h, g):
 
 
 @njit(cache=True, nogil=True, parallel=True)
-def _batch(p, yc, h, g, bounds):
+def _batch(p, yc, h, g, bounds, obs_mask):
     result = np.empty((len(bounds), 5))
     for j in prange(len(bounds)):
         lo, hi = bounds[j]
         p_sub = p[lo:hi]
         yc_sub = yc[:, lo:hi]
         h_sub = h[lo:hi]
-        length, c, effect, se, best = _fit(p_sub, yc_sub, h_sub, g)
+        mask_sub = obs_mask[:, lo:hi]
+        if np.all(mask_sub):
+            length, c, effect, se, best = _fit(p_sub, yc_sub, h_sub, g)
+        else:
+            length, c, effect, se, best = _fit_masked(p_sub, yc_sub, h_sub, g, mask_sub)
         result[j, 0] = length
         result[j, 1] = c
         result[j, 2] = effect
@@ -397,20 +408,36 @@ def _validate(p, yc, h, g):
     return p, yc, h, g
 
 
-def evaluate_covariance(p, yc, h, g, length, c):
+def _observation_mask(yc, obs_mask):
+    if obs_mask is None:
+        return np.ones(yc.shape, dtype=np.bool_)
+    mask = np.asarray(obs_mask, dtype=np.bool_)
+    if mask.shape != yc.shape or np.any(mask.sum(axis=0) == 0):
+        raise ValueError("Observation mask must cover each locus and match the response shape")
+    return mask
+
+
+def evaluate_covariance(p, yc, h, g, length, c, *, obs_mask=None):
     p, yc, h, g = _validate(p, yc, h, g)
     if length < 0 or not 0 <= c < 1:
         raise ValueError("Invalid covariance parameters")
+    if obs_mask is not None:
+        mask = _observation_mask(yc, obs_mask)
+        return _spectral_evaluate(_spectral_prepare(p, yc, h, g, mask, length), c)
     return _evaluate(p, yc, h, length, c, _prepare(yc, h, g))
 
 
-def profile_covariance(p, yc, h, g, length):
+def profile_covariance(p, yc, h, g, length, *, obs_mask=None):
     p, yc, h, g = _validate(p, yc, h, g)
+    if obs_mask is not None:
+        mask = _observation_mask(yc, obs_mask)
+        return _profile_masked(p, yc, h, g, mask, length)
     return _profile(p, yc, h, length, _prepare(yc, h, g))
 
 
-def fit_regions(p, yc, h, g, bounds, *, workers=None):
+def fit_regions(p, yc, h, g, bounds, *, workers=None, obs_mask=None):
     p, yc, h, g = _validate(p, yc, h, g)
+    mask = _observation_mask(yc, obs_mask)
     bounds = np.asarray(bounds, dtype=np.int64).reshape(-1, 2)
     if (
         np.any(bounds[:, 0] < 0)
@@ -424,7 +451,7 @@ def fit_regions(p, yc, h, g, bounds, *, workers=None):
         raise ValueError("workers must be a positive integer")
     try:
         set_num_threads(min(workers, previous))
-        result = _batch(p, yc, h, g, bounds)
+        result = _batch(p, yc, h, g, bounds, mask)
     finally:
         set_num_threads(previous)
     if not np.isfinite(result).all() or np.any(result[:, 3] <= 0):
