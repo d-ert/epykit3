@@ -34,44 +34,28 @@ def _trim_and_append_subregion(
     if n_sub < min_cpgs:
         return
 
-    # Exact 1D Kadane's algorithm for maximum-scoring contiguous subsegment
-    best_score = -1e30
-    best_l = sub_start
-    best_r = sub_end
-    cur_score = 0.0
-    cur_l = sub_start
-
-    for j in range(sub_start, sub_end):
-        s_j = direction * effects[j] - tau
-        if cur_score <= 0.0:
-            cur_score = s_j
-            cur_l = j
-        else:
-            cur_score += s_j
-
-        if (j - cur_l + 1) >= min_cpgs and (pos[j] - pos[cur_l] + 1) >= min_length:
-            if cur_score > best_score:
-                best_score = cur_score
-                best_l = cur_l
-                best_r = j + 1
-
-    if best_score > -1e29:
-        # Greedily extend right and left if net score of extension is >= 0
-        tail_sum = 0.0
-        for j in range(best_r, sub_end):
-            tail_sum += direction * effects[j] - tau
-            if tail_sum >= 0.0:
-                best_r = j + 1
-                tail_sum = 0.0
-        head_sum = 0.0
-        for j in range(best_l - 1, sub_start - 1, -1):
-            head_sum += direction * effects[j] - tau
-            if head_sum >= 0.0:
-                best_l = j
-                head_sum = 0.0
-        regions.append((int(best_l), int(best_r)))
-    elif pos[sub_end - 1] - pos[sub_start] + 1 >= min_length:
-        regions.append((int(sub_start), int(sub_end)))
+    # Each right endpoint admits a growing set of starts meeting BOTH count
+    # and genomic-span constraints. The smallest admissible prefix gives the
+    # globally best segment ending there; no unconstrained Kadane resets.
+    prefix = np.zeros(n_sub + 1)
+    for j in range(n_sub):
+        prefix[j + 1] = prefix[j] + direction * effects[sub_start + j] - tau
+    next_start, min_start = 0, 0
+    min_prefix, best_score = np.inf, -np.inf
+    best_l, best_r = -1, -1
+    for end in range(min_cpgs, n_sub + 1):
+        while (
+            next_start <= end - min_cpgs
+            and pos[sub_start + end - 1] - pos[sub_start + next_start] + 1 >= min_length
+        ):
+            if prefix[next_start] < min_prefix:
+                min_prefix, min_start = prefix[next_start], next_start
+            next_start += 1
+        score = prefix[end] - min_prefix
+        if score > best_score:
+            best_score, best_l, best_r = score, min_start, end
+    if best_l >= 0:
+        regions.append((int(sub_start + best_l), int(sub_start + best_r)))
 
 
 @njit(inline="always")
@@ -389,23 +373,10 @@ def _batch(p, yc, h, g, bounds):
         yc_sub = yc[:, lo:hi]
         h_sub = h[lo:hi]
         length, c, effect, se, best = _fit(p_sub, yc_sub, h_sub, g)
-        # Empirical Bayes variance moderation + effective independent CpG support
-        # Applied symmetrically across observed and decoy batch fits.
-        k = len(p_sub)
-        samples = yc_sub.shape[0]
-        df = float((samples - 1) * (k - 1) + (samples - 2))
-        d0 = 6.0
-        # Moderate raw SE toward theoretical arcsin-binomial unit variance floor
-        if se > 0.0 and np.isfinite(se):
-            # Stabilize small-K denominator variance collapse
-            k_scale = 1.0 + 0.18 * np.log(max(float(k) / 5.0, 1.0))
-            se_mod = se * np.sqrt((df + d0 / k_scale) / (df + d0)) / k_scale
-        else:
-            se_mod = se
         result[j, 0] = length
         result[j, 1] = c
         result[j, 2] = effect
-        result[j, 3] = se_mod
+        result[j, 3] = se
         result[j, 4] = best
     return result
 

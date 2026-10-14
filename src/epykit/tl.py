@@ -1017,10 +1017,9 @@ def dmr(
 
         * ``"strict"`` -- validation-ready DMRs only (alpha=1e-6,
           min_cpgs=5, min_abs_meth_diff=0.20). DSS-strict alpha.
-        * ``"default"`` -- balanced (alpha=0.005, min_cpgs=5,
-          min_abs_meth_diff=0.10). Calibrated with spatial autocorrelation-
-          adjusted Stouffer Z; keeps the 10% per-CpG effect-size floor.
-          Recommended starting point for general WGBS analyses.
+        * ``"default"`` -- conservative seed gate (alpha=1e-4, min_cpgs=3,
+          min_abs_meth_diff=0.10). Spatial model adjustment and the complete
+          search-family correction still require empirical calibration.
         * ``"permissive"`` -- recall-oriented (alpha=1e-4,
           dis_merge_bp=1000, min_abs_meth_diff=0.05). Expect lower PPV.
     tile_size_bp, min_cpgs_per_tile : int

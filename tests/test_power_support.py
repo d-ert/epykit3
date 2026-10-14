@@ -111,7 +111,6 @@ def test_spatial_stouffer_variance_deflation_and_length_scale():
         _spatial_variance_sum,
         _stouffer_combine_signed,
         call_dmr_chain_merge,
-        DMR_PRESETS,
     )
 
     # 1. Test length scale estimation on simulated AR(1) spatial Z-scores
@@ -144,18 +143,17 @@ def test_spatial_stouffer_variance_deflation_and_length_scale():
     assert p_corr > p_uncorr
     assert p_corr > 1e-8  # uncorrected gives ~3e-13
 
-    # 3. Test DMR_PRESETS["default"] configuration
-    assert DMR_PRESETS["default"]["alpha"] == 0.005
-    assert DMR_PRESETS["default"]["min_cpgs"] == 5
-
-    # 4. End-to-end chain merge with preset="default"
+    # A conservative default must not seed marginal sites, but should retain
+    # a strong coherent cluster. Assert behavior rather than preset constants.
     dmc_df = pl.DataFrame({
         "chrom": ["chr1"] * 10,
         "pos": [100, 120, 140, 160, 180, 200, 220, 240, 260, 280],
         "meth_diff": [0.25] * 10,
         "pvalue": [0.001] * 10,
     })
-    dmrs = call_dmr_chain_merge(dmc_df, preset="default")
+    assert call_dmr_chain_merge(dmc_df, preset="default").is_empty()
+    strong = dmc_df.with_columns(pl.lit(1e-5).alias("pvalue"))
+    dmrs = call_dmr_chain_merge(strong, preset="default")
     assert len(dmrs) == 1
     assert dmrs["n_cpgs"][0] == 10
     assert dmrs["combined_pvalue"][0] > 0.0

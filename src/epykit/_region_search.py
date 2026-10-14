@@ -1,20 +1,20 @@
 """Multiplicity for the complete geometry-defined chain-merge search.
 
-The family contains every distinct anchor span meeting the count and length
+The family contains every contiguous CpG span meeting the count and length
 constraints, without crossing a gap larger than the chain limit. It is defined
 before inspecting effects or p-values. Unreported spans receive p=1.
 
-By Benjamini & Yekutieli (2001) Theorem 1.2, positively correlated overlapping
-Stouffer sums satisfy Positive Regression Dependence on a Subset (PRDS), so
-BH over the effective anchor family controls FDR without the conservative
-harmonic log(M) penalty.
+BY accommodates arbitrary dependence over this complete search family,
+provided each fixed interval's raw p-value is valid. It does not repair
+misspecified spatial covariance or establish empirical calibration.
 """
 
 import numpy as np
+from scipy.special import digamma
 
 
 def count_intervals(positions, min_cpgs, minlen_bp, max_gap):
-    """Count effective region anchors meeting count, length and gap constraints (O(n log n))."""
+    """Count all admissible inclusive spans without enumerating them."""
     pos = np.asarray(positions, dtype=np.int64)
     if len(pos) < min_cpgs:
         return 0
@@ -24,14 +24,11 @@ def count_intervals(positions, min_cpgs, minlen_bp, max_gap):
         np.arange(len(pos)) + min_cpgs - 1,
         np.searchsorted(pos, pos + minlen_bp - 1),
     )
-    # Because chain_merge is a deterministic greedy partition, each CpG position
-    # can anchor at most one reported disjoint chain.
-    valid_anchors = int(np.sum(first_end < segment_ends, dtype=np.int64))
-    return max(valid_anchors, 1)
+    return int(np.maximum(segment_ends - first_end, 0).sum(dtype=np.int64))
 
 
 def adjust_selected(pvalues, family_size):
-    """PRDS-BH adjusted q-values as if all unreported family members had p=1."""
+    """BY adjusted values with unreported complete-family members assigned p=1."""
     p = np.asarray(pvalues, dtype=np.float64)
     if family_size < len(p):
         raise ValueError("Interval family is smaller than the reported candidate set")
@@ -41,7 +38,8 @@ def adjust_selected(pvalues, family_size):
         return q
     indices = np.flatnonzero(valid)
     order = np.argsort(p[valid], kind="stable")
-    ranked = p[indices[order]] * float(family_size)
+    harmonic = float(digamma(float(family_size) + 1) + np.euler_gamma)
+    ranked = p[indices[order]] * (float(family_size) * harmonic)
     ranked /= np.arange(1, len(order) + 1)
     q[indices[order]] = np.minimum(1.0, np.minimum.accumulate(ranked[::-1])[::-1])
     return q

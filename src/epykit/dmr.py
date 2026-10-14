@@ -92,7 +92,7 @@ def _dmr_chain_merge_cache_key(
     return _cache.fingerprint(
         [
             ("base", base_sig),
-            ("region_correction", "complete-interval-family-prds-bh-spatial-stouffer-v2"),
+            ("region_correction", "complete-interval-family-by-spatial-stouffer-v3"),
             ("alpha", f"{float(alpha):.10g}"),
             ("delta", f"{float(min_abs_meth_diff):.10g}"),
             ("dismerge", str(int(dis_merge_bp))),
@@ -720,17 +720,15 @@ DMR_PRESETS: dict[str, dict] = {
         pct_sig=0.5,
         minlen_bp=100,
     ),
-    # "default": balanced preset for general WGBS analyses. Calibrated to
-    # alpha=0.005 and min_cpgs=5 with spatial autocorrelation-deflated Stouffer Z
-    # to eliminate null false positives while preserving sensitivity.
+    # "default": conservative seed gate for exploratory WGBS analyses.
     # The 10% per-CpG effect-size floor is kept (matches DSS delta=0.1) so
     # individual measurement noise can't anchor chains. Recommended starting point;
     # use 'strict' for validation-ready DMRs or 'permissive' for exploratory analyses.
     "default": dict(
-        alpha=0.005,
+        alpha=1e-4,
         min_abs_meth_diff=0.10,
         dis_merge_bp=500,
-        min_cpgs=5,
+        min_cpgs=3,
         pct_sig=0.5,
         minlen_bp=50,
     ),
@@ -859,8 +857,8 @@ def call_dmr_chain_merge(
       of the smoothed statistic; the ``combined_pvalue`` here is an epykit
       spatial autocorrelation-adjusted signed-Stouffer construct (see
       :func:`_stouffer_combine_signed`).
-    * **Calibrated default gate.** The ``"default"`` preset uses ``alpha=0.005``
-      and ``min_cpgs=5`` to balance sensitivity and false-positive control.
+    * **Default gate.** The ``"default"`` preset uses ``alpha=1e-4``
+      and ``min_cpgs=3``; these settings do not establish FDR calibration.
 
     Geometrically this is more permissive than ``call_dmr_sliding_window``
     for sparse-cluster signal: two sig CpGs 140 bp apart cannot fit in a

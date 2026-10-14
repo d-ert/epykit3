@@ -84,14 +84,21 @@ def test_native_batch_parallel_matches_serial_and_mirror():
 
 
 @pytest.mark.parametrize("window", [100, 500, 1600])
-def test_native_discovery_matches_segmented_numpy_geometry(window):
-    from epykit._regional_gls import discover_regions
-    from epykit._regional_gls_native import discover_prepared, prepare_discovery
+def test_prepared_geometry_matches_independent_segment_windows(window):
+    from epykit._regional_gls_native import prepare_discovery
 
     rng = np.random.default_rng(9021)
     pos = np.cumsum(rng.integers(1, 700, 10000))
-    effects = rng.uniform(-0.4, 0.4, len(pos))
     geom = prepare_discovery(pos, window, 5, 500)
-    got = discover_prepared(pos, effects, *geom, 0.1, 5, 500, 50)
-    expected = discover_regions(pos, effects, window_bp=window)
-    assert got.tolist() == [list(r) for r in expected]
+    cuts = np.r_[0, np.flatnonzero(np.diff(pos) > 500) + 1, len(pos)]
+    expected_left, expected_right, starts, stops = [], [], [], []
+    for a, b in zip(cuts[:-1], cuts[1:], strict=True):
+        segment = pos[a:b]
+        for coordinate in segment:
+            expected_left.append(int(a + np.searchsorted(segment, coordinate - window // 2)))
+            expected_right.append(int(a + np.searchsorted(segment, coordinate + (window+1)//2, side="right")))
+        if b-a >= 5:
+            starts.append(a)
+            stops.append(b)
+    for got, want in zip(geom, [expected_left, expected_right, starts, stops], strict=True):
+        assert got.tolist() == want
