@@ -2,8 +2,10 @@
 
 import numpy as np
 import pytest
+from numba.typed import List
 
 from epykit._regional_gls_native import (
+    _refine_and_append_region,
     _trim_and_append_subregion,
     discover_prepared,
     fit_regions,
@@ -39,6 +41,19 @@ def test_split_fragment_must_keep_its_own_smoothed_seed():
 
     assert positive.tolist() == [[8, 13]]
     assert negative.tolist() == positive.tolist()
+
+
+def test_boundary_extension_does_not_lower_split_penalty():
+    pos = np.arange(7) * 50
+    effects = np.array([.2, .2, .052, .052, .052, .2, .2])
+    for boundary in (0.0, .05, .08):
+        typed_regions = List()
+        typed_regions.append((np.int64(0), np.int64(0)))
+        typed_regions.pop()
+        _refine_and_append_region(
+            pos, effects, 0, len(pos), 1, .1, 2, 50, typed_regions, boundary,
+        )
+        assert list(typed_regions) == [(0, 2), (5, 7)]
 
 
 def test_constrained_trimming_matches_exhaustive_admissible_segments():

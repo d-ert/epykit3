@@ -82,5 +82,5 @@ def discover_multiscale(pos, effects, precision, window_bp, min_effect, min_cpgs
             candidates.append(bounds)
     if not candidates:
         return np.empty((0, 2), dtype=np.int64)
-    tau = boundary_min_effect if boundary_min_effect > 0 else .55*min_effect
+    tau = .55*min_effect
     return _distinct_candidates(np.concatenate(candidates), effects, tau)

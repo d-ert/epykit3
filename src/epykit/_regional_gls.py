@@ -889,7 +889,7 @@ def run_regional_gls(
         method="regional_gls",
         experimental=True,
         promoted=False,
-        algorithm_revision="spatial-gls-observed-data-multiscale-seeded-v10",
+        algorithm_revision="spatial-gls-observed-data-multiscale-seeded-decoupled-v11",
         accelerator="numba-native-analytical-donor-reml",
         masked_accelerator="numba-native-observed-CAR-residual-donor-eigensystem-REML",
         likelihood="observed-cells-with-locus-intercepts-and-shared-treatment",

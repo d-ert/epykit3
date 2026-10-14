@@ -101,7 +101,7 @@ def _refine_and_append_region(
     seed_signal=None,
 ):
     """Trim neutral boxcar halos and split valley bridges via penalized CUSUM."""
-    tau = boundary_min_effect if boundary_min_effect > 0.0 else 0.55 * min_effect
+    tau = 0.55 * min_effect
     edge_floor = boundary_min_effect if boundary_min_effect > 0.0 else 0.35 * min_effect
     while first < stop_excl and direction * effects[first] < edge_floor:
         first += 1
