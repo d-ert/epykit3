@@ -126,6 +126,7 @@ def main(argv=None):
                                                             if p.is_file() and p.name != "run.json"})
                 logging.info("COMPLETE null %s %s: GLS %d, DMC %d", name, config, len(selected), dmc_calls)
             except Exception:
+                metrics["status"] = "failed"
                 state.update(status="failed", error=traceback.format_exc())
                 logging.exception("FAILED null validation %s %s", name, config)
             write_json(analysis / "run.json", state)

@@ -110,7 +110,7 @@ def test_pilot_evaluation_identity_includes_both_truth_files(tmp_path):
 
 def test_dmc_scoring_preserves_zero_to_one_based_coordinates(tmp_path):
     import gzip
-    import polars as pl
+    pl = pytest.importorskip("polars", reason="Epykit benchmark scoring requires its optional environment")
     from scripts.run_statistical_repair_benchmarks import dmc_metrics
 
     with gzip.open(tmp_path / 'truth.cpg.tsv.gz', 'wt') as f:
