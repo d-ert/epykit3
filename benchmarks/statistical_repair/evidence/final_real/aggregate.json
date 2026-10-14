@@ -1,0 +1,11 @@
+{
+  "cov10_boundNone": {
+    "empirical_main_recall": null,
+    "empirical_main_signal_overlap_fdp": null,
+    "generative_main_recall": null,
+    "generative_main_signal_overlap_fdp": null,
+    "null_discovery_counts": [],
+    "null_datasets": [],
+    "any_null_discovery_fraction": null
+  }
+}

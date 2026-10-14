@@ -1,0 +1,5 @@
+config_id	label	coverage_min	boundary_min_effect	elapsed_seconds	common_cpgs	n_candidates	n_dmr_calls	gls_overlapping_paper	paper_overlapping_gls	overlap_pairs	same_direction_overlap_pairs	one_to_one_50pct_bp_matches	shared_nearest_genes	paper_shared_gene_fraction	gls_shared_gene_fraction	gene_jaccard	shared_genes_with_coordinate_overlap	shared_genes_without_coordinate_overlap	shared_genes_with_same_direction
+cov10_boundNone	Cov >=10, Boundary disabled	10		20.803544375001366	19930056	72426	4940	438	461	462	462	162	441	0.6264204545454546	0.12308121685738208	0.11466458658346333	349	92	418
+cov10_bound05	Cov >=10, Boundary 0.05	10	0.05	23.07505416600179	19930056	117750	4406	377	399	400	400	105	409	0.5809659090909091	0.1254601226993865	0.1150492264416315	301	108	386
+cov5_boundNone	Cov >=5, Boundary disabled	5		23.551552665998315	23725299	81893	1043	200	213	214	214	73	212	0.30113636363636365	0.22943722943722944	0.1497175141242938	162	50	205
+cov5_bound05	Cov >=5, Boundary 0.05	5	0.05	26.59068012500211	23725299	134784	1105	202	221	222	222	63	218	0.3096590909090909	0.22131979695431472	0.14819850441876276	161	57	210

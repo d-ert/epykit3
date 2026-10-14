@@ -33,30 +33,30 @@
 **Files:** modify `src/epykit/dmc.py`, `src/epykit/_glm.py`; create `tests/test_dispersion_repair.py`.
 **Interfaces:** preserve `_smyth_eb_moderation` return tuple; `reference_pvalues` handles infinite denominator df.
 
-- [ ] Write failing tests for constant scale across heterogeneous df, inverse-chi-square prior recovery, prior scale50 null reference, infinite-df references, invalid/small inputs and NaN singleton counts.
-- [ ] Run targeted pytest and inspect expected failures.
-- [ ] Implement expectation-based log-moment fitting, unclipped prior scale, post-pooling dispersion clamp, limiting references, finite-contributor counts and cache revision.
-- [ ] Run targeted and full pytest; commit the independently verified milestone.
+- [x] Write failing tests for constant scale across heterogeneous df, inverse-chi-square prior recovery, prior scale50 null reference, infinite-df references, invalid/small inputs and NaN singleton counts.
+- [x] Run targeted pytest and inspect expected failures.
+- [x] Implement expectation-based log-moment fitting, unclipped prior scale, post-pooling dispersion clamp, limiting references, finite-contributor counts and cache revision.
+- [x] Run targeted and full pytest; commit the independently verified milestone.
 
 ### Task 2: Constrained discovery and honest region multiplicity
 
 **Files:** modify `_regional_gls_native.py`, `_region_search.py`, `dmr.py`, `tl.py`; create `tests/test_discovery_repair.py` and `tests/test_region_search.py`.
 **Interfaces:** preserve discovery APIs and region schema; `count_intervals` counts all geometry-defined spans; `adjust_selected` uses BY.
 
-- [ ] Write failing constrained-trim fixture and brute-force small-array oracle, independent discovery geometry checks, interval-count and BY-reference checks.
-- [ ] Observe failures; implement admissible prefix minima and remove untrimmed fallback, restore complete family/BY, withdraw unsupported calibrated-default wording and arbitrary default loosening.
-- [ ] Test actual batch SE against raw profiled fit, remove undocumented length modifier, and update algorithm cache revisions.
-- [ ] Run targeted/full pytest and commit.
+- [x] Write failing constrained-trim fixture and brute-force small-array oracle, independent discovery geometry checks, interval-count and BY-reference checks.
+- [x] Observe failures; implement admissible prefix minima and remove untrimmed fallback, restore complete family/BY, withdraw unsupported calibrated-default wording and arbitrary default loosening.
+- [x] Test actual batch SE against raw profiled fit, remove undocumented length modifier, and update algorithm cache revisions.
+- [x] Run targeted/full pytest and commit.
 
 ### Task 3: Exact masked GLS and exchangeable union scans
 
 **Files:** create `src/epykit/_regional_gls_masked.py` and `tests/test_regional_gls_masked.py`; modify `_regional_gls.py`, `_regional_gls_native.py`.
 **Interfaces:** add optional `obs_mask` to fixed/native fitting APIs; complete support retains numerical results; output remains five fit columns with effects, SE and REML objective.
 
-- [ ] Write independent statsmodels/dense GLS observed-submatrix tests with irregular missingness, valid zero residuals, complementary labels, accurate residual df and complete-support agreement.
-- [ ] Observe failures; implement observed covariance, nuisance-intercept elimination and identified treatment information with native numerical profiling.
-- [ ] Write integration tests for relabelled support/universe, missing chromosome partitions and raw-effect reporting; observe failures then apply per-scan eligibility and label-independent universe.
-- [ ] Run targeted/full pytest and performance probe; optimize only with oracle equivalence; commit.
+- [x] Write independent statsmodels/dense GLS observed-submatrix tests with irregular missingness, valid zero residuals, complementary labels, accurate residual df and complete-support agreement.
+- [x] Observe failures; implement observed covariance, nuisance-intercept elimination and identified treatment information with native numerical profiling.
+- [x] Write integration tests for relabelled support/universe, missing chromosome partitions and raw-effect reporting; observe failures then apply per-scan eligibility and label-independent universe.
+- [x] Run targeted/full pytest and performance probe; optimize only with oracle equivalence; commit.
 
 ### Task 4: Provenance-backed benchmarks and evidence-driven iteration
 
@@ -78,3 +78,12 @@
 - [ ] Run final full tests, lint on changed code, result verifiers and source consistency checks; commit.
 - [ ] Create fresh bundle preserving older bundles; verify every packaged source/result hash and disclose calibration limits and benchmark reuse.
 - [ ] Audit all user requirements against current files and process results; mark goal complete only when every deliverable is verified.
+
+## Final user-directed scope change
+
+The user stopped all final benchmark processes and requested a final report and
+committed work instead of further benchmark execution. Tasks4/5 retain their
+original unchecked acceptance items where full final-source benchmark/holdout
+evidence is incomplete. `docs/STATISTICAL_REPAIR_HANDOFF.md` records the delivered
+repairs, completed and interrupted runs, review fixes, verification and limitations.
+No benchmark process should be restarted without a new user instruction.

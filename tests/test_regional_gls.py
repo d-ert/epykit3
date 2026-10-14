@@ -371,6 +371,7 @@ def test_public_api_records_boundary_and_isolates_cache(tmp_path):
 
 def test_regional_gls_union_support_handles_partial_missingness(tmp_path):
     import polars as pl
+
     import epykit as ep
 
     rng = np.random.default_rng(999)

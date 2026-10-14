@@ -1,0 +1,84 @@
+{
+  "cov10_bound05": {
+    "empirical_main_recall": 0.27777777777777773,
+    "empirical_main_signal_overlap_fdp": 0.04217893217893218,
+    "generative_main_recall": 0.16666666666666666,
+    "generative_main_signal_overlap_fdp": 0.021739130434782608,
+    "null_discovery_counts": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "null_datasets": [
+      "empirical_null_seed2026",
+      "empirical_null_seed2027",
+      "empirical_null_seed2028",
+      "generative_null_seed2026",
+      "generative_null_seed2027"
+    ],
+    "any_null_discovery_fraction": 0.0
+  },
+  "cov10_boundNone": {
+    "empirical_main_recall": 0.21428571428571427,
+    "empirical_main_signal_overlap_fdp": 0.04047619047619048,
+    "generative_main_recall": 0.17857142857142855,
+    "generative_main_signal_overlap_fdp": 0.016129032258064516,
+    "null_discovery_counts": [
+      2,
+      0,
+      0,
+      0,
+      0
+    ],
+    "null_datasets": [
+      "empirical_null_seed2026",
+      "empirical_null_seed2027",
+      "empirical_null_seed2028",
+      "generative_null_seed2026",
+      "generative_null_seed2027"
+    ],
+    "any_null_discovery_fraction": 0.2
+  },
+  "cov5_bound05": {
+    "empirical_main_recall": 0.3452380952380952,
+    "empirical_main_signal_overlap_fdp": 0.04072398190045249,
+    "generative_main_recall": 0.26190476190476186,
+    "generative_main_signal_overlap_fdp": 0.047379032258064516,
+    "null_discovery_counts": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "null_datasets": [
+      "empirical_null_seed2026",
+      "empirical_null_seed2027",
+      "empirical_null_seed2028",
+      "generative_null_seed2026"
+    ],
+    "any_null_discovery_fraction": 0.0
+  },
+  "cov5_boundNone": {
+    "empirical_main_recall": 0.26587301587301587,
+    "empirical_main_signal_overlap_fdp": 0.06242149735469874,
+    "generative_main_recall": 0.2678571428571429,
+    "generative_main_signal_overlap_fdp": 0.08214285714285714,
+    "null_discovery_counts": [
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    "null_datasets": [
+      "empirical_null_seed2026",
+      "empirical_null_seed2027",
+      "empirical_null_seed2028",
+      "generative_null_seed2026",
+      "generative_null_seed2027"
+    ],
+    "any_null_discovery_fraction": 0.2
+  }
+}

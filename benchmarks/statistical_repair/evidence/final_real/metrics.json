@@ -1,0 +1,29 @@
+[
+  {
+    "kind": "real",
+    "dataset": "GSE263850",
+    "config_id": "cov10_boundNone",
+    "coverage_min": 10,
+    "boundary_min_effect": null,
+    "elapsed_seconds": 277.7758140839942,
+    "common_cpgs": 19930062,
+    "union_cpgs": 20535890,
+    "n_candidates": 89070,
+    "n_dmr_calls": 2341,
+    "gls_overlapping_paper": 310,
+    "paper_overlapping_gls": 327,
+    "overlap_pairs": 328,
+    "same_direction_overlap_pairs": 328,
+    "one_to_one_50pct_bp_matches": 102,
+    "shared_nearest_genes": 331,
+    "paper_shared_gene_fraction": 0.47017045454545453,
+    "shared_genes_with_coordinate_overlap": 249,
+    "n_maxT_calls": 0,
+    "n_dmc_calls": 193871,
+    "n_dmc_tested": 19930061,
+    "dmc_seconds": 219.69008687500173,
+    "source_commit": "d91378f4eb23fe0286a770bb56b792734da077bf",
+    "source_signature": "9cdd76dd3df8f99d6b2130dec7f3aaa8db0a40c487e7326220cdb31c0747fa1b",
+    "chromosome_subset": null
+  }
+]

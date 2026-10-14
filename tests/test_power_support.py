@@ -79,6 +79,7 @@ def test_paper_coordinates_do_not_create_boundary_overlap():
 
 def test_smyth_eb_dispersion_moderation():
     import numpy as np
+
     from epykit.dmc import _smyth_eb_moderation
 
     rng = np.random.default_rng(42)
@@ -97,7 +98,7 @@ def test_smyth_eb_dispersion_moderation():
     assert np.all(phi_eff >= 1.0)
 
     # Fallback with few sites
-    phi_eff_few, df_phi_few, d0_few, phi0_few = _smyth_eb_moderation(
+    _phi_eff_few, df_phi_few, d0_few, _phi0_few = _smyth_eb_moderation(
         chi_sum[:20], df_arr[:20], valid[:20], min_dispersion=1.0, min_disp_sites=100
     )
     assert d0_few == 0.0
@@ -106,6 +107,7 @@ def test_smyth_eb_dispersion_moderation():
 
 def test_spatial_stouffer_variance_deflation_and_length_scale():
     import numpy as np
+
     from epykit.dmr import (
         _estimate_chrom_z_length_scale,
         _spatial_variance_sum,

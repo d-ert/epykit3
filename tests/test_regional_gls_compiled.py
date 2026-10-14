@@ -1,5 +1,7 @@
 """Independent numerical checks for native spatial REML acceleration."""
 
+from itertools import pairwise
+
 import numpy as np
 import pytest
 from scipy.optimize import minimize_scalar
@@ -92,7 +94,7 @@ def test_prepared_geometry_matches_independent_segment_windows(window):
     geom = prepare_discovery(pos, window, 5, 500)
     cuts = np.r_[0, np.flatnonzero(np.diff(pos) > 500) + 1, len(pos)]
     expected_left, expected_right, starts, stops = [], [], [], []
-    for a, b in zip(cuts[:-1], cuts[1:], strict=True):
+    for a, b in pairwise(cuts):
         segment = pos[a:b]
         for coordinate in segment:
             expected_left.append(int(a + np.searchsorted(segment, coordinate - window // 2)))

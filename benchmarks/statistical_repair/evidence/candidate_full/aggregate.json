@@ -1,0 +1,110 @@
+{
+  "cov10_bound05": {
+    "empirical_main_recall": 0.27777777777777773,
+    "empirical_main_signal_overlap_fdp": 0.04217893217893218,
+    "generative_main_recall": 0.15476190476190477,
+    "generative_main_signal_overlap_fdp": 0.038302277432712216,
+    "null_discovery_counts": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "null_datasets": [
+      "blueprint_exploratory_null",
+      "empirical_null_seed2026",
+      "empirical_null_seed2027",
+      "empirical_null_seed2028",
+      "generative_null_seed2026",
+      "generative_null_seed2027",
+      "generative_null_seed2028",
+      "wt_fitted_binomial_null"
+    ],
+    "any_null_discovery_fraction": 0.0
+  },
+  "cov10_boundNone": {
+    "empirical_main_recall": 0.21428571428571427,
+    "empirical_main_signal_overlap_fdp": 0.04047619047619048,
+    "generative_main_recall": 0.15476190476190474,
+    "generative_main_signal_overlap_fdp": 0.036393713813068655,
+    "null_discovery_counts": [
+      0,
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "null_datasets": [
+      "blueprint_exploratory_null",
+      "empirical_null_seed2026",
+      "empirical_null_seed2027",
+      "empirical_null_seed2028",
+      "generative_null_seed2026",
+      "generative_null_seed2027",
+      "generative_null_seed2028",
+      "wt_fitted_binomial_null"
+    ],
+    "any_null_discovery_fraction": 0.125
+  },
+  "cov5_bound05": {
+    "empirical_main_recall": 0.3452380952380952,
+    "empirical_main_signal_overlap_fdp": 0.04072398190045249,
+    "generative_main_recall": 0.23015873015873015,
+    "generative_main_signal_overlap_fdp": 0.05010454002389486,
+    "null_discovery_counts": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "null_datasets": [
+      "blueprint_exploratory_null",
+      "empirical_null_seed2026",
+      "empirical_null_seed2027",
+      "empirical_null_seed2028",
+      "generative_null_seed2026",
+      "generative_null_seed2027",
+      "generative_null_seed2028",
+      "wt_fitted_binomial_null"
+    ],
+    "any_null_discovery_fraction": 0.0
+  },
+  "cov5_boundNone": {
+    "empirical_main_recall": 0.26587301587301587,
+    "empirical_main_signal_overlap_fdp": 0.06242149735469874,
+    "generative_main_recall": 0.2261904761904762,
+    "generative_main_signal_overlap_fdp": 0.07559523809523809,
+    "null_discovery_counts": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "null_datasets": [
+      "blueprint_exploratory_null",
+      "empirical_null_seed2026",
+      "empirical_null_seed2027",
+      "empirical_null_seed2028",
+      "generative_null_seed2026",
+      "generative_null_seed2027",
+      "generative_null_seed2028",
+      "wt_fitted_binomial_null"
+    ],
+    "any_null_discovery_fraction": 0.125
+  }
+}

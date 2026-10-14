@@ -1,0 +1,69 @@
+{
+  "iteration1_full": {
+    "status_counts": {
+      "complete": 72
+    },
+    "source_commit": "003b8b46a329138cb91f9cbf00fe30094514efe3",
+    "source_signature": "2f8bbf81ca06bbd6f1e4b50459e862da541ad70173653c5cb7edd08d2f67c345",
+    "verified_completed_output_files": 432
+  },
+  "iteration1_real": {
+    "status_counts": {
+      "complete": 2
+    },
+    "source_commit": "003b8b46a329138cb91f9cbf00fe30094514efe3",
+    "source_signature": "2f8bbf81ca06bbd6f1e4b50459e862da541ad70173653c5cb7edd08d2f67c345",
+    "verified_completed_output_files": 16
+  },
+  "candidate_full": {
+    "status_counts": {
+      "complete": 72
+    },
+    "source_commit": "11163ca83d1aa3c9b3ebf0a61e8bb3e1ba566373",
+    "source_signature": "ed606cf4e2f68d08237e3f053c808592b662a4ee773e4fa05a3491977e72b75c",
+    "verified_completed_output_files": 432
+  },
+  "candidate_real": {
+    "status_counts": {
+      "complete": 4
+    },
+    "source_commit": "11163ca83d1aa3c9b3ebf0a61e8bb3e1ba566373",
+    "source_signature": "ed606cf4e2f68d08237e3f053c808592b662a4ee773e4fa05a3491977e72b75c",
+    "verified_completed_output_files": 32
+  },
+  "candidate_null_development": {
+    "status_counts": {
+      "complete": 80
+    },
+    "source_commit": "11163ca83d1aa3c9b3ebf0a61e8bb3e1ba566373",
+    "source_signature": "ed606cf4e2f68d08237e3f053c808592b662a4ee773e4fa05a3491977e72b75c",
+    "verified_completed_output_files": 480
+  },
+  "final_full": {
+    "status_counts": {
+      "complete": 39,
+      "interrupted": 1
+    },
+    "source_commit": "d91378f4eb23fe0286a770bb56b792734da077bf",
+    "source_signature": "9cdd76dd3df8f99d6b2130dec7f3aaa8db0a40c487e7326220cdb31c0747fa1b",
+    "verified_completed_output_files": 254
+  },
+  "final_real": {
+    "status_counts": {
+      "complete": 1,
+      "interrupted": 1
+    },
+    "source_commit": "d91378f4eb23fe0286a770bb56b792734da077bf",
+    "source_signature": "9cdd76dd3df8f99d6b2130dec7f3aaa8db0a40c487e7326220cdb31c0747fa1b",
+    "verified_completed_output_files": 9
+  },
+  "final_null_holdout": {
+    "status_counts": {
+      "complete": 78
+    },
+    "source_commit": "d91378f4eb23fe0286a770bb56b792734da077bf",
+    "source_signature": "9cdd76dd3df8f99d6b2130dec7f3aaa8db0a40c487e7326220cdb31c0747fa1b",
+    "verified_completed_output_files": 468
+  },
+  "interpretation": "Integrity audit of preserved outputs. Interrupted final sweeps are incomplete; no claim of final calibration or full benchmark acceptance."
+}
